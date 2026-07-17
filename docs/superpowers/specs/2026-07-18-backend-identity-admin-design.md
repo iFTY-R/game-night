@@ -50,7 +50,8 @@ platform/
 ├─ outbox/                      # 同事务领域事件和后续投递
 └─ persistence/
    ├─ postgres/                 # pgxpool、sqlc 和事务适配
-   └─ redis/                    # 限流存储适配
+   ├─ redis/                    # 限流存储适配
+   └─ objectstorage/            # 审计 WORM checkpoint sink
 contracts/
 ├─ platform/identity/v1/
 └─ platform/admin/v1/
@@ -102,7 +103,9 @@ tooling/sqlc/                  # sqlc 配置和查询输入
 
 - `credential_id`：公开 selector，不承担保密性。
 - `secret_hash`：设备秘密的 HMAC-SHA-256 摘要。
+- `secret_key_version`：当前 secret 使用的 HMAC key version。
 - `previous_secret_hash` 和 `previous_valid_until`：支持轮换时短暂并发宽限。
+- `previous_secret_key_version`：previous secret 使用的 HMAC key version。
 - `csrf_hash`：绑定该设备会话的 CSRF 秘密摘要。
 - `label`：由客户端提交、服务端清理后的设备名称。
 - `created_at`、`last_seen_at`、`rotated_at`。
@@ -110,7 +113,7 @@ tooling/sqlc/                  # sqlc 配置和查询输入
 - `absolute_expires_at`：创建后 365 天。
 - `revoked_at`、`revoke_reason`。
 
-设备 token 使用 `v1.<credential_id>.<secret>` 格式。`secret` 至少 256 bit，由密码学安全随机源生成。数据库不保存原 token 或可逆设备秘密。
+设备 token 使用 `v1.<credential_id>.<secret>` 格式。`secret` 至少 256 bit，由密码学安全随机源生成。长期 `device_credentials` 表不保存原 token 或可逆设备秘密；只有下述短期 result envelope 可以为了可靠交付保存加密 token。
 
 凭证每 30 天轮换，身份恢复和敏感安全事件也会触发轮换。旧 secret 只保留两分钟宽限，以允许同一页面的并发请求完成。使用 previous secret 的请求只能完成当前读取或已开始的幂等操作，不能触发再次轮换、修改安全设置或覆盖新 Cookie。
 
@@ -126,9 +129,15 @@ tooling/sqlc/                  # sqlc 配置和查询输入
 2. `CompleteRecovery` 携带 grant、客户端生成的 `operation_id` 和请求摘要，原子消费恢复码并创建新凭证。
 3. 新设备 token、新恢复码和 Cookie 元数据使用独立 result-envelope key 加密，按 `operation_id` 保存最多 10 分钟。
 4. 相同 grant、operation ID 和请求摘要的重试返回同一结果并重新设置同一 Cookie；不同请求摘要返回 idempotency conflict。
-5. 客户端确认收妥后调用 `ConfirmSecretReceipt` 删除 envelope；未确认时由 TTL 清理。
+5. 客户端确认收妥后调用 `ConfirmSecretReceipt` 擦除 envelope 的密文、nonce 和 wrapped data key；未确认时秘密可取回 TTL 到期后执行同样擦除。
 
-首次设备 bootstrap、入驻完成、用户恢复、用户恢复码主动轮换、管理员 TOTP seed/初始化恢复码和管理员辅助恢复 grant 都复用该“一次性结果 envelope”机制。所有产生一次性秘密的方法都要求至少 128 bit 随机 operation ID。数据库只短期保存可逆密文，envelope key 与 PII、TOTP 和长期凭证 key 完全隔离。
+普通 recovery grant 包含至少 128 bit selector 和 256 bit secret，数据库只保存 secret HMAC、key version、原恢复凭证 ID/version、challenge ID、Origin hash、purpose、请求摘要、尝试次数、5 分钟 TTL、consumed time 和 result ID。`CompleteRecovery` 使用 `active -> consumed(result_id)` 条件更新；已消费 grant 只能读取原 result envelope，不能再次推进状态。Begin 响应丢失时原恢复码尚未消费，客户端可以重新开始。
+
+首次设备 bootstrap、入驻完成、用户恢复、用户恢复码主动轮换、管理员 TOTP seed/初始化恢复码和管理员辅助恢复 grant 都复用该“一次性结果 envelope”机制。所有产生一次性秘密的方法都要求至少 128 bit 随机 operation ID。数据库只在秘密可取回 TTL 内保存可逆密文，envelope key 与 PII、TOTP 和长期凭证 key 完全隔离。
+
+AES-GCM associated data 必须包含 operation scope、actor/challenge ID、operation ID、请求摘要、result type/version、key version 和 expiry。读取、确认和重放都必须重新验证对应 actor/challenge/grant，operation ID 本身不构成授权。
+
+密文擦除后保留不含秘密的 tombstone：scope、actor/challenge、operation ID、请求摘要、terminal status、result type/version 和完成时间至少保存 30 天。相同 operation 的延迟请求返回“结果已提交但秘密不可再次获取”，绝不重新执行；不同摘要仍返回 idempotency conflict。确认、TTL 清理和重试的并发通过行锁/条件更新串行化。
 
 首次执行 `CompleteRecovery` 必须在同一事务中：
 
@@ -151,7 +160,7 @@ tooling/sqlc/                  # sqlc 配置和查询输入
 
 真实姓名使用 AES-256-GCM 加密，associated data 固定包含 `user_id`、字段名和 schema version，防止密文跨用户或跨字段替换。PII 独立 keyring 从只读 secret file 加载，包含 active key version 和历史解密 key；数据库不保存密钥。TOTP、一次性结果 envelope、设备 HMAC、challenge、限流和审计分别使用独立 keyring，禁止仅靠 AAD 共用一个主密钥。
 
-读取、修改和导出真实姓名都必须先完成管理员授权。单条读取和修改在同一事务中写入审计；审计提交失败时不返回明文。导出采用短期 export context 和分页 unary API：每页先在短事务中读取、解密并提交包含 export ID、查询范围、字段集合、页游标和记录数的 checkpoint 审计，提交成功后才返回该页；不使用无法撤回的服务端明文流。导出结束或过期时记录 `completed`、`aborted` 或 `expired`。日志、指标和错误信息只允许使用 `user_id` 和脱敏值。
+读取、修改和导出真实姓名都必须先完成管理员授权。单条读取和修改在同一事务中写入审计；审计提交失败时不返回明文。导出采用短期 export context 和分页 unary API：创建时物化按 user ID 排序的加密资料快照和 schema version；每页先提交包含 export ID、查询范围、字段集合、稳定 keyset cursor、规范化 target user ID 集合摘要、profile version、schema version 和记录数的 checkpoint 审计，提交成功后才返回该页。导出结束、主动中止或过期时记录 `completed`、`aborted` 或 `expired`。不使用无法撤回的服务端明文流。日志、指标和错误信息只允许使用 `user_id` 和脱敏值。
 
 ### 4.5 管理员
 
@@ -183,9 +192,10 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 | `active` | 密码正确 | 5 分钟 `mfa_pending` | 仅 TOTP 或恢复码验证 |
 | `active` | TOTP 原子 CAS | full session | 全部显式 permission |
 | `active` | MFA challenge + 恢复码 | `recovery_pending` | 仅改密、重绑 TOTP、生成恢复码 |
-| `recovery_pending` | 新 TOTP 首码 CAS | `active` + full session | 全部显式 permission |
+| `recovery_pending` | 修改密码 | 新 `recovery_pending` token | 事务内递增 password version、消费旧 token 并签发绑定新版本的替代 token |
+| `recovery_pending` | 新 TOTP 首码 CAS + 新恢复码 result envelope | `active` + full session | 原子启用新 seed、生成恢复码、保存 envelope 后才恢复权限 |
 
-所有 setup/MFA/recovery token 都保存摘要、purpose、audience、admin version、password version、尝试次数、创建时间、到期时间和 consumed time。状态或密码版本变化后旧 token 全部失效。TOTP enrollment 通过管理员行版本和 active enrollment 唯一约束保证并发页面只能共享同一 pending seed，不能覆盖。
+所有 setup/MFA/recovery token 都保存摘要、purpose、audience、admin version、password version、尝试次数、创建时间、到期时间和 consumed time。状态或密码版本变化后旧 token 全部失效；唯一例外是 recovery pending 改密事务会同时消费旧 token 并签发绑定新 password version 的替代 token。TOTP enrollment 通过管理员行版本和 active enrollment 唯一约束保证并发页面只能共享同一 pending seed，不能覆盖。
 
 ### 4.6 用户状态转换
 
@@ -198,7 +208,7 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 | `suspended` | 管理员解除 | `active` | 不自动恢复旧凭证，用户必须使用管理员辅助恢复 grant |
 | `active/suspended` | 管理员删除 | `deleted` | 撤销全部凭证，username claim 保留 90 天，写 outbox/audit |
 
-`suspended` 和 `deleted` 状态不能调用恢复、改名、设备管理或普通身份业务 API。认证拦截器只返回稳定状态码和退出指令。管理员辅助恢复 grant 只能发给 `active` 或刚解除暂停的用户。
+`suspended` 和 `deleted` 状态不能调用恢复、改名、设备管理或普通身份业务 API。撤销后的 credential 可以在专用 inspection 路径校验 secret 后只返回 `ACCOUNT_SUSPENDED`/`ACCOUNT_DELETED` 和清除 Cookie 指令，不建立认证主体、不返回用户资料；未校验的 selector 仍使用统一无效凭证响应。退出只清除客户端 Cookie。管理员辅助恢复 grant 只能发给 `active` 或刚解除暂停的用户。
 
 ## 5. 数据库模型
 
@@ -219,6 +229,7 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 - `admin_recovery_codes`
 - `admin_assisted_recovery_grants`
 - `profile_export_contexts`
+- `profile_export_items`
 - `audit_chain_head`
 - `audit_events`
 - `outbox_events`
@@ -226,19 +237,23 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 关键约束：
 
 - `username_claims.username_key` 为主键，统一保存 active 和 reserved claim；用户状态变化不能绕过该主键。
-- `users.current_username_key` 外键指向 owner 为自身且状态 active 的 claim；该一致性通过受限数据库函数或 deferred constraint trigger 校验。
+- active/onboarding 用户的 `users.current_username_key` 外键指向 owner 为自身且状态 active 的 claim；删除事务先把 claim 改为 reserved，再把 `current_username_key` 置空，deferred constraint trigger 按用户状态校验。
 - 一个用户同一时刻只能有一个 active 恢复凭证。
 - selector、token hash 和恢复 selector 均唯一。
-- `secret_operation_results` 以 `(operation_scope, actor_or_challenge_id, operation_id)` 唯一，并保存请求摘要、密文、key version、到期和确认时间；不同身份不能通过预占全局 operation ID 相互干扰。
+- `secret_operation_results` 以 `(operation_scope, actor_or_challenge_id, operation_id)` 唯一，并保存请求摘要、可空密文、key version、秘密到期、确认时间、tombstone 到期和 terminal status；不同身份不能通过预占全局 operation ID 相互干扰。
+- 每个用户最多一个 active `admin_assisted_recovery_grant`；创建新 grant、暂停、删除或任一恢复成功时在同一事务撤销该用户全部旧 grant。
+- `profile_export_items` 在创建 export context 时按稳定 ordinal 物化 user ID、profile version 和加密字段快照，不保存明文；分页期间资料变化不会改变导出集合或内容。
 - 被撤销或过期凭证不能通过查询条件回到 active 集合。
 - 所有时间由应用注入的 UTC clock 产生，数据库使用 `timestamptz`。
 - migration 必须同时提供向上和向下脚本；破坏性回滚仅允许在无生产数据环境执行，并在文档中标记。
 
-管理员审计量低，使用单行 `audit_chain_head` 加锁串行追加。事务内的 audit repository 先锁定并读取 chain head，使用版本化 canonical Protobuf 编码构造包含 previous hash 的事件，再由应用 Ed25519 私钥签名。数据库通过 `SECURITY DEFINER` 的受限 `append_audit_event(expected_previous_hash, event, signature)` 函数校验 expected head 未变化、原子更新 chain head 并插入事件；并发变化时整个业务事务重试。runtime 角色只能 SELECT chain head、EXECUTE 该函数和 SELECT 脱敏视图，不能直接 INSERT/UPDATE/DELETE 审计表。
+管理员审计量低，使用单行 `audit_chain_head` 加锁串行追加。应用通过只读 `SECURITY DEFINER read_audit_head()` 函数取得 head，使用版本化 canonical Protobuf 编码构造包含 previous hash 的事件，再由 Ed25519 私钥签名。`SECURITY DEFINER append_audit_event(expected_previous_hash, event, signature)` 在内部取得 `FOR UPDATE` 锁、校验 expected head、原子更新 head 并插入事件；并发变化返回可识别冲突并重试整个业务事务。runtime 角色只能 EXECUTE 这两个函数和 SELECT 脱敏视图，不能直接锁定或 INSERT/UPDATE/DELETE 审计表。
 
-签名公钥和历史 key version 可公开验证，私钥从独立 secret file 加载。链头按固定事件数或时间间隔签名并写入 `AuditCheckpointSink`；生产 sink 必须是启用 Object Lock/WORM 的外部对象存储，开发环境可以使用明确标记为非生产的本地 sink。缺少生产 checkpoint sink 时 API readiness 失败，避免把同库链误报为不可抵赖。
+签名公钥和历史 key version 可公开验证，私钥从独立 secret file 加载。达到固定事件数或时间间隔时，审计 append 事务同时写入 `audit.checkpoint.pending` outbox，包含 chain sequence/hash、签名和确定性对象 key。dispatcher 使用 create-if-absent 上传并验证 WORM 对象后记录 consumer ack；进程崩溃只能延迟，不能丢失 checkpoint。
 
-需要通知后续房间/实时模块的设备撤销、用户暂停和删除事件与权威状态变更在同一 `UnitOfWork` 中写入 `outbox_events`。本阶段实现 outbox claim/ack 和测试适配，但消费者在后续模块接入；消费方仍需在执行敏感命令时查询权威身份状态，不能只依赖事件缓存。
+生产 sink 必须启用 Object Lock/WORM，应用账号不能覆盖对象、缩短 retention 或删除；开发环境可以使用明确标记为非生产的本地 sink。缺少生产 sink 时 readiness 失败。运行中连续 5 分钟或 100 个审计事件未 checkpoint 时 readiness 降级、告警，并让 PII、恢复重置、封禁和管理员安全设置等敏感写 fail closed，普通用户只读不受影响。
+
+需要通知后续房间/实时模块的设备撤销、用户暂停和删除事件与权威状态变更在同一 `UnitOfWork` 中写入 `outbox_events`。本阶段只有 `audit.checkpoint` 注册生产 consumer 并执行 claim/ack/retry；身份领域事件保持 durable、未 ack，禁止无消费者时直接确认或清理。未来消费者以独立 consumer ID 从最早保留 event ID 建立 offset，完成上线和回放验证后才能制定保留策略。消费方仍需在执行敏感命令时查询权威身份状态，不能只依赖事件缓存。
 
 ## 6. Cookie、来源和 CSRF
 
@@ -266,8 +281,10 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 - 管理 challenge Cookie：`__Host-gn_admin_challenge`，`Secure`、`HttpOnly`、`SameSite=Strict`、`Path=/`。
 - challenge secret 至少 256 bit，数据库只保存摘要；响应 body 另返回同 challenge 绑定的 proof，完成请求必须同时提交 Cookie 和 proof。
 - 记录 `purpose`、`audience`、Origin hash、request flow ID、创建时间、5 分钟 TTL、最多尝试次数和 consumed time。
-- 首次完成请求以条件更新原子消费 challenge；已消费 challenge 只能在 operation ID、purpose、audience、Origin 和请求摘要全部相同时读取既有 result envelope，不能再次执行状态转换。其他过期、重放或绑定不匹配统一失败。
+- 首次完成请求以条件更新原子消费 challenge，并为产生秘密的操作把 exact-result replay authorization 延长到 envelope 的秘密可取回期限；已消费 challenge 只能在 operation ID、purpose、audience、Origin 和请求摘要全部相同时读取既有 result envelope，不能再次执行状态转换。其他过期、重放或绑定不匹配统一失败。
 - 用户身份创建、用户恢复、管理员登录、管理员 setup 和管理员恢复使用不同 purpose；用户端和管理端使用独立版本化 signing key，禁止跨流程接受。
+
+包含设备 token、恢复码、TOTP seed/URI、管理员恢复码、辅助 grant、真实姓名或导出页的响应统一设置 `Cache-Control: no-store`、`Pragma: no-cache`，并由 Nginx 禁止缓存。响应 tracing、错误采样和 body logging 对这些方法强制关闭。
 
 ## 7. 管理员会话
 
@@ -323,13 +340,13 @@ Nginx 必须覆盖而不是追加客户端传入的 `Forwarded`/`X-Forwarded-For
 - `BeginAdminLogin`：校验管理 Origin 并创建短期 admin-login challenge。
 - `LoginPassword`：消费 login challenge；setup 状态创建受限 setup token，active 状态创建 MFA challenge。
 - `VerifyTotp`：完成 MFA 并签发管理员会话。
-- `ChangeInitialPassword`：只允许 `setup_required` challenge。
+- `ChangeInitialPassword`：只允许 `setup_password_pending` token，成功后签发 `totp_enrollment_pending` token。
 - `BeginTotpEnrollment`：只展示一次 TOTP seed/otpauth URI。
-- `CompleteTotpEnrollment`：验证首个 code 并返回一次性管理员恢复码集合。
+- `CompleteTotpEnrollment`：要求 `totp_enrollment_pending` token，原子验证首个 code、生成恢复码 result envelope 并激活管理员。
 - `ConfirmAdminSecretReceipt`：确认管理员恢复码集合已保存并删除短期 result envelope。
 - `RecoverAdmin`：消费管理员恢复码并进入强制重绑流程。
 - `ChangeAdminPassword`：active/recovery pending 管理员改密，并按状态撤销会话。
-- `BeginTotpRebind`、`CompleteTotpRebind`：要求近期密码/MFA 或 recovery pending token，替换 TOTP 并撤销旧 seed。
+- `BeginTotpRebind`、`CompleteTotpRebind`：要求近期密码/MFA 或 recovery pending token；recovery 流程只有在替换 TOTP、生成新恢复码 result envelope 并保存 tombstone 后才激活管理员。
 - `RegenerateAdminRecoveryCodes`：要求近期 TOTP，撤销旧集合并通过 result envelope 返回新集合。
 - `LogoutAdmin`：只撤销当前会话并清除 Cookie。
 - `LogoutAllAdminSessions`：撤销全部管理员会话和 pending challenge。
@@ -342,14 +359,16 @@ Nginx 必须覆盖而不是追加客户端传入的 `Forwarded`/`X-Forwarded-For
 - `CreateUserProfileExport`：创建短期 export context，记录筛选范围、字段和开始审计。
 - `GetUserProfileExportPage`：每页审计提交成功后返回该页授权字段。
 - `CompleteUserProfileExport`：关闭 context 并记录完成状态；过期 context 由清理任务记录 expired。
+- `AbortUserProfileExport`：主动关闭 context 并记录 aborted，后续页面读取全部拒绝。
 - `CreateAssistedRecoveryGrant`：撤销旧恢复凭证并通过幂等 result envelope 创建 15 分钟有效的管理员交付 grant；管理员不能读取旧恢复码或用户新的长期恢复码。
 - `ForceChangeUsername`：强制改名或释放违规名称，必须提交原因并通过统一 claim registry。
+- `SuspendUser`、`UnsuspendUser`、`DeleteUser`：执行用户状态矩阵、凭证/grant 撤销、claim 变更、审计和 outbox。
 - `RevokeUserDevice`：撤销指定设备并写入原因。
 - `ListAuditEvents`：分页读取脱敏审计事件，读取行为也写入审计。
 
 所有 Proto 字段使用明确 message，不使用无边界 `Struct` 或 JSON payload。枚举零值必须为 `UNSPECIFIED`，时间使用 Protobuf timestamp，ID 使用 string 传输并在服务端严格校验。
 
-管理员辅助恢复 grant 具有至少 128 bit selector 和 256 bit secret，数据库只保存 Argon2id hash、target user、purpose、15 分钟 TTL、尝试计数、创建管理员和 consumed time。用户通过独立 challenge 兑换 grant 后进入标准 recovery prepare/complete 流程；兑换与 grant 消费原子，最终长期恢复码只返回给用户。管理员重置恢复不会轮换离线设备 secret，只按明确选项撤销设备；仍 active 的设备在下次安全操作时按普通 generation 协议轮换。
+管理员辅助恢复 grant 具有至少 128 bit selector 和 256 bit secret，数据库只保存 Argon2id hash、target user、purpose、15 分钟 TTL、尝试计数、创建管理员和 consumed/result time。每个用户最多一个 active grant；新建 grant 会原子撤销旧 grant。用户通过独立 challenge 校验 grant 后创建可重试的 recovery attempt，但 grant 只在 `CompleteRecovery` 成功事务中变为 `consumed(result_id)`；Begin 响应丢失或 attempt 过期时，TTL 内仍可重新 Begin。最终长期恢复码只返回给用户。管理员重置恢复不会轮换离线设备 secret，只按明确选项撤销设备；仍 active 的设备在下次安全操作时按普通 generation 协议轮换。
 
 ## 10. 稳定错误模型
 
@@ -365,6 +384,7 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - `DEVICE_REVOKED`
 - `RECOVERY_INVALID`
 - `IDEMPOTENCY_CONFLICT`
+- `SECRET_RESULT_NO_LONGER_AVAILABLE`
 - `CSRF_INVALID`
 - `ORIGIN_NOT_ALLOWED`
 - `RATE_LIMITED`
@@ -388,6 +408,7 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - 真实姓名修改和审计在同一事务提交；读取审计提交失败时不返回明文。
 - 设备轮换使用凭证 generation 和 previous-secret 宽限，旧 generation 不能覆盖新 generation。
 - 所有写请求携带 request ID；涉及一次性秘密的操作另携带客户端持久化的 operation ID。服务端保存请求摘要和加密结果，提交后响应丢失时只能重放相同结果，不能再次推进状态。
+- secret receipt 确认或秘密 TTL 到期只擦除密文，幂等 tombstone 保留 30 天；confirm、清理和延迟 retry 通过同一行条件更新互斥。
 - 审计和 outbox 与权威写入共用 `UnitOfWork`；事务提交后由 outbox dispatcher 以 claim/ack/retry 投递，消费者按 event ID 幂等。
 
 ## 12. 配置和密钥
@@ -402,6 +423,7 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - 设备 token、限流 key、用户 challenge、管理 challenge 的独立版本化 HMAC/signing keyring。
 - PII、TOTP 和一次性结果 envelope 的独立 AES keyring secret file 和 active key version。
 - audit Ed25519 signing keyring、历史公钥和生产 checkpoint sink。
+- checkpoint 最大未确认事件数/时长及敏感操作 fail-closed 阈值。
 - 可选的一次性 bootstrap admin password secret file。
 
 密钥必须至少 256 bit，不能使用默认值。生产模式缺少或重复 key 时服务拒绝启动。测试使用显式测试 key，不允许生产配置自动回退到测试值。
@@ -430,6 +452,7 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 
 - 用户名 NFKC、大小写、字符集、长度、保留名和相似边界。
 - Argon2id 参数、恢复 selector、token 解析和常量时间比较。
+- recovery grant 的 entropy、credential version/challenge/origin 绑定、尝试上限和原子消费。
 - 设备滑动/绝对过期、轮换宽限和撤销。
 - 管理员状态机、TOTP 时间窗口与重放保护。
 - AES-GCM associated data、key rotation 和错误 key。
@@ -447,12 +470,16 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - 恢复码并发消费只有一个成功。
 - 恢复事务提交成功但响应丢失后，相同 operation 返回相同 envelope，不同摘要冲突。
 - 不同 actor/scope 使用相同 operation ID 互不干扰，不能读取彼此 envelope。
+- confirm 后、秘密 TTL 后和 confirm/retry 并发时 tombstone 阻止重复状态转换。
+- envelope AAD 阻止跨 actor、跨 operation 和跨 result type 密文替换。
 - 设备轮换 generation 防止陈旧写覆盖。
 - 真实姓名与审计原子提交。
 - 同一 TOTP step 并发验证只有一个成功并只签发一个 session。
 - 多实例 bootstrap 只有一个 CAS 胜者，配置不一致实例 readiness 失败。
 - 并发 TOTP enrollment 不替换 pending seed，旧 setup challenge 不能重放。
+- recovery pending 改密后替代 token 绑定新 password version；TOTP 成功但恢复码 envelope 失败时不能激活。
 - 审计 canonical 编码、签名、链完整性、checkpoint 和受限数据库函数权限。
+- 审计提交后、checkpoint 上传前崩溃可由 durable outbox 重试；超过运行阈值时敏感操作 fail closed。
 - 并发审计 append 的 expected-head 冲突会重试，业务写和审计不会分离提交。
 - 权威写入、审计和 outbox 原子性，dispatcher 重试不重复事件。
 - sqlc 查询和 transaction adapter 使用真实 PostgreSQL 行为。
@@ -472,13 +499,16 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - 首次设备 bootstrap 和入驻在提交后响应丢失时可以重放同一 Cookie/恢复码结果。
 - challenge 过期、重放、跨 purpose、跨 audience 和 login CSRF 被拒绝。
 - 用户恢复、提交成功响应丢失、恢复码轮换和可选撤销旧设备。
+- 辅助 grant 在 Begin/Complete 间中断后可继续，签发新 grant 会撤销旧 grant，并发兑换只有一个成功。
 - 管理员多实例 bootstrap、强制改密、并发 TOTP enrollment、登录和受限恢复。
 - 离线 `adminctl reset` 撤销旧认证材料并留下可验证审计，不存在 HTTP 密码找回旁路。
 - setup/MFA/recovery pending token 不能访问任何管理业务 API。
 - 用户 Cookie 不能调用管理 API，管理员 Cookie 不能替代用户身份。
 - 真实姓名读写均产生同事务审计；分页导出每页先提交 checkpoint，断线记录 aborted/expired。
+- 分页导出使用物化快照和稳定 keyset cursor，审计 target digest 与实际返回集合一致。
 - 管理员辅助恢复 grant 的过期、尝试上限、并发消费和重放。
 - `onboarding/active/suspended/deleted` 的完整接口权限矩阵。
+- suspended 的 revoked credential 只能返回状态指令；deleted 事务正确清空 current username FK。
 - 跨 Origin、缺 CSRF、重放 token 和过期会话被拒绝。
 
 本阶段明确以 CI PostgreSQL/Redis service containers 覆盖总体设计中笼统的 Testcontainers 表述，避免依赖本机 Docker。开发机使用现有专用测试服务；没有测试连接时集成测试必须明确标记 `SKIPPED`，不能报告为通过，完整验收必须提供真实服务结果。
@@ -493,6 +523,8 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 6. 管理员修改密码、绑定 TOTP 并保存恢复码。
 7. 从部署配置移除 bootstrap secret file 并重启验证 readiness。
 
+审计 checkpoint 对象 key 使用 `audit/<chain-id>/<zero-padded-sequence>-<chain-hash>.checkpoint`，只允许 create-if-absent。bucket policy 强制 retention，应用账号没有 overwrite/delete/shorten-retention 权限；dispatcher 上传后必须重新读取 metadata/hash 验证再 ack outbox。
+
 迁移、API 和 key rotation 都必须支持先部署兼容 schema、再切换代码、最后清理旧字段的 expand/contract 流程。禁止在同一发布中直接删除仍被上一版本读取的列。
 
 ## 16. 验收标准
@@ -506,6 +538,8 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - TOTP 并发重放、管理员恢复码重用、pending token 越权和跨认证域 Cookie 均被拒绝。
 - 真实姓名在数据库中不可读，读取、修改和分页导出均在返回明文前提交对应审计。
 - username claim、身份状态、审计和 outbox 在所有交错事务中保持一致。
+- 一次性秘密确认或过期后密文被擦除，幂等 tombstone 仍阻止延迟请求重复执行。
+- 审计 checkpoint 在进程崩溃后可重试，外部对象不可覆盖；超过故障窗口时敏感管理操作 fail closed。
 - PostgreSQL/Redis 真实集成测试、API 测试、race、vet、Buf 生成和仓库边界检查全部通过。
 - 服务和测试日志中不出现任何 token、恢复码、密码、TOTP seed、验证码或真实姓名明文。
 

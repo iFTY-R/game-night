@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package tooling.smoke.v1;
+
+option go_package = "github.com/iFTY-R/game-night/tooling/testdata/proto/gen/go/tooling/smoke/v1;smokev1";
+
+message PingRequest {
+  int64 payload = 1;
+}
+
+message PingResponse {
+  string payload = 1;
+}
+
+service SmokeService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}

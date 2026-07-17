@@ -188,7 +188,7 @@ TOTP 使用 6 位数字、30 秒周期和前后各一个时间窗口。TOTP seed
 | `bootstrap_pending` | 一次性 secret file，CAS 成功 | `setup_required` | 无 HTTP 业务权限 |
 | `setup_required` | bootstrap password | 10 分钟 `setup_password_pending` | 仅修改初始密码 |
 | `setup_required` | 已改密码的 setup token | 10 分钟 `totp_enrollment_pending` | 仅创建/读取当前 enrollment seed |
-| `setup_required` | 首个 TOTP code，原子 CAS | `active` + full session | 全部显式 permission |
+| `setup_required` | `totp_enrollment_pending` token + 首个 TOTP code | `active` + full session | 原子 CAS、生成管理员恢复码 result envelope 后才激活 |
 | `active` | 密码正确 | 5 分钟 `mfa_pending` | 仅 TOTP 或恢复码验证 |
 | `active` | TOTP 原子 CAS | full session | 全部显式 permission |
 | `active` | MFA challenge + 恢复码 | `recovery_pending` | 仅改密、重绑 TOTP、生成恢复码 |
@@ -322,7 +322,7 @@ Nginx 必须覆盖而不是追加客户端传入的 `Forwarded`/`X-Forwarded-For
 ### 9.1 IdentityService
 
 - `BeginIdentityBootstrap`：校验用户 Origin 并创建短期匿名 identity-bootstrap challenge。
-- `BootstrapIdentity`：消费 challenge 和 operation ID；无 Cookie 时创建待完善身份、设备和 result envelope，有有效 Cookie 时返回当前入驻状态和 CSRF token。响应丢失时相同 operation 重新设置同一设备 Cookie。携带无效、撤销或过期 Cookie 时只清除 Cookie并返回恢复/重新开始选择，不静默创建新身份。
+- `BootstrapIdentity`：消费 challenge 和 operation ID；无 Cookie 时创建待完善身份、设备和 result envelope，有有效 Cookie 时返回当前入驻状态和 CSRF token。响应丢失时相同 operation 重新设置同一设备 Cookie。携带撤销 Cookie 时先验证 secret：只有验证成功且撤销原因为账户暂停/删除，才返回 `ACCOUNT_SUSPENDED`/`ACCOUNT_DELETED` 和清除 Cookie 指令；其他无效、撤销或过期凭证统一返回恢复/重新开始选择，不静默创建新身份。
 - `CompleteOnboarding`：携带 operation ID 设置用户名、激活用户并通过 result envelope 返回只展示一次的恢复码。
 - `GetCurrentIdentity`：返回当前用户和设备摘要。
 - `ChangeUsername`：执行规范化、冷却期和并发唯一占用。
@@ -330,7 +330,7 @@ Nginx 必须覆盖而不是追加客户端传入的 `Forwarded`/`X-Forwarded-For
 - `BeginRecoveryChallenge`：校验用户 Origin 并创建短期匿名 recovery challenge。
 - `BeginRecovery`：消费 challenge、校验恢复码但不消费，创建一次性 recovery grant。
 - `CompleteRecovery`：按 operation ID 原子消费恢复码、签发设备、轮换恢复码并创建可幂等重放的结果 envelope。
-- `ConfirmSecretReceipt`：确认一次性结果已保存并删除短期 envelope。
+- `ConfirmSecretReceipt`：确认一次性结果已保存，擦除短期 envelope 的秘密列并保留幂等 tombstone。
 - `ListDevices`：列出 active/revoked 设备摘要，不返回秘密。
 - `RevokeDevice`：撤销指定设备；撤销当前设备会立即清除 Cookie。
 
@@ -343,10 +343,10 @@ Nginx 必须覆盖而不是追加客户端传入的 `Forwarded`/`X-Forwarded-For
 - `ChangeInitialPassword`：只允许 `setup_password_pending` token，成功后签发 `totp_enrollment_pending` token。
 - `BeginTotpEnrollment`：只展示一次 TOTP seed/otpauth URI。
 - `CompleteTotpEnrollment`：要求 `totp_enrollment_pending` token，原子验证首个 code、生成恢复码 result envelope 并激活管理员。
-- `ConfirmAdminSecretReceipt`：确认管理员恢复码集合已保存并删除短期 result envelope。
+- `ConfirmAdminSecretReceipt`：确认管理员恢复码集合已保存，擦除秘密列并保留幂等 tombstone。
 - `RecoverAdmin`：消费管理员恢复码并进入强制重绑流程。
 - `ChangeAdminPassword`：active/recovery pending 管理员改密，并按状态撤销会话。
-- `BeginTotpRebind`、`CompleteTotpRebind`：要求近期密码/MFA 或 recovery pending token；recovery 流程只有在替换 TOTP、生成新恢复码 result envelope 并保存 tombstone 后才激活管理员。
+- `BeginTotpRebind`、`CompleteTotpRebind`：要求近期密码/MFA 或 recovery pending token；recovery 流程只有在替换 TOTP、生成新恢复码并保存可取回 result envelope 后才激活管理员，确认或秘密 TTL 到期时再擦除密文并保留 tombstone。
 - `RegenerateAdminRecoveryCodes`：要求近期 TOTP，撤销旧集合并通过 result envelope 返回新集合。
 - `LogoutAdmin`：只撤销当前会话并清除 Cookie。
 - `LogoutAllAdminSessions`：撤销全部管理员会话和 pending challenge。
@@ -382,6 +382,8 @@ Connect error detail 返回稳定业务 code、可安全展示的 message key、
 - `USERNAME_CHANGE_COOLDOWN`
 - `DEVICE_CREDENTIAL_INVALID`
 - `DEVICE_REVOKED`
+- `ACCOUNT_SUSPENDED`
+- `ACCOUNT_DELETED`
 - `RECOVERY_INVALID`
 - `IDEMPOTENCY_CONFLICT`
 - `SECRET_RESULT_NO_LONGER_AVAILABLE`

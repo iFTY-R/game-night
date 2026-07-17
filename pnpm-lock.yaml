@@ -12,6 +12,8 @@ importers:
         specifier: 2.10.5
         version: 2.10.5
 
+  tooling/workspace-smoke: {}
+
 packages:
 
   '@turbo/darwin-64@2.10.5':

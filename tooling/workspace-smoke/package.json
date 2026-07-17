@@ -1,0 +1,10 @@
+{
+  "name": "@game-night/workspace-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node --check src/add.mjs",
+    "test": "node --test src/add.test.mjs"
+  }
+}

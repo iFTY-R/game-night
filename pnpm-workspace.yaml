@@ -5,3 +5,4 @@ packages:
   - packages/*
   - games/*/client
   - games/*/themes
+  - tooling/workspace-smoke

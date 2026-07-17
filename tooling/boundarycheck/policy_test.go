@@ -52,6 +52,88 @@ func TestValidateEdges(t *testing.T) {
 	}
 }
 
+func TestValidateEdgesEnforcesPlatformAdapterBoundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		edge        Edge
+		wantAllowed bool
+		wantReason  string
+	}{
+		{
+			name:       "identity cannot import persistence implementation",
+			edge:       Edge{From: "platform/identity", To: "platform/persistence/postgres"},
+			wantReason: "platform domains cannot import persistence adapters",
+		},
+		{
+			name:       "identity cannot import pgx",
+			edge:       Edge{From: "platform/identity", To: "github.com/jackc/pgx/v5/pgxpool"},
+			wantReason: "PostgreSQL dependencies are only allowed in platform/persistence/postgres",
+		},
+		{
+			name:       "admin cannot import redis",
+			edge:       Edge{From: "platform/admin", To: "github.com/redis/go-redis/v9"},
+			wantReason: "Redis dependencies are only allowed in platform/persistence/redis",
+		},
+		{
+			name:       "profile cannot import object storage sdk",
+			edge:       Edge{From: "platform/profile", To: "github.com/aws/aws-sdk-go-v2/service/s3"},
+			wantReason: "object storage dependencies are only allowed in platform/persistence/objectstorage",
+		},
+		{
+			name:       "audit cannot import http transport",
+			edge:       Edge{From: "platform/audit", To: "net/http"},
+			wantReason: "HTTP dependencies are only allowed in platform/persistence/objectstorage",
+		},
+		{
+			name:       "postgres adapter cannot import redis",
+			edge:       Edge{From: "platform/persistence/postgres", To: "github.com/redis/go-redis/v9"},
+			wantReason: "Redis dependencies are only allowed in platform/persistence/redis",
+		},
+		{
+			name:        "postgres adapter may import pgx",
+			edge:        Edge{From: "platform/persistence/postgres", To: "github.com/jackc/pgx/v5/pgxpool"},
+			wantAllowed: true,
+		},
+		{
+			name:        "redis adapter may import go redis",
+			edge:        Edge{From: "platform/persistence/redis", To: "github.com/redis/go-redis/v9"},
+			wantAllowed: true,
+		},
+		{
+			name:        "object storage adapter may import aws sdk",
+			edge:        Edge{From: "platform/persistence/objectstorage/s3", To: "github.com/aws/aws-sdk-go-v2/service/s3"},
+			wantAllowed: true,
+		},
+		{
+			name:        "object storage adapter may configure http client",
+			edge:        Edge{From: "platform/persistence/objectstorage/s3", To: "net/http"},
+			wantAllowed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			violations := ValidateEdges([]Edge{tt.edge})
+			if tt.wantAllowed {
+				if len(violations) != 0 {
+					t.Fatalf("expected edge to be allowed, got %#v", violations)
+				}
+				return
+			}
+			if len(violations) != 1 {
+				t.Fatalf("expected one violation, got %#v", violations)
+			}
+			if violations[0].Reason != tt.wantReason {
+				t.Fatalf("expected reason %q, got %q", tt.wantReason, violations[0].Reason)
+			}
+		})
+	}
+}
+
 func TestValidateEdgesNormalizesWindowsPaths(t *testing.T) {
 	t.Parallel()
 

@@ -83,8 +83,9 @@ func decodeGoListEdges(reader io.Reader, modulePath string) ([]Edge, error) {
 				edges = append(edges, Edge{From: from, To: to})
 				continue
 			}
-			// Pure engines must expose all direct external imports so IO, clock, and randomness bans are enforceable.
-			if gameArea(from, "engine") {
+			// Engines expose every external import; platform packages expose the infrastructure imports governed by policy.
+			_, _, platformImportRestricted := platformInfrastructureBoundary(imported)
+			if gameArea(from, "engine") || under(from, "platform") && platformImportRestricted {
 				edges = append(edges, Edge{From: from, To: imported})
 			}
 		}

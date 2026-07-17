@@ -14,16 +14,19 @@ import (
 func TestDecodeGoListEdges(t *testing.T) {
 	t.Parallel()
 
-	input := strings.NewReader(`{"ImportPath":"github.com/iFTY-R/game-night/platform/room","Imports":["github.com/iFTY-R/game-night/games/dice/engine","context"]}
+	input := strings.NewReader(`{"ImportPath":"github.com/iFTY-R/game-night/platform/room","Imports":["github.com/iFTY-R/game-night/games/dice/engine","github.com/jackc/pgx/v5/pgxpool","context"]}
 {"ImportPath":"github.com/iFTY-R/game-night/games/dice/engine","Imports":["github.com/iFTY-R/game-night/sdk/go/game","os"]}`)
 	edges, err := decodeGoListEdges(input, "github.com/iFTY-R/game-night")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(edges) != 3 {
-		t.Fatalf("expected two internal edges and one engine external edge, got %#v", edges)
+	if len(edges) != 4 {
+		t.Fatalf("expected two internal edges and two policy-relevant external edges, got %#v", edges)
 	}
-	if edges[2] != (Edge{From: "games/dice/engine", To: "os"}) {
+	if edges[1] != (Edge{From: "platform/room", To: "github.com/jackc/pgx/v5/pgxpool"}) {
+		t.Fatalf("expected platform infrastructure import to be preserved, got %#v", edges)
+	}
+	if edges[3] != (Edge{From: "games/dice/engine", To: "os"}) {
 		t.Fatalf("expected engine external import to be preserved, got %#v", edges)
 	}
 }
@@ -81,8 +84,8 @@ func TestForbiddenFixtureProducesViolations(t *testing.T) {
 		t.Fatal(err)
 	}
 	violations := ValidateEdges(edges)
-	if len(violations) < 3 {
-		t.Fatalf("expected package, application, and engine IO violations, got %#v", violations)
+	if len(violations) < 4 {
+		t.Fatalf("expected package, application, platform infrastructure, and engine IO violations, got %#v", violations)
 	}
 }
 

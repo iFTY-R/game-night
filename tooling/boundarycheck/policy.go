@@ -42,6 +42,12 @@ func forbiddenReason(edge Edge) (string, bool) {
 	if under(edge.From, "platform") && under(edge.To, "games") {
 		return "platform modules cannot import concrete games", true
 	}
+	if under(edge.From, "platform") && !under(edge.From, "platform/persistence") && under(edge.To, "platform/persistence") {
+		return "platform domains cannot import persistence adapters", true
+	}
+	if reason, forbidden := forbiddenPlatformInfrastructureImport(edge); forbidden {
+		return reason, true
+	}
 
 	// Stable SDK contracts cannot depend on concrete application or domain implementations.
 	if under(edge.From, "sdk") && (under(edge.To, "apps") || under(edge.To, "platform") || under(edge.To, "games")) {
@@ -71,6 +77,34 @@ func forbiddenReason(edge Edge) (string, bool) {
 		return "themes cannot import game rules or authoritative runtime state", true
 	}
 	return "", false
+}
+
+// forbiddenPlatformInfrastructureImport keeps each managed client inside its single owning adapter.
+func forbiddenPlatformInfrastructureImport(edge Edge) (string, bool) {
+	if !under(edge.From, "platform") {
+		return "", false
+	}
+	adapterRoot, reason, restricted := platformInfrastructureBoundary(edge.To)
+	if !restricted || under(edge.From, adapterRoot) {
+		return "", false
+	}
+	return reason, true
+}
+
+// platformInfrastructureBoundary is shared by discovery and validation so CI records every external import governed here.
+func platformInfrastructureBoundary(importPath string) (adapterRoot, reason string, restricted bool) {
+	switch {
+	case under(importPath, "github.com/jackc/pgx"), under(importPath, "database/sql"):
+		return "platform/persistence/postgres", "PostgreSQL dependencies are only allowed in platform/persistence/postgres", true
+	case under(importPath, "github.com/redis/go-redis"), under(importPath, "github.com/go-redis"):
+		return "platform/persistence/redis", "Redis dependencies are only allowed in platform/persistence/redis", true
+	case under(importPath, "github.com/aws/aws-sdk-go-v2"):
+		return "platform/persistence/objectstorage", "object storage dependencies are only allowed in platform/persistence/objectstorage", true
+	case under(importPath, "net/http"):
+		return "platform/persistence/objectstorage", "HTTP dependencies are only allowed in platform/persistence/objectstorage", true
+	default:
+		return "", "", false
+	}
 }
 
 func forbiddenEngineImport(importPath string) (string, bool) {

@@ -17,7 +17,13 @@ func TestCLIRejectsForbiddenFixture(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected CLI failure, output: %s", output)
 	}
-	for _, expected := range []string{"platform modules cannot import concrete games", "games cannot import application entrypoints", "game engines cannot own IO"} {
+	expectedDiagnostics := []string{
+		"platform modules cannot import concrete games",
+		"games cannot import application entrypoints",
+		"game engines cannot own IO",
+		"HTTP dependencies are only allowed in platform/persistence/objectstorage",
+	}
+	for _, expected := range expectedDiagnostics {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("missing %q in CLI output: %s", expected, output)
 		}

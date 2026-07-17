@@ -182,4 +182,5 @@ yarn.lock
 .omc/
 .omx/
 .superpowers/
+.worktrees/
 .tmp

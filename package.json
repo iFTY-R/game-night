@@ -8,8 +8,9 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "check": "turbo run check",
-    "test": "turbo run test"
+    "check": "pnpm run check:boundaries && turbo run check",
+    "check:boundaries": "go run ./tooling/cmd/boundarycheck",
+    "test": "go test ./... && turbo run test"
   },
   "devDependencies": {
     "turbo": "2.10.5"

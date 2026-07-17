@@ -1,0 +1,6 @@
+{
+  "name": "@game-night/room",
+  "dependencies": {
+    "@game-night/dice": "workspace:*"
+  }
+}

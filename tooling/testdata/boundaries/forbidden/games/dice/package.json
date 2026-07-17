@@ -1,0 +1,6 @@
+{
+  "name": "@game-night/dice",
+  "dependencies": {
+    "@game-night/realtime": "workspace:*"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@game-night/root",
+  "private": true,
+  "packageManager": "pnpm@11.13.1",
+  "engines": {
+    "node": "24.18.0",
+    "pnpm": "11.13.1"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "check": "turbo run check",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "2.10.5"
+  }
+}

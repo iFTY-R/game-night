@@ -1,0 +1,7 @@
+packages:
+  - apps/web
+  - apps/admin
+  - sdk/ts/*
+  - packages/*
+  - games/*/client
+  - games/*/themes

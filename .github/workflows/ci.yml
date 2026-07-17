@@ -1,0 +1,127 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          # The root module has no go.sum yet; enable caching only after dependency metadata is tracked.
+          cache: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check Go formatting
+        run: |
+          formatting_issues="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+          if [[ -n "$formatting_issues" ]]; then
+            printf '%s\n' "$formatting_issues"
+            exit 1
+          fi
+      - name: Test Go packages
+        run: go test ./...
+      - name: Vet Go packages
+        run: go vet ./...
+      - name: Run repository checks
+        run: pnpm run check
+      - name: Run repository tests
+        run: pnpm test
+      - name: Build workspace
+        run: pnpm build
+      - name: Validate Turbo task graph
+        run: |
+          pnpm exec turbo run check test build --dry=json > "$RUNNER_TEMP/turbo-dry.json"
+          node -e "const fs=require('node:fs');const data=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/turbo-dry.json','utf8'));const ids=new Set(data.tasks.map((task)=>task.taskId));for(const id of ['@game-night/workspace-smoke#check','@game-night/workspace-smoke#test','@game-night/workspace-smoke#build']){if(!ids.has(id))throw new Error('missing Turbo task: '+id)}"
+
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go for generated smoke code
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache-dependency-path: tooling/testdata/proto/go.sum
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          # Keep CI aligned with the local generation baseline; upgrades require rerunning generation and breaking checks.
+          version: 1.66.0
+      - name: Verify Buf smoke generation
+        run: |
+          (cd tooling/testdata/proto && buf format --diff --exit-code && buf lint && buf generate --template buf.gen.yaml && go test ./...)
+          buf breaking tooling/testdata/proto --against tooling/testdata/proto-baseline
+          buf lint tooling/testdata/proto-breaking
+          buf build tooling/testdata/proto-breaking -o /dev/null
+          set +e
+          breaking_output="$(buf breaking tooling/testdata/proto-breaking --against tooling/testdata/proto-baseline 2>&1)"
+          breaking_status=$?
+          set -e
+          printf '%s\n' "$breaking_output"
+          if [[ $breaking_status -eq 0 ]]; then
+            echo "breaking fixture unexpectedly passed"
+            exit 1
+          fi
+          if [[ "$breaking_output" != *'changed type from "string" to "int64"'* ]]; then
+            echo "breaking fixture failed without the expected field type diagnostic"
+            exit 1
+          fi
+          echo "breaking fixture rejected as expected (exit code $breaking_status)"
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+      - name: Verify production Proto when present
+        run: |
+          if find contracts games -type f -name '*.proto' -print -quit | grep -q .; then
+            while IFS= read -r proto; do
+              buf lint --path "$proto"
+            done < <(find contracts games -type f -name '*.proto' -print)
+            buf format --diff --exit-code
+            buf lint
+            buf generate
+            git diff --exit-code
+            test -z "$(git status --porcelain)"
+          else
+            echo "SKIPPED: no production Proto files"
+          fi
+      - name: Check production breaking changes
+        if: github.event_name == 'pull_request'
+        run: |
+          git rev-parse --verify "origin/${{ github.base_ref }}^{commit}"
+          if git ls-tree -r --name-only "origin/${{ github.base_ref }}" -- contracts games | grep -q '\.proto$'; then
+            buf breaking --against ".git#branch=origin/${{ github.base_ref }}"
+          else
+            echo "SKIPPED: no production Proto baseline"
+          fi

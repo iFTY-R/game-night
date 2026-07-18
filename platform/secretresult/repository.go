@@ -16,6 +16,7 @@ type Confirmation struct {
 
 // Repository stores domain values without exposing PostgreSQL or generated query types.
 type Repository interface {
+	GetByIDForUpdate(context.Context, uuid.UUID) (Result, error)
 	GetByOperationForUpdate(context.Context, Key) (Result, error)
 	InsertAvailable(context.Context, Result) (Result, error)
 	ConfirmCAS(context.Context, Confirmation) (Result, error)

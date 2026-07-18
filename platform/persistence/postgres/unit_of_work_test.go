@@ -120,6 +120,49 @@ func TestIdentityUnitOfWorkRejectsNilWorkWithIdentityError(t *testing.T) {
 	if err := (&IdentityUnitOfWork{}).Run(context.Background(), nil); err != identityDomain.ErrInvalidIdentityRequest {
 		t.Fatalf("identity nil-work error = %v", err)
 	}
+	if err := (&IdentityUnitOfWork{}).RunIdentity(context.Background(), nil); err != identityDomain.ErrInvalidIdentityRequest {
+		t.Fatalf("full identity nil-work error = %v", err)
+	}
+}
+
+func TestCompleteIdentityTransactionInjectsRecoveryAuditAndOutboxRepositories(t *testing.T) {
+	verifier, err := audit.NewService(newRepositoryAuditKeyring())
+	if err != nil {
+		t.Fatal(err)
+	}
+	transaction := newCompleteIdentityTransaction(nil, verifier)
+	if _, ok := transaction.RecoveryAttempts().(*identityRecoveryAttemptRepository); !ok {
+		t.Fatalf("recovery attempts repository = %T", transaction.RecoveryAttempts())
+	}
+	if _, ok := transaction.AssistedRecoveryGrants().(*identityAssistedRecoveryRepository); !ok {
+		t.Fatalf("assisted recovery repository = %T", transaction.AssistedRecoveryGrants())
+	}
+	auditRepository, ok := transaction.Audit().(*AuditRepository)
+	if !ok {
+		t.Fatalf("audit repository = %T", transaction.Audit())
+	}
+	if auditRepository.verifier != verifier {
+		t.Fatalf("audit verifier = %T, want %T", auditRepository.verifier, verifier)
+	}
+	checkpointRepository, ok := transaction.AuditCheckpoints().(*AuditCheckpointRepository)
+	if !ok {
+		t.Fatalf("checkpoint repository = %T", transaction.AuditCheckpoints())
+	}
+	if checkpointRepository.verifier != verifier {
+		t.Fatalf("checkpoint verifier = %T, want %T", checkpointRepository.verifier, verifier)
+	}
+	if _, ok := transaction.OutboxEvents().(*OutboxEventRepository); !ok {
+		t.Fatalf("outbox repository = %T", transaction.OutboxEvents())
+	}
+}
+
+func TestIdentityUnitOfWorkWithAuditRejectsNilVerifier(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("nil audit verifier did not panic")
+		}
+	}()
+	NewIdentityUnitOfWorkWithAudit(nil, nil)
 }
 
 func TestIdentityUnitOfWorkMapsCommitSQLStates(t *testing.T) {
@@ -138,7 +181,7 @@ func TestIdentityUnitOfWorkMapsCommitSQLStates(t *testing.T) {
 			unitOfWork := &IdentityUnitOfWork{runner: newTestTransactionRunner(&fakeTransaction{
 				commitError: &pgconn.PgError{Code: test.code},
 			})}
-			err := unitOfWork.Run(context.Background(), func(context.Context, identityDomain.IdentityTransaction) error {
+			err := unitOfWork.RunIdentity(context.Background(), func(context.Context, identityDomain.IdentityTransaction) error {
 				return nil
 			})
 			if err != test.want {
@@ -160,7 +203,7 @@ func TestIdentityUnitOfWorkMapsCommitSQLStates(t *testing.T) {
 	beginFailure := newTransactionRunner(func(context.Context, pgx.TxOptions) (transactionHandle, error) {
 		return nil, &pgconn.PgError{Code: "23514"}
 	})
-	err = (&IdentityUnitOfWork{runner: beginFailure}).Run(
+	err = (&IdentityUnitOfWork{runner: beginFailure}).RunIdentity(
 		context.Background(), func(context.Context, identityDomain.IdentityTransaction) error { return nil },
 	)
 	if err != identityDomain.ErrIdentityRepositoryUnavailable {
@@ -196,7 +239,7 @@ func unitOfWorkTestCases() []unitOfWorkTestCase {
 			domainErrors:          identityTransactionDomainErrors,
 			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
 				unitOfWork := &IdentityUnitOfWork{runner: runner}
-				return unitOfWork.Run(ctx, func(context.Context, identityDomain.IdentityTransaction) error {
+				return unitOfWork.RunIdentity(ctx, func(context.Context, identityDomain.IdentityTransaction) error {
 					return callbackErr
 				})
 			},

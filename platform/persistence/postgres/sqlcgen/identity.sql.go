@@ -241,7 +241,8 @@ WHERE recovery_credential_id = $2
   AND user_id = $3
   AND version = $4
   AND status = 'active'
-RETURNING recovery_credential_id, user_id, version, status, consumed_at
+RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+          created_at, consumed_at, revoked_at, revoke_reason
 `
 
 type ConsumeUserRecoveryCredentialCASParams struct {
@@ -249,14 +250,6 @@ type ConsumeUserRecoveryCredentialCASParams struct {
 	RecoveryCredentialID pgtype.UUID        `json:"recovery_credential_id"`
 	UserID               pgtype.UUID        `json:"user_id"`
 	ExpectedVersion      int64              `json:"expected_version"`
-}
-
-type ConsumeUserRecoveryCredentialCASRow struct {
-	RecoveryCredentialID pgtype.UUID        `json:"recovery_credential_id"`
-	UserID               pgtype.UUID        `json:"user_id"`
-	Version              int64              `json:"version"`
-	Status               string             `json:"status"`
-	ConsumedAt           pgtype.Timestamptz `json:"consumed_at"`
 }
 
 // ConsumeUserRecoveryCredentialCAS
@@ -268,21 +261,27 @@ type ConsumeUserRecoveryCredentialCASRow struct {
 //	  AND user_id = $3
 //	  AND version = $4
 //	  AND status = 'active'
-//	RETURNING recovery_credential_id, user_id, version, status, consumed_at
-func (q *Queries) ConsumeUserRecoveryCredentialCAS(ctx context.Context, arg ConsumeUserRecoveryCredentialCASParams) (ConsumeUserRecoveryCredentialCASRow, error) {
+//	RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+//	          created_at, consumed_at, revoked_at, revoke_reason
+func (q *Queries) ConsumeUserRecoveryCredentialCAS(ctx context.Context, arg ConsumeUserRecoveryCredentialCASParams) (UserRecoveryCredential, error) {
 	row := q.db.QueryRow(ctx, consumeUserRecoveryCredentialCAS,
 		arg.ConsumedAt,
 		arg.RecoveryCredentialID,
 		arg.UserID,
 		arg.ExpectedVersion,
 	)
-	var i ConsumeUserRecoveryCredentialCASRow
+	var i UserRecoveryCredential
 	err := row.Scan(
 		&i.RecoveryCredentialID,
 		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
 		&i.Version,
 		&i.Status,
+		&i.CreatedAt,
 		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
 	)
 	return i, err
 }
@@ -511,6 +510,45 @@ func (q *Queries) CreateUserRecoveryCredential(ctx context.Context, arg CreateUs
 		arg.Version,
 		arg.CreatedAt,
 	)
+	var i UserRecoveryCredential
+	err := row.Scan(
+		&i.RecoveryCredentialID,
+		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.Version,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
+	return i, err
+}
+
+const getActiveUserRecoveryCredentialForUpdate = `-- name: GetActiveUserRecoveryCredentialForUpdate :one
+SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+       created_at, consumed_at, revoked_at, revoke_reason
+FROM user_recovery_credentials
+WHERE user_id = $1
+  AND status = 'active'
+FOR UPDATE
+`
+
+type GetActiveUserRecoveryCredentialForUpdateParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+// GetActiveUserRecoveryCredentialForUpdate
+//
+//	SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+//	       created_at, consumed_at, revoked_at, revoke_reason
+//	FROM user_recovery_credentials
+//	WHERE user_id = $1
+//	  AND status = 'active'
+//	FOR UPDATE
+func (q *Queries) GetActiveUserRecoveryCredentialForUpdate(ctx context.Context, arg GetActiveUserRecoveryCredentialForUpdateParams) (UserRecoveryCredential, error) {
+	row := q.db.QueryRow(ctx, getActiveUserRecoveryCredentialForUpdate, arg.UserID)
 	var i UserRecoveryCredential
 	err := row.Scan(
 		&i.RecoveryCredentialID,
@@ -797,16 +835,55 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, arg GetUserForUpdatePara
 	return i, err
 }
 
-const getUserRecoveryCredentialForUpdate = `-- name: GetUserRecoveryCredentialForUpdate :one
+const getUserRecoveryCredentialBySelector = `-- name: GetUserRecoveryCredentialBySelector :one
 SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
        created_at, consumed_at, revoked_at, revoke_reason
 FROM user_recovery_credentials
 WHERE selector = $1
+`
+
+type GetUserRecoveryCredentialBySelectorParams struct {
+	Selector string `json:"selector"`
+}
+
+// GetUserRecoveryCredentialBySelector
+//
+//	SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+//	       created_at, consumed_at, revoked_at, revoke_reason
+//	FROM user_recovery_credentials
+//	WHERE selector = $1
+func (q *Queries) GetUserRecoveryCredentialBySelector(ctx context.Context, arg GetUserRecoveryCredentialBySelectorParams) (UserRecoveryCredential, error) {
+	row := q.db.QueryRow(ctx, getUserRecoveryCredentialBySelector, arg.Selector)
+	var i UserRecoveryCredential
+	err := row.Scan(
+		&i.RecoveryCredentialID,
+		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.Version,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
+	return i, err
+}
+
+const getUserRecoveryCredentialForUpdate = `-- name: GetUserRecoveryCredentialForUpdate :one
+SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+       created_at, consumed_at, revoked_at, revoke_reason
+FROM user_recovery_credentials
+WHERE recovery_credential_id = $1
+  AND user_id = $2
+  AND version = $3
 FOR UPDATE
 `
 
 type GetUserRecoveryCredentialForUpdateParams struct {
-	Selector string `json:"selector"`
+	RecoveryCredentialID pgtype.UUID `json:"recovery_credential_id"`
+	UserID               pgtype.UUID `json:"user_id"`
+	ExpectedVersion      int64       `json:"expected_version"`
 }
 
 // GetUserRecoveryCredentialForUpdate
@@ -814,10 +891,12 @@ type GetUserRecoveryCredentialForUpdateParams struct {
 //	SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
 //	       created_at, consumed_at, revoked_at, revoke_reason
 //	FROM user_recovery_credentials
-//	WHERE selector = $1
+//	WHERE recovery_credential_id = $1
+//	  AND user_id = $2
+//	  AND version = $3
 //	FOR UPDATE
 func (q *Queries) GetUserRecoveryCredentialForUpdate(ctx context.Context, arg GetUserRecoveryCredentialForUpdateParams) (UserRecoveryCredential, error) {
-	row := q.db.QueryRow(ctx, getUserRecoveryCredentialForUpdate, arg.Selector)
+	row := q.db.QueryRow(ctx, getUserRecoveryCredentialForUpdate, arg.RecoveryCredentialID, arg.UserID, arg.ExpectedVersion)
 	var i UserRecoveryCredential
 	err := row.Scan(
 		&i.RecoveryCredentialID,
@@ -871,15 +950,20 @@ SELECT credential_id, user_id, generation, label, created_at, last_seen_at, rota
        idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
 FROM device_credentials
 WHERE user_id = $1
-  AND (created_at, credential_id) > ($2, $3)
+  AND ($2::boolean OR revoked_at IS NULL)
+  AND (created_at, credential_id) > (
+      $3::timestamptz,
+      $4::uuid
+  )
 ORDER BY created_at, credential_id
-LIMIT $4
+LIMIT $5
 `
 
 type ListUserDeviceCredentialsParams struct {
 	UserID            pgtype.UUID        `json:"user_id"`
+	IncludeRevoked    bool               `json:"include_revoked"`
 	AfterCreatedAt    pgtype.Timestamptz `json:"after_created_at"`
-	AfterCredentialID pgtype.Timestamptz `json:"after_credential_id"`
+	AfterCredentialID pgtype.UUID        `json:"after_credential_id"`
 	PageSize          int32              `json:"page_size"`
 }
 
@@ -903,12 +987,17 @@ type ListUserDeviceCredentialsRow struct {
 //	       idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
 //	FROM device_credentials
 //	WHERE user_id = $1
-//	  AND (created_at, credential_id) > ($2, $3)
+//	  AND ($2::boolean OR revoked_at IS NULL)
+//	  AND (created_at, credential_id) > (
+//	      $3::timestamptz,
+//	      $4::uuid
+//	  )
 //	ORDER BY created_at, credential_id
-//	LIMIT $4
+//	LIMIT $5
 func (q *Queries) ListUserDeviceCredentials(ctx context.Context, arg ListUserDeviceCredentialsParams) ([]ListUserDeviceCredentialsRow, error) {
 	rows, err := q.db.Query(ctx, listUserDeviceCredentials,
 		arg.UserID,
+		arg.IncludeRevoked,
 		arg.AfterCreatedAt,
 		arg.AfterCredentialID,
 		arg.PageSize,
@@ -1000,7 +1089,10 @@ WHERE credential_id = $3
   AND user_id = $4
   AND generation = $5
   AND revoked_at IS NULL
-RETURNING credential_id, generation, revoked_at, revoke_reason
+RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
+          previous_secret_key_version, previous_valid_until, csrf_hash, generation, label,
+          created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
+          revoked_at, revoke_reason
 `
 
 type RevokeDeviceCredentialCASParams struct {
@@ -1009,13 +1101,6 @@ type RevokeDeviceCredentialCASParams struct {
 	CredentialID       pgtype.UUID        `json:"credential_id"`
 	UserID             pgtype.UUID        `json:"user_id"`
 	ExpectedGeneration int64              `json:"expected_generation"`
-}
-
-type RevokeDeviceCredentialCASRow struct {
-	CredentialID pgtype.UUID        `json:"credential_id"`
-	Generation   int64              `json:"generation"`
-	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
-	RevokeReason pgtype.Text        `json:"revoke_reason"`
 }
 
 // RevokeDeviceCredentialCAS
@@ -1028,8 +1113,11 @@ type RevokeDeviceCredentialCASRow struct {
 //	  AND user_id = $4
 //	  AND generation = $5
 //	  AND revoked_at IS NULL
-//	RETURNING credential_id, generation, revoked_at, revoke_reason
-func (q *Queries) RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDeviceCredentialCASParams) (RevokeDeviceCredentialCASRow, error) {
+//	RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
+//	          previous_secret_key_version, previous_valid_until, csrf_hash, generation, label,
+//	          created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
+//	          revoked_at, revoke_reason
+func (q *Queries) RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDeviceCredentialCASParams) (DeviceCredential, error) {
 	row := q.db.QueryRow(ctx, revokeDeviceCredentialCAS,
 		arg.RevokedAt,
 		arg.RevokeReason,
@@ -1037,14 +1125,102 @@ func (q *Queries) RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDevic
 		arg.UserID,
 		arg.ExpectedGeneration,
 	)
-	var i RevokeDeviceCredentialCASRow
+	var i DeviceCredential
 	err := row.Scan(
 		&i.CredentialID,
+		&i.UserID,
+		&i.SecretHash,
+		&i.SecretKeyVersion,
+		&i.PreviousSecretHash,
+		&i.PreviousSecretKeyVersion,
+		&i.PreviousValidUntil,
+		&i.CsrfHash,
 		&i.Generation,
+		&i.Label,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.RotatedAt,
+		&i.IdleExpiresAt,
+		&i.AbsoluteExpiresAt,
 		&i.RevokedAt,
 		&i.RevokeReason,
 	)
 	return i, err
+}
+
+const revokeOtherDeviceCredentialsForRecovery = `-- name: RevokeOtherDeviceCredentialsForRecovery :many
+UPDATE device_credentials
+SET revoked_at = $1,
+    revoke_reason = 'recovery',
+    generation = generation + 1
+WHERE user_id = $2
+  AND credential_id <> $3
+  AND revoked_at IS NULL
+RETURNING credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
+          idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+`
+
+type RevokeOtherDeviceCredentialsForRecoveryParams struct {
+	RevokedAt             pgtype.Timestamptz `json:"revoked_at"`
+	UserID                pgtype.UUID        `json:"user_id"`
+	PreservedCredentialID pgtype.UUID        `json:"preserved_credential_id"`
+}
+
+type RevokeOtherDeviceCredentialsForRecoveryRow struct {
+	CredentialID      pgtype.UUID        `json:"credential_id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Generation        int64              `json:"generation"`
+	Label             string             `json:"label"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	RotatedAt         pgtype.Timestamptz `json:"rotated_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+}
+
+// RevokeOtherDeviceCredentialsForRecovery
+//
+//	UPDATE device_credentials
+//	SET revoked_at = $1,
+//	    revoke_reason = 'recovery',
+//	    generation = generation + 1
+//	WHERE user_id = $2
+//	  AND credential_id <> $3
+//	  AND revoked_at IS NULL
+//	RETURNING credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
+//	          idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+func (q *Queries) RevokeOtherDeviceCredentialsForRecovery(ctx context.Context, arg RevokeOtherDeviceCredentialsForRecoveryParams) ([]RevokeOtherDeviceCredentialsForRecoveryRow, error) {
+	rows, err := q.db.Query(ctx, revokeOtherDeviceCredentialsForRecovery, arg.RevokedAt, arg.UserID, arg.PreservedCredentialID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RevokeOtherDeviceCredentialsForRecoveryRow{}
+	for rows.Next() {
+		var i RevokeOtherDeviceCredentialsForRecoveryRow
+		if err := rows.Scan(
+			&i.CredentialID,
+			&i.UserID,
+			&i.Generation,
+			&i.Label,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.RotatedAt,
+			&i.IdleExpiresAt,
+			&i.AbsoluteExpiresAt,
+			&i.RevokedAt,
+			&i.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const revokeUserRecoveryCredentialCAS = `-- name: RevokeUserRecoveryCredentialCAS :one
@@ -1056,7 +1232,8 @@ WHERE recovery_credential_id = $3
   AND user_id = $4
   AND version = $5
   AND status = 'active'
-RETURNING recovery_credential_id, user_id, version, status, revoked_at, revoke_reason
+RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+          created_at, consumed_at, revoked_at, revoke_reason
 `
 
 type RevokeUserRecoveryCredentialCASParams struct {
@@ -1065,15 +1242,6 @@ type RevokeUserRecoveryCredentialCASParams struct {
 	RecoveryCredentialID pgtype.UUID        `json:"recovery_credential_id"`
 	UserID               pgtype.UUID        `json:"user_id"`
 	ExpectedVersion      int64              `json:"expected_version"`
-}
-
-type RevokeUserRecoveryCredentialCASRow struct {
-	RecoveryCredentialID pgtype.UUID        `json:"recovery_credential_id"`
-	UserID               pgtype.UUID        `json:"user_id"`
-	Version              int64              `json:"version"`
-	Status               string             `json:"status"`
-	RevokedAt            pgtype.Timestamptz `json:"revoked_at"`
-	RevokeReason         pgtype.Text        `json:"revoke_reason"`
 }
 
 // RevokeUserRecoveryCredentialCAS
@@ -1086,8 +1254,9 @@ type RevokeUserRecoveryCredentialCASRow struct {
 //	  AND user_id = $4
 //	  AND version = $5
 //	  AND status = 'active'
-//	RETURNING recovery_credential_id, user_id, version, status, revoked_at, revoke_reason
-func (q *Queries) RevokeUserRecoveryCredentialCAS(ctx context.Context, arg RevokeUserRecoveryCredentialCASParams) (RevokeUserRecoveryCredentialCASRow, error) {
+//	RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+//	          created_at, consumed_at, revoked_at, revoke_reason
+func (q *Queries) RevokeUserRecoveryCredentialCAS(ctx context.Context, arg RevokeUserRecoveryCredentialCASParams) (UserRecoveryCredential, error) {
 	row := q.db.QueryRow(ctx, revokeUserRecoveryCredentialCAS,
 		arg.RevokedAt,
 		arg.RevokeReason,
@@ -1095,12 +1264,16 @@ func (q *Queries) RevokeUserRecoveryCredentialCAS(ctx context.Context, arg Revok
 		arg.UserID,
 		arg.ExpectedVersion,
 	)
-	var i RevokeUserRecoveryCredentialCASRow
+	var i UserRecoveryCredential
 	err := row.Scan(
 		&i.RecoveryCredentialID,
 		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
 		&i.Version,
 		&i.Status,
+		&i.CreatedAt,
+		&i.ConsumedAt,
 		&i.RevokedAt,
 		&i.RevokeReason,
 	)

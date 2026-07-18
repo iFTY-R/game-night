@@ -14,9 +14,25 @@ import (
 
 // Service centralizes result preparation, replay authorization, decryption, confirmation, and expiry.
 type Service struct {
-	cipher       *EnvelopeCipher
-	clock        clock.Clock
-	deviceAccess *security.HMACKeyring[security.DeviceHMACKeyPurpose]
+	cipher         *EnvelopeCipher
+	clock          clock.Clock
+	deviceAccess   *security.HMACKeyring[security.DeviceHMACKeyPurpose]
+	recoveryAccess *security.HMACKeyring[security.UserChallengeKeyPurpose]
+}
+
+// NewServiceWithIdentityAccess enables both authenticated-device and consumed-recovery result authority.
+func NewServiceWithIdentityAccess(
+	cipher *EnvelopeCipher,
+	serviceClock clock.Clock,
+	deviceAccess *security.HMACKeyring[security.DeviceHMACKeyPurpose],
+	recoveryAccess *security.HMACKeyring[security.UserChallengeKeyPurpose],
+) (*Service, error) {
+	if cipher == nil || serviceClock == nil || deviceAccess == nil || recoveryAccess == nil {
+		return nil, ErrInvalidInput
+	}
+	return &Service{
+		cipher: cipher, clock: serviceClock, deviceAccess: deviceAccess, recoveryAccess: recoveryAccess,
+	}, nil
 }
 
 // NewService requires explicit cryptography and time dependencies so tests never use hidden wall-clock state.
@@ -147,6 +163,86 @@ func (service *Service) OpenAuthorizedResult(
 		return nil, ErrSecretNoLongerAvailable
 	}
 	return service.cipher.open(snapshot.Payload, binding, snapshot.SecretExpiresAt)
+}
+
+// OpenRecoveryAuthorizedResult decrypts only the exact result authorized by a consumed recovery attempt.
+func (service *Service) OpenRecoveryAuthorizedResult(
+	result Result,
+	binding Binding,
+	grant secretaccess.RecoveryGrant,
+) ([]byte, error) {
+	if service == nil || service.cipher == nil || service.clock == nil || binding.Validate() != nil {
+		return nil, ErrInvalidInput
+	}
+	snapshot := result.Snapshot()
+	now := service.clock.Now()
+	if snapshot.ID == uuid.Nil ||
+		!secretaccess.VerifyRecoveryGrant(service.recoveryAccess, grant, snapshot.ID, binding.Key.ActorID, now) {
+		return nil, ErrReplayUnauthorized
+	}
+	resolution, err := result.Resolve(binding, now)
+	if err != nil {
+		return nil, err
+	}
+	if resolution.Kind != ReplayAvailable {
+		return nil, ErrSecretNoLongerAvailable
+	}
+	return service.cipher.open(snapshot.Payload, binding, snapshot.SecretExpiresAt)
+}
+
+// ConfirmDeviceAuthorizedResult erases a locked exact result after current-device authorization is revalidated.
+func (service *Service) ConfirmDeviceAuthorizedResult(
+	ctx context.Context,
+	repository Repository,
+	result Result,
+	binding Binding,
+	grant secretaccess.DeviceGrant,
+) (Result, error) {
+	snapshot := result.Snapshot()
+	authorized := service != nil && service.clock != nil &&
+		secretaccess.VerifyDeviceGrant(service.deviceAccess, grant, snapshot.ID, binding.Key.ActorID, service.clock.Now())
+	return service.confirmAuthorizedResult(ctx, repository, result, binding, authorized)
+}
+
+// ConfirmRecoveryAuthorizedResult erases a locked exact result after the consumed attempt is reauthenticated.
+func (service *Service) ConfirmRecoveryAuthorizedResult(
+	ctx context.Context,
+	repository Repository,
+	result Result,
+	binding Binding,
+	grant secretaccess.RecoveryGrant,
+) (Result, error) {
+	snapshot := result.Snapshot()
+	authorized := service != nil && service.clock != nil &&
+		secretaccess.VerifyRecoveryGrant(service.recoveryAccess, grant, snapshot.ID, binding.Key.ActorID, service.clock.Now())
+	return service.confirmAuthorizedResult(ctx, repository, result, binding, authorized)
+}
+
+func (service *Service) confirmAuthorizedResult(
+	ctx context.Context,
+	repository Repository,
+	result Result,
+	binding Binding,
+	authorized bool,
+) (Result, error) {
+	if service == nil || service.clock == nil || ctx == nil || repository == nil || binding.Validate() != nil || !authorized {
+		return Result{}, ErrReplayUnauthorized
+	}
+	now := service.clock.Now()
+	snapshot := result.Snapshot()
+	if snapshot.ID == uuid.Nil {
+		return Result{}, ErrReplayUnauthorized
+	}
+	if _, err := result.Resolve(binding, now); err != nil {
+		return Result{}, err
+	}
+	if snapshot.Status == StatusConfirmed {
+		return result, nil
+	}
+	if snapshot.Status != StatusAvailable || !now.Before(snapshot.SecretExpiresAt) {
+		return Result{}, ErrSecretNoLongerAvailable
+	}
+	return repository.ConfirmCAS(ctx, Confirmation{ResultID: snapshot.ID, Binding: binding, ConfirmedAt: now})
 }
 
 // Confirm erases secret material only for the exact result authorized by a consumed challenge.

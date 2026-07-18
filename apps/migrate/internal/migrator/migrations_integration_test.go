@@ -209,6 +209,215 @@ func TestIdentityInvariantMigrationRejectsInvalidVersionEightRows(t *testing.T) 
 	}
 }
 
+func TestIdentityRecoveryInvariantMigrationAcceptsValidVersionNineRows(t *testing.T) {
+	ctx, fixture, database, migrationsDir := openMigrationNineTest(t)
+	if _, err := fixture.Pool.Exec(ctx, migrationNineRecoveryAttemptSQL(
+		"a1000000-0000-4000-8000-000000000001", "5 minutes",
+	)); err != nil {
+		t.Fatalf("insert valid migration-9 recovery state: %v", err)
+	}
+	_, err := fixture.Pool.Exec(ctx, `
+		INSERT INTO user_recovery_attempts (
+			recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version, user_id,
+			recovery_credential_id, recovery_credential_version, challenge_id, origin_hash,
+			purpose, request_digest, attempt_count, max_attempts, status, created_at, expires_at
+		) VALUES (
+			'a4000000-0000-4000-8000-000000000002', 'valid-expired-recovery-grant',
+			decode(repeat('55', 32), 'hex'), 1, 'a1000000-0000-4000-8000-000000000001',
+			'a2000000-0000-4000-8000-000000000001', 1,
+			'a3000000-0000-4000-8000-000000000001', decode(repeat('22', 32), 'hex'),
+			'identity.recovery', NULL, 1, 5, 'expired',
+			transaction_timestamp(), transaction_timestamp() + interval '5 minutes'
+		)
+	`)
+	if err != nil {
+		t.Fatalf("insert valid TTL-expired migration-9 recovery attempt: %v", err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationsDir, 10); err != nil {
+		t.Fatalf("upgrade valid recovery state to migration 10: %v", err)
+	}
+}
+
+func TestIdentityRecoveryInvariantMigrationRejectsInvalidVersionNineRows(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		insertSQL  string
+		constraint string
+	}{
+		{
+			name: "active recovery attempt has request digest",
+			insertSQL: strings.Replace(
+				migrationNineRecoveryAttemptSQL("a1000000-0000-4000-8000-000000000001", "5 minutes"),
+				"'identity.recovery', NULL, 0, 5, 'active'",
+				"'identity.recovery', decode(repeat('44', 32), 'hex'), 0, 5, 'active'",
+				1,
+			),
+			constraint: "user_recovery_attempts_lifecycle_invariant",
+		},
+		{
+			name: "consumed recovery attempt missing request digest",
+			insertSQL: migrationNineRecoveryAttemptSQL(
+				"a1000000-0000-4000-8000-000000000001", "5 minutes",
+			) + `
+				INSERT INTO secret_operation_results (
+					result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+					result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+					status, secret_expires_at, completed_at, tombstone_expires_at
+				) VALUES (
+					'a5000000-0000-4000-8000-000000000001', 'identity.recovery',
+					'a1000000-0000-4000-8000-000000000001', 'migration-10-consumed-null',
+					decode(repeat('77', 32), 'hex'), 'identity.device_credential', 1,
+					decode('01', 'hex'), decode('02', 'hex'), decode('03', 'hex'), 1,
+					'available', transaction_timestamp() + interval '5 minutes', transaction_timestamp(),
+					transaction_timestamp() + interval '10 minutes'
+				);
+				UPDATE user_recovery_attempts
+				SET status = 'consumed', consumed_at = transaction_timestamp() + interval '1 minute',
+					result_id = 'a5000000-0000-4000-8000-000000000001'
+				WHERE recovery_attempt_id = 'a4000000-0000-4000-8000-000000000001'
+			`,
+			constraint: "user_recovery_attempts_lifecycle_invariant",
+		},
+		{
+			name: "recovery attempt ttl",
+			insertSQL: migrationNineRecoveryAttemptSQL(
+				"a1000000-0000-4000-8000-000000000001", "301 seconds",
+			),
+			constraint: "user_recovery_attempts_lifecycle_invariant",
+		},
+		{
+			name: "recovery credential version",
+			insertSQL: strings.Replace(
+				migrationNineRecoveryAttemptSQL("a1000000-0000-4000-8000-000000000001", "5 minutes"),
+				"'a2000000-0000-4000-8000-000000000001', 1,",
+				"'a2000000-0000-4000-8000-000000000001', 0,",
+				1,
+			),
+			constraint: "user_recovery_attempts_lifecycle_invariant",
+		},
+		{
+			name: "recovery attempt owner",
+			insertSQL: migrationNineRecoveryAttemptSQL(
+				"a1000000-0000-4000-8000-000000000002", "5 minutes",
+			),
+			constraint: "user_recovery_attempts_credential_owner_fk",
+		},
+		{
+			name: "active recovery credential has revoke reason",
+			insertSQL: `
+				INSERT INTO users (user_id, status, created_at, updated_at)
+				VALUES (
+					'a1000000-0000-4000-8000-000000000001', 'onboarding',
+					transaction_timestamp(), transaction_timestamp()
+				);
+				INSERT INTO user_recovery_credentials (
+					recovery_credential_id, user_id, selector, secret_hash, version, status,
+					created_at, revoke_reason
+				) VALUES (
+					'a2000000-0000-4000-8000-000000000001',
+					'a1000000-0000-4000-8000-000000000001', 'active-reason-recovery-credential',
+					'argon2id hash', 1, 'active', transaction_timestamp(), 'rotated'
+				)
+			`,
+			constraint: "user_recovery_credentials_revoke_reason_invariant",
+		},
+		{
+			name: "recovery credential revoke reason",
+			insertSQL: `
+				INSERT INTO users (user_id, status, created_at, updated_at)
+				VALUES (
+					'a1000000-0000-4000-8000-000000000001', 'onboarding',
+					transaction_timestamp(), transaction_timestamp()
+				);
+				INSERT INTO user_recovery_credentials (
+					recovery_credential_id, user_id, selector, secret_hash, version, status,
+					created_at, revoked_at, revoke_reason
+				) VALUES (
+					'a2000000-0000-4000-8000-000000000001',
+					'a1000000-0000-4000-8000-000000000001', 'invalid-revoke-recovery-credential',
+					'argon2id hash', 1, 'revoked', transaction_timestamp(), transaction_timestamp(), 'unknown_reason'
+				)
+			`,
+			constraint: "user_recovery_credentials_revoke_reason_invariant",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, fixture, database, migrationsDir := openMigrationNineTest(t)
+			if _, err := fixture.Pool.Exec(ctx, test.insertSQL); err != nil {
+				t.Fatalf("insert invalid migration-9 recovery state: %v", err)
+			}
+			err := goose.UpToContext(ctx, database, migrationsDir, 10)
+			if err == nil || !strings.Contains(err.Error(), test.constraint) {
+				t.Fatalf("migration error = %v, want constraint %q", err, test.constraint)
+			}
+		})
+	}
+}
+
+func migrationNineRecoveryAttemptSQL(attemptUserID, expiryInterval string) string {
+	return fmt.Sprintf(`
+		INSERT INTO users (user_id, status, created_at, updated_at) VALUES
+			('a1000000-0000-4000-8000-000000000001', 'onboarding', transaction_timestamp(), transaction_timestamp()),
+			('a1000000-0000-4000-8000-000000000002', 'onboarding', transaction_timestamp(), transaction_timestamp());
+		INSERT INTO user_recovery_credentials (
+			recovery_credential_id, user_id, selector, secret_hash, version, status, created_at
+		) VALUES (
+			'a2000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001',
+			'valid-recovery-credential', 'argon2id hash', 1, 'active', transaction_timestamp()
+		);
+		INSERT INTO anonymous_challenges (
+			challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
+			origin_hash, request_flow_id, max_attempts, created_at, expires_at
+		) VALUES (
+			'a3000000-0000-4000-8000-000000000001', 'valid-recovery-challenge', decode(repeat('11', 32), 'hex'), 1,
+			'identity.recovery', 'identity.v1.IdentityService', decode(repeat('22', 32), 'hex'),
+			'valid-recovery-flow', 5, transaction_timestamp(), transaction_timestamp() + interval '5 minutes'
+		);
+		INSERT INTO user_recovery_attempts (
+			recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version, user_id,
+			recovery_credential_id, recovery_credential_version, challenge_id, origin_hash,
+			purpose, request_digest, attempt_count, max_attempts, status, created_at, expires_at
+		) VALUES (
+			'a4000000-0000-4000-8000-000000000001', 'valid-recovery-grant', decode(repeat('33', 32), 'hex'), 1,
+			'%s', 'a2000000-0000-4000-8000-000000000001', 1,
+			'a3000000-0000-4000-8000-000000000001', decode(repeat('22', 32), 'hex'),
+			'identity.recovery', NULL, 0, 5, 'active',
+			transaction_timestamp(), transaction_timestamp() + interval '%s'
+		)
+	`, attemptUserID, expiryInterval)
+}
+
+func openMigrationNineTest(t testing.TB) (
+	context.Context,
+	*integrationtest.PostgresSchema,
+	*sql.DB,
+	string,
+) {
+	t.Helper()
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	t.Cleanup(cancel)
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting:       currentUser,
+		auditWriterRoleSetting: currentUser,
+		migrationRoleSetting:   currentUser,
+		runtimeRoleSetting:     currentUser,
+		workerRoleSetting:      currentUser,
+	})
+	migrationsDir := migrationDirectory(t)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationsDir, 9); err != nil {
+		t.Fatalf("apply migrations through version 9: %v", err)
+	}
+	return ctx, fixture, database, migrationsDir
+}
+
 func openMigrationEightTest(t testing.TB) (
 	context.Context,
 	*integrationtest.PostgresSchema,
@@ -307,14 +516,14 @@ func TestSecretResultWorkflowDownRemovesConsumedChallengesWithoutReplay(t *testi
 		INSERT INTO user_recovery_attempts (
 			recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version, user_id,
 			recovery_credential_id, recovery_credential_version, challenge_id, origin_hash,
-			purpose, attempt_count, max_attempts, status, created_at, expires_at
+			purpose, request_digest, attempt_count, max_attempts, status, created_at, expires_at
 		) VALUES (
 			'40000000-0000-4000-8000-000000000001', 'downgrade-recovery-grant',
 			decode(repeat('33', 32), 'hex'), 1, '10000000-0000-4000-8000-000000000001',
 			'20000000-0000-4000-8000-000000000001', 1,
 			'30000000-0000-4000-8000-000000000001', decode(repeat('22', 32), 'hex'),
-			'identity.recovery', 0, 5, 'active', transaction_timestamp(),
-			transaction_timestamp() + interval '4 minutes'
+			'identity.recovery', NULL, 0, 5, 'active', transaction_timestamp(),
+			transaction_timestamp() + interval '5 minutes'
 		)
 	`)
 	if err != nil {

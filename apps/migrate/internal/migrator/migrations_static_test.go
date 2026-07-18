@@ -16,7 +16,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 		t.Fatalf("collect migrations: %v", err)
 	}
 
-	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	if len(migrations) != len(wantVersions) {
 		t.Fatalf("expected %d migrations, got %d", len(wantVersions), len(migrations))
 	}

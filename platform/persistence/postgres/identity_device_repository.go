@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"math"
+	"reflect"
+	"time"
 
 	"github.com/google/uuid"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
@@ -13,8 +15,58 @@ import (
 type identityDeviceQueries interface {
 	CreateDeviceCredential(context.Context, sqlcgen.CreateDeviceCredentialParams) (sqlcgen.DeviceCredential, error)
 	GetDeviceIdentityForUpdate(context.Context, sqlcgen.GetDeviceIdentityForUpdateParams) (sqlcgen.GetDeviceIdentityForUpdateRow, error)
+	GetDeviceCredentialForUpdate(context.Context, sqlcgen.GetDeviceCredentialForUpdateParams) (sqlcgen.DeviceCredential, error)
+	ListUserDeviceCredentials(context.Context, sqlcgen.ListUserDeviceCredentialsParams) ([]sqlcgen.ListUserDeviceCredentialsRow, error)
 	TouchDeviceCredentialCAS(context.Context, sqlcgen.TouchDeviceCredentialCASParams) (sqlcgen.TouchDeviceCredentialCASRow, error)
 	RotateDeviceCredentialCAS(context.Context, sqlcgen.RotateDeviceCredentialCASParams) (sqlcgen.DeviceCredential, error)
+	RevokeDeviceCredentialCAS(context.Context, sqlcgen.RevokeDeviceCredentialCASParams) (sqlcgen.DeviceCredential, error)
+	RevokeOtherDeviceCredentialsForRecovery(context.Context, sqlcgen.RevokeOtherDeviceCredentialsForRecoveryParams) ([]sqlcgen.RevokeOtherDeviceCredentialsForRecoveryRow, error)
+}
+
+func (repository *identityDeviceRepository) GetForUpdate(
+	ctx context.Context,
+	credentialID uuid.UUID,
+) (identityDomain.DeviceCredential, error) {
+	if credentialID == uuid.Nil {
+		return identityDomain.DeviceCredential{}, identityDomain.ErrInvalidDeviceInput
+	}
+	row, err := repository.queries.GetDeviceCredentialForUpdate(ctx, sqlcgen.GetDeviceCredentialForUpdateParams{
+		CredentialID: uuidToPG(credentialID),
+	})
+	if err != nil {
+		return identityDomain.DeviceCredential{}, mapIdentityQueryError(ctx, err, identityDomain.ErrDeviceAuthentication)
+	}
+	return identityDeviceFromRow(row)
+}
+
+func (repository *identityDeviceRepository) List(
+	ctx context.Context,
+	request identityDomain.DeviceListRequest,
+) ([]identityDomain.DeviceSummary, error) {
+	if request.UserID == uuid.Nil || request.PageSize == 0 || request.PageSize > identityDomain.MaximumDevicePageSize ||
+		request.ListedAt.IsZero() {
+		return nil, identityDomain.ErrInvalidDeviceInput
+	}
+	rows, err := repository.queries.ListUserDeviceCredentials(ctx, sqlcgen.ListUserDeviceCredentialsParams{
+		UserID: uuidToPG(request.UserID), IncludeRevoked: request.IncludeRevoked,
+		AfterCreatedAt: timeToPG(request.After.CreatedAt), AfterCredentialID: uuidToPG(request.After.CredentialID),
+		PageSize: int32(request.PageSize),
+	})
+	if err != nil {
+		return nil, mapIdentityQueryError(ctx, err, identityDomain.ErrIdentityRepositoryUnavailable)
+	}
+	devices := make([]identityDomain.DeviceSummary, 0, len(rows))
+	for _, row := range rows {
+		summary, mapErr := restoreIdentityDeviceSummary(
+			row.CredentialID, row.UserID, row.Label, row.CreatedAt, row.LastSeenAt,
+			row.IdleExpiresAt, row.AbsoluteExpiresAt, row.RevokedAt, request.ListedAt,
+		)
+		if mapErr != nil || summary.UserID() != request.UserID {
+			return nil, identityDomain.ErrIdentityIntegrity
+		}
+		devices = append(devices, summary)
+	}
+	return devices, nil
 }
 
 type identityDeviceRepository struct{ queries identityDeviceQueries }
@@ -134,6 +186,61 @@ func (repository *identityDeviceRepository) RotateCAS(
 		return identityDomain.DeviceCredential{}, identityDomain.ErrIdentityIntegrity
 	}
 	return stored, nil
+}
+
+func (repository *identityDeviceRepository) RevokeCAS(
+	ctx context.Context,
+	current, next identityDomain.DeviceCredential,
+) (identityDomain.DeviceCredential, error) {
+	before, after := current.Snapshot(), next.Snapshot()
+	expected, err := current.Revoke(after.RevokeReason, after.RevokedAt)
+	if err != nil || !deviceSnapshotsEqual(expected.Snapshot(), after) {
+		return identityDomain.DeviceCredential{}, identityDomain.ErrInvalidDeviceInput
+	}
+	row, err := repository.queries.RevokeDeviceCredentialCAS(ctx, sqlcgen.RevokeDeviceCredentialCASParams{
+		RevokedAt: timeToPG(after.RevokedAt), RevokeReason: textToPG(string(after.RevokeReason)),
+		CredentialID: uuidToPG(before.CredentialID), UserID: uuidToPG(before.UserID),
+		ExpectedGeneration: int64(before.Generation),
+	})
+	if err != nil {
+		return identityDomain.DeviceCredential{}, mapIdentityQueryError(ctx, err, identityDomain.ErrDeviceConcurrentTransition)
+	}
+	return identityDeviceFromRow(row)
+}
+
+func (repository *identityDeviceRepository) RevokeOtherActiveForRecovery(
+	ctx context.Context,
+	userID, preservedCredentialID uuid.UUID,
+	revokedAt time.Time,
+) ([]identityDomain.DeviceSummary, error) {
+	if userID == uuid.Nil || preservedCredentialID == uuid.Nil || revokedAt.IsZero() {
+		return nil, identityDomain.ErrInvalidDeviceInput
+	}
+	rows, err := repository.queries.RevokeOtherDeviceCredentialsForRecovery(
+		ctx, sqlcgen.RevokeOtherDeviceCredentialsForRecoveryParams{
+			RevokedAt: timeToPG(revokedAt), UserID: uuidToPG(userID),
+			PreservedCredentialID: uuidToPG(preservedCredentialID),
+		},
+	)
+	if err != nil {
+		return nil, mapIdentityQueryError(ctx, err, identityDomain.ErrRecoveryConcurrentTransition)
+	}
+	devices := make([]identityDomain.DeviceSummary, 0, len(rows))
+	for _, row := range rows {
+		summary, mapErr := restoreIdentityDeviceSummary(
+			row.CredentialID, row.UserID, row.Label, row.CreatedAt, row.LastSeenAt,
+			row.IdleExpiresAt, row.AbsoluteExpiresAt, row.RevokedAt, revokedAt,
+		)
+		if mapErr != nil || summary.UserID() != userID || summary.Status != identityDomain.DeviceStateRevoked {
+			return nil, identityDomain.ErrIdentityIntegrity
+		}
+		devices = append(devices, summary)
+	}
+	return devices, nil
+}
+
+func deviceSnapshotsEqual(left, right identityDomain.DeviceCredentialSnapshot) bool {
+	return reflect.DeepEqual(left, right)
 }
 
 var _ identityDomain.DeviceRepository = (*identityDeviceRepository)(nil)

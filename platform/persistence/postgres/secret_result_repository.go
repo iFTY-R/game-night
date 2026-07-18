@@ -16,6 +16,7 @@ import (
 
 type secretResultQueries interface {
 	CreateSecretOperationResult(context.Context, sqlcgen.CreateSecretOperationResultParams) (sqlcgen.SecretOperationResult, error)
+	GetSecretOperationResultByIDForUpdate(context.Context, sqlcgen.GetSecretOperationResultByIDForUpdateParams) (sqlcgen.SecretOperationResult, error)
 	GetSecretOperationResultByOperationForUpdate(context.Context, sqlcgen.GetSecretOperationResultByOperationForUpdateParams) (sqlcgen.SecretOperationResult, error)
 	ConfirmSecretOperationResultCAS(context.Context, sqlcgen.ConfirmSecretOperationResultCASParams) (sqlcgen.ConfirmSecretOperationResultCASRow, error)
 	ExpireSecretOperationResultCAS(context.Context, sqlcgen.ExpireSecretOperationResultCASParams) (sqlcgen.ExpireSecretOperationResultCASRow, error)
@@ -29,6 +30,20 @@ type SecretResultRepository struct {
 
 func newSecretResultRepository(queries secretResultQueries) *SecretResultRepository {
 	return &SecretResultRepository{queries: queries}
+}
+
+// GetByIDForUpdate locks the authorization-selected result before callers trust its persisted operation binding.
+func (repository *SecretResultRepository) GetByIDForUpdate(ctx context.Context, resultID uuid.UUID) (secretresult.Result, error) {
+	if resultID == uuid.Nil {
+		return secretresult.Result{}, secretresult.ErrInvalidInput
+	}
+	row, err := repository.queries.GetSecretOperationResultByIDForUpdate(
+		ctx, sqlcgen.GetSecretOperationResultByIDForUpdateParams{ResultID: uuidToPG(resultID)},
+	)
+	if err != nil {
+		return secretresult.Result{}, mapSecretResultQueryError(ctx, err, secretresult.ErrNotFound)
+	}
+	return secretResultFromRow(row)
 }
 
 // GetByOperationForUpdate locks the composite operation row for retry, confirm, or cleanup arbitration.

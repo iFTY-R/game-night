@@ -29,6 +29,18 @@ func TestSecretResultRepositoryIdempotencyAndTerminalErasure(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := unitOfWork.Run(ctx, func(ctx context.Context, repository secretresult.Repository) error {
+		stored, err := repository.GetByIDForUpdate(ctx, available.Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		if stored.Snapshot().Binding != binding {
+			t.Fatalf("result-id lookup binding = %+v, want %+v", stored.Snapshot().Binding, binding)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	mismatchedVersion := binding
 	mismatchedVersion.ResultVersion++

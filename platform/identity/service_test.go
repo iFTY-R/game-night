@@ -55,6 +55,19 @@ func TestServiceBootstrapReplaysSameDeviceSecretsAfterResponseLoss(t *testing.T)
 	if _, err := fixture.service.BootstrapIdentity(ctx, conflict); !errors.Is(err, idempotency.ErrConflict) {
 		t.Fatalf("conflicting replay error = %v", err)
 	}
+	resultKey := secretresult.Key{
+		Scope: secretresult.ScopeIdentityBootstrap, ActorID: first.User.Snapshot().ID, OperationID: operationID,
+	}
+	if _, exists := fixture.storage.results[resultKey]; !exists {
+		t.Fatal("bootstrap result is not owned by the newly created user")
+	}
+	confirmed, err := fixture.service.ConfirmSecretReceipt(ctx, ConfirmSecretReceiptCommand{
+		DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
+		Operation: IdentitySecretOperationBootstrap, OperationID: operationID, ResultID: first.Operation.ResultID,
+	})
+	if err != nil || !confirmed.Confirmed || fixture.storage.results[resultKey].Snapshot().Status != secretresult.StatusConfirmed {
+		t.Fatalf("bootstrap receipt was not confirmed: result=%#v err=%v", confirmed, err)
+	}
 }
 
 func TestServiceScheduledRotationReplaysSameGenerationAfterResponseLoss(t *testing.T) {
@@ -109,6 +122,19 @@ func TestServiceScheduledRotationReplaysSameGenerationAfterResponseLoss(t *testi
 		first.DeviceSecrets.Token() != second.DeviceSecrets.Token() || first.DeviceSecrets.CSRFToken() != second.DeviceSecrets.CSRFToken() ||
 		first.Operation.ResultID != second.Operation.ResultID || !second.Operation.Replayed {
 		t.Fatalf("scheduled rotation was not reliably replayed: first=%+v second=%+v", first, second)
+	}
+	resultKey := secretresult.Key{
+		Scope: secretresult.ScopeIdentityBootstrap, ActorID: bootstrap.User.Snapshot().ID, OperationID: command.OperationID,
+	}
+	if _, exists := fixture.storage.results[resultKey]; !exists {
+		t.Fatal("scheduled rotation result is not owned by the authenticated user")
+	}
+	confirmed, err := fixture.service.ConfirmSecretReceipt(ctx, ConfirmSecretReceiptCommand{
+		DeviceToken: second.DeviceSecrets.Token(), CSRFToken: second.DeviceSecrets.CSRFToken(),
+		Operation: IdentitySecretOperationBootstrap, OperationID: command.OperationID, ResultID: second.Operation.ResultID,
+	})
+	if err != nil || !confirmed.Confirmed || fixture.storage.results[resultKey].Snapshot().Status != secretresult.StatusConfirmed {
+		t.Fatalf("scheduled rotation receipt was not confirmed: result=%#v err=%v", confirmed, err)
 	}
 	verification, err := fixture.service.devices.Authenticate(second.Device, bootstrap.DeviceSecrets.Token())
 	if err != nil || verification.SecretKind() != DeviceSecretPrevious {
@@ -337,6 +363,7 @@ type identityServiceFixture struct {
 	clock   *clock.Fake
 	limiter *ratelimittest.Fake
 	storage *memoryIdentityStorage
+	hasher  *recordingRecoveryHasher
 }
 
 func newIdentityServiceFixture(t testing.TB) *identityServiceFixture {
@@ -360,11 +387,12 @@ func newIdentityServiceFixture(t testing.TB) *identityServiceFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultService, err := secretresult.NewServiceWithDeviceAccess(cipher, serviceClock, deviceService.keyring)
+	resultService, err := secretresult.NewServiceWithIdentityAccess(cipher, serviceClock, deviceService.keyring, challengeKeyring)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recoveryService, err := NewRecoveryCodeService(&recordingRecoveryHasher{hash: testRecoveryPHC})
+	hasher := &recordingRecoveryHasher{hash: testRecoveryPHC, verifyMatched: true}
+	recoveryService, err := NewRecoveryCodeService(hasher)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,11 +403,18 @@ func newIdentityServiceFixture(t testing.TB) *identityServiceFixture {
 	storage := newMemoryIdentityStorage()
 	unitOfWork := &memoryIdentityUnitOfWork{storage: storage}
 	limiter := ratelimittest.New()
-	service, err := NewService(challengeService, deviceService, recoveryService, resultService, unitOfWork, limiter, validator, serviceClock)
+	attemptService, err := NewRecoveryAttemptService(challengeKeyring, serviceClock)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &identityServiceFixture{service: service, clock: serviceClock, limiter: limiter, storage: storage}
+	service, err := NewServiceWithRecovery(
+		challengeService, deviceService, recoveryService, attemptService, resultService,
+		unitOfWork, limiter, validator, serviceClock, newIdentityAuditService(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &identityServiceFixture{service: service, clock: serviceClock, limiter: limiter, storage: storage, hasher: hasher}
 }
 
 func (fixture *identityServiceFixture) bootstrap(t testing.TB, ctx context.Context) BootstrapIdentityResult {

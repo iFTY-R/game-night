@@ -131,6 +131,17 @@ func (repository *memoryRepository) GetByOperationForUpdate(_ context.Context, k
 	return result, nil
 }
 
+func (repository *memoryRepository) GetByIDForUpdate(_ context.Context, resultID uuid.UUID) (Result, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	for _, result := range repository.results {
+		if result.Snapshot().ID == resultID {
+			return result, nil
+		}
+	}
+	return Result{}, ErrNotFound
+}
+
 type memoryUnitOfWork struct {
 	repository Repository
 }

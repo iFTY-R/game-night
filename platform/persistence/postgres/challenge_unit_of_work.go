@@ -6,6 +6,7 @@ import (
 
 	adminDomain "github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/challenge"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,7 +29,7 @@ func (unitOfWork *IdentityChallengeUnitOfWork) Run(ctx context.Context, work ide
 		return challenge.ErrInvalidInput
 	}
 	err := unitOfWork.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
-		return work(ctx, newIdentityTransaction(queries))
+		return work(ctx, newIdentityChallengeTransaction(queries))
 	})
 	return mapUnitOfWorkError(err, challenge.ErrRepositoryUnavailable, challengeTransactionDomainErrors...)
 }
@@ -42,8 +43,8 @@ type identityChallengeTransaction struct {
 	recovery   identityDomain.RecoveryCredentialRepository
 }
 
-// newIdentityTransaction keeps both public identity transaction boundaries on the same repository set.
-func newIdentityTransaction(queries QueryHandle) identityChallengeTransaction {
+// newIdentityChallengeTransaction builds the repository subset shared by legacy challenge and full security workflows.
+func newIdentityChallengeTransaction(queries QueryHandle) identityChallengeTransaction {
 	return identityChallengeTransaction{
 		challenges: &identityChallengeRepository{queries: queries},
 		results:    newSecretResultRepository(queries),
@@ -116,7 +117,7 @@ var challengeTransactionDomainErrors = append([]error{
 }, secretResultDomainErrors...)
 
 // identityTransactionDomainErrors preserves reviewed callback sentinels while hiding transaction diagnostics.
-var identityTransactionDomainErrors = append(challengeTransactionDomainErrors,
+var identityTransactionDomainErrors = append(append(challengeTransactionDomainErrors, []error{
 	identityDomain.ErrInvalidIdentityRequest,
 	identityDomain.ErrInvalidUserInput,
 	identityDomain.ErrUserStatus,
@@ -135,7 +136,13 @@ var identityTransactionDomainErrors = append(challengeTransactionDomainErrors,
 	identityDomain.ErrDeviceConcurrentTransition,
 	identityDomain.ErrDeviceIntegrity,
 	identityDomain.ErrInvalidRecoveryCredential,
-)
+	identityDomain.ErrRecoveryInvalid,
+	identityDomain.ErrRecoveryConcurrentTransition,
+	identityDomain.ErrInvalidRecoveryAttempt,
+	identityDomain.ErrInvalidAssistedRecoveryGrant,
+	idempotency.ErrInvalidInput,
+	idempotency.ErrConflict,
+}...), auditOutboxDomainErrors...)
 
 // mapIdentityCommitFailure translates deferred PostgreSQL constraint and serialization failures at commit.
 func mapIdentityCommitFailure(err error) error {

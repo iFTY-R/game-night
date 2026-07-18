@@ -27,6 +27,14 @@ var (
 	ErrIdentityIntegrity = errors.New("identity persistence integrity failure")
 	// ErrInvalidRecoveryCredential rejects malformed generated or restored recovery records.
 	ErrInvalidRecoveryCredential = errors.New("invalid recovery credential")
+	// ErrRecoveryInvalid collapses malformed, unknown, expired, consumed, and mismatched recovery material.
+	ErrRecoveryInvalid = errors.New("recovery credential is invalid")
+	// ErrRecoveryConcurrentTransition reports a stale recovery credential, attempt, or assisted-grant CAS.
+	ErrRecoveryConcurrentTransition = errors.New("recovery transition lost concurrency race")
+	// ErrInvalidRecoveryAttempt rejects malformed grant claims or corrupted persisted attempt state.
+	ErrInvalidRecoveryAttempt = errors.New("invalid recovery attempt")
+	// ErrInvalidAssistedRecoveryGrant rejects malformed or corrupted administrator-assisted recovery state.
+	ErrInvalidAssistedRecoveryGrant = errors.New("invalid assisted recovery grant")
 	// ErrInvalidDeviceInput rejects malformed issue parameters and corrupted snapshots without echoing secrets.
 	ErrInvalidDeviceInput = errors.New("invalid device credential input")
 	// ErrDeviceAuthentication merges malformed tokens, selector mismatches, and wrong secrets.

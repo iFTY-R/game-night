@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/identifier"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 )
 
@@ -88,20 +90,58 @@ type UsernameClaimRepository interface {
 type DeviceRepository interface {
 	Insert(context.Context, DeviceCredential) (DeviceCredential, error)
 	GetIdentityForUpdate(context.Context, uuid.UUID) (User, DeviceCredential, error)
+	GetForUpdate(context.Context, uuid.UUID) (DeviceCredential, error)
+	List(context.Context, DeviceListRequest) ([]DeviceSummary, error)
 	TouchCAS(context.Context, DeviceCredential, DeviceCredential) (DeviceCredential, error)
 	RotateCAS(context.Context, DeviceCredential, DeviceCredential) (DeviceCredential, error)
+	RevokeCAS(context.Context, DeviceCredential, DeviceCredential) (DeviceCredential, error)
+	RevokeOtherActiveForRecovery(context.Context, uuid.UUID, uuid.UUID, time.Time) ([]DeviceSummary, error)
 }
 
-// RecoveryCredentialRepository stores the initial active credential during onboarding.
+// RecoveryCredentialRepository owns selector lookup and source consumption/rotation under explicit CAS.
 type RecoveryCredentialRepository interface {
 	Insert(context.Context, RecoveryCredential) (RecoveryCredential, error)
+	GetBySelector(context.Context, identifier.Selector) (RecoveryCredential, error)
+	GetForUpdate(context.Context, uuid.UUID, uuid.UUID, uint64) (RecoveryCredential, error)
+	GetActiveForUserForUpdate(context.Context, uuid.UUID) (RecoveryCredential, error)
+	ConsumeCAS(context.Context, RecoveryCredential, RecoveryCredential) (RecoveryCredential, error)
+	RevokeCAS(context.Context, RecoveryCredential, RecoveryCredential) (RecoveryCredential, error)
 }
 
-// IdentityTransaction is the full user-side transaction surface; it aliases the challenge transaction intentionally.
-type IdentityTransaction = ChallengeTransaction
+// RecoveryAttemptRepository persists the short-lived HMAC grant and its failure/consumption transitions.
+type RecoveryAttemptRepository interface {
+	Insert(context.Context, RecoveryAttempt) (RecoveryAttempt, error)
+	GetBySelector(context.Context, identifier.Selector) (RecoveryAttempt, error)
+	GetForUpdate(context.Context, identifier.Selector) (RecoveryAttempt, error)
+	RecordFailureCAS(context.Context, RecoveryAttempt, RecoveryAttempt) (RecoveryAttempt, error)
+	ConsumeCAS(context.Context, RecoveryAttempt, RecoveryAttempt) (RecoveryAttempt, error)
+	RevokeCAS(context.Context, RecoveryAttempt, RecoveryAttempt) (RecoveryAttempt, error)
+}
+
+// AssistedRecoveryGrantRepository exposes only identity-side authentication and terminal transitions.
+type AssistedRecoveryGrantRepository interface {
+	GetBySelector(context.Context, identifier.Selector) (AssistedRecoveryGrant, error)
+	GetForUpdate(context.Context, uuid.UUID, uuid.UUID) (AssistedRecoveryGrant, error)
+	RecordFailureCAS(context.Context, AssistedRecoveryGrant, AssistedRecoveryGrant) (AssistedRecoveryGrant, error)
+	ConsumeCAS(context.Context, AssistedRecoveryGrant, AssistedRecoveryGrant) (AssistedRecoveryGrant, error)
+	RevokeActiveForUser(context.Context, uuid.UUID, uuid.UUID, time.Time) ([]uuid.UUID, error)
+}
+
+// IdentityTransaction adds security-event and recovery participants to the narrower challenge transaction.
+type IdentityTransaction interface {
+	ChallengeTransaction
+	RecoveryAttempts() RecoveryAttemptRepository
+	AssistedRecoveryGrants() AssistedRecoveryGrantRepository
+	Audit() audit.Repository
+	AuditCheckpoints() audit.CheckpointRepository
+	OutboxEvents() outbox.EventRepository
+}
 
 // IdentityTransactionWork receives all repositories bound to one database transaction.
-type IdentityTransactionWork = ChallengeTransactionWork
+type IdentityTransactionWork func(context.Context, IdentityTransaction) error
 
-// IdentityUnitOfWork commits user, device, challenge, claim, recovery, and result changes atomically.
-type IdentityUnitOfWork = ChallengeUnitOfWork
+// IdentityUnitOfWork supports existing challenge callbacks and the complete security transaction surface.
+type IdentityUnitOfWork interface {
+	ChallengeUnitOfWork
+	RunIdentity(context.Context, IdentityTransactionWork) error
+}

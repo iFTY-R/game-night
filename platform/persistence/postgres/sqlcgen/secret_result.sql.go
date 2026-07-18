@@ -193,26 +193,25 @@ const consumeUserRecoveryAttemptCAS = `-- name: ConsumeUserRecoveryAttemptCAS :o
 UPDATE user_recovery_attempts
 SET status = 'consumed',
     consumed_at = $1,
-    result_id = $2
-WHERE recovery_attempt_id = $3
+    request_digest = $2,
+    result_id = $3
+WHERE recovery_attempt_id = $4
   AND status = 'active'
+  AND attempt_count = $5
   AND expires_at > $1
   AND attempt_count < max_attempts
-RETURNING recovery_attempt_id, user_id, status, consumed_at, result_id
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id
 `
 
 type ConsumeUserRecoveryAttemptCASParams struct {
-	ConsumedAt        pgtype.Timestamptz `json:"consumed_at"`
-	ResultID          pgtype.UUID        `json:"result_id"`
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-}
-
-type ConsumeUserRecoveryAttemptCASRow struct {
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-	UserID            pgtype.UUID        `json:"user_id"`
-	Status            string             `json:"status"`
-	ConsumedAt        pgtype.Timestamptz `json:"consumed_at"`
-	ResultID          pgtype.UUID        `json:"result_id"`
+	ConsumedAt           pgtype.Timestamptz `json:"consumed_at"`
+	RequestDigest        []byte             `json:"request_digest"`
+	ResultID             pgtype.UUID        `json:"result_id"`
+	RecoveryAttemptID    pgtype.UUID        `json:"recovery_attempt_id"`
+	ExpectedAttemptCount int32              `json:"expected_attempt_count"`
 }
 
 // ConsumeUserRecoveryAttemptCAS
@@ -220,20 +219,46 @@ type ConsumeUserRecoveryAttemptCASRow struct {
 //	UPDATE user_recovery_attempts
 //	SET status = 'consumed',
 //	    consumed_at = $1,
-//	    result_id = $2
-//	WHERE recovery_attempt_id = $3
+//	    request_digest = $2,
+//	    result_id = $3
+//	WHERE recovery_attempt_id = $4
 //	  AND status = 'active'
+//	  AND attempt_count = $5
 //	  AND expires_at > $1
 //	  AND attempt_count < max_attempts
-//	RETURNING recovery_attempt_id, user_id, status, consumed_at, result_id
-func (q *Queries) ConsumeUserRecoveryAttemptCAS(ctx context.Context, arg ConsumeUserRecoveryAttemptCASParams) (ConsumeUserRecoveryAttemptCASRow, error) {
-	row := q.db.QueryRow(ctx, consumeUserRecoveryAttemptCAS, arg.ConsumedAt, arg.ResultID, arg.RecoveryAttemptID)
-	var i ConsumeUserRecoveryAttemptCASRow
+//	RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+//	          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+//	          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+//	          status, created_at, expires_at, consumed_at, revoked_at, result_id
+func (q *Queries) ConsumeUserRecoveryAttemptCAS(ctx context.Context, arg ConsumeUserRecoveryAttemptCASParams) (UserRecoveryAttempt, error) {
+	row := q.db.QueryRow(ctx, consumeUserRecoveryAttemptCAS,
+		arg.ConsumedAt,
+		arg.RequestDigest,
+		arg.ResultID,
+		arg.RecoveryAttemptID,
+		arg.ExpectedAttemptCount,
+	)
+	var i UserRecoveryAttempt
 	err := row.Scan(
 		&i.RecoveryAttemptID,
+		&i.GrantSelector,
+		&i.GrantSecretHash,
+		&i.GrantKeyVersion,
 		&i.UserID,
+		&i.RecoveryCredentialID,
+		&i.RecoveryCredentialVersion,
+		&i.AssistedGrantID,
+		&i.ChallengeID,
+		&i.OriginHash,
+		&i.Purpose,
+		&i.RequestDigest,
+		&i.AttemptCount,
+		&i.MaxAttempts,
 		&i.Status,
+		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.ConsumedAt,
+		&i.RevokedAt,
 		&i.ResultID,
 	)
 	return i, err
@@ -503,7 +528,6 @@ INSERT INTO user_recovery_attempts (
     challenge_id,
     origin_hash,
     purpose,
-    request_digest,
     attempt_count,
     max_attempts,
     status,
@@ -521,12 +545,11 @@ INSERT INTO user_recovery_attempts (
     $9,
     $10,
     $11,
-    $12,
     0,
-    $13,
+    $12,
     'active',
-    $14,
-    $15
+    $13,
+    $14
 )
 RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
           user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
@@ -546,7 +569,6 @@ type CreateUserRecoveryAttemptParams struct {
 	ChallengeID               pgtype.UUID        `json:"challenge_id"`
 	OriginHash                []byte             `json:"origin_hash"`
 	Purpose                   string             `json:"purpose"`
-	RequestDigest             []byte             `json:"request_digest"`
 	MaxAttempts               int32              `json:"max_attempts"`
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 	ExpiresAt                 pgtype.Timestamptz `json:"expires_at"`
@@ -566,7 +588,6 @@ type CreateUserRecoveryAttemptParams struct {
 //	    challenge_id,
 //	    origin_hash,
 //	    purpose,
-//	    request_digest,
 //	    attempt_count,
 //	    max_attempts,
 //	    status,
@@ -584,12 +605,11 @@ type CreateUserRecoveryAttemptParams struct {
 //	    $9,
 //	    $10,
 //	    $11,
-//	    $12,
 //	    0,
-//	    $13,
+//	    $12,
 //	    'active',
-//	    $14,
-//	    $15
+//	    $13,
+//	    $14
 //	)
 //	RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
 //	          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
@@ -608,7 +628,6 @@ func (q *Queries) CreateUserRecoveryAttempt(ctx context.Context, arg CreateUserR
 		arg.ChallengeID,
 		arg.OriginHash,
 		arg.Purpose,
-		arg.RequestDigest,
 		arg.MaxAttempts,
 		arg.CreatedAt,
 		arg.ExpiresAt,
@@ -726,6 +745,51 @@ func (q *Queries) GetAnonymousChallengeForUpdate(ctx context.Context, arg GetAno
 	return i, err
 }
 
+const getSecretOperationResultByIDForUpdate = `-- name: GetSecretOperationResultByIDForUpdate :one
+SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+FROM secret_operation_results
+WHERE result_id = $1
+FOR UPDATE
+`
+
+type GetSecretOperationResultByIDForUpdateParams struct {
+	ResultID pgtype.UUID `json:"result_id"`
+}
+
+// GetSecretOperationResultByIDForUpdate
+//
+//	SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+//	       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+//	       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+//	FROM secret_operation_results
+//	WHERE result_id = $1
+//	FOR UPDATE
+func (q *Queries) GetSecretOperationResultByIDForUpdate(ctx context.Context, arg GetSecretOperationResultByIDForUpdateParams) (SecretOperationResult, error) {
+	row := q.db.QueryRow(ctx, getSecretOperationResultByIDForUpdate, arg.ResultID)
+	var i SecretOperationResult
+	err := row.Scan(
+		&i.ResultID,
+		&i.OperationScope,
+		&i.ActorOrChallengeID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.ResultType,
+		&i.ResultVersion,
+		&i.Ciphertext,
+		&i.Nonce,
+		&i.WrappedDataKey,
+		&i.KeyVersion,
+		&i.Status,
+		&i.SecretExpiresAt,
+		&i.ConfirmedAt,
+		&i.CompletedAt,
+		&i.TombstoneExpiresAt,
+	)
+	return i, err
+}
+
 const getSecretOperationResultByOperation = `-- name: GetSecretOperationResultByOperation :one
 SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
        result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
@@ -826,21 +890,20 @@ func (q *Queries) GetSecretOperationResultByOperationForUpdate(ctx context.Conte
 	return i, err
 }
 
-const getUserRecoveryAttemptForUpdate = `-- name: GetUserRecoveryAttemptForUpdate :one
+const getUserRecoveryAttemptBySelector = `-- name: GetUserRecoveryAttemptBySelector :one
 SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
        user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
        challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
        status, created_at, expires_at, consumed_at, revoked_at, result_id
 FROM user_recovery_attempts
 WHERE grant_selector = $1
-FOR UPDATE
 `
 
-type GetUserRecoveryAttemptForUpdateParams struct {
+type GetUserRecoveryAttemptBySelectorParams struct {
 	GrantSelector string `json:"grant_selector"`
 }
 
-// GetUserRecoveryAttemptForUpdate
+// GetUserRecoveryAttemptBySelector
 //
 //	SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
 //	       user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
@@ -848,10 +911,115 @@ type GetUserRecoveryAttemptForUpdateParams struct {
 //	       status, created_at, expires_at, consumed_at, revoked_at, result_id
 //	FROM user_recovery_attempts
 //	WHERE grant_selector = $1
-//	FOR UPDATE
-func (q *Queries) GetUserRecoveryAttemptForUpdate(ctx context.Context, arg GetUserRecoveryAttemptForUpdateParams) (UserRecoveryAttempt, error) {
-	row := q.db.QueryRow(ctx, getUserRecoveryAttemptForUpdate, arg.GrantSelector)
+func (q *Queries) GetUserRecoveryAttemptBySelector(ctx context.Context, arg GetUserRecoveryAttemptBySelectorParams) (UserRecoveryAttempt, error) {
+	row := q.db.QueryRow(ctx, getUserRecoveryAttemptBySelector, arg.GrantSelector)
 	var i UserRecoveryAttempt
+	err := row.Scan(
+		&i.RecoveryAttemptID,
+		&i.GrantSelector,
+		&i.GrantSecretHash,
+		&i.GrantKeyVersion,
+		&i.UserID,
+		&i.RecoveryCredentialID,
+		&i.RecoveryCredentialVersion,
+		&i.AssistedGrantID,
+		&i.ChallengeID,
+		&i.OriginHash,
+		&i.Purpose,
+		&i.RequestDigest,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.ResultID,
+	)
+	return i, err
+}
+
+const getUserRecoveryAttemptForUpdate = `-- name: GetUserRecoveryAttemptForUpdate :one
+WITH selected_attempt AS MATERIALIZED (
+    SELECT selected.recovery_attempt_id, selected.user_id
+    FROM user_recovery_attempts AS selected
+    WHERE selected.grant_selector = $1
+),
+locked_user AS MATERIALIZED (
+    SELECT users.user_id
+    FROM users
+    JOIN selected_attempt AS selected ON selected.user_id = users.user_id
+    FOR UPDATE OF users
+),
+locked_attempt AS MATERIALIZED (
+    SELECT attempts.recovery_attempt_id, attempts.grant_selector, attempts.grant_secret_hash, attempts.grant_key_version, attempts.user_id, attempts.recovery_credential_id, attempts.recovery_credential_version, attempts.assisted_grant_id, attempts.challenge_id, attempts.origin_hash, attempts.purpose, attempts.request_digest, attempts.attempt_count, attempts.max_attempts, attempts.status, attempts.created_at, attempts.expires_at, attempts.consumed_at, attempts.revoked_at, attempts.result_id
+    FROM user_recovery_attempts AS attempts
+    JOIN selected_attempt AS selected ON selected.recovery_attempt_id = attempts.recovery_attempt_id
+    JOIN locked_user AS users ON users.user_id = attempts.user_id
+    FOR UPDATE OF attempts
+)
+SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+       user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+       challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+       status, created_at, expires_at, consumed_at, revoked_at, result_id
+FROM locked_attempt
+`
+
+type GetUserRecoveryAttemptForUpdateParams struct {
+	GrantSelector string `json:"grant_selector"`
+}
+
+type GetUserRecoveryAttemptForUpdateRow struct {
+	RecoveryAttemptID         pgtype.UUID        `json:"recovery_attempt_id"`
+	GrantSelector             string             `json:"grant_selector"`
+	GrantSecretHash           []byte             `json:"grant_secret_hash"`
+	GrantKeyVersion           int32              `json:"grant_key_version"`
+	UserID                    pgtype.UUID        `json:"user_id"`
+	RecoveryCredentialID      pgtype.UUID        `json:"recovery_credential_id"`
+	RecoveryCredentialVersion pgtype.Int8        `json:"recovery_credential_version"`
+	AssistedGrantID           pgtype.UUID        `json:"assisted_grant_id"`
+	ChallengeID               pgtype.UUID        `json:"challenge_id"`
+	OriginHash                []byte             `json:"origin_hash"`
+	Purpose                   string             `json:"purpose"`
+	RequestDigest             []byte             `json:"request_digest"`
+	AttemptCount              int32              `json:"attempt_count"`
+	MaxAttempts               int32              `json:"max_attempts"`
+	Status                    string             `json:"status"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt                 pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt                pgtype.Timestamptz `json:"consumed_at"`
+	RevokedAt                 pgtype.Timestamptz `json:"revoked_at"`
+	ResultID                  pgtype.UUID        `json:"result_id"`
+}
+
+// GetUserRecoveryAttemptForUpdate
+//
+//	WITH selected_attempt AS MATERIALIZED (
+//	    SELECT selected.recovery_attempt_id, selected.user_id
+//	    FROM user_recovery_attempts AS selected
+//	    WHERE selected.grant_selector = $1
+//	),
+//	locked_user AS MATERIALIZED (
+//	    SELECT users.user_id
+//	    FROM users
+//	    JOIN selected_attempt AS selected ON selected.user_id = users.user_id
+//	    FOR UPDATE OF users
+//	),
+//	locked_attempt AS MATERIALIZED (
+//	    SELECT attempts.recovery_attempt_id, attempts.grant_selector, attempts.grant_secret_hash, attempts.grant_key_version, attempts.user_id, attempts.recovery_credential_id, attempts.recovery_credential_version, attempts.assisted_grant_id, attempts.challenge_id, attempts.origin_hash, attempts.purpose, attempts.request_digest, attempts.attempt_count, attempts.max_attempts, attempts.status, attempts.created_at, attempts.expires_at, attempts.consumed_at, attempts.revoked_at, attempts.result_id
+//	    FROM user_recovery_attempts AS attempts
+//	    JOIN selected_attempt AS selected ON selected.recovery_attempt_id = attempts.recovery_attempt_id
+//	    JOIN locked_user AS users ON users.user_id = attempts.user_id
+//	    FOR UPDATE OF attempts
+//	)
+//	SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+//	       user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+//	       challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+//	       status, created_at, expires_at, consumed_at, revoked_at, result_id
+//	FROM locked_attempt
+func (q *Queries) GetUserRecoveryAttemptForUpdate(ctx context.Context, arg GetUserRecoveryAttemptForUpdateParams) (GetUserRecoveryAttemptForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getUserRecoveryAttemptForUpdate, arg.GrantSelector)
+	var i GetUserRecoveryAttemptForUpdateRow
 	err := row.Scan(
 		&i.RecoveryAttemptID,
 		&i.GrantSelector,
@@ -922,45 +1090,65 @@ func (q *Queries) RecordAnonymousChallengeFailureCAS(ctx context.Context, arg Re
 
 const recordUserRecoveryAttemptFailureCAS = `-- name: RecordUserRecoveryAttemptFailureCAS :one
 UPDATE user_recovery_attempts
-SET attempt_count = attempt_count + 1
-WHERE recovery_attempt_id = $1
+SET attempt_count = $1,
+    status = $2
+WHERE recovery_attempt_id = $3
   AND status = 'active'
-  AND expires_at > $2
-  AND attempt_count < max_attempts
-RETURNING recovery_attempt_id, attempt_count, max_attempts, status, expires_at
+  AND attempt_count = $4
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id
 `
 
 type RecordUserRecoveryAttemptFailureCASParams struct {
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-	AttemptedAt       pgtype.Timestamptz `json:"attempted_at"`
-}
-
-type RecordUserRecoveryAttemptFailureCASRow struct {
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-	AttemptCount      int32              `json:"attempt_count"`
-	MaxAttempts       int32              `json:"max_attempts"`
-	Status            string             `json:"status"`
-	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	NextAttemptCount     int32       `json:"next_attempt_count"`
+	NextStatus           string      `json:"next_status"`
+	RecoveryAttemptID    pgtype.UUID `json:"recovery_attempt_id"`
+	ExpectedAttemptCount int32       `json:"expected_attempt_count"`
 }
 
 // RecordUserRecoveryAttemptFailureCAS
 //
 //	UPDATE user_recovery_attempts
-//	SET attempt_count = attempt_count + 1
-//	WHERE recovery_attempt_id = $1
+//	SET attempt_count = $1,
+//	    status = $2
+//	WHERE recovery_attempt_id = $3
 //	  AND status = 'active'
-//	  AND expires_at > $2
-//	  AND attempt_count < max_attempts
-//	RETURNING recovery_attempt_id, attempt_count, max_attempts, status, expires_at
-func (q *Queries) RecordUserRecoveryAttemptFailureCAS(ctx context.Context, arg RecordUserRecoveryAttemptFailureCASParams) (RecordUserRecoveryAttemptFailureCASRow, error) {
-	row := q.db.QueryRow(ctx, recordUserRecoveryAttemptFailureCAS, arg.RecoveryAttemptID, arg.AttemptedAt)
-	var i RecordUserRecoveryAttemptFailureCASRow
+//	  AND attempt_count = $4
+//	RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+//	          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+//	          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+//	          status, created_at, expires_at, consumed_at, revoked_at, result_id
+func (q *Queries) RecordUserRecoveryAttemptFailureCAS(ctx context.Context, arg RecordUserRecoveryAttemptFailureCASParams) (UserRecoveryAttempt, error) {
+	row := q.db.QueryRow(ctx, recordUserRecoveryAttemptFailureCAS,
+		arg.NextAttemptCount,
+		arg.NextStatus,
+		arg.RecoveryAttemptID,
+		arg.ExpectedAttemptCount,
+	)
+	var i UserRecoveryAttempt
 	err := row.Scan(
 		&i.RecoveryAttemptID,
+		&i.GrantSelector,
+		&i.GrantSecretHash,
+		&i.GrantKeyVersion,
+		&i.UserID,
+		&i.RecoveryCredentialID,
+		&i.RecoveryCredentialVersion,
+		&i.AssistedGrantID,
+		&i.ChallengeID,
+		&i.OriginHash,
+		&i.Purpose,
+		&i.RequestDigest,
 		&i.AttemptCount,
 		&i.MaxAttempts,
 		&i.Status,
+		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.ResultID,
 	)
 	return i, err
 }
@@ -971,19 +1159,17 @@ SET status = 'revoked',
     revoked_at = $1
 WHERE recovery_attempt_id = $2
   AND status = 'active'
-RETURNING recovery_attempt_id, user_id, status, revoked_at
+  AND attempt_count = $3
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id
 `
 
 type RevokeUserRecoveryAttemptCASParams struct {
-	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-}
-
-type RevokeUserRecoveryAttemptCASRow struct {
-	RecoveryAttemptID pgtype.UUID        `json:"recovery_attempt_id"`
-	UserID            pgtype.UUID        `json:"user_id"`
-	Status            string             `json:"status"`
-	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokedAt            pgtype.Timestamptz `json:"revoked_at"`
+	RecoveryAttemptID    pgtype.UUID        `json:"recovery_attempt_id"`
+	ExpectedAttemptCount int32              `json:"expected_attempt_count"`
 }
 
 // RevokeUserRecoveryAttemptCAS
@@ -993,15 +1179,35 @@ type RevokeUserRecoveryAttemptCASRow struct {
 //	    revoked_at = $1
 //	WHERE recovery_attempt_id = $2
 //	  AND status = 'active'
-//	RETURNING recovery_attempt_id, user_id, status, revoked_at
-func (q *Queries) RevokeUserRecoveryAttemptCAS(ctx context.Context, arg RevokeUserRecoveryAttemptCASParams) (RevokeUserRecoveryAttemptCASRow, error) {
-	row := q.db.QueryRow(ctx, revokeUserRecoveryAttemptCAS, arg.RevokedAt, arg.RecoveryAttemptID)
-	var i RevokeUserRecoveryAttemptCASRow
+//	  AND attempt_count = $3
+//	RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+//	          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+//	          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+//	          status, created_at, expires_at, consumed_at, revoked_at, result_id
+func (q *Queries) RevokeUserRecoveryAttemptCAS(ctx context.Context, arg RevokeUserRecoveryAttemptCASParams) (UserRecoveryAttempt, error) {
+	row := q.db.QueryRow(ctx, revokeUserRecoveryAttemptCAS, arg.RevokedAt, arg.RecoveryAttemptID, arg.ExpectedAttemptCount)
+	var i UserRecoveryAttempt
 	err := row.Scan(
 		&i.RecoveryAttemptID,
+		&i.GrantSelector,
+		&i.GrantSecretHash,
+		&i.GrantKeyVersion,
 		&i.UserID,
+		&i.RecoveryCredentialID,
+		&i.RecoveryCredentialVersion,
+		&i.AssistedGrantID,
+		&i.ChallengeID,
+		&i.OriginHash,
+		&i.Purpose,
+		&i.RequestDigest,
+		&i.AttemptCount,
+		&i.MaxAttempts,
 		&i.Status,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
 		&i.RevokedAt,
+		&i.ResultID,
 	)
 	return i, err
 }

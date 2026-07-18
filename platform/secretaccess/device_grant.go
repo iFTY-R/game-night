@@ -14,8 +14,8 @@ import (
 // deviceGrantDomain prevents a grant MAC from being reused as another device-authentication primitive.
 const deviceGrantDomain = "game-night:device-result-grant:v1\x00"
 
-// ErrInvalidGrant rejects malformed or unauthenticated grants without exposing their claims.
-var ErrInvalidGrant = errors.New("invalid device result grant")
+// ErrInvalidGrant rejects malformed or unauthenticated result grants without exposing their claims.
+var ErrInvalidGrant = errors.New("invalid result grant")
 
 // DeviceGrant is a signed, exact-result capability. Private claims prevent mutation after minting.
 type DeviceGrant struct {

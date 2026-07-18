@@ -4,17 +4,20 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/idempotency"
@@ -92,6 +95,119 @@ func TestIdentityServicePostgresResponseLossReplaysBootstrapAndOnboardingSecrets
 	assertIdentityTableCount(t, ctx, fixture, "users", 1)
 	assertIdentityTableCount(t, ctx, fixture, "device_credentials", 1)
 	assertIdentityTableCount(t, ctx, fixture, "secret_operation_results", 2)
+}
+
+func TestIdentityServicePostgresRecoveryCommitsAndReplaysExactBundle(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), transactionIntegrationTimeout)
+	defer cancel()
+	applyTransactionTestMigrations(t, ctx, fixture)
+	service := integrationIdentityService(t, fixture)
+	bootstrap, onboarding := integrationOnboardIdentity(t, ctx, service, 0x71, 0x72, "RecoveryOwner9")
+	begin := integrationBeginRecovery(t, ctx, service, onboarding.RecoveryCode, "recovery_commit")
+
+	var beginDigest []byte
+	if err := fixture.Pool.QueryRow(ctx, "SELECT request_digest FROM user_recovery_attempts").Scan(&beginDigest); err != nil {
+		t.Fatal(err)
+	}
+	if beginDigest != nil {
+		t.Fatalf("BeginRecovery persisted request digest %x, want NULL", beginDigest)
+	}
+
+	command := identityDomain.CompleteRecoveryCommand{
+		CanonicalOrigin: "https://play.example.test", RecoveryGrant: begin.RecoveryGrant,
+		OperationID: integrationIdentityOperationID(t, 0x73), DeviceLabel: "Recovered Phone",
+		DevicePolicy: identityDomain.RecoveryDevicePolicyKeepOtherDevices, RequestID: "request-recovery-commit",
+	}
+	first, err := service.CompleteRecovery(ctx, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.CompleteRecovery(ctx, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.Operation.Replayed || first.Operation.ResultID != second.Operation.ResultID ||
+		first.DeviceSecrets.Token() != second.DeviceSecrets.Token() || first.RecoveryCode != second.RecoveryCode ||
+		first.User.Snapshot().ID != bootstrap.User.Snapshot().ID {
+		t.Fatal("PostgreSQL recovery response-loss retry did not return the exact committed bundle")
+	}
+
+	var attemptStatus, sourceStatus string
+	var requestDigest []byte
+	var resultID uuid.UUID
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT attempt.status, attempt.request_digest, attempt.result_id, source.status
+		FROM user_recovery_attempts AS attempt
+		JOIN user_recovery_credentials AS source
+		  ON source.recovery_credential_id = attempt.recovery_credential_id
+	`).Scan(&attemptStatus, &requestDigest, &resultID, &sourceStatus); err != nil {
+		t.Fatal(err)
+	}
+	if attemptStatus != "consumed" || sourceStatus != "consumed" || len(requestDigest) != idempotency.DigestSize ||
+		resultID != first.Operation.ResultID {
+		t.Fatalf("committed recovery state: attempt=%s source=%s digest=%d result=%s",
+			attemptStatus, sourceStatus, len(requestDigest), resultID)
+	}
+	assertIdentityRecoveryCommitCounts(t, ctx, fixture, 2, 2, 3, 1, 1)
+}
+
+func TestIdentityServicePostgresConcurrentRecoveryGrantHasOneWinner(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), transactionIntegrationTimeout)
+	defer cancel()
+	applyTransactionTestMigrations(t, ctx, fixture)
+	service := integrationIdentityService(t, fixture)
+	_, onboarding := integrationOnboardIdentity(t, ctx, service, 0x74, 0x75, "RecoveryRace9")
+	begin := integrationBeginRecovery(t, ctx, service, onboarding.RecoveryCode, "recovery_race")
+	commands := []identityDomain.CompleteRecoveryCommand{
+		{
+			CanonicalOrigin: "https://play.example.test", RecoveryGrant: begin.RecoveryGrant,
+			OperationID: integrationIdentityOperationID(t, 0x76), DeviceLabel: "Race Winner",
+			DevicePolicy: identityDomain.RecoveryDevicePolicyKeepOtherDevices, RequestID: "request-recovery-race-a",
+		},
+		{
+			CanonicalOrigin: "https://play.example.test", RecoveryGrant: begin.RecoveryGrant,
+			OperationID: integrationIdentityOperationID(t, 0x77), DeviceLabel: "Race Winner",
+			DevicePolicy: identityDomain.RecoveryDevicePolicyKeepOtherDevices, RequestID: "request-recovery-race-b",
+		},
+	}
+	type outcome struct {
+		result identityDomain.CompleteRecoveryResult
+		err    error
+	}
+	start := make(chan struct{})
+	outcomes := make(chan outcome, len(commands))
+	var waitGroup sync.WaitGroup
+	for _, command := range commands {
+		command := command
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			<-start
+			result, completeErr := service.CompleteRecovery(ctx, command)
+			outcomes <- outcome{result: result, err: completeErr}
+		}()
+	}
+	close(start)
+	waitGroup.Wait()
+	close(outcomes)
+
+	successes, rejected := 0, 0
+	for result := range outcomes {
+		switch {
+		case result.err == nil && result.result.RecoveryCode != "":
+			successes++
+		case errors.Is(result.err, identityDomain.ErrRecoveryInvalid):
+			rejected++
+		default:
+			t.Fatalf("unexpected concurrent recovery outcome: result=%#v err=%v", result.result.Operation, result.err)
+		}
+	}
+	if successes != 1 || rejected != 1 {
+		t.Fatalf("concurrent recovery outcomes: success=%d rejected=%d", successes, rejected)
+	}
+	assertIdentityRecoveryCommitCounts(t, ctx, fixture, 2, 2, 3, 1, 1)
 }
 
 func TestIdentityServicePostgresConcurrentUsernameClaimHasOneWinner(t *testing.T) {
@@ -183,7 +299,7 @@ func TestIdentityPostgresConcurrentUsernameClaimMeetsAtClaimPoint(t *testing.T) 
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			results <- unitOfWork.Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+			results <- unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 				user, getErr := transaction.Users().GetForUpdate(ctx, userID)
 				ready <- getErr
 				if getErr != nil {
@@ -281,7 +397,7 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 	}
 
 	// Each snapshot is valid alone, but the adapter must reject a caller-crafted transition inside the cooldown.
-	err = NewIdentityUnitOfWork(fixture.Pool).Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	err = NewIdentityUnitOfWork(fixture.Pool).RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		user, getErr := transaction.Users().GetForUpdate(ctx, changed.User.Snapshot().ID)
 		if getErr != nil {
 			return getErr
@@ -354,7 +470,7 @@ func TestIdentityPostgresRejectsStaleDeviceCAS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = NewIdentityUnitOfWork(fixture.Pool).Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	err = NewIdentityUnitOfWork(fixture.Pool).RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		_, touchErr := transaction.Devices().TouchCAS(ctx, bootstrap.Device, staleTouch)
 		return touchErr
 	})
@@ -374,13 +490,13 @@ func TestIdentityPostgresRejectsStaleDeviceCAS(t *testing.T) {
 		t.Fatal(err)
 	}
 	unitOfWork := NewIdentityUnitOfWork(fixture.Pool)
-	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	if err := unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		_, rotateErr := transaction.Devices().RotateCAS(ctx, fresh.Device, rotated.Credential)
 		return rotateErr
 	}); err != nil {
 		t.Fatal(err)
 	}
-	err = unitOfWork.Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	err = unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		_, rotateErr := transaction.Devices().RotateCAS(ctx, fresh.Device, rotated.Credential)
 		return rotateErr
 	})
@@ -400,7 +516,7 @@ func TestIdentityPostgresRollsBackWritesAfterCallbackFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	injected := errors.New("fail after identity write")
-	err = NewIdentityUnitOfWork(fixture.Pool).Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	err = NewIdentityUnitOfWork(fixture.Pool).RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		if _, insertErr := transaction.Users().Insert(ctx, user); insertErr != nil {
 			return insertErr
 		}
@@ -437,13 +553,13 @@ func TestIdentityPostgresOnboardingCASRejectsExpiredWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	unitOfWork := NewIdentityUnitOfWork(fixture.Pool)
-	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	if err := unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		_, insertErr := transaction.Users().Insert(ctx, current)
 		return insertErr
 	}); err != nil {
 		t.Fatal(err)
 	}
-	err = unitOfWork.Run(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
+	err = unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		_, transitionErr := transaction.Users().CompleteOnboardingCAS(ctx, current, next)
 		return transitionErr
 	})
@@ -482,9 +598,8 @@ func newIntegrationIdentityRuntime(t testing.TB, fixture *integrationtest.Postgr
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	serviceClock := clock.NewFake(now)
-	challengeService, err := identityDomain.NewChallengeService(
-		integrationChallengeKeyring[security.UserChallengeKeyPurpose](t, now), serviceClock,
-	)
+	challengeKeyring := integrationChallengeKeyring[security.UserChallengeKeyPurpose](t, now)
+	challengeService, err := identityDomain.NewChallengeService(challengeKeyring, serviceClock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,7 +612,7 @@ func newIntegrationIdentityRuntime(t testing.TB, fixture *integrationtest.Postgr
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultService, err := secretresult.NewServiceWithDeviceAccess(resultCipher, serviceClock, deviceKeyring)
+	resultService, err := secretresult.NewServiceWithIdentityAccess(resultCipher, serviceClock, deviceKeyring, challengeKeyring)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,14 +624,94 @@ func newIntegrationIdentityRuntime(t testing.TB, fixture *integrationtest.Postgr
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := identityDomain.NewService(
-		challengeService, deviceService, recoveryService, resultService,
-		NewIdentityUnitOfWork(fixture.Pool), ratelimittest.New(), validator, serviceClock,
+	recoveryAttemptService, err := identityDomain.NewRecoveryAttemptService(challengeKeyring, serviceClock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditService, err := audit.NewService(newRepositoryAuditKeyring())
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := identityDomain.NewServiceWithRecovery(
+		challengeService, deviceService, recoveryService, recoveryAttemptService, resultService,
+		NewIdentityUnitOfWorkWithAudit(fixture.Pool, auditService), ratelimittest.New(), validator, serviceClock, auditService,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return integrationIdentityRuntime{service: service, clock: serviceClock, devices: deviceService}
+}
+
+// integrationOnboardIdentity creates one active user and retains its initial device plus recovery authority.
+func integrationOnboardIdentity(
+	t testing.TB,
+	ctx context.Context,
+	service *identityDomain.Service,
+	bootstrapMarker, onboardingMarker byte,
+	username string,
+) (identityDomain.BootstrapIdentityResult, identityDomain.CompleteOnboardingResult) {
+	t.Helper()
+	bootstrap := integrationBootstrapIdentity(t, ctx, service, bootstrapMarker)
+	onboarding, err := service.CompleteOnboarding(ctx, identityDomain.CompleteOnboardingCommand{
+		DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
+		ClientIP: "203.0.113.41", Username: username,
+		OperationID: integrationIdentityOperationID(t, onboardingMarker),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bootstrap, onboarding
+}
+
+// integrationBeginRecovery consumes only the anonymous challenge and returns an unbound short-lived grant.
+func integrationBeginRecovery(
+	t testing.TB,
+	ctx context.Context,
+	service *identityDomain.Service,
+	recoveryCode, flowSuffix string,
+) identityDomain.BeginRecoveryResult {
+	t.Helper()
+	flowID := challenge.RequestFlowID("flow_" + flowSuffix)
+	issued, err := service.BeginRecoveryChallenge(ctx, identityDomain.BeginRecoveryChallengeCommand{
+		CanonicalOrigin: "https://play.example.test", RequestFlowID: flowID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.BeginRecovery(ctx, identityDomain.BeginRecoveryCommand{
+		CanonicalOrigin: "https://play.example.test", RequestFlowID: flowID,
+		ChallengeCredentials: issued.Credentials, RecoveryCode: recoveryCode, ClientIP: "203.0.113.42",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+// assertIdentityRecoveryCommitCounts proves the authoritative, secret-result, audit, and outbox writes committed together.
+func assertIdentityRecoveryCommitCounts(
+	t testing.TB,
+	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
+	devices, recoveries, secretResults, auditEvents, outboxEvents int,
+) {
+	t.Helper()
+	var gotDevices, gotRecoveries, gotResults, gotAudit, gotOutbox int
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT
+			(SELECT count(*) FROM device_credentials),
+			(SELECT count(*) FROM user_recovery_credentials),
+			(SELECT count(*) FROM secret_operation_results),
+			(SELECT count(*) FROM audit_events),
+			(SELECT count(*) FROM outbox_events)
+	`).Scan(&gotDevices, &gotRecoveries, &gotResults, &gotAudit, &gotOutbox); err != nil {
+		t.Fatal(err)
+	}
+	if gotDevices != devices || gotRecoveries != recoveries || gotResults != secretResults ||
+		gotAudit != auditEvents || gotOutbox != outboxEvents {
+		t.Fatalf("recovery commit counts: devices=%d recoveries=%d results=%d audit=%d outbox=%d",
+			gotDevices, gotRecoveries, gotResults, gotAudit, gotOutbox)
+	}
 }
 
 func integrationBootstrapIdentity(
@@ -599,6 +794,22 @@ func (integrationRecoveryHasher) Hash(_ context.Context, input []byte) (string, 
 	salt := make([]byte, 16)
 	return "$argon2id$v=19$m=65536,t=3,p=2$" + base64.RawStdEncoding.EncodeToString(salt) + "$" +
 		base64.RawStdEncoding.EncodeToString(digest[:]), nil
+}
+
+// VerifyOrDummy follows one digest-and-compare path for both valid and malformed integration-test hashes.
+func (integrationRecoveryHasher) VerifyOrDummy(_ context.Context, encoded string, input []byte) (bool, bool, error) {
+	digest := sha256.Sum256(input)
+	stored := make([]byte, sha256.Size)
+	separator := strings.LastIndexByte(encoded, '$')
+	parsed := separator >= 0
+	if parsed {
+		decoded, err := base64.RawStdEncoding.DecodeString(encoded[separator+1:])
+		parsed = err == nil && len(decoded) == sha256.Size
+		if parsed {
+			copy(stored, decoded)
+		}
+	}
+	return parsed && subtle.ConstantTimeCompare(stored, digest[:]) == 1, false, nil
 }
 
 func assertIdentityTableCount(

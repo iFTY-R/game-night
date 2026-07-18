@@ -50,6 +50,10 @@ type EventType string
 const (
 	// EventTypeAuditCheckpointPending asks the checkpoint consumer to persist one signed audit checkpoint.
 	EventTypeAuditCheckpointPending EventType = "audit.checkpoint.pending"
+	// EventTypeIdentityRecoveryCompleted records one committed user recovery without carrying recovery secrets.
+	EventTypeIdentityRecoveryCompleted EventType = "identity.recovery.completed.v1"
+	// EventTypeIdentityDeviceRevoked tells downstream modules to recheck one device's authoritative state.
+	EventTypeIdentityDeviceRevoked EventType = "identity.device.revoked.v1"
 )
 
 // ParseEventType validates a durable event protocol name.
@@ -75,6 +79,10 @@ type AggregateType string
 const (
 	// AggregateTypeAuditChain identifies the append-only audit chain checkpointed by the production consumer.
 	AggregateTypeAuditChain AggregateType = "audit.chain"
+	// AggregateTypeIdentityUser identifies durable events emitted by one user identity aggregate.
+	AggregateTypeIdentityUser AggregateType = "identity.user"
+	// AggregateTypeIdentityDevice identifies durable events emitted for one device credential.
+	AggregateTypeIdentityDevice AggregateType = "identity.device"
 )
 
 // ParseAggregateType validates a namespace-qualified aggregate type.

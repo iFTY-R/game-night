@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/idempotency"
@@ -115,14 +116,16 @@ type ChangeUsernameResult struct {
 
 // Service orchestrates identity aggregates while keeping transport and PostgreSQL types outside the domain.
 type Service struct {
-	challenges *ChallengeService
-	devices    *DeviceService
-	recovery   *RecoveryCodeService
-	results    *secretresult.Service
-	unitOfWork IdentityUnitOfWork
-	limiter    ratelimit.RateLimiter
-	usernames  identifier.UsernameValidator
-	clock      clock.Clock
+	challenges       *ChallengeService
+	devices          *DeviceService
+	recovery         *RecoveryCodeService
+	recoveryAttempts *RecoveryAttemptService
+	results          *secretresult.Service
+	audit            *audit.Service
+	unitOfWork       IdentityUnitOfWork
+	limiter          ratelimit.RateLimiter
+	usernames        identifier.UsernameValidator
+	clock            clock.Clock
 }
 
 // NewService requires every security and persistence dependency so protected methods fail closed when wiring is absent.
@@ -190,19 +193,14 @@ func (service *Service) BootstrapIdentity(ctx context.Context, command Bootstrap
 		ctx, service.unitOfWork, ChallengePurposeBootstrap, command.CanonicalOrigin, command.RequestFlowID,
 		command.ChallengeCredentials, command.OperationID, digest,
 		func(ctx context.Context, transaction ChallengeTransaction, record Challenge, authorization challenge.Authorization) (AuthorizedChallengeCompletion, error) {
-			binding = identityResultBinding(
-				secretresult.ScopeIdentityBootstrap, record.Snapshot().ID, command.OperationID, digest,
-				secretresult.ResultTypeIdentityDeviceCredential,
-			)
 			if authorization.Kind() == challenge.AuthorizeExactReplay {
-				stored, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
+				stored, storedBinding, getErr := service.getBootstrapReplayResult(
+					ctx, transaction.SecretResults(), authorization, command.OperationID, digest,
+				)
 				if getErr != nil {
 					return AuthorizedChallengeCompletion{}, getErr
 				}
-				if _, resolveErr := stored.Resolve(binding, service.clock.Now()); resolveErr != nil {
-					return AuthorizedChallengeCompletion{}, resolveErr
-				}
-				result = stored
+				result, binding = stored, storedBinding
 				replayed = true
 				return NoReplayCompletion(), nil
 			}
@@ -215,6 +213,10 @@ func (service *Service) BootstrapIdentity(ctx context.Context, command Bootstrap
 			if newErr != nil {
 				return AuthorizedChallengeCompletion{}, newErr
 			}
+			binding = identityResultBinding(
+				secretresult.ScopeIdentityBootstrap, userID, command.OperationID, digest,
+				secretresult.ResultTypeIdentityDeviceCredential,
+			)
 			issuedDevice, issueErr := service.devices.Issue(userID, label)
 			if issueErr != nil {
 				return AuthorizedChallengeCompletion{}, issueErr
@@ -516,19 +518,14 @@ func (service *Service) bootstrapExistingIdentity(ctx context.Context, command B
 		ctx, service.unitOfWork, ChallengePurposeBootstrap, command.CanonicalOrigin, command.RequestFlowID,
 		command.ChallengeCredentials, command.OperationID, digest,
 		func(ctx context.Context, transaction ChallengeTransaction, record Challenge, authorization challenge.Authorization) (AuthorizedChallengeCompletion, error) {
-			binding = identityResultBinding(
-				secretresult.ScopeIdentityBootstrap, record.Snapshot().ID, command.OperationID, digest,
-				secretresult.ResultTypeIdentityDeviceCredential,
-			)
 			if authorization.Kind() == challenge.AuthorizeExactReplay {
-				stored, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
+				stored, storedBinding, getErr := service.getBootstrapReplayResult(
+					ctx, transaction.SecretResults(), authorization, command.OperationID, digest,
+				)
 				if getErr != nil {
 					return AuthorizedChallengeCompletion{}, getErr
 				}
-				if _, resolveErr := stored.Resolve(binding, service.clock.Now()); resolveErr != nil {
-					return AuthorizedChallengeCompletion{}, resolveErr
-				}
-				result = stored
+				result, binding = stored, storedBinding
 				replayed = true
 				return NoReplayCompletion(), nil
 			}
@@ -569,6 +566,10 @@ func (service *Service) bootstrapExistingIdentity(ctx context.Context, command B
 					return AuthorizedChallengeCompletion{}, cookieErr
 				}
 				response.DeviceSecrets = &cookieWrite
+				binding = identityResultBinding(
+					secretresult.ScopeIdentityBootstrap, user.Snapshot().ID, command.OperationID, digest,
+					secretresult.ResultTypeIdentityDeviceCredential,
+				)
 				plaintext, marshalErr := encodeBootstrapEnvelope(rotated)
 				if marshalErr != nil {
 					return AuthorizedChallengeCompletion{}, marshalErr
@@ -642,6 +643,9 @@ func (service *Service) openBootstrapReplay(
 		if getErr != nil {
 			return getErr
 		}
+		if user.Snapshot().ID != binding.Key.ActorID {
+			return ErrIdentityIntegrity
+		}
 		// Generation one is issued under challenge authority; rotations must reauthenticate this retry's device proof.
 		if envelope.Generation > 1 {
 			submittedAuthorization, authErr := service.devices.Authenticate(device, submittedDeviceToken)
@@ -672,6 +676,38 @@ func (service *Service) openBootstrapReplay(
 	}
 	response.Operation = operationResult(operationID, result, true)
 	return response, nil
+}
+
+// getBootstrapReplayResult locks the exact result selected by the consumed anonymous challenge.
+// The persisted user binding is trusted only after every operation and envelope contract field is checked.
+func (service *Service) getBootstrapReplayResult(
+	ctx context.Context,
+	repository secretresult.Repository,
+	authorization challenge.Authorization,
+	operationID idempotency.OperationID,
+	digest idempotency.Digest,
+) (secretresult.Result, secretresult.Binding, error) {
+	if authorization.Kind() != challenge.AuthorizeExactReplay || authorization.ResultID() == uuid.Nil {
+		return secretresult.Result{}, secretresult.Binding{}, secretresult.ErrReplayUnauthorized
+	}
+	stored, err := repository.GetByIDForUpdate(ctx, authorization.ResultID())
+	if errors.Is(err, secretresult.ErrNotFound) {
+		return secretresult.Result{}, secretresult.Binding{}, secretresult.ErrReplayUnauthorized
+	}
+	if err != nil {
+		return secretresult.Result{}, secretresult.Binding{}, err
+	}
+	snapshot := stored.Snapshot()
+	binding := snapshot.Binding
+	if snapshot.ID != authorization.ResultID() || binding.Key.Scope != secretresult.ScopeIdentityBootstrap ||
+		binding.Key.OperationID != operationID || binding.RequestDigest != digest ||
+		binding.ResultType != secretresult.ResultTypeIdentityDeviceCredential || binding.ResultVersion != identityResultVersion {
+		return secretresult.Result{}, secretresult.Binding{}, secretresult.ErrReplayUnauthorized
+	}
+	if _, err := stored.Resolve(binding, service.clock.Now()); err != nil {
+		return secretresult.Result{}, secretresult.Binding{}, err
+	}
+	return stored, binding, nil
 }
 
 func (service *Service) resolveOnboardingResult(

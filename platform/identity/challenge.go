@@ -71,6 +71,14 @@ type ChallengeService struct {
 	source clock.Clock
 }
 
+// AuthorizedIdentityChallengeWork runs with the full recovery/security transaction after challenge authentication.
+type AuthorizedIdentityChallengeWork func(
+	context.Context,
+	IdentityTransaction,
+	Challenge,
+	challenge.Authorization,
+) (AuthorizedChallengeCompletion, error)
+
 // NewChallengeService prevents an admin challenge keyring from being wired into user identity flows.
 func NewChallengeService(keyring *security.HMACKeyring[security.UserChallengeKeyPurpose], source clock.Clock) (*ChallengeService, error) {
 	core, err := challenge.NewService(keyring, source)
@@ -166,6 +174,71 @@ func (service *ChallengeService) AuthorizePersistent(
 	return authorization, nil
 }
 
+// AuthorizeIdentityPersistent is the full-transaction counterpart used when challenge completion creates a recovery attempt.
+func (service *ChallengeService) AuthorizeIdentityPersistent(
+	ctx context.Context,
+	unitOfWork IdentityUnitOfWork,
+	purpose ChallengePurpose,
+	canonicalOrigin string,
+	requestFlowID challenge.RequestFlowID,
+	credentials challenge.Credentials,
+	operationID idempotency.OperationID,
+	requestDigest idempotency.Digest,
+	work AuthorizedIdentityChallengeWork,
+) (challenge.Authorization, error) {
+	if service == nil || service.core == nil || service.source == nil || unitOfWork == nil || work == nil {
+		return challenge.Authorization{}, challenge.ErrInvalidInput
+	}
+	binding, err := identityChallengeBinding(purpose, canonicalOrigin, requestFlowID)
+	if err != nil {
+		return challenge.Authorization{}, challenge.ErrAuthentication
+	}
+	selector, err := challenge.SelectorFromCredentials(credentials)
+	if err != nil {
+		return challenge.Authorization{}, challenge.ErrAuthentication
+	}
+
+	var authorization challenge.Authorization
+	var authorizationErr error
+	err = unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction IdentityTransaction) error {
+		repository := transaction.Challenges()
+		record, getErr := repository.GetForUpdate(ctx, selector)
+		if errors.Is(getErr, challenge.ErrNotFound) {
+			authorizationErr = challenge.ErrAuthentication
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		authorization, authorizationErr = service.core.Authorize(
+			record, binding, credentials, operationID, requestDigest,
+		)
+		if authorizationErr == nil {
+			completion, workErr := work(ctx, transaction, record, authorization)
+			if workErr != nil {
+				return workErr
+			}
+			if authorization.Kind() == challenge.AuthorizeExactReplay {
+				return nil
+			}
+			return service.completeFirstUse(ctx, transaction, repository, record, operationID, requestDigest, completion)
+		}
+		attemptedAt := service.source.Now()
+		if !errors.Is(authorizationErr, challenge.ErrAuthentication) || record.State(attemptedAt) != challenge.StateActive {
+			return nil
+		}
+		_, failureErr := repository.RecordFailureCAS(ctx, record, attemptedAt)
+		return failureErr
+	})
+	if err != nil {
+		return challenge.Authorization{}, err
+	}
+	if authorizationErr != nil {
+		return challenge.Authorization{}, authorizationErr
+	}
+	return authorization, nil
+}
+
 // completeFirstUse verifies the persisted result contract before the service owns challenge consumption.
 func (service *ChallengeService) completeFirstUse(
 	ctx context.Context,
@@ -185,8 +258,13 @@ func (service *ChallengeService) completeFirstUse(
 	} else {
 		provided := completion.result.Snapshot()
 		recordID := record.Snapshot().ID
+		// Bootstrap creates or rotates a user-owned credential under anonymous challenge authority.
+		// Every other challenge result remains owned by the challenge itself.
+		bootstrapOwnsUserResult := record.Snapshot().Binding.Purpose == challenge.Purpose(ChallengePurposeBootstrap.String()) &&
+			provided.Binding.Key.Scope == secretresult.ScopeIdentityBootstrap
+		actorAllowed := provided.Binding.Key.ActorID == recordID || bootstrapOwnsUserResult
 		if provided.ID == uuid.Nil || provided.Status != secretresult.StatusAvailable || !provided.Binding.Key.Scope.IsIdentity() ||
-			provided.Binding.Key.ActorID != recordID || provided.Binding.Key.OperationID != operationID ||
+			!actorAllowed || provided.Binding.Key.OperationID != operationID ||
 			provided.Binding.RequestDigest != requestDigest {
 			return challenge.ErrInvalidInput
 		}

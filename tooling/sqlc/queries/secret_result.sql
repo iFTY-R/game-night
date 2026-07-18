@@ -56,6 +56,14 @@ WHERE operation_scope = sqlc.arg(operation_scope)
   AND operation_id = sqlc.arg(operation_id)
 FOR UPDATE;
 
+-- name: GetSecretOperationResultByIDForUpdate :one
+SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+FROM secret_operation_results
+WHERE result_id = sqlc.arg(result_id)
+FOR UPDATE;
+
 -- name: ConfirmSecretOperationResultCAS :one
 UPDATE secret_operation_results
 SET status = 'confirmed',
@@ -169,7 +177,6 @@ INSERT INTO user_recovery_attempts (
     challenge_id,
     origin_hash,
     purpose,
-    request_digest,
     attempt_count,
     max_attempts,
     status,
@@ -187,7 +194,6 @@ INSERT INTO user_recovery_attempts (
     sqlc.arg(challenge_id),
     sqlc.arg(origin_hash),
     sqlc.arg(purpose),
-    sqlc.narg(request_digest),
     0,
     sqlc.arg(max_attempts),
     'active',
@@ -199,34 +205,66 @@ RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_vers
           challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
           status, created_at, expires_at, consumed_at, revoked_at, result_id;
 
--- name: GetUserRecoveryAttemptForUpdate :one
+-- name: GetUserRecoveryAttemptBySelector :one
 SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
        user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
        challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
        status, created_at, expires_at, consumed_at, revoked_at, result_id
 FROM user_recovery_attempts
-WHERE grant_selector = sqlc.arg(grant_selector)
-FOR UPDATE;
+WHERE grant_selector = sqlc.arg(grant_selector);
+
+-- name: GetUserRecoveryAttemptForUpdate :one
+WITH selected_attempt AS MATERIALIZED (
+    SELECT selected.recovery_attempt_id, selected.user_id
+    FROM user_recovery_attempts AS selected
+    WHERE selected.grant_selector = sqlc.arg(grant_selector)
+),
+locked_user AS MATERIALIZED (
+    SELECT users.user_id
+    FROM users
+    JOIN selected_attempt AS selected ON selected.user_id = users.user_id
+    FOR UPDATE OF users
+),
+locked_attempt AS MATERIALIZED (
+    SELECT attempts.*
+    FROM user_recovery_attempts AS attempts
+    JOIN selected_attempt AS selected ON selected.recovery_attempt_id = attempts.recovery_attempt_id
+    JOIN locked_user AS users ON users.user_id = attempts.user_id
+    FOR UPDATE OF attempts
+)
+SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+       user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+       challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+       status, created_at, expires_at, consumed_at, revoked_at, result_id
+FROM locked_attempt;
 
 -- name: RecordUserRecoveryAttemptFailureCAS :one
 UPDATE user_recovery_attempts
-SET attempt_count = attempt_count + 1
+SET attempt_count = sqlc.arg(next_attempt_count),
+    status = sqlc.arg(next_status)
 WHERE recovery_attempt_id = sqlc.arg(recovery_attempt_id)
   AND status = 'active'
-  AND expires_at > sqlc.arg(attempted_at)
-  AND attempt_count < max_attempts
-RETURNING recovery_attempt_id, attempt_count, max_attempts, status, expires_at;
+  AND attempt_count = sqlc.arg(expected_attempt_count)
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id;
 
 -- name: ConsumeUserRecoveryAttemptCAS :one
 UPDATE user_recovery_attempts
 SET status = 'consumed',
     consumed_at = sqlc.arg(consumed_at),
+    request_digest = sqlc.arg(request_digest),
     result_id = sqlc.arg(result_id)
 WHERE recovery_attempt_id = sqlc.arg(recovery_attempt_id)
   AND status = 'active'
+  AND attempt_count = sqlc.arg(expected_attempt_count)
   AND expires_at > sqlc.arg(consumed_at)
   AND attempt_count < max_attempts
-RETURNING recovery_attempt_id, user_id, status, consumed_at, result_id;
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id;
 
 -- name: RevokeUserRecoveryAttemptCAS :one
 UPDATE user_recovery_attempts
@@ -234,4 +272,8 @@ SET status = 'revoked',
     revoked_at = sqlc.arg(revoked_at)
 WHERE recovery_attempt_id = sqlc.arg(recovery_attempt_id)
   AND status = 'active'
-RETURNING recovery_attempt_id, user_id, status, revoked_at;
+  AND attempt_count = sqlc.arg(expected_attempt_count)
+RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+          user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+          challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+          status, created_at, expires_at, consumed_at, revoked_at, result_id;

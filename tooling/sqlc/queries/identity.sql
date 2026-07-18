@@ -267,16 +267,34 @@ WHERE credential_id = sqlc.arg(credential_id)
   AND user_id = sqlc.arg(user_id)
   AND generation = sqlc.arg(expected_generation)
   AND revoked_at IS NULL
-RETURNING credential_id, generation, revoked_at, revoke_reason;
+RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
+          previous_secret_key_version, previous_valid_until, csrf_hash, generation, label,
+          created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
+          revoked_at, revoke_reason;
 
 -- name: ListUserDeviceCredentials :many
 SELECT credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
        idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
 FROM device_credentials
 WHERE user_id = sqlc.arg(user_id)
-  AND (created_at, credential_id) > (sqlc.arg(after_created_at), sqlc.arg(after_credential_id))
+  AND (sqlc.arg(include_revoked)::boolean OR revoked_at IS NULL)
+  AND (created_at, credential_id) > (
+      sqlc.arg(after_created_at)::timestamptz,
+      sqlc.arg(after_credential_id)::uuid
+  )
 ORDER BY created_at, credential_id
 LIMIT sqlc.arg(page_size);
+
+-- name: RevokeOtherDeviceCredentialsForRecovery :many
+UPDATE device_credentials
+SET revoked_at = sqlc.arg(revoked_at),
+    revoke_reason = 'recovery',
+    generation = generation + 1
+WHERE user_id = sqlc.arg(user_id)
+  AND credential_id <> sqlc.arg(preserved_credential_id)
+  AND revoked_at IS NULL
+RETURNING credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
+          idle_expires_at, absolute_expires_at, revoked_at, revoke_reason;
 
 -- name: CreateUserRecoveryCredential :one
 INSERT INTO user_recovery_credentials (
@@ -299,11 +317,27 @@ INSERT INTO user_recovery_credentials (
 RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
           created_at, consumed_at, revoked_at, revoke_reason;
 
+-- name: GetUserRecoveryCredentialBySelector :one
+SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+       created_at, consumed_at, revoked_at, revoke_reason
+FROM user_recovery_credentials
+WHERE selector = sqlc.arg(selector);
+
 -- name: GetUserRecoveryCredentialForUpdate :one
 SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
        created_at, consumed_at, revoked_at, revoke_reason
 FROM user_recovery_credentials
-WHERE selector = sqlc.arg(selector)
+WHERE recovery_credential_id = sqlc.arg(recovery_credential_id)
+  AND user_id = sqlc.arg(user_id)
+  AND version = sqlc.arg(expected_version)
+FOR UPDATE;
+
+-- name: GetActiveUserRecoveryCredentialForUpdate :one
+SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+       created_at, consumed_at, revoked_at, revoke_reason
+FROM user_recovery_credentials
+WHERE user_id = sqlc.arg(user_id)
+  AND status = 'active'
 FOR UPDATE;
 
 -- name: ConsumeUserRecoveryCredentialCAS :one
@@ -314,7 +348,8 @@ WHERE recovery_credential_id = sqlc.arg(recovery_credential_id)
   AND user_id = sqlc.arg(user_id)
   AND version = sqlc.arg(expected_version)
   AND status = 'active'
-RETURNING recovery_credential_id, user_id, version, status, consumed_at;
+RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+          created_at, consumed_at, revoked_at, revoke_reason;
 
 -- name: RevokeUserRecoveryCredentialCAS :one
 UPDATE user_recovery_credentials
@@ -325,7 +360,8 @@ WHERE recovery_credential_id = sqlc.arg(recovery_credential_id)
   AND user_id = sqlc.arg(user_id)
   AND version = sqlc.arg(expected_version)
   AND status = 'active'
-RETURNING recovery_credential_id, user_id, version, status, revoked_at, revoke_reason;
+RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+          created_at, consumed_at, revoked_at, revoke_reason;
 
 -- name: TransitionUserStatusCAS :one
 UPDATE users

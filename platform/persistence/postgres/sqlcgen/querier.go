@@ -6,6 +6,8 @@ package sqlcgen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -293,11 +295,15 @@ type Querier interface {
 	//      consumed_at = $1,
 	//      result_id = $2
 	//  WHERE assisted_grant_id = $3
+	//    AND user_id = $4
 	//    AND status = 'active'
+	//    AND attempt_count = $5
 	//    AND expires_at > $1
 	//    AND attempt_count < max_attempts
-	//  RETURNING assisted_grant_id, user_id, status, consumed_at, result_id
-	ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (ConsumeAdminAssistedRecoveryGrantCASRow, error)
+	//  RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+	//            attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+	//            consumed_at, revoked_at, result_id
+	ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (AdminAssistedRecoveryGrant, error)
 	//ConsumeAdminChallengeCAS
 	//
 	//  WITH current_admin AS MATERIALIZED (
@@ -368,13 +374,18 @@ type Querier interface {
 	//  UPDATE user_recovery_attempts
 	//  SET status = 'consumed',
 	//      consumed_at = $1,
-	//      result_id = $2
-	//  WHERE recovery_attempt_id = $3
+	//      request_digest = $2,
+	//      result_id = $3
+	//  WHERE recovery_attempt_id = $4
 	//    AND status = 'active'
+	//    AND attempt_count = $5
 	//    AND expires_at > $1
 	//    AND attempt_count < max_attempts
-	//  RETURNING recovery_attempt_id, user_id, status, consumed_at, result_id
-	ConsumeUserRecoveryAttemptCAS(ctx context.Context, arg ConsumeUserRecoveryAttemptCASParams) (ConsumeUserRecoveryAttemptCASRow, error)
+	//  RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+	//            user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+	//            challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+	//            status, created_at, expires_at, consumed_at, revoked_at, result_id
+	ConsumeUserRecoveryAttemptCAS(ctx context.Context, arg ConsumeUserRecoveryAttemptCASParams) (UserRecoveryAttempt, error)
 	//ConsumeUserRecoveryCredentialCAS
 	//
 	//  UPDATE user_recovery_credentials
@@ -384,8 +395,9 @@ type Querier interface {
 	//    AND user_id = $3
 	//    AND version = $4
 	//    AND status = 'active'
-	//  RETURNING recovery_credential_id, user_id, version, status, consumed_at
-	ConsumeUserRecoveryCredentialCAS(ctx context.Context, arg ConsumeUserRecoveryCredentialCASParams) (ConsumeUserRecoveryCredentialCASRow, error)
+	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+	//            created_at, consumed_at, revoked_at, revoke_reason
+	ConsumeUserRecoveryCredentialCAS(ctx context.Context, arg ConsumeUserRecoveryCredentialCASParams) (UserRecoveryCredential, error)
 	//CountPIIKeyReferences
 	//
 	//  SELECT (
@@ -851,7 +863,6 @@ type Querier interface {
 	//      challenge_id,
 	//      origin_hash,
 	//      purpose,
-	//      request_digest,
 	//      attempt_count,
 	//      max_attempts,
 	//      status,
@@ -869,12 +880,11 @@ type Querier interface {
 	//      $9,
 	//      $10,
 	//      $11,
-	//      $12,
 	//      0,
-	//      $13,
+	//      $12,
 	//      'active',
-	//      $14,
-	//      $15
+	//      $13,
+	//      $14
 	//  )
 	//  RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
 	//            user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
@@ -951,14 +961,39 @@ type Querier interface {
 	//    AND lease_owner = $4
 	//  RETURNING job_id, status, processed_count, conflict_count, last_error_code, updated_at
 	FailKeyRotationJobCAS(ctx context.Context, arg FailKeyRotationJobCASParams) (FailKeyRotationJobCASRow, error)
-	//GetAdminAssistedRecoveryGrantForUpdate
+	//GetActiveUserRecoveryCredentialForUpdate
+	//
+	//  SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+	//         created_at, consumed_at, revoked_at, revoke_reason
+	//  FROM user_recovery_credentials
+	//  WHERE user_id = $1
+	//    AND status = 'active'
+	//  FOR UPDATE
+	GetActiveUserRecoveryCredentialForUpdate(ctx context.Context, arg GetActiveUserRecoveryCredentialForUpdateParams) (UserRecoveryCredential, error)
+	//GetAdminAssistedRecoveryGrantBySelector
 	//
 	//  SELECT assisted_grant_id, user_id, selector, secret_hash, purpose, status,
 	//         attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
 	//         consumed_at, revoked_at, result_id
 	//  FROM admin_assisted_recovery_grants
 	//  WHERE selector = $1
-	//  FOR UPDATE
+	GetAdminAssistedRecoveryGrantBySelector(ctx context.Context, arg GetAdminAssistedRecoveryGrantBySelectorParams) (AdminAssistedRecoveryGrant, error)
+	//GetAdminAssistedRecoveryGrantForUpdate
+	//
+	//  WITH locked_user AS MATERIALIZED (
+	//      SELECT target.user_id
+	//      FROM users AS target
+	//      WHERE target.user_id = $2
+	//      FOR UPDATE OF target
+	//  )
+	//  SELECT grants.assisted_grant_id, grants.user_id, grants.selector, grants.secret_hash,
+	//         grants.purpose, grants.status, grants.attempt_count, grants.max_attempts,
+	//         grants.created_by_admin_id, grants.created_at, grants.expires_at,
+	//         grants.consumed_at, grants.revoked_at, grants.result_id
+	//  FROM admin_assisted_recovery_grants AS grants
+	//  JOIN locked_user AS users ON users.user_id = grants.user_id
+	//  WHERE grants.assisted_grant_id = $1
+	//  FOR UPDATE OF grants
 	GetAdminAssistedRecoveryGrantForUpdate(ctx context.Context, arg GetAdminAssistedRecoveryGrantForUpdateParams) (AdminAssistedRecoveryGrant, error)
 	//GetAdminChallengeForUpdate
 	//
@@ -1113,6 +1148,15 @@ type Querier interface {
 	//  WHERE export_id = $1
 	//  FOR UPDATE
 	GetProfileExportContextForUpdate(ctx context.Context, arg GetProfileExportContextForUpdateParams) (ProfileExportContext, error)
+	//GetSecretOperationResultByIDForUpdate
+	//
+	//  SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+	//         result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+	//         status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+	//  FROM secret_operation_results
+	//  WHERE result_id = $1
+	//  FOR UPDATE
+	GetSecretOperationResultByIDForUpdate(ctx context.Context, arg GetSecretOperationResultByIDForUpdateParams) (SecretOperationResult, error)
 	//GetSecretOperationResultByOperation
 	//
 	//  SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
@@ -1163,7 +1207,7 @@ type Querier interface {
 	//  FROM user_profiles
 	//  WHERE user_id = $1
 	GetUserProfile(ctx context.Context, arg GetUserProfileParams) (UserProfile, error)
-	//GetUserRecoveryAttemptForUpdate
+	//GetUserRecoveryAttemptBySelector
 	//
 	//  SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
 	//         user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
@@ -1171,14 +1215,48 @@ type Querier interface {
 	//         status, created_at, expires_at, consumed_at, revoked_at, result_id
 	//  FROM user_recovery_attempts
 	//  WHERE grant_selector = $1
-	//  FOR UPDATE
-	GetUserRecoveryAttemptForUpdate(ctx context.Context, arg GetUserRecoveryAttemptForUpdateParams) (UserRecoveryAttempt, error)
-	//GetUserRecoveryCredentialForUpdate
+	GetUserRecoveryAttemptBySelector(ctx context.Context, arg GetUserRecoveryAttemptBySelectorParams) (UserRecoveryAttempt, error)
+	//GetUserRecoveryAttemptForUpdate
+	//
+	//  WITH selected_attempt AS MATERIALIZED (
+	//      SELECT selected.recovery_attempt_id, selected.user_id
+	//      FROM user_recovery_attempts AS selected
+	//      WHERE selected.grant_selector = $1
+	//  ),
+	//  locked_user AS MATERIALIZED (
+	//      SELECT users.user_id
+	//      FROM users
+	//      JOIN selected_attempt AS selected ON selected.user_id = users.user_id
+	//      FOR UPDATE OF users
+	//  ),
+	//  locked_attempt AS MATERIALIZED (
+	//      SELECT attempts.recovery_attempt_id, attempts.grant_selector, attempts.grant_secret_hash, attempts.grant_key_version, attempts.user_id, attempts.recovery_credential_id, attempts.recovery_credential_version, attempts.assisted_grant_id, attempts.challenge_id, attempts.origin_hash, attempts.purpose, attempts.request_digest, attempts.attempt_count, attempts.max_attempts, attempts.status, attempts.created_at, attempts.expires_at, attempts.consumed_at, attempts.revoked_at, attempts.result_id
+	//      FROM user_recovery_attempts AS attempts
+	//      JOIN selected_attempt AS selected ON selected.recovery_attempt_id = attempts.recovery_attempt_id
+	//      JOIN locked_user AS users ON users.user_id = attempts.user_id
+	//      FOR UPDATE OF attempts
+	//  )
+	//  SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+	//         user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+	//         challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+	//         status, created_at, expires_at, consumed_at, revoked_at, result_id
+	//  FROM locked_attempt
+	GetUserRecoveryAttemptForUpdate(ctx context.Context, arg GetUserRecoveryAttemptForUpdateParams) (GetUserRecoveryAttemptForUpdateRow, error)
+	//GetUserRecoveryCredentialBySelector
 	//
 	//  SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
 	//         created_at, consumed_at, revoked_at, revoke_reason
 	//  FROM user_recovery_credentials
 	//  WHERE selector = $1
+	GetUserRecoveryCredentialBySelector(ctx context.Context, arg GetUserRecoveryCredentialBySelectorParams) (UserRecoveryCredential, error)
+	//GetUserRecoveryCredentialForUpdate
+	//
+	//  SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
+	//         created_at, consumed_at, revoked_at, revoke_reason
+	//  FROM user_recovery_credentials
+	//  WHERE recovery_credential_id = $1
+	//    AND user_id = $2
+	//    AND version = $3
 	//  FOR UPDATE
 	GetUserRecoveryCredentialForUpdate(ctx context.Context, arg GetUserRecoveryCredentialForUpdateParams) (UserRecoveryCredential, error)
 	//GetUsernameClaimForUpdate
@@ -1273,9 +1351,13 @@ type Querier interface {
 	//         idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
 	//  FROM device_credentials
 	//  WHERE user_id = $1
-	//    AND (created_at, credential_id) > ($2, $3)
+	//    AND ($2::boolean OR revoked_at IS NULL)
+	//    AND (created_at, credential_id) > (
+	//        $3::timestamptz,
+	//        $4::uuid
+	//    )
 	//  ORDER BY created_at, credential_id
-	//  LIMIT $4
+	//  LIMIT $5
 	ListUserDeviceCredentials(ctx context.Context, arg ListUserDeviceCredentialsParams) ([]ListUserDeviceCredentialsRow, error)
 	//ListUserProfilesForKeyRotation
 	//
@@ -1311,13 +1393,15 @@ type Querier interface {
 	//RecordAdminAssistedRecoveryFailureCAS
 	//
 	//  UPDATE admin_assisted_recovery_grants
-	//  SET attempt_count = attempt_count + 1
-	//  WHERE assisted_grant_id = $1
+	//  SET attempt_count = $1,
+	//      status = $2
+	//  WHERE assisted_grant_id = $3
 	//    AND status = 'active'
-	//    AND expires_at > $2
-	//    AND attempt_count < max_attempts
-	//  RETURNING assisted_grant_id, attempt_count, max_attempts, status, expires_at
-	RecordAdminAssistedRecoveryFailureCAS(ctx context.Context, arg RecordAdminAssistedRecoveryFailureCASParams) (RecordAdminAssistedRecoveryFailureCASRow, error)
+	//    AND attempt_count = $4
+	//  RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+	//            attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+	//            consumed_at, revoked_at, result_id
+	RecordAdminAssistedRecoveryFailureCAS(ctx context.Context, arg RecordAdminAssistedRecoveryFailureCASParams) (AdminAssistedRecoveryGrant, error)
 	//RecordAdminChallengeFailureCAS
 	//
 	//  UPDATE admin_challenges
@@ -1360,13 +1444,16 @@ type Querier interface {
 	//RecordUserRecoveryAttemptFailureCAS
 	//
 	//  UPDATE user_recovery_attempts
-	//  SET attempt_count = attempt_count + 1
-	//  WHERE recovery_attempt_id = $1
+	//  SET attempt_count = $1,
+	//      status = $2
+	//  WHERE recovery_attempt_id = $3
 	//    AND status = 'active'
-	//    AND expires_at > $2
-	//    AND attempt_count < max_attempts
-	//  RETURNING recovery_attempt_id, attempt_count, max_attempts, status, expires_at
-	RecordUserRecoveryAttemptFailureCAS(ctx context.Context, arg RecordUserRecoveryAttemptFailureCASParams) (RecordUserRecoveryAttemptFailureCASRow, error)
+	//    AND attempt_count = $4
+	//  RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+	//            user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+	//            challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+	//            status, created_at, expires_at, consumed_at, revoked_at, result_id
+	RecordUserRecoveryAttemptFailureCAS(ctx context.Context, arg RecordUserRecoveryAttemptFailureCASParams) (UserRecoveryAttempt, error)
 	//ReleaseOutboxConsumerLeaseCAS
 	//
 	//  UPDATE outbox_consumers
@@ -1448,6 +1535,16 @@ type Querier interface {
 	//         decode(pg_catalog.substring(result.payload ->> 'appended_hash', 3), 'hex') AS appended_hash
 	//  FROM result
 	ResetAdminAccount(ctx context.Context, arg ResetAdminAccountParams) (ResetAdminAccountRow, error)
+	//RevokeActiveAdminAssistedRecoveryGrantsForUser
+	//
+	//  UPDATE admin_assisted_recovery_grants
+	//  SET status = 'revoked',
+	//      revoked_at = $1
+	//  WHERE user_id = $2
+	//    AND assisted_grant_id <> $3
+	//    AND status = 'active'
+	//  RETURNING assisted_grant_id
+	RevokeActiveAdminAssistedRecoveryGrantsForUser(ctx context.Context, arg RevokeActiveAdminAssistedRecoveryGrantsForUserParams) ([]pgtype.UUID, error)
 	//RevokeAdminChallenges
 	//
 	//  UPDATE admin_challenges
@@ -1492,8 +1589,23 @@ type Querier interface {
 	//    AND user_id = $4
 	//    AND generation = $5
 	//    AND revoked_at IS NULL
-	//  RETURNING credential_id, generation, revoked_at, revoke_reason
-	RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDeviceCredentialCASParams) (RevokeDeviceCredentialCASRow, error)
+	//  RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
+	//            previous_secret_key_version, previous_valid_until, csrf_hash, generation, label,
+	//            created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
+	//            revoked_at, revoke_reason
+	RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDeviceCredentialCASParams) (DeviceCredential, error)
+	//RevokeOtherDeviceCredentialsForRecovery
+	//
+	//  UPDATE device_credentials
+	//  SET revoked_at = $1,
+	//      revoke_reason = 'recovery',
+	//      generation = generation + 1
+	//  WHERE user_id = $2
+	//    AND credential_id <> $3
+	//    AND revoked_at IS NULL
+	//  RETURNING credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
+	//            idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+	RevokeOtherDeviceCredentialsForRecovery(ctx context.Context, arg RevokeOtherDeviceCredentialsForRecoveryParams) ([]RevokeOtherDeviceCredentialsForRecoveryRow, error)
 	//RevokeUserRecoveryAttemptCAS
 	//
 	//  UPDATE user_recovery_attempts
@@ -1501,8 +1613,12 @@ type Querier interface {
 	//      revoked_at = $1
 	//  WHERE recovery_attempt_id = $2
 	//    AND status = 'active'
-	//  RETURNING recovery_attempt_id, user_id, status, revoked_at
-	RevokeUserRecoveryAttemptCAS(ctx context.Context, arg RevokeUserRecoveryAttemptCASParams) (RevokeUserRecoveryAttemptCASRow, error)
+	//    AND attempt_count = $3
+	//  RETURNING recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
+	//            user_id, recovery_credential_id, recovery_credential_version, assisted_grant_id,
+	//            challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
+	//            status, created_at, expires_at, consumed_at, revoked_at, result_id
+	RevokeUserRecoveryAttemptCAS(ctx context.Context, arg RevokeUserRecoveryAttemptCASParams) (UserRecoveryAttempt, error)
 	//RevokeUserRecoveryCredentialCAS
 	//
 	//  UPDATE user_recovery_credentials
@@ -1513,8 +1629,9 @@ type Querier interface {
 	//    AND user_id = $4
 	//    AND version = $5
 	//    AND status = 'active'
-	//  RETURNING recovery_credential_id, user_id, version, status, revoked_at, revoke_reason
-	RevokeUserRecoveryCredentialCAS(ctx context.Context, arg RevokeUserRecoveryCredentialCASParams) (RevokeUserRecoveryCredentialCASRow, error)
+	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
+	//            created_at, consumed_at, revoked_at, revoke_reason
+	RevokeUserRecoveryCredentialCAS(ctx context.Context, arg RevokeUserRecoveryCredentialCASParams) (UserRecoveryCredential, error)
 	//RotateAdminTotpEnrollmentCiphertextCAS
 	//
 	//  UPDATE admin_totp_enrollments

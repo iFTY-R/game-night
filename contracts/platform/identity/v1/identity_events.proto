@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package platform.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/identity/v1/identity.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1;identityv1";
+
+// IdentityRecoverySource records which reviewed authority completed account recovery.
+enum IdentityRecoverySource {
+  IDENTITY_RECOVERY_SOURCE_UNSPECIFIED = 0;
+  IDENTITY_RECOVERY_SOURCE_RECOVERY_CODE = 1;
+  IDENTITY_RECOVERY_SOURCE_ADMIN_ASSISTED_GRANT = 2;
+}
+
+// IdentityDeviceRevocationReason is the durable, non-sensitive reason consumed by downstream modules.
+enum IdentityDeviceRevocationReason {
+  IDENTITY_DEVICE_REVOCATION_REASON_UNSPECIFIED = 0;
+  IDENTITY_DEVICE_REVOCATION_REASON_USER_REQUESTED = 1;
+  IDENTITY_DEVICE_REVOCATION_REASON_ADMIN_REQUESTED = 2;
+  IDENTITY_DEVICE_REVOCATION_REASON_RECOVERY = 3;
+  IDENTITY_DEVICE_REVOCATION_REASON_ONBOARDING_EXPIRED = 4;
+  IDENTITY_DEVICE_REVOCATION_REASON_ACCOUNT_SUSPENDED = 5;
+  IDENTITY_DEVICE_REVOCATION_REASON_ACCOUNT_DELETED = 6;
+}
+
+// IdentityRecoveryCompletedEvent contains only stable IDs and reviewed policy metadata.
+message IdentityRecoveryCompletedEvent {
+  uint32 schema_version = 1;
+  string event_id = 2;
+  string request_id = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  string user_id = 5;
+  string new_device_credential_id = 6;
+  string new_recovery_credential_id = 7;
+  string result_id = 8;
+  IdentityRecoverySource source = 9;
+  RecoveryDevicePolicy device_policy = 10;
+
+  // Producers must sort these UUIDs lexicographically before deterministic serialization.
+  repeated string revoked_device_credential_ids = 11;
+  uint32 revoked_assisted_grant_count = 12;
+}
+
+// IdentityDeviceRevokedEvent notifies room and realtime modules to recheck authoritative identity state.
+message IdentityDeviceRevokedEvent {
+  uint32 schema_version = 1;
+  string event_id = 2;
+
+  // Empty for a direct revocation; recovery-driven revocations reference the recovery event ID.
+  string cause_event_id = 3;
+  string request_id = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  string user_id = 6;
+  string device_credential_id = 7;
+  IdentityDeviceRevocationReason reason = 8;
+}

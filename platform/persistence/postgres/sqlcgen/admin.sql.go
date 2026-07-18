@@ -198,24 +198,22 @@ SET status = 'consumed',
     consumed_at = $1,
     result_id = $2
 WHERE assisted_grant_id = $3
+  AND user_id = $4
   AND status = 'active'
+  AND attempt_count = $5
   AND expires_at > $1
   AND attempt_count < max_attempts
-RETURNING assisted_grant_id, user_id, status, consumed_at, result_id
+RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+          attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+          consumed_at, revoked_at, result_id
 `
 
 type ConsumeAdminAssistedRecoveryGrantCASParams struct {
-	ConsumedAt      pgtype.Timestamptz `json:"consumed_at"`
-	ResultID        pgtype.UUID        `json:"result_id"`
-	AssistedGrantID pgtype.UUID        `json:"assisted_grant_id"`
-}
-
-type ConsumeAdminAssistedRecoveryGrantCASRow struct {
-	AssistedGrantID pgtype.UUID        `json:"assisted_grant_id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	Status          string             `json:"status"`
-	ConsumedAt      pgtype.Timestamptz `json:"consumed_at"`
-	ResultID        pgtype.UUID        `json:"result_id"`
+	ConsumedAt           pgtype.Timestamptz `json:"consumed_at"`
+	ResultID             pgtype.UUID        `json:"result_id"`
+	AssistedGrantID      pgtype.UUID        `json:"assisted_grant_id"`
+	UserID               pgtype.UUID        `json:"user_id"`
+	ExpectedAttemptCount int32              `json:"expected_attempt_count"`
 }
 
 // ConsumeAdminAssistedRecoveryGrantCAS
@@ -225,18 +223,37 @@ type ConsumeAdminAssistedRecoveryGrantCASRow struct {
 //	    consumed_at = $1,
 //	    result_id = $2
 //	WHERE assisted_grant_id = $3
+//	  AND user_id = $4
 //	  AND status = 'active'
+//	  AND attempt_count = $5
 //	  AND expires_at > $1
 //	  AND attempt_count < max_attempts
-//	RETURNING assisted_grant_id, user_id, status, consumed_at, result_id
-func (q *Queries) ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (ConsumeAdminAssistedRecoveryGrantCASRow, error) {
-	row := q.db.QueryRow(ctx, consumeAdminAssistedRecoveryGrantCAS, arg.ConsumedAt, arg.ResultID, arg.AssistedGrantID)
-	var i ConsumeAdminAssistedRecoveryGrantCASRow
+//	RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+//	          attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+//	          consumed_at, revoked_at, result_id
+func (q *Queries) ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (AdminAssistedRecoveryGrant, error) {
+	row := q.db.QueryRow(ctx, consumeAdminAssistedRecoveryGrantCAS,
+		arg.ConsumedAt,
+		arg.ResultID,
+		arg.AssistedGrantID,
+		arg.UserID,
+		arg.ExpectedAttemptCount,
+	)
+	var i AdminAssistedRecoveryGrant
 	err := row.Scan(
 		&i.AssistedGrantID,
 		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.Purpose,
 		&i.Status,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.CreatedByAdminID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.ConsumedAt,
+		&i.RevokedAt,
 		&i.ResultID,
 	)
 	return i, err
@@ -1013,29 +1030,87 @@ func (q *Queries) DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg D
 	return i, err
 }
 
-const getAdminAssistedRecoveryGrantForUpdate = `-- name: GetAdminAssistedRecoveryGrantForUpdate :one
+const getAdminAssistedRecoveryGrantBySelector = `-- name: GetAdminAssistedRecoveryGrantBySelector :one
 SELECT assisted_grant_id, user_id, selector, secret_hash, purpose, status,
        attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
        consumed_at, revoked_at, result_id
 FROM admin_assisted_recovery_grants
 WHERE selector = $1
-FOR UPDATE
 `
 
-type GetAdminAssistedRecoveryGrantForUpdateParams struct {
+type GetAdminAssistedRecoveryGrantBySelectorParams struct {
 	Selector string `json:"selector"`
 }
 
-// GetAdminAssistedRecoveryGrantForUpdate
+// GetAdminAssistedRecoveryGrantBySelector
 //
 //	SELECT assisted_grant_id, user_id, selector, secret_hash, purpose, status,
 //	       attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
 //	       consumed_at, revoked_at, result_id
 //	FROM admin_assisted_recovery_grants
 //	WHERE selector = $1
-//	FOR UPDATE
+func (q *Queries) GetAdminAssistedRecoveryGrantBySelector(ctx context.Context, arg GetAdminAssistedRecoveryGrantBySelectorParams) (AdminAssistedRecoveryGrant, error) {
+	row := q.db.QueryRow(ctx, getAdminAssistedRecoveryGrantBySelector, arg.Selector)
+	var i AdminAssistedRecoveryGrant
+	err := row.Scan(
+		&i.AssistedGrantID,
+		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.Purpose,
+		&i.Status,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.CreatedByAdminID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.ResultID,
+	)
+	return i, err
+}
+
+const getAdminAssistedRecoveryGrantForUpdate = `-- name: GetAdminAssistedRecoveryGrantForUpdate :one
+WITH locked_user AS MATERIALIZED (
+    SELECT target.user_id
+    FROM users AS target
+    WHERE target.user_id = $2
+    FOR UPDATE OF target
+)
+SELECT grants.assisted_grant_id, grants.user_id, grants.selector, grants.secret_hash,
+       grants.purpose, grants.status, grants.attempt_count, grants.max_attempts,
+       grants.created_by_admin_id, grants.created_at, grants.expires_at,
+       grants.consumed_at, grants.revoked_at, grants.result_id
+FROM admin_assisted_recovery_grants AS grants
+JOIN locked_user AS users ON users.user_id = grants.user_id
+WHERE grants.assisted_grant_id = $1
+FOR UPDATE OF grants
+`
+
+type GetAdminAssistedRecoveryGrantForUpdateParams struct {
+	AssistedGrantID pgtype.UUID `json:"assisted_grant_id"`
+	TargetUserID    pgtype.UUID `json:"target_user_id"`
+}
+
+// GetAdminAssistedRecoveryGrantForUpdate
+//
+//	WITH locked_user AS MATERIALIZED (
+//	    SELECT target.user_id
+//	    FROM users AS target
+//	    WHERE target.user_id = $2
+//	    FOR UPDATE OF target
+//	)
+//	SELECT grants.assisted_grant_id, grants.user_id, grants.selector, grants.secret_hash,
+//	       grants.purpose, grants.status, grants.attempt_count, grants.max_attempts,
+//	       grants.created_by_admin_id, grants.created_at, grants.expires_at,
+//	       grants.consumed_at, grants.revoked_at, grants.result_id
+//	FROM admin_assisted_recovery_grants AS grants
+//	JOIN locked_user AS users ON users.user_id = grants.user_id
+//	WHERE grants.assisted_grant_id = $1
+//	FOR UPDATE OF grants
 func (q *Queries) GetAdminAssistedRecoveryGrantForUpdate(ctx context.Context, arg GetAdminAssistedRecoveryGrantForUpdateParams) (AdminAssistedRecoveryGrant, error) {
-	row := q.db.QueryRow(ctx, getAdminAssistedRecoveryGrantForUpdate, arg.Selector)
+	row := q.db.QueryRow(ctx, getAdminAssistedRecoveryGrantForUpdate, arg.AssistedGrantID, arg.TargetUserID)
 	var i AdminAssistedRecoveryGrant
 	err := row.Scan(
 		&i.AssistedGrantID,
@@ -1261,45 +1336,57 @@ func (q *Queries) GetSingletonAdminForUpdate(ctx context.Context) (AdminAccount,
 
 const recordAdminAssistedRecoveryFailureCAS = `-- name: RecordAdminAssistedRecoveryFailureCAS :one
 UPDATE admin_assisted_recovery_grants
-SET attempt_count = attempt_count + 1
-WHERE assisted_grant_id = $1
+SET attempt_count = $1,
+    status = $2
+WHERE assisted_grant_id = $3
   AND status = 'active'
-  AND expires_at > $2
-  AND attempt_count < max_attempts
-RETURNING assisted_grant_id, attempt_count, max_attempts, status, expires_at
+  AND attempt_count = $4
+RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+          attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+          consumed_at, revoked_at, result_id
 `
 
 type RecordAdminAssistedRecoveryFailureCASParams struct {
-	AssistedGrantID pgtype.UUID        `json:"assisted_grant_id"`
-	AttemptedAt     pgtype.Timestamptz `json:"attempted_at"`
-}
-
-type RecordAdminAssistedRecoveryFailureCASRow struct {
-	AssistedGrantID pgtype.UUID        `json:"assisted_grant_id"`
-	AttemptCount    int32              `json:"attempt_count"`
-	MaxAttempts     int32              `json:"max_attempts"`
-	Status          string             `json:"status"`
-	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	NextAttemptCount     int32       `json:"next_attempt_count"`
+	NextStatus           string      `json:"next_status"`
+	AssistedGrantID      pgtype.UUID `json:"assisted_grant_id"`
+	ExpectedAttemptCount int32       `json:"expected_attempt_count"`
 }
 
 // RecordAdminAssistedRecoveryFailureCAS
 //
 //	UPDATE admin_assisted_recovery_grants
-//	SET attempt_count = attempt_count + 1
-//	WHERE assisted_grant_id = $1
+//	SET attempt_count = $1,
+//	    status = $2
+//	WHERE assisted_grant_id = $3
 //	  AND status = 'active'
-//	  AND expires_at > $2
-//	  AND attempt_count < max_attempts
-//	RETURNING assisted_grant_id, attempt_count, max_attempts, status, expires_at
-func (q *Queries) RecordAdminAssistedRecoveryFailureCAS(ctx context.Context, arg RecordAdminAssistedRecoveryFailureCASParams) (RecordAdminAssistedRecoveryFailureCASRow, error) {
-	row := q.db.QueryRow(ctx, recordAdminAssistedRecoveryFailureCAS, arg.AssistedGrantID, arg.AttemptedAt)
-	var i RecordAdminAssistedRecoveryFailureCASRow
+//	  AND attempt_count = $4
+//	RETURNING assisted_grant_id, user_id, selector, secret_hash, purpose, status,
+//	          attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
+//	          consumed_at, revoked_at, result_id
+func (q *Queries) RecordAdminAssistedRecoveryFailureCAS(ctx context.Context, arg RecordAdminAssistedRecoveryFailureCASParams) (AdminAssistedRecoveryGrant, error) {
+	row := q.db.QueryRow(ctx, recordAdminAssistedRecoveryFailureCAS,
+		arg.NextAttemptCount,
+		arg.NextStatus,
+		arg.AssistedGrantID,
+		arg.ExpectedAttemptCount,
+	)
+	var i AdminAssistedRecoveryGrant
 	err := row.Scan(
 		&i.AssistedGrantID,
+		&i.UserID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.Purpose,
+		&i.Status,
 		&i.AttemptCount,
 		&i.MaxAttempts,
-		&i.Status,
+		&i.CreatedByAdminID,
+		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.ResultID,
 	)
 	return i, err
 }
@@ -1347,6 +1434,51 @@ func (q *Queries) RecordAdminChallengeFailureCAS(ctx context.Context, arg Record
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const revokeActiveAdminAssistedRecoveryGrantsForUser = `-- name: RevokeActiveAdminAssistedRecoveryGrantsForUser :many
+UPDATE admin_assisted_recovery_grants
+SET status = 'revoked',
+    revoked_at = $1
+WHERE user_id = $2
+  AND assisted_grant_id <> $3
+  AND status = 'active'
+RETURNING assisted_grant_id
+`
+
+type RevokeActiveAdminAssistedRecoveryGrantsForUserParams struct {
+	RevokedAt                pgtype.Timestamptz `json:"revoked_at"`
+	UserID                   pgtype.UUID        `json:"user_id"`
+	PreservedAssistedGrantID pgtype.UUID        `json:"preserved_assisted_grant_id"`
+}
+
+// RevokeActiveAdminAssistedRecoveryGrantsForUser
+//
+//	UPDATE admin_assisted_recovery_grants
+//	SET status = 'revoked',
+//	    revoked_at = $1
+//	WHERE user_id = $2
+//	  AND assisted_grant_id <> $3
+//	  AND status = 'active'
+//	RETURNING assisted_grant_id
+func (q *Queries) RevokeActiveAdminAssistedRecoveryGrantsForUser(ctx context.Context, arg RevokeActiveAdminAssistedRecoveryGrantsForUserParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, revokeActiveAdminAssistedRecoveryGrantsForUser, arg.RevokedAt, arg.UserID, arg.PreservedAssistedGrantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var assisted_grant_id pgtype.UUID
+		if err := rows.Scan(&assisted_grant_id); err != nil {
+			return nil, err
+		}
+		items = append(items, assisted_grant_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const revokeAdminChallenges = `-- name: RevokeAdminChallenges :execrows

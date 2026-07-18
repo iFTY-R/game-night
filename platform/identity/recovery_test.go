@@ -146,12 +146,25 @@ func validRecoverySnapshot(t testing.TB, now time.Time) RecoveryCredentialSnapsh
 }
 
 type recordingRecoveryHasher struct {
-	hash  string
-	err   error
-	input []byte
+	hash            string
+	err             error
+	input           []byte
+	verifyHash      string
+	verifyInput     []byte
+	verifyMatched   bool
+	verifyNeedsUp   bool
+	verifyErr       error
+	verifyCallCount int
 }
 
 func (hasher *recordingRecoveryHasher) Hash(_ context.Context, input []byte) (string, error) {
 	hasher.input = append([]byte(nil), input...)
 	return hasher.hash, hasher.err
+}
+
+func (hasher *recordingRecoveryHasher) VerifyOrDummy(_ context.Context, encoded string, input []byte) (bool, bool, error) {
+	hasher.verifyHash = encoded
+	hasher.verifyInput = append([]byte(nil), input...)
+	hasher.verifyCallCount++
+	return hasher.verifyMatched, hasher.verifyNeedsUp, hasher.verifyErr
 }

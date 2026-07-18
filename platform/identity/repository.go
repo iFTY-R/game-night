@@ -23,6 +23,10 @@ type ChallengeRepository interface {
 type ChallengeTransaction interface {
 	Challenges() ChallengeRepository
 	SecretResults() secretresult.Repository
+	Users() UserRepository
+	UsernameClaims() UsernameClaimRepository
+	Devices() DeviceRepository
+	RecoveryCredentials() RecoveryCredentialRepository
 }
 
 // ChallengeTransactionWork receives transaction-scoped ports and must not retain them after returning.
@@ -63,3 +67,41 @@ type AuthorizedChallengeWork func(
 type ChallengeUnitOfWork interface {
 	Run(context.Context, ChallengeTransactionWork) error
 }
+
+// UserRepository persists the user aggregate and uses operation-specific CAS updates for status transitions.
+type UserRepository interface {
+	Insert(context.Context, User) (User, error)
+	GetByID(context.Context, uuid.UUID) (User, error)
+	GetForUpdate(context.Context, uuid.UUID) (User, error)
+	CompleteOnboardingCAS(context.Context, User, User) (User, error)
+	ChangeUsernameCAS(context.Context, User, User) (User, error)
+}
+
+// UsernameClaimRepository owns the single global current/history username registry.
+type UsernameClaimRepository interface {
+	Claim(context.Context, UsernameClaim, time.Time) (UsernameClaim, error)
+	GetForUpdate(context.Context, string) (UsernameClaim, error)
+	ReserveCAS(context.Context, UsernameClaim, UsernameClaim) (UsernameClaim, error)
+}
+
+// DeviceRepository fixes authenticated transaction lock order and generation-aware persistence.
+type DeviceRepository interface {
+	Insert(context.Context, DeviceCredential) (DeviceCredential, error)
+	GetIdentityForUpdate(context.Context, uuid.UUID) (User, DeviceCredential, error)
+	TouchCAS(context.Context, DeviceCredential, DeviceCredential) (DeviceCredential, error)
+	RotateCAS(context.Context, DeviceCredential, DeviceCredential) (DeviceCredential, error)
+}
+
+// RecoveryCredentialRepository stores the initial active credential during onboarding.
+type RecoveryCredentialRepository interface {
+	Insert(context.Context, RecoveryCredential) (RecoveryCredential, error)
+}
+
+// IdentityTransaction is the full user-side transaction surface; it aliases the challenge transaction intentionally.
+type IdentityTransaction = ChallengeTransaction
+
+// IdentityTransactionWork receives all repositories bound to one database transaction.
+type IdentityTransactionWork = ChallengeTransactionWork
+
+// IdentityUnitOfWork commits user, device, challenge, claim, recovery, and result changes atomically.
+type IdentityUnitOfWork = ChallengeUnitOfWork

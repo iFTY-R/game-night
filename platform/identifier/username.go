@@ -14,7 +14,7 @@ import (
 const (
 	// MinimumUsernameCodePoints is measured after NFKC normalization and trimming.
 	MinimumUsernameCodePoints = 2
-	// MaximumUsernameCodePoints bounds public display names and PostgreSQL claim keys by Unicode code points.
+	// MaximumUsernameCodePoints bounds the normalized display; case-folded claim keys may expand beyond it.
 	MaximumUsernameCodePoints = 20
 	// maximumUsernameInputBytes bounds normalization work while allowing combining forms around the display limit.
 	maximumUsernameInputBytes = MaximumUsernameCodePoints * 16
@@ -153,6 +153,12 @@ func normalizeUsernameSyntax(input string) (display, key string, err error) {
 	}
 	if !utf8.ValidString(input) {
 		return "", "", ErrUsernameCharacters
+	}
+	// Reject control and format code points before trimming so normalization never repairs forbidden input.
+	for _, character := range input {
+		if unicode.IsControl(character) || unicode.Is(unicode.Cf, character) {
+			return "", "", ErrUsernameCharacters
+		}
 	}
 
 	display = strings.TrimSpace(norm.NFKC.String(input))

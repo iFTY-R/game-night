@@ -181,6 +181,16 @@ func (identityMemoryChallengeTransaction) SecretResults() secretresult.Repositor
 	return nil
 }
 
+func (identityMemoryChallengeTransaction) Users() UserRepository { return nil }
+
+func (identityMemoryChallengeTransaction) UsernameClaims() UsernameClaimRepository { return nil }
+
+func (identityMemoryChallengeTransaction) Devices() DeviceRepository { return nil }
+
+func (identityMemoryChallengeTransaction) RecoveryCredentials() RecoveryCredentialRepository {
+	return nil
+}
+
 type identityMemoryChallengeUnitOfWork struct {
 	repository *identityMemoryChallengeRepository
 }

@@ -11,6 +11,74 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const changeCurrentUsernameCAS = `-- name: ChangeCurrentUsernameCAS :one
+UPDATE users
+SET username = $1,
+    current_username_key = $2,
+    username_changed_at = $3,
+    updated_at = $3
+WHERE user_id = $4
+  AND status = 'active'
+  AND username = $5
+  AND current_username_key = $6
+  AND username_changed_at = $7
+  AND updated_at = $8
+  AND username_changed_at <= $9
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+`
+
+type ChangeCurrentUsernameCASParams struct {
+	DisplayUsername           pgtype.Text        `json:"display_username"`
+	UsernameKey               pgtype.Text        `json:"username_key"`
+	ChangedAt                 pgtype.Timestamptz `json:"changed_at"`
+	UserID                    pgtype.UUID        `json:"user_id"`
+	ExpectedDisplayUsername   pgtype.Text        `json:"expected_display_username"`
+	ExpectedUsernameKey       pgtype.Text        `json:"expected_username_key"`
+	ExpectedUsernameChangedAt pgtype.Timestamptz `json:"expected_username_changed_at"`
+	ExpectedUpdatedAt         pgtype.Timestamptz `json:"expected_updated_at"`
+	CooldownCutoff            pgtype.Timestamptz `json:"cooldown_cutoff"`
+}
+
+// ChangeCurrentUsernameCAS
+//
+//	UPDATE users
+//	SET username = $1,
+//	    current_username_key = $2,
+//	    username_changed_at = $3,
+//	    updated_at = $3
+//	WHERE user_id = $4
+//	  AND status = 'active'
+//	  AND username = $5
+//	  AND current_username_key = $6
+//	  AND username_changed_at = $7
+//	  AND updated_at = $8
+//	  AND username_changed_at <= $9
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+func (q *Queries) ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error) {
+	row := q.db.QueryRow(ctx, changeCurrentUsernameCAS,
+		arg.DisplayUsername,
+		arg.UsernameKey,
+		arg.ChangedAt,
+		arg.UserID,
+		arg.ExpectedDisplayUsername,
+		arg.ExpectedUsernameKey,
+		arg.ExpectedUsernameChangedAt,
+		arg.ExpectedUpdatedAt,
+		arg.CooldownCutoff,
+	)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Status,
+		&i.Username,
+		&i.CurrentUsernameKey,
+		&i.UsernameChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const claimUsername = `-- name: ClaimUsername :one
 INSERT INTO username_claims (
     username_key,
@@ -89,6 +157,76 @@ func (q *Queries) ClaimUsername(ctx context.Context, arg ClaimUsernameParams) (U
 		&i.Status,
 		&i.OwnerUserID,
 		&i.ReservedUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const completeOnboardingUserCAS = `-- name: CompleteOnboardingUserCAS :one
+UPDATE users
+SET status = 'active',
+    username = $1,
+    current_username_key = $2,
+    username_changed_at = $3,
+    updated_at = $3
+WHERE user_id = $4
+  AND status = 'onboarding'
+  AND username IS NULL
+  AND current_username_key IS NULL
+  AND username_changed_at IS NULL
+  AND updated_at = $5
+  AND created_at = $6
+  AND created_at <= $3
+  AND $3 >= $5
+  AND created_at > $3 - INTERVAL '86400 seconds'
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+`
+
+type CompleteOnboardingUserCASParams struct {
+	DisplayUsername   pgtype.Text        `json:"display_username"`
+	UsernameKey       pgtype.Text        `json:"username_key"`
+	ChangedAt         pgtype.Timestamptz `json:"changed_at"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	ExpectedUpdatedAt pgtype.Timestamptz `json:"expected_updated_at"`
+	ExpectedCreatedAt pgtype.Timestamptz `json:"expected_created_at"`
+}
+
+// CompleteOnboardingUserCAS
+//
+//	UPDATE users
+//	SET status = 'active',
+//	    username = $1,
+//	    current_username_key = $2,
+//	    username_changed_at = $3,
+//	    updated_at = $3
+//	WHERE user_id = $4
+//	  AND status = 'onboarding'
+//	  AND username IS NULL
+//	  AND current_username_key IS NULL
+//	  AND username_changed_at IS NULL
+//	  AND updated_at = $5
+//	  AND created_at = $6
+//	  AND created_at <= $3
+//	  AND $3 >= $5
+//	  AND created_at > $3 - INTERVAL '86400 seconds'
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+func (q *Queries) CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnboardingUserCASParams) (User, error) {
+	row := q.db.QueryRow(ctx, completeOnboardingUserCAS,
+		arg.DisplayUsername,
+		arg.UsernameKey,
+		arg.ChangedAt,
+		arg.UserID,
+		arg.ExpectedUpdatedAt,
+		arg.ExpectedCreatedAt,
+	)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Status,
+		&i.Username,
+		&i.CurrentUsernameKey,
+		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -437,6 +575,166 @@ func (q *Queries) GetDeviceCredentialForUpdate(ctx context.Context, arg GetDevic
 	return i, err
 }
 
+const getDeviceIdentityForUpdate = `-- name: GetDeviceIdentityForUpdate :one
+WITH selected_device AS MATERIALIZED (
+    SELECT selected.user_id
+    FROM device_credentials AS selected
+    WHERE selected.credential_id = $1
+),
+locked_user AS MATERIALIZED (
+    SELECT u.user_id, u.status, u.username, u.current_username_key,
+           u.username_changed_at, u.created_at, u.updated_at
+    FROM users AS u
+    JOIN selected_device AS selected ON selected.user_id = u.user_id
+    FOR UPDATE OF u
+),
+locked_device AS MATERIALIZED (
+    SELECT d.credential_id, d.user_id, d.secret_hash, d.secret_key_version,
+           d.previous_secret_hash, d.previous_secret_key_version, d.previous_valid_until,
+           d.csrf_hash, d.generation, d.label, d.created_at, d.last_seen_at, d.rotated_at,
+           d.idle_expires_at, d.absolute_expires_at, d.revoked_at, d.revoke_reason
+    FROM device_credentials AS d
+    JOIN locked_user AS locked ON locked.user_id = d.user_id
+    WHERE d.credential_id = $1
+    FOR UPDATE OF d
+)
+SELECT u.user_id AS user_id,
+       u.status AS user_status,
+       u.username AS user_username,
+       u.current_username_key AS user_current_username_key,
+       u.username_changed_at AS user_username_changed_at,
+       u.created_at AS user_created_at,
+       u.updated_at AS user_updated_at,
+       d.credential_id,
+       d.secret_hash,
+       d.secret_key_version,
+       d.previous_secret_hash,
+       d.previous_secret_key_version,
+       d.previous_valid_until,
+       d.csrf_hash,
+       d.generation,
+       d.label,
+       d.created_at AS device_created_at,
+       d.last_seen_at,
+       d.rotated_at,
+       d.idle_expires_at,
+       d.absolute_expires_at,
+       d.revoked_at,
+       d.revoke_reason
+FROM locked_user AS u
+JOIN locked_device AS d ON d.user_id = u.user_id
+`
+
+type GetDeviceIdentityForUpdateParams struct {
+	TargetCredentialID pgtype.UUID `json:"target_credential_id"`
+}
+
+type GetDeviceIdentityForUpdateRow struct {
+	UserID                   pgtype.UUID        `json:"user_id"`
+	UserStatus               string             `json:"user_status"`
+	UserUsername             pgtype.Text        `json:"user_username"`
+	UserCurrentUsernameKey   pgtype.Text        `json:"user_current_username_key"`
+	UserUsernameChangedAt    pgtype.Timestamptz `json:"user_username_changed_at"`
+	UserCreatedAt            pgtype.Timestamptz `json:"user_created_at"`
+	UserUpdatedAt            pgtype.Timestamptz `json:"user_updated_at"`
+	CredentialID             pgtype.UUID        `json:"credential_id"`
+	SecretHash               []byte             `json:"secret_hash"`
+	SecretKeyVersion         int32              `json:"secret_key_version"`
+	PreviousSecretHash       []byte             `json:"previous_secret_hash"`
+	PreviousSecretKeyVersion pgtype.Int4        `json:"previous_secret_key_version"`
+	PreviousValidUntil       pgtype.Timestamptz `json:"previous_valid_until"`
+	CsrfHash                 []byte             `json:"csrf_hash"`
+	Generation               int64              `json:"generation"`
+	Label                    string             `json:"label"`
+	DeviceCreatedAt          pgtype.Timestamptz `json:"device_created_at"`
+	LastSeenAt               pgtype.Timestamptz `json:"last_seen_at"`
+	RotatedAt                pgtype.Timestamptz `json:"rotated_at"`
+	IdleExpiresAt            pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt        pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt                pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason             pgtype.Text        `json:"revoke_reason"`
+}
+
+// GetDeviceIdentityForUpdate
+//
+//	WITH selected_device AS MATERIALIZED (
+//	    SELECT selected.user_id
+//	    FROM device_credentials AS selected
+//	    WHERE selected.credential_id = $1
+//	),
+//	locked_user AS MATERIALIZED (
+//	    SELECT u.user_id, u.status, u.username, u.current_username_key,
+//	           u.username_changed_at, u.created_at, u.updated_at
+//	    FROM users AS u
+//	    JOIN selected_device AS selected ON selected.user_id = u.user_id
+//	    FOR UPDATE OF u
+//	),
+//	locked_device AS MATERIALIZED (
+//	    SELECT d.credential_id, d.user_id, d.secret_hash, d.secret_key_version,
+//	           d.previous_secret_hash, d.previous_secret_key_version, d.previous_valid_until,
+//	           d.csrf_hash, d.generation, d.label, d.created_at, d.last_seen_at, d.rotated_at,
+//	           d.idle_expires_at, d.absolute_expires_at, d.revoked_at, d.revoke_reason
+//	    FROM device_credentials AS d
+//	    JOIN locked_user AS locked ON locked.user_id = d.user_id
+//	    WHERE d.credential_id = $1
+//	    FOR UPDATE OF d
+//	)
+//	SELECT u.user_id AS user_id,
+//	       u.status AS user_status,
+//	       u.username AS user_username,
+//	       u.current_username_key AS user_current_username_key,
+//	       u.username_changed_at AS user_username_changed_at,
+//	       u.created_at AS user_created_at,
+//	       u.updated_at AS user_updated_at,
+//	       d.credential_id,
+//	       d.secret_hash,
+//	       d.secret_key_version,
+//	       d.previous_secret_hash,
+//	       d.previous_secret_key_version,
+//	       d.previous_valid_until,
+//	       d.csrf_hash,
+//	       d.generation,
+//	       d.label,
+//	       d.created_at AS device_created_at,
+//	       d.last_seen_at,
+//	       d.rotated_at,
+//	       d.idle_expires_at,
+//	       d.absolute_expires_at,
+//	       d.revoked_at,
+//	       d.revoke_reason
+//	FROM locked_user AS u
+//	JOIN locked_device AS d ON d.user_id = u.user_id
+func (q *Queries) GetDeviceIdentityForUpdate(ctx context.Context, arg GetDeviceIdentityForUpdateParams) (GetDeviceIdentityForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getDeviceIdentityForUpdate, arg.TargetCredentialID)
+	var i GetDeviceIdentityForUpdateRow
+	err := row.Scan(
+		&i.UserID,
+		&i.UserStatus,
+		&i.UserUsername,
+		&i.UserCurrentUsernameKey,
+		&i.UserUsernameChangedAt,
+		&i.UserCreatedAt,
+		&i.UserUpdatedAt,
+		&i.CredentialID,
+		&i.SecretHash,
+		&i.SecretKeyVersion,
+		&i.PreviousSecretHash,
+		&i.PreviousSecretKeyVersion,
+		&i.PreviousValidUntil,
+		&i.CsrfHash,
+		&i.Generation,
+		&i.Label,
+		&i.DeviceCreatedAt,
+		&i.LastSeenAt,
+		&i.RotatedAt,
+		&i.IdleExpiresAt,
+		&i.AbsoluteExpiresAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
+	return i, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 FROM users
@@ -532,6 +830,38 @@ func (q *Queries) GetUserRecoveryCredentialForUpdate(ctx context.Context, arg Ge
 		&i.ConsumedAt,
 		&i.RevokedAt,
 		&i.RevokeReason,
+	)
+	return i, err
+}
+
+const getUsernameClaimForUpdate = `-- name: GetUsernameClaimForUpdate :one
+SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
+FROM username_claims
+WHERE username_key = $1
+FOR UPDATE
+`
+
+type GetUsernameClaimForUpdateParams struct {
+	UsernameKey string `json:"username_key"`
+}
+
+// GetUsernameClaimForUpdate
+//
+//	SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
+//	FROM username_claims
+//	WHERE username_key = $1
+//	FOR UPDATE
+func (q *Queries) GetUsernameClaimForUpdate(ctx context.Context, arg GetUsernameClaimForUpdateParams) (UsernameClaim, error) {
+	row := q.db.QueryRow(ctx, getUsernameClaimForUpdate, arg.UsernameKey)
+	var i UsernameClaim
+	err := row.Scan(
+		&i.UsernameKey,
+		&i.DisplayUsername,
+		&i.Status,
+		&i.OwnerUserID,
+		&i.ReservedUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -792,6 +1122,16 @@ SET previous_secret_hash = secret_hash,
 WHERE credential_id = $7
   AND user_id = $8
   AND generation = $9
+  AND secret_hash = $10
+  AND secret_key_version = $11
+  AND previous_secret_hash IS NOT DISTINCT FROM $12::bytea
+  AND previous_secret_key_version IS NOT DISTINCT FROM $13::integer
+  AND previous_valid_until IS NOT DISTINCT FROM $14::timestamptz
+  AND csrf_hash = $15
+  AND last_seen_at = $16
+  AND rotated_at = $17
+  AND idle_expires_at = $18
+  AND absolute_expires_at = $19
   AND revoked_at IS NULL
   AND absolute_expires_at > $5
 RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
@@ -801,15 +1141,25 @@ RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secr
 `
 
 type RotateDeviceCredentialCASParams struct {
-	PreviousValidUntil pgtype.Timestamptz `json:"previous_valid_until"`
-	SecretHash         []byte             `json:"secret_hash"`
-	SecretKeyVersion   int32              `json:"secret_key_version"`
-	CsrfHash           []byte             `json:"csrf_hash"`
-	RotatedAt          pgtype.Timestamptz `json:"rotated_at"`
-	IdleExpiresAt      pgtype.Timestamptz `json:"idle_expires_at"`
-	CredentialID       pgtype.UUID        `json:"credential_id"`
-	UserID             pgtype.UUID        `json:"user_id"`
-	ExpectedGeneration int64              `json:"expected_generation"`
+	PreviousValidUntil               pgtype.Timestamptz `json:"previous_valid_until"`
+	SecretHash                       []byte             `json:"secret_hash"`
+	SecretKeyVersion                 int32              `json:"secret_key_version"`
+	CsrfHash                         []byte             `json:"csrf_hash"`
+	RotatedAt                        pgtype.Timestamptz `json:"rotated_at"`
+	IdleExpiresAt                    pgtype.Timestamptz `json:"idle_expires_at"`
+	CredentialID                     pgtype.UUID        `json:"credential_id"`
+	UserID                           pgtype.UUID        `json:"user_id"`
+	ExpectedGeneration               int64              `json:"expected_generation"`
+	ExpectedSecretHash               []byte             `json:"expected_secret_hash"`
+	ExpectedSecretKeyVersion         int32              `json:"expected_secret_key_version"`
+	ExpectedPreviousSecretHash       []byte             `json:"expected_previous_secret_hash"`
+	ExpectedPreviousSecretKeyVersion pgtype.Int4        `json:"expected_previous_secret_key_version"`
+	ExpectedPreviousValidUntil       pgtype.Timestamptz `json:"expected_previous_valid_until"`
+	ExpectedCsrfHash                 []byte             `json:"expected_csrf_hash"`
+	ExpectedLastSeenAt               pgtype.Timestamptz `json:"expected_last_seen_at"`
+	ExpectedRotatedAt                pgtype.Timestamptz `json:"expected_rotated_at"`
+	ExpectedIdleExpiresAt            pgtype.Timestamptz `json:"expected_idle_expires_at"`
+	ExpectedAbsoluteExpiresAt        pgtype.Timestamptz `json:"expected_absolute_expires_at"`
 }
 
 // RotateDeviceCredentialCAS
@@ -828,6 +1178,16 @@ type RotateDeviceCredentialCASParams struct {
 //	WHERE credential_id = $7
 //	  AND user_id = $8
 //	  AND generation = $9
+//	  AND secret_hash = $10
+//	  AND secret_key_version = $11
+//	  AND previous_secret_hash IS NOT DISTINCT FROM $12::bytea
+//	  AND previous_secret_key_version IS NOT DISTINCT FROM $13::integer
+//	  AND previous_valid_until IS NOT DISTINCT FROM $14::timestamptz
+//	  AND csrf_hash = $15
+//	  AND last_seen_at = $16
+//	  AND rotated_at = $17
+//	  AND idle_expires_at = $18
+//	  AND absolute_expires_at = $19
 //	  AND revoked_at IS NULL
 //	  AND absolute_expires_at > $5
 //	RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
@@ -845,6 +1205,16 @@ func (q *Queries) RotateDeviceCredentialCAS(ctx context.Context, arg RotateDevic
 		arg.CredentialID,
 		arg.UserID,
 		arg.ExpectedGeneration,
+		arg.ExpectedSecretHash,
+		arg.ExpectedSecretKeyVersion,
+		arg.ExpectedPreviousSecretHash,
+		arg.ExpectedPreviousSecretKeyVersion,
+		arg.ExpectedPreviousValidUntil,
+		arg.ExpectedCsrfHash,
+		arg.ExpectedLastSeenAt,
+		arg.ExpectedRotatedAt,
+		arg.ExpectedIdleExpiresAt,
+		arg.ExpectedAbsoluteExpiresAt,
 	)
 	var i DeviceCredential
 	err := row.Scan(
@@ -933,17 +1303,38 @@ SET last_seen_at = $1,
     idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
 WHERE credential_id = $3
   AND generation = $4
+  AND secret_hash = $5
+  AND secret_key_version = $6
+  AND previous_secret_hash IS NOT DISTINCT FROM $7::bytea
+  AND previous_secret_key_version IS NOT DISTINCT FROM $8::integer
+  AND previous_valid_until IS NOT DISTINCT FROM $9::timestamptz
+  AND csrf_hash = $10
+  AND last_seen_at = $11
+  AND rotated_at = $12
+  AND idle_expires_at = $13
+  AND absolute_expires_at = $14
   AND revoked_at IS NULL
   AND idle_expires_at > $1
   AND absolute_expires_at > $1
+  AND last_seen_at < $1
 RETURNING credential_id, generation, last_seen_at, idle_expires_at, absolute_expires_at
 `
 
 type TouchDeviceCredentialCASParams struct {
-	SeenAt             pgtype.Timestamptz `json:"seen_at"`
-	IdleExpiresAt      pgtype.Timestamptz `json:"idle_expires_at"`
-	CredentialID       pgtype.UUID        `json:"credential_id"`
-	ExpectedGeneration int64              `json:"expected_generation"`
+	SeenAt                           pgtype.Timestamptz `json:"seen_at"`
+	IdleExpiresAt                    pgtype.Timestamptz `json:"idle_expires_at"`
+	CredentialID                     pgtype.UUID        `json:"credential_id"`
+	ExpectedGeneration               int64              `json:"expected_generation"`
+	ExpectedSecretHash               []byte             `json:"expected_secret_hash"`
+	ExpectedSecretKeyVersion         int32              `json:"expected_secret_key_version"`
+	ExpectedPreviousSecretHash       []byte             `json:"expected_previous_secret_hash"`
+	ExpectedPreviousSecretKeyVersion pgtype.Int4        `json:"expected_previous_secret_key_version"`
+	ExpectedPreviousValidUntil       pgtype.Timestamptz `json:"expected_previous_valid_until"`
+	ExpectedCsrfHash                 []byte             `json:"expected_csrf_hash"`
+	ExpectedLastSeenAt               pgtype.Timestamptz `json:"expected_last_seen_at"`
+	ExpectedRotatedAt                pgtype.Timestamptz `json:"expected_rotated_at"`
+	ExpectedIdleExpiresAt            pgtype.Timestamptz `json:"expected_idle_expires_at"`
+	ExpectedAbsoluteExpiresAt        pgtype.Timestamptz `json:"expected_absolute_expires_at"`
 }
 
 type TouchDeviceCredentialCASRow struct {
@@ -961,9 +1352,20 @@ type TouchDeviceCredentialCASRow struct {
 //	    idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
 //	WHERE credential_id = $3
 //	  AND generation = $4
+//	  AND secret_hash = $5
+//	  AND secret_key_version = $6
+//	  AND previous_secret_hash IS NOT DISTINCT FROM $7::bytea
+//	  AND previous_secret_key_version IS NOT DISTINCT FROM $8::integer
+//	  AND previous_valid_until IS NOT DISTINCT FROM $9::timestamptz
+//	  AND csrf_hash = $10
+//	  AND last_seen_at = $11
+//	  AND rotated_at = $12
+//	  AND idle_expires_at = $13
+//	  AND absolute_expires_at = $14
 //	  AND revoked_at IS NULL
 //	  AND idle_expires_at > $1
 //	  AND absolute_expires_at > $1
+//	  AND last_seen_at < $1
 //	RETURNING credential_id, generation, last_seen_at, idle_expires_at, absolute_expires_at
 func (q *Queries) TouchDeviceCredentialCAS(ctx context.Context, arg TouchDeviceCredentialCASParams) (TouchDeviceCredentialCASRow, error) {
 	row := q.db.QueryRow(ctx, touchDeviceCredentialCAS,
@@ -971,6 +1373,16 @@ func (q *Queries) TouchDeviceCredentialCAS(ctx context.Context, arg TouchDeviceC
 		arg.IdleExpiresAt,
 		arg.CredentialID,
 		arg.ExpectedGeneration,
+		arg.ExpectedSecretHash,
+		arg.ExpectedSecretKeyVersion,
+		arg.ExpectedPreviousSecretHash,
+		arg.ExpectedPreviousSecretKeyVersion,
+		arg.ExpectedPreviousValidUntil,
+		arg.ExpectedCsrfHash,
+		arg.ExpectedLastSeenAt,
+		arg.ExpectedRotatedAt,
+		arg.ExpectedIdleExpiresAt,
+		arg.ExpectedAbsoluteExpiresAt,
 	)
 	var i TouchDeviceCredentialCASRow
 	err := row.Scan(

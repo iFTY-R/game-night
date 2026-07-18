@@ -177,6 +177,22 @@ type Querier interface {
 	//    AND admin_version = $5
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	BootstrapAdminPasswordCAS(ctx context.Context, arg BootstrapAdminPasswordCASParams) (BootstrapAdminPasswordCASRow, error)
+	//ChangeCurrentUsernameCAS
+	//
+	//  UPDATE users
+	//  SET username = $1,
+	//      current_username_key = $2,
+	//      username_changed_at = $3,
+	//      updated_at = $3
+	//  WHERE user_id = $4
+	//    AND status = 'active'
+	//    AND username = $5
+	//    AND current_username_key = $6
+	//    AND username_changed_at = $7
+	//    AND updated_at = $8
+	//    AND username_changed_at <= $9
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error)
 	//ClaimUsername
 	//
 	//  INSERT INTO username_claims (
@@ -220,6 +236,26 @@ type Querier interface {
 	//    AND lease_until > $1
 	//  RETURNING job_id, status, processed_count, conflict_count, completed_at
 	CompleteKeyRotationJobCAS(ctx context.Context, arg CompleteKeyRotationJobCASParams) (CompleteKeyRotationJobCASRow, error)
+	//CompleteOnboardingUserCAS
+	//
+	//  UPDATE users
+	//  SET status = 'active',
+	//      username = $1,
+	//      current_username_key = $2,
+	//      username_changed_at = $3,
+	//      updated_at = $3
+	//  WHERE user_id = $4
+	//    AND status = 'onboarding'
+	//    AND username IS NULL
+	//    AND current_username_key IS NULL
+	//    AND username_changed_at IS NULL
+	//    AND updated_at = $5
+	//    AND created_at = $6
+	//    AND created_at <= $3
+	//    AND $3 >= $5
+	//    AND created_at > $3 - INTERVAL '86400 seconds'
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnboardingUserCASParams) (User, error)
 	//CompleteProfileExportContextCAS
 	//
 	//  UPDATE profile_export_contexts
@@ -975,6 +1011,56 @@ type Querier interface {
 	//  WHERE credential_id = $1
 	//  FOR UPDATE
 	GetDeviceCredentialForUpdate(ctx context.Context, arg GetDeviceCredentialForUpdateParams) (DeviceCredential, error)
+	//GetDeviceIdentityForUpdate
+	//
+	//  WITH selected_device AS MATERIALIZED (
+	//      SELECT selected.user_id
+	//      FROM device_credentials AS selected
+	//      WHERE selected.credential_id = $1
+	//  ),
+	//  locked_user AS MATERIALIZED (
+	//      SELECT u.user_id, u.status, u.username, u.current_username_key,
+	//             u.username_changed_at, u.created_at, u.updated_at
+	//      FROM users AS u
+	//      JOIN selected_device AS selected ON selected.user_id = u.user_id
+	//      FOR UPDATE OF u
+	//  ),
+	//  locked_device AS MATERIALIZED (
+	//      SELECT d.credential_id, d.user_id, d.secret_hash, d.secret_key_version,
+	//             d.previous_secret_hash, d.previous_secret_key_version, d.previous_valid_until,
+	//             d.csrf_hash, d.generation, d.label, d.created_at, d.last_seen_at, d.rotated_at,
+	//             d.idle_expires_at, d.absolute_expires_at, d.revoked_at, d.revoke_reason
+	//      FROM device_credentials AS d
+	//      JOIN locked_user AS locked ON locked.user_id = d.user_id
+	//      WHERE d.credential_id = $1
+	//      FOR UPDATE OF d
+	//  )
+	//  SELECT u.user_id AS user_id,
+	//         u.status AS user_status,
+	//         u.username AS user_username,
+	//         u.current_username_key AS user_current_username_key,
+	//         u.username_changed_at AS user_username_changed_at,
+	//         u.created_at AS user_created_at,
+	//         u.updated_at AS user_updated_at,
+	//         d.credential_id,
+	//         d.secret_hash,
+	//         d.secret_key_version,
+	//         d.previous_secret_hash,
+	//         d.previous_secret_key_version,
+	//         d.previous_valid_until,
+	//         d.csrf_hash,
+	//         d.generation,
+	//         d.label,
+	//         d.created_at AS device_created_at,
+	//         d.last_seen_at,
+	//         d.rotated_at,
+	//         d.idle_expires_at,
+	//         d.absolute_expires_at,
+	//         d.revoked_at,
+	//         d.revoke_reason
+	//  FROM locked_user AS u
+	//  JOIN locked_device AS d ON d.user_id = u.user_id
+	GetDeviceIdentityForUpdate(ctx context.Context, arg GetDeviceIdentityForUpdateParams) (GetDeviceIdentityForUpdateRow, error)
 	//GetKeyRotationJob
 	//
 	//  SELECT job_id, purpose, source_key_version, target_key_version, status, cursor_scope,
@@ -1095,6 +1181,13 @@ type Querier interface {
 	//  WHERE selector = $1
 	//  FOR UPDATE
 	GetUserRecoveryCredentialForUpdate(ctx context.Context, arg GetUserRecoveryCredentialForUpdateParams) (UserRecoveryCredential, error)
+	//GetUsernameClaimForUpdate
+	//
+	//  SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
+	//  FROM username_claims
+	//  WHERE username_key = $1
+	//  FOR UPDATE
+	GetUsernameClaimForUpdate(ctx context.Context, arg GetUsernameClaimForUpdateParams) (UsernameClaim, error)
 	//ListAdminTotpEnrollmentsForKeyRotation
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
@@ -1450,6 +1543,16 @@ type Querier interface {
 	//  WHERE credential_id = $7
 	//    AND user_id = $8
 	//    AND generation = $9
+	//    AND secret_hash = $10
+	//    AND secret_key_version = $11
+	//    AND previous_secret_hash IS NOT DISTINCT FROM $12::bytea
+	//    AND previous_secret_key_version IS NOT DISTINCT FROM $13::integer
+	//    AND previous_valid_until IS NOT DISTINCT FROM $14::timestamptz
+	//    AND csrf_hash = $15
+	//    AND last_seen_at = $16
+	//    AND rotated_at = $17
+	//    AND idle_expires_at = $18
+	//    AND absolute_expires_at = $19
 	//    AND revoked_at IS NULL
 	//    AND absolute_expires_at > $5
 	//  RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
@@ -1512,9 +1615,20 @@ type Querier interface {
 	//      idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
 	//  WHERE credential_id = $3
 	//    AND generation = $4
+	//    AND secret_hash = $5
+	//    AND secret_key_version = $6
+	//    AND previous_secret_hash IS NOT DISTINCT FROM $7::bytea
+	//    AND previous_secret_key_version IS NOT DISTINCT FROM $8::integer
+	//    AND previous_valid_until IS NOT DISTINCT FROM $9::timestamptz
+	//    AND csrf_hash = $10
+	//    AND last_seen_at = $11
+	//    AND rotated_at = $12
+	//    AND idle_expires_at = $13
+	//    AND absolute_expires_at = $14
 	//    AND revoked_at IS NULL
 	//    AND idle_expires_at > $1
 	//    AND absolute_expires_at > $1
+	//    AND last_seen_at < $1
 	//  RETURNING credential_id, generation, last_seen_at, idle_expires_at, absolute_expires_at
 	TouchDeviceCredentialCAS(ctx context.Context, arg TouchDeviceCredentialCASParams) (TouchDeviceCredentialCASRow, error)
 	//TransitionAdminStatusCAS

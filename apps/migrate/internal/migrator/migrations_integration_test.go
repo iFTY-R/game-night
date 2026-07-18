@@ -2,6 +2,8 @@ package migrator
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -46,6 +48,216 @@ func TestMigrationsUpDownUp(t *testing.T) {
 		t.Fatalf("reapply migrations: %v", err)
 	}
 	assertExpectedTables(t, ctx, fixture.Pool)
+}
+
+func TestIdentityInvariantMigrationAcceptsValidVersionEightRows(t *testing.T) {
+	ctx, fixture, database, migrationsDir := openMigrationEightTest(t)
+	_, err := fixture.Pool.Exec(ctx, `
+		INSERT INTO users (
+			user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+		) VALUES (
+			'91000000-0000-4000-8000-000000000001', 'active', 'Valid9', 'valid9',
+			transaction_timestamp(), transaction_timestamp(), transaction_timestamp()
+		);
+		INSERT INTO username_claims (
+			username_key, display_username, status, owner_user_id, created_at, updated_at
+		) VALUES (
+			'valid9', 'Valid9', 'active', '91000000-0000-4000-8000-000000000001',
+			transaction_timestamp(), transaction_timestamp()
+		);
+		INSERT INTO device_credentials (
+			credential_id, user_id, secret_hash, secret_key_version, csrf_hash, generation, label,
+			created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at
+		) VALUES (
+			'92000000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000001',
+			decode(repeat('11', 32), 'hex'), 1, decode(repeat('22', 32), 'hex'), 1, 'Phone',
+			transaction_timestamp(), transaction_timestamp(), transaction_timestamp(),
+			transaction_timestamp() + interval '15552000 seconds',
+			transaction_timestamp() + interval '31536000 seconds'
+		)
+	`)
+	if err != nil {
+		t.Fatalf("insert valid migration-8 identity state: %v", err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationsDir, 9); err != nil {
+		t.Fatalf("upgrade valid identity state to migration 9: %v", err)
+	}
+}
+
+func TestIdentityInvariantMigrationRejectsInvalidVersionEightRows(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		insertSQL  string
+		constraint string
+	}{
+		{
+			name: "active user missing username timestamp",
+			insertSQL: `
+				INSERT INTO users (
+					user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+				) VALUES (
+					'93000000-0000-4000-8000-000000000001', 'active', 'Broken9', 'broken9', NULL,
+					transaction_timestamp(), transaction_timestamp()
+				);
+				INSERT INTO username_claims (
+					username_key, display_username, status, owner_user_id, created_at, updated_at
+				) VALUES (
+					'broken9', 'Broken9', 'active', '93000000-0000-4000-8000-000000000001',
+					transaction_timestamp(), transaction_timestamp()
+				)
+			`,
+			constraint: "users_username_timestamp_invariant",
+		},
+		{
+			name: "username timestamp follows update",
+			insertSQL: `
+				INSERT INTO users (
+					user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+				) VALUES (
+					'93000000-0000-4000-8000-000000000007', 'active', 'Future9', 'future9',
+					transaction_timestamp() + interval '1 second', transaction_timestamp(), transaction_timestamp()
+				);
+				INSERT INTO username_claims (
+					username_key, display_username, status, owner_user_id, created_at, updated_at
+				) VALUES (
+					'future9', 'Future9', 'active', '93000000-0000-4000-8000-000000000007',
+					transaction_timestamp(), transaction_timestamp()
+				)
+			`,
+			constraint: "users_username_timestamp_invariant",
+		},
+		{
+			name: "expired reservation has invalid chronology",
+			insertSQL: `
+				INSERT INTO users (user_id, status, created_at, updated_at)
+				VALUES (
+					'93000000-0000-4000-8000-000000000002', 'onboarding',
+					transaction_timestamp(), transaction_timestamp()
+				);
+				INSERT INTO username_claims (
+					username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
+				) VALUES (
+					'expired9', 'Expired9', 'reserved', '93000000-0000-4000-8000-000000000002',
+					transaction_timestamp(), transaction_timestamp(), transaction_timestamp()
+				)
+			`,
+			constraint: "username_claims_reservation_time_invariant",
+		},
+		{
+			name: "device ttl",
+			insertSQL: invalidMigrationEightDeviceSQL(
+				"93000000-0000-4000-8000-000000000003", "94000000-0000-4000-8000-000000000003",
+				"1, 'Phone', transaction_timestamp(), transaction_timestamp(), transaction_timestamp(), "+
+					"transaction_timestamp() + interval '15552000 seconds', transaction_timestamp() + interval '31449600 seconds', NULL, NULL",
+				false,
+			),
+			constraint: "device_credentials_time_invariant",
+		},
+		{
+			name: "previous secret grace",
+			insertSQL: invalidMigrationEightDeviceSQL(
+				"93000000-0000-4000-8000-000000000004", "94000000-0000-4000-8000-000000000004",
+				"2, 'Phone', transaction_timestamp(), transaction_timestamp(), transaction_timestamp(), "+
+					"transaction_timestamp() + interval '15552000 seconds', transaction_timestamp() + interval '31536000 seconds', NULL, NULL",
+				true,
+			),
+			constraint: "device_credentials_previous_time_invariant",
+		},
+		{
+			name: "empty device label",
+			insertSQL: invalidMigrationEightDeviceSQL(
+				"93000000-0000-4000-8000-000000000005", "94000000-0000-4000-8000-000000000005",
+				"1, '', transaction_timestamp(), transaction_timestamp(), transaction_timestamp(), "+
+					"transaction_timestamp() + interval '15552000 seconds', transaction_timestamp() + interval '31536000 seconds', NULL, NULL",
+				false,
+			),
+			constraint: "device_credentials_label_invariant",
+		},
+		{
+			name: "revocation predates last activity",
+			insertSQL: invalidMigrationEightDeviceSQL(
+				"93000000-0000-4000-8000-000000000006", "94000000-0000-4000-8000-000000000006",
+				"1, 'Phone', transaction_timestamp(), transaction_timestamp() + interval '60 seconds', transaction_timestamp(), "+
+					"transaction_timestamp() + interval '15552060 seconds', transaction_timestamp() + interval '31536000 seconds', "+
+					"transaction_timestamp() + interval '30 seconds', 'account_deleted'",
+				false,
+			),
+			constraint: "device_credentials_time_invariant",
+		},
+		{
+			name: "unknown revocation reason",
+			insertSQL: invalidMigrationEightDeviceSQL(
+				"93000000-0000-4000-8000-000000000008", "94000000-0000-4000-8000-000000000008",
+				"1, 'Phone', transaction_timestamp(), transaction_timestamp(), transaction_timestamp(), "+
+					"transaction_timestamp() + interval '15552000 seconds', transaction_timestamp() + interval '31536000 seconds', "+
+					"transaction_timestamp(), 'unknown_reason'",
+				false,
+			),
+			constraint: "device_credentials_revoke_reason_invariant",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, fixture, database, migrationsDir := openMigrationEightTest(t)
+			if _, err := fixture.Pool.Exec(ctx, test.insertSQL); err != nil {
+				t.Fatalf("insert invalid migration-8 state: %v", err)
+			}
+			err := goose.UpToContext(ctx, database, migrationsDir, 9)
+			if err == nil || !strings.Contains(err.Error(), test.constraint) {
+				t.Fatalf("migration error = %v, want constraint %q", err, test.constraint)
+			}
+		})
+	}
+}
+
+func openMigrationEightTest(t testing.TB) (
+	context.Context,
+	*integrationtest.PostgresSchema,
+	*sql.DB,
+	string,
+) {
+	t.Helper()
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	t.Cleanup(cancel)
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting:       currentUser,
+		auditWriterRoleSetting: currentUser,
+		migrationRoleSetting:   currentUser,
+		runtimeRoleSetting:     currentUser,
+		workerRoleSetting:      currentUser,
+	})
+	migrationsDir := migrationDirectory(t)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationsDir, 8); err != nil {
+		t.Fatalf("apply migrations through version 8: %v", err)
+	}
+	return ctx, fixture, database, migrationsDir
+}
+
+func invalidMigrationEightDeviceSQL(userID, credentialID, stateValues string, withPrevious bool) string {
+	previousColumns := "NULL, NULL, NULL"
+	if withPrevious {
+		previousColumns = "decode(repeat('33', 32), 'hex'), 1, transaction_timestamp() + interval '121 seconds'"
+	}
+	return fmt.Sprintf(`
+		INSERT INTO users (user_id, status, created_at, updated_at)
+		VALUES ('%s', 'onboarding', transaction_timestamp(), transaction_timestamp());
+		INSERT INTO device_credentials (
+			credential_id, user_id, secret_hash, secret_key_version,
+			previous_secret_hash, previous_secret_key_version, previous_valid_until,
+			csrf_hash, generation, label, created_at, last_seen_at, rotated_at,
+			idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+		) VALUES (
+			'%s', '%s', decode(repeat('11', 32), 'hex'), 1,
+			%s, decode(repeat('22', 32), 'hex'), %s
+		)
+	`, userID, credentialID, userID, previousColumns, stateValues)
 }
 
 func TestSecretResultWorkflowDownRemovesConsumedChallengesWithoutReplay(t *testing.T) {

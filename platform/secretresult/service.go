@@ -8,12 +8,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/clock"
+	"github.com/iFTY-R/game-night/platform/secretaccess"
+	"github.com/iFTY-R/game-night/platform/security"
 )
 
 // Service centralizes result preparation, replay authorization, decryption, confirmation, and expiry.
 type Service struct {
-	cipher *EnvelopeCipher
-	clock  clock.Clock
+	cipher       *EnvelopeCipher
+	clock        clock.Clock
+	deviceAccess *security.HMACKeyring[security.DeviceHMACKeyPurpose]
 }
 
 // NewService requires explicit cryptography and time dependencies so tests never use hidden wall-clock state.
@@ -22,6 +25,18 @@ func NewService(cipher *EnvelopeCipher, serviceClock clock.Clock) (*Service, err
 		return nil, ErrInvalidInput
 	}
 	return &Service{cipher: cipher, clock: serviceClock}, nil
+}
+
+// NewServiceWithDeviceAccess enables authenticated user-device result replay with signed concrete grants.
+func NewServiceWithDeviceAccess(
+	cipher *EnvelopeCipher,
+	serviceClock clock.Clock,
+	deviceAccess *security.HMACKeyring[security.DeviceHMACKeyPurpose],
+) (*Service, error) {
+	if cipher == nil || serviceClock == nil || deviceAccess == nil {
+		return nil, ErrInvalidInput
+	}
+	return &Service{cipher: cipher, clock: serviceClock, deviceAccess: deviceAccess}, nil
 }
 
 // PrepareAvailable seals one plaintext before the caller's larger business transaction inserts it.
@@ -106,6 +121,32 @@ func (service *Service) Open(
 		return nil, err
 	}
 	return plaintext, nil
+}
+
+// OpenAuthorizedResult verifies and decrypts a result already locked by an outer actor transaction.
+// The caller must retain the device and result row locks until its enclosing UnitOfWork commits.
+func (service *Service) OpenAuthorizedResult(
+	result Result,
+	binding Binding,
+	grant secretaccess.DeviceGrant,
+) ([]byte, error) {
+	if service == nil || service.cipher == nil || service.clock == nil || binding.Validate() != nil {
+		return nil, ErrInvalidInput
+	}
+	snapshot := result.Snapshot()
+	now := service.clock.Now()
+	if snapshot.ID == uuid.Nil ||
+		!secretaccess.VerifyDeviceGrant(service.deviceAccess, grant, snapshot.ID, binding.Key.ActorID, now) {
+		return nil, ErrReplayUnauthorized
+	}
+	resolution, err := result.Resolve(binding, now)
+	if err != nil {
+		return nil, err
+	}
+	if resolution.Kind != ReplayAvailable {
+		return nil, ErrSecretNoLongerAvailable
+	}
+	return service.cipher.open(snapshot.Payload, binding, snapshot.SecretExpiresAt)
 }
 
 // Confirm erases secret material only for the exact result authorized by a consumed challenge.

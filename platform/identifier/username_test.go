@@ -66,7 +66,7 @@ func TestParseUsernameRejectsInvalidSyntax(t *testing.T) {
 		input string
 		err   error
 	}{
-		{name: "empty", input: " \t\n ", err: ErrUsernameLength},
+		{name: "empty", input: "  \u3000 ", err: ErrUsernameLength},
 		{name: "too short", input: "a", err: ErrUsernameLength},
 		{name: "too long", input: strings.Repeat("界", MaximumUsernameCodePoints+1), err: ErrUsernameLength},
 		{name: "far above normalization bound", input: strings.Repeat("Ａ", 1<<16), err: ErrUsernameLength},
@@ -76,7 +76,12 @@ func TestParseUsernameRejectsInvalidSyntax(t *testing.T) {
 		{name: "internal whitespace", input: "ab cd", err: ErrUsernameCharacters},
 		{name: "format character", input: "ab\u200dcd", err: ErrUsernameCharacters},
 		{name: "control character", input: "ab\u0000cd", err: ErrUsernameCharacters},
+		{name: "trimmed controls remain forbidden", input: "\tAlice\n", err: ErrUsernameCharacters},
+		{name: "byte order mark remains forbidden", input: "\ufeffAlice", err: ErrUsernameCharacters},
+		{name: "normalization creates consecutive underscores", input: "ab＿_cd", err: ErrUsernameUnderscores},
+		{name: "compatibility expansion exceeds maximum", input: strings.Repeat("Ⅳ", 11), err: ErrUsernameLength},
 		{name: "unsupported script", input: "абв", err: ErrUsernameCharacters},
+		{name: "uncomposed mark", input: "q\u0301", err: ErrUsernameCharacters},
 		{name: "invalid utf8", input: string([]byte{'a', 0xff, 'b'}), err: ErrUsernameCharacters},
 	}
 
@@ -87,6 +92,19 @@ func TestParseUsernameRejectsInvalidSyntax(t *testing.T) {
 				t.Fatalf("parse error = %v, want %v", err, test.err)
 			}
 		})
+	}
+}
+
+func TestUsernameDisplayLimitAllowsFoldedKeyExpansion(t *testing.T) {
+	username, err := ParseUsername(strings.Repeat("ß", MaximumUsernameCodePoints))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := username.CodePointCount(); got != MaximumUsernameCodePoints {
+		t.Fatalf("display code point count = %d, want %d", got, MaximumUsernameCodePoints)
+	}
+	if got := username.Key(); got != strings.Repeat("ss", MaximumUsernameCodePoints) {
+		t.Fatalf("folded key = %q", got)
 	}
 }
 

@@ -14,6 +14,9 @@ import (
 // transactionCleanupTimeout bounds rollback after the request context has failed or been canceled.
 const transactionCleanupTimeout = 5 * time.Second
 
+// transactionCommitOperation identifies the only lifecycle phase where deferred constraints can surface.
+const transactionCommitOperation = "commit PostgreSQL transaction"
+
 // QueryHandle exposes generated statements while keeping pgx.Tx and transaction lifecycle private.
 type QueryHandle = sqlcgen.Querier
 
@@ -125,7 +128,7 @@ func (runner *TransactionRunner) RunWithOptions(ctx context.Context, options pgx
 		return fmt.Errorf("run PostgreSQL transaction work: %w", workErr)
 	}
 	if commitErr := transaction.Commit(ctx); commitErr != nil {
-		return newTransactionLifecycleError("commit PostgreSQL transaction", commitErr)
+		return newTransactionLifecycleError(transactionCommitOperation, commitErr)
 	}
 	finished = true
 	return nil

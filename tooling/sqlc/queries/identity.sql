@@ -23,6 +23,55 @@ FROM users
 WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
+-- name: GetDeviceIdentityForUpdate :one
+WITH selected_device AS MATERIALIZED (
+    SELECT selected.user_id
+    FROM device_credentials AS selected
+    WHERE selected.credential_id = sqlc.arg(target_credential_id)
+),
+locked_user AS MATERIALIZED (
+    SELECT u.user_id, u.status, u.username, u.current_username_key,
+           u.username_changed_at, u.created_at, u.updated_at
+    FROM users AS u
+    JOIN selected_device AS selected ON selected.user_id = u.user_id
+    FOR UPDATE OF u
+),
+locked_device AS MATERIALIZED (
+    SELECT d.credential_id, d.user_id, d.secret_hash, d.secret_key_version,
+           d.previous_secret_hash, d.previous_secret_key_version, d.previous_valid_until,
+           d.csrf_hash, d.generation, d.label, d.created_at, d.last_seen_at, d.rotated_at,
+           d.idle_expires_at, d.absolute_expires_at, d.revoked_at, d.revoke_reason
+    FROM device_credentials AS d
+    JOIN locked_user AS locked ON locked.user_id = d.user_id
+    WHERE d.credential_id = sqlc.arg(target_credential_id)
+    FOR UPDATE OF d
+)
+SELECT u.user_id AS user_id,
+       u.status AS user_status,
+       u.username AS user_username,
+       u.current_username_key AS user_current_username_key,
+       u.username_changed_at AS user_username_changed_at,
+       u.created_at AS user_created_at,
+       u.updated_at AS user_updated_at,
+       d.credential_id,
+       d.secret_hash,
+       d.secret_key_version,
+       d.previous_secret_hash,
+       d.previous_secret_key_version,
+       d.previous_valid_until,
+       d.csrf_hash,
+       d.generation,
+       d.label,
+       d.created_at AS device_created_at,
+       d.last_seen_at,
+       d.rotated_at,
+       d.idle_expires_at,
+       d.absolute_expires_at,
+       d.revoked_at,
+       d.revoke_reason
+FROM locked_user AS u
+JOIN locked_device AS d ON d.user_id = u.user_id;
+
 -- name: ClaimUsername :one
 INSERT INTO username_claims (
     username_key,
@@ -50,6 +99,46 @@ SET display_username = EXCLUDED.display_username,
 WHERE username_claims.status = 'reserved'
   AND username_claims.reserved_until <= sqlc.arg(claimed_at)
 RETURNING username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at;
+
+-- name: GetUsernameClaimForUpdate :one
+SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
+FROM username_claims
+WHERE username_key = sqlc.arg(username_key)
+FOR UPDATE;
+
+-- name: CompleteOnboardingUserCAS :one
+UPDATE users
+SET status = 'active',
+    username = sqlc.arg(display_username),
+    current_username_key = sqlc.arg(username_key),
+    username_changed_at = sqlc.arg(changed_at),
+    updated_at = sqlc.arg(changed_at)
+WHERE user_id = sqlc.arg(user_id)
+  AND status = 'onboarding'
+  AND username IS NULL
+  AND current_username_key IS NULL
+  AND username_changed_at IS NULL
+  AND updated_at = sqlc.arg(expected_updated_at)
+  AND created_at = sqlc.arg(expected_created_at)
+  AND created_at <= sqlc.arg(changed_at)
+  AND sqlc.arg(changed_at) >= sqlc.arg(expected_updated_at)
+  AND created_at > sqlc.arg(changed_at) - INTERVAL '86400 seconds'
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+
+-- name: ChangeCurrentUsernameCAS :one
+UPDATE users
+SET username = sqlc.arg(display_username),
+    current_username_key = sqlc.arg(username_key),
+    username_changed_at = sqlc.arg(changed_at),
+    updated_at = sqlc.arg(changed_at)
+WHERE user_id = sqlc.arg(user_id)
+  AND status = 'active'
+  AND username = sqlc.arg(expected_display_username)
+  AND current_username_key = sqlc.arg(expected_username_key)
+  AND username_changed_at = sqlc.arg(expected_username_changed_at)
+  AND updated_at = sqlc.arg(expected_updated_at)
+  AND username_changed_at <= sqlc.arg(cooldown_cutoff)
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
 
 -- name: SetCurrentUsernameCAS :one
 UPDATE users
@@ -130,6 +219,16 @@ SET previous_secret_hash = secret_hash,
 WHERE credential_id = sqlc.arg(credential_id)
   AND user_id = sqlc.arg(user_id)
   AND generation = sqlc.arg(expected_generation)
+  AND secret_hash = sqlc.arg(expected_secret_hash)
+  AND secret_key_version = sqlc.arg(expected_secret_key_version)
+  AND previous_secret_hash IS NOT DISTINCT FROM sqlc.narg(expected_previous_secret_hash)::bytea
+  AND previous_secret_key_version IS NOT DISTINCT FROM sqlc.narg(expected_previous_secret_key_version)::integer
+  AND previous_valid_until IS NOT DISTINCT FROM sqlc.narg(expected_previous_valid_until)::timestamptz
+  AND csrf_hash = sqlc.arg(expected_csrf_hash)
+  AND last_seen_at = sqlc.arg(expected_last_seen_at)
+  AND rotated_at = sqlc.arg(expected_rotated_at)
+  AND idle_expires_at = sqlc.arg(expected_idle_expires_at)
+  AND absolute_expires_at = sqlc.arg(expected_absolute_expires_at)
   AND revoked_at IS NULL
   AND absolute_expires_at > sqlc.arg(rotated_at)
 RETURNING credential_id, user_id, secret_hash, secret_key_version, previous_secret_hash,
@@ -143,9 +242,20 @@ SET last_seen_at = sqlc.arg(seen_at),
     idle_expires_at = LEAST(sqlc.arg(idle_expires_at)::timestamptz, absolute_expires_at)
 WHERE credential_id = sqlc.arg(credential_id)
   AND generation = sqlc.arg(expected_generation)
+  AND secret_hash = sqlc.arg(expected_secret_hash)
+  AND secret_key_version = sqlc.arg(expected_secret_key_version)
+  AND previous_secret_hash IS NOT DISTINCT FROM sqlc.narg(expected_previous_secret_hash)::bytea
+  AND previous_secret_key_version IS NOT DISTINCT FROM sqlc.narg(expected_previous_secret_key_version)::integer
+  AND previous_valid_until IS NOT DISTINCT FROM sqlc.narg(expected_previous_valid_until)::timestamptz
+  AND csrf_hash = sqlc.arg(expected_csrf_hash)
+  AND last_seen_at = sqlc.arg(expected_last_seen_at)
+  AND rotated_at = sqlc.arg(expected_rotated_at)
+  AND idle_expires_at = sqlc.arg(expected_idle_expires_at)
+  AND absolute_expires_at = sqlc.arg(expected_absolute_expires_at)
   AND revoked_at IS NULL
   AND idle_expires_at > sqlc.arg(seen_at)
   AND absolute_expires_at > sqlc.arg(seen_at)
+  AND last_seen_at < sqlc.arg(seen_at)
 RETURNING credential_id, generation, last_seen_at, idle_expires_at, absolute_expires_at;
 
 -- name: RevokeDeviceCredentialCAS :one

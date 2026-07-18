@@ -103,9 +103,13 @@ func TestAESKeyringReportsImmutableActiveVersion(t *testing.T) {
 
 func TestHMACKeyringVersionedDigest(t *testing.T) {
 	now := time.Now().UTC()
+	historicalKey := randomTestBytes(t, 32)
 	path := writeSymmetricKeyring(t, keyringDocument{
-		ActiveVersion: 7,
-		Keys:          []keyDocument{testKeyDocument(7, randomTestBytes(t, 32), now.Add(-time.Hour), time.Time{})},
+		ActiveVersion: 8,
+		Keys: []keyDocument{
+			testKeyDocument(7, historicalKey, now.Add(-2*time.Hour), time.Time{}),
+			testKeyDocument(8, randomTestBytes(t, 32), now.Add(-time.Hour), time.Time{}),
+		},
 	})
 	ring, err := LoadHMACKeyring[DeviceHMACKeyPurpose](path, now)
 	if err != nil {
@@ -115,7 +119,7 @@ func TestHMACKeyringVersionedDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest.KeyVersion != 7 || len(digest.Value) != 32 {
+	if digest.KeyVersion != 8 || len(digest.Value) != 32 {
 		t.Fatalf("unexpected digest metadata: version=%d length=%d", digest.KeyVersion, len(digest.Value))
 	}
 	matched, err := ring.Verify([]byte("device secret"), digest)
@@ -125,6 +129,11 @@ func TestHMACKeyringVersionedDigest(t *testing.T) {
 	matched, err = ring.Verify([]byte("other secret"), digest)
 	if err != nil || matched {
 		t.Fatalf("expected digest mismatch, matched=%t err=%v", matched, err)
+	}
+	historical := MAC[DeviceHMACKeyPurpose]{KeyVersion: 7, Value: sumHMAC(historicalKey, []byte("old device secret"))}
+	matched, err = ring.Verify([]byte("old device secret"), historical)
+	if err != nil || !matched {
+		t.Fatalf("historical HMAC did not verify, matched=%t err=%v", matched, err)
 	}
 }
 

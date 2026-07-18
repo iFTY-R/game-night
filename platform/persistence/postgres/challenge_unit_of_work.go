@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	adminDomain "github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/secretresult"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,11 +28,7 @@ func (unitOfWork *IdentityChallengeUnitOfWork) Run(ctx context.Context, work ide
 		return challenge.ErrInvalidInput
 	}
 	err := unitOfWork.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
-		transaction := identityChallengeTransaction{
-			challenges: &identityChallengeRepository{queries: queries},
-			results:    newSecretResultRepository(queries),
-		}
-		return work(ctx, transaction)
+		return work(ctx, newIdentityTransaction(queries))
 	})
 	return mapUnitOfWorkError(err, challenge.ErrRepositoryUnavailable, challengeTransactionDomainErrors...)
 }
@@ -38,6 +36,22 @@ func (unitOfWork *IdentityChallengeUnitOfWork) Run(ctx context.Context, work ide
 type identityChallengeTransaction struct {
 	challenges identityDomain.ChallengeRepository
 	results    secretresult.Repository
+	users      identityDomain.UserRepository
+	claims     identityDomain.UsernameClaimRepository
+	devices    identityDomain.DeviceRepository
+	recovery   identityDomain.RecoveryCredentialRepository
+}
+
+// newIdentityTransaction keeps both public identity transaction boundaries on the same repository set.
+func newIdentityTransaction(queries QueryHandle) identityChallengeTransaction {
+	return identityChallengeTransaction{
+		challenges: &identityChallengeRepository{queries: queries},
+		results:    newSecretResultRepository(queries),
+		users:      &identityUserRepository{queries: queries},
+		claims:     &identityClaimRepository{queries: queries},
+		devices:    &identityDeviceRepository{queries: queries},
+		recovery:   &identityRecoveryRepository{queries: queries},
+	}
 }
 
 func (transaction identityChallengeTransaction) Challenges() identityDomain.ChallengeRepository {
@@ -46,6 +60,22 @@ func (transaction identityChallengeTransaction) Challenges() identityDomain.Chal
 
 func (transaction identityChallengeTransaction) SecretResults() secretresult.Repository {
 	return transaction.results
+}
+
+func (transaction identityChallengeTransaction) Users() identityDomain.UserRepository {
+	return transaction.users
+}
+
+func (transaction identityChallengeTransaction) UsernameClaims() identityDomain.UsernameClaimRepository {
+	return transaction.claims
+}
+
+func (transaction identityChallengeTransaction) Devices() identityDomain.DeviceRepository {
+	return transaction.devices
+}
+
+func (transaction identityChallengeTransaction) RecoveryCredentials() identityDomain.RecoveryCredentialRepository {
+	return transaction.recovery
 }
 
 // AdminChallengeUnitOfWork atomically combines administrator challenge and secret-result repositories.
@@ -84,6 +114,51 @@ var challengeTransactionDomainErrors = append([]error{
 	challenge.ErrRepositoryUnavailable,
 	challenge.ErrIntegrity,
 }, secretResultDomainErrors...)
+
+// identityTransactionDomainErrors preserves reviewed callback sentinels while hiding transaction diagnostics.
+var identityTransactionDomainErrors = append(challengeTransactionDomainErrors,
+	identityDomain.ErrInvalidIdentityRequest,
+	identityDomain.ErrInvalidUserInput,
+	identityDomain.ErrUserStatus,
+	identityDomain.ErrOnboardingExpired,
+	identityDomain.ErrUsernameChangeCooldown,
+	identityDomain.ErrUsernameUnchanged,
+	identityDomain.ErrUsernameUnavailable,
+	identityDomain.ErrUserNotFound,
+	identityDomain.ErrIdentityConcurrentTransition,
+	identityDomain.ErrIdentityRepositoryUnavailable,
+	identityDomain.ErrIdentityIntegrity,
+	identityDomain.ErrInvalidDeviceInput,
+	identityDomain.ErrDeviceAuthentication,
+	identityDomain.ErrDeviceUnavailable,
+	identityDomain.ErrDeviceRotationNotDue,
+	identityDomain.ErrDeviceConcurrentTransition,
+	identityDomain.ErrDeviceIntegrity,
+	identityDomain.ErrInvalidRecoveryCredential,
+)
+
+// mapIdentityCommitFailure translates deferred PostgreSQL constraint and serialization failures at commit.
+func mapIdentityCommitFailure(err error) error {
+	var lifecycleFailure *transactionLifecycleError
+	if !errors.As(err, &lifecycleFailure) {
+		return nil
+	}
+	if lifecycleFailure.operation != transactionCommitOperation {
+		return nil
+	}
+	var pgError *pgconn.PgError
+	if !errors.As(lifecycleFailure.cause, &pgError) {
+		return nil
+	}
+	switch pgError.Code {
+	case "23503", "23514":
+		return identityDomain.ErrIdentityIntegrity
+	case "23505", "40001", "40P01":
+		return identityDomain.ErrIdentityConcurrentTransition
+	default:
+		return nil
+	}
+}
 
 type adminChallengeTransaction struct {
 	challenges adminDomain.ChallengeRepository

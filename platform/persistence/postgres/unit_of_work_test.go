@@ -13,6 +13,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type unitOfWorkTestCase struct {
@@ -115,6 +116,58 @@ func TestChallengeUnitOfWorksRejectNilWorkWithChallengeError(t *testing.T) {
 	}
 }
 
+func TestIdentityUnitOfWorkRejectsNilWorkWithIdentityError(t *testing.T) {
+	if err := (&IdentityUnitOfWork{}).Run(context.Background(), nil); err != identityDomain.ErrInvalidIdentityRequest {
+		t.Fatalf("identity nil-work error = %v", err)
+	}
+}
+
+func TestIdentityUnitOfWorkMapsCommitSQLStates(t *testing.T) {
+	for _, test := range []struct {
+		code string
+		want error
+	}{
+		{code: "23503", want: identityDomain.ErrIdentityIntegrity},
+		{code: "23514", want: identityDomain.ErrIdentityIntegrity},
+		{code: "23505", want: identityDomain.ErrIdentityConcurrentTransition},
+		{code: "40001", want: identityDomain.ErrIdentityConcurrentTransition},
+		{code: "40P01", want: identityDomain.ErrIdentityConcurrentTransition},
+		{code: "XX000", want: identityDomain.ErrIdentityRepositoryUnavailable},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			unitOfWork := &IdentityUnitOfWork{runner: newTestTransactionRunner(&fakeTransaction{
+				commitError: &pgconn.PgError{Code: test.code},
+			})}
+			err := unitOfWork.Run(context.Background(), func(context.Context, identityDomain.IdentityTransaction) error {
+				return nil
+			})
+			if err != test.want {
+				t.Fatalf("commit SQLSTATE %s error = %v, want %v", test.code, err, test.want)
+			}
+		})
+	}
+
+	challengeUnitOfWork := &IdentityChallengeUnitOfWork{runner: newTestTransactionRunner(&fakeTransaction{
+		commitError: &pgconn.PgError{Code: "23514"},
+	})}
+	err := challengeUnitOfWork.Run(context.Background(), func(context.Context, identityDomain.ChallengeTransaction) error {
+		return nil
+	})
+	if err != challenge.ErrRepositoryUnavailable {
+		t.Fatalf("challenge commit constraint error = %v", err)
+	}
+
+	beginFailure := newTransactionRunner(func(context.Context, pgx.TxOptions) (transactionHandle, error) {
+		return nil, &pgconn.PgError{Code: "23514"}
+	})
+	err = (&IdentityUnitOfWork{runner: beginFailure}).Run(
+		context.Background(), func(context.Context, identityDomain.IdentityTransaction) error { return nil },
+	)
+	if err != identityDomain.ErrIdentityRepositoryUnavailable {
+		t.Fatalf("begin constraint-shaped error = %v", err)
+	}
+}
+
 func TestAuditAndOutboxUnitOfWorksRejectNilWork(t *testing.T) {
 	if err := (&AuditOutboxUnitOfWork{}).Run(context.Background(), nil); err != audit.ErrInvalidInput {
 		t.Fatalf("audit nil-work error = %v", err)
@@ -133,6 +186,17 @@ func unitOfWorkTestCases() []unitOfWorkTestCase {
 			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
 				unitOfWork := &SecretResultUnitOfWork{runner: runner}
 				return unitOfWork.Run(ctx, func(context.Context, secretresult.Repository) error {
+					return callbackErr
+				})
+			},
+		},
+		{
+			name:                  "identity",
+			repositoryUnavailable: identityDomain.ErrIdentityRepositoryUnavailable,
+			domainErrors:          identityTransactionDomainErrors,
+			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
+				unitOfWork := &IdentityUnitOfWork{runner: runner}
+				return unitOfWork.Run(ctx, func(context.Context, identityDomain.IdentityTransaction) error {
 					return callbackErr
 				})
 			},

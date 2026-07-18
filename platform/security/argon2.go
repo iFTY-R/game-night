@@ -183,6 +183,12 @@ func (service *Argon2Service) VerifyOrDummy(ctx context.Context, encoded string,
 	return service.Verify(ctx, encoded, secret)
 }
 
+// ValidateArgon2Hash performs bounded PHC syntax, algorithm, version, and cost validation without deriving a secret.
+func ValidateArgon2Hash(encoded string) error {
+	_, err := parsePasswordHash(encoded)
+	return err
+}
+
 // Close rejects new work, drains accepted jobs, and waits for all fixed workers to exit.
 func (service *Argon2Service) Close() {
 	service.closeOnce.Do(func() {

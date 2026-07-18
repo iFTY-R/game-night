@@ -128,6 +128,7 @@ func validAPIEnvironment(t *testing.T) map[string]string {
 		"GAME_NIGHT_RATE_LIMIT_KEYRING_FILE":      filepath.Join(secretDirectory, "rate-limit.json"),
 		"GAME_NIGHT_USER_CHALLENGE_KEYRING_FILE":  filepath.Join(secretDirectory, "user-challenge.json"),
 		"GAME_NIGHT_ADMIN_CHALLENGE_KEYRING_FILE": filepath.Join(secretDirectory, "admin-challenge.json"),
+		"GAME_NIGHT_ADMIN_SESSION_KEYRING_FILE":   filepath.Join(secretDirectory, "admin-session.json"),
 		"GAME_NIGHT_AUDIT_KEYRING_FILE":           filepath.Join(secretDirectory, "audit.json"),
 	}
 }

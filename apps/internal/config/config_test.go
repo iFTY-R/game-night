@@ -253,6 +253,7 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 		RateLimit:      RateLimitKeyringFile("rate-limit"),
 		UserChallenge:  UserChallengeKeyringFile("user-challenge"),
 		AdminChallenge: AdminChallengeKeyringFile("admin-challenge"),
+		AdminSession:   AdminSessionKeyringFile("admin-session"),
 		Audit:          AuditKeyringFile("audit"),
 	}
 
@@ -264,6 +265,7 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 		reflect.TypeOf(files.RateLimit),
 		reflect.TypeOf(files.UserChallenge),
 		reflect.TypeOf(files.AdminChallenge),
+		reflect.TypeOf(files.AdminSession),
 		reflect.TypeOf(files.Audit),
 	}
 	seen := make(map[reflect.Type]struct{}, len(types))
@@ -276,7 +278,7 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 	paths := files.SecurityPaths()
 	if paths.PII != "pii" || paths.TOTP != "totp" || paths.ResultEnvelope != "result" ||
 		paths.Device != "device" || paths.RateLimit != "rate-limit" ||
-		paths.UserChallenge != "user-challenge" || paths.AdminChallenge != "admin-challenge" || paths.Audit != "audit" {
+		paths.UserChallenge != "user-challenge" || paths.AdminChallenge != "admin-challenge" || paths.AdminSession != "admin-session" || paths.Audit != "audit" {
 		t.Fatalf("security path mapping crossed keyring purposes: %+v", paths)
 	}
 }
@@ -299,6 +301,7 @@ func validEnvironment(t *testing.T) map[string]string {
 		rateLimitKeyringFileEnvironment:      filepath.Join(secretDirectory, "rate-limit.json"),
 		userChallengeKeyringFileEnvironment:  filepath.Join(secretDirectory, "user-challenge.json"),
 		adminChallengeKeyringFileEnvironment: filepath.Join(secretDirectory, "admin-challenge.json"),
+		adminSessionKeyringFileEnvironment:   filepath.Join(secretDirectory, "admin-session.json"),
 		auditKeyringFileEnvironment:          filepath.Join(secretDirectory, "audit.json"),
 	}
 }

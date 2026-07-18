@@ -961,6 +961,15 @@ type Querier interface {
 	//    AND lease_owner = $4
 	//  RETURNING job_id, status, processed_count, conflict_count, last_error_code, updated_at
 	FailKeyRotationJobCAS(ctx context.Context, arg FailKeyRotationJobCASParams) (FailKeyRotationJobCASRow, error)
+	//GetActiveAdminTotpEnrollmentForUpdate
+	//
+	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+	//         operation_id, created_at, expires_at, activated_at, disabled_at
+	//  FROM admin_totp_enrollments
+	//  WHERE admin_id = $1
+	//    AND status = 'active'
+	//  FOR UPDATE
+	GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error)
 	//GetActiveUserRecoveryCredentialForUpdate
 	//
 	//  SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
@@ -1018,6 +1027,14 @@ type Querier interface {
 	//    AND challenge.password_version = current_admin.password_version
 	//  FOR UPDATE OF challenge
 	GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminChallengeForUpdateParams) (AdminChallenge, error)
+	//GetAdminRecoveryCodeForUpdate
+	//
+	//  SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
+	//         created_at, consumed_at, revoked_at
+	//  FROM admin_recovery_codes
+	//  WHERE selector = $1
+	//  FOR UPDATE
+	GetAdminRecoveryCodeForUpdate(ctx context.Context, arg GetAdminRecoveryCodeForUpdateParams) (AdminRecoveryCode, error)
 	//GetAdminSessionForUpdate
 	//
 	//  SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
@@ -1571,6 +1588,14 @@ type Querier interface {
 	//    AND revoked_at IS NULL
 	//  RETURNING session_id, revoked_at, revoke_reason
 	RevokeAdminSessionCAS(ctx context.Context, arg RevokeAdminSessionCASParams) (RevokeAdminSessionCASRow, error)
+	//RevokeAllAdminRecoveryCodeSets
+	//
+	//  UPDATE admin_recovery_codes
+	//  SET status = 'revoked',
+	//      revoked_at = $1
+	//  WHERE admin_id = $2
+	//    AND status = 'active'
+	RevokeAllAdminRecoveryCodeSets(ctx context.Context, arg RevokeAllAdminRecoveryCodeSetsParams) (int64, error)
 	//RevokeAllAdminSessions
 	//
 	//  UPDATE admin_sessions

@@ -18,6 +18,19 @@ type Service struct {
 	clock          clock.Clock
 	deviceAccess   *security.HMACKeyring[security.DeviceHMACKeyPurpose]
 	recoveryAccess *security.HMACKeyring[security.UserChallengeKeyPurpose]
+	adminAccess    *security.HMACKeyring[security.AdminSessionKeyPurpose]
+}
+
+// NewServiceWithAdminAccess enables authenticated administrator sessions to replay and confirm exact secret results.
+func NewServiceWithAdminAccess(
+	cipher *EnvelopeCipher,
+	serviceClock clock.Clock,
+	adminAccess *security.HMACKeyring[security.AdminSessionKeyPurpose],
+) (*Service, error) {
+	if cipher == nil || serviceClock == nil || adminAccess == nil {
+		return nil, ErrInvalidInput
+	}
+	return &Service{cipher: cipher, clock: serviceClock, adminAccess: adminAccess}, nil
 }
 
 // NewServiceWithIdentityAccess enables both authenticated-device and consumed-recovery result authority.
@@ -190,6 +203,26 @@ func (service *Service) OpenRecoveryAuthorizedResult(
 	return service.cipher.open(snapshot.Payload, binding, snapshot.SecretExpiresAt)
 }
 
+// OpenAdminAuthorizedResult decrypts only the result bound to the authenticated administrator grant.
+func (service *Service) OpenAdminAuthorizedResult(result Result, binding Binding, grant secretaccess.AdminGrant) ([]byte, error) {
+	if service == nil || service.cipher == nil || service.clock == nil || binding.Validate() != nil {
+		return nil, ErrInvalidInput
+	}
+	snapshot := result.Snapshot()
+	now := service.clock.Now()
+	if snapshot.ID == uuid.Nil || !secretaccess.VerifyAdminGrant(service.adminAccess, grant, snapshot.ID, binding.Key.ActorID, now) {
+		return nil, ErrReplayUnauthorized
+	}
+	resolution, err := result.Resolve(binding, now)
+	if err != nil {
+		return nil, err
+	}
+	if resolution.Kind != ReplayAvailable {
+		return nil, ErrSecretNoLongerAvailable
+	}
+	return service.cipher.open(snapshot.Payload, binding, snapshot.SecretExpiresAt)
+}
+
 // ConfirmDeviceAuthorizedResult erases a locked exact result after current-device authorization is revalidated.
 func (service *Service) ConfirmDeviceAuthorizedResult(
 	ctx context.Context,
@@ -215,6 +248,20 @@ func (service *Service) ConfirmRecoveryAuthorizedResult(
 	snapshot := result.Snapshot()
 	authorized := service != nil && service.clock != nil &&
 		secretaccess.VerifyRecoveryGrant(service.recoveryAccess, grant, snapshot.ID, binding.Key.ActorID, service.clock.Now())
+	return service.confirmAuthorizedResult(ctx, repository, result, binding, authorized)
+}
+
+// ConfirmAdminAuthorizedResult erases an exact result after revalidating the administrator capability.
+func (service *Service) ConfirmAdminAuthorizedResult(
+	ctx context.Context,
+	repository Repository,
+	result Result,
+	binding Binding,
+	grant secretaccess.AdminGrant,
+) (Result, error) {
+	snapshot := result.Snapshot()
+	authorized := service != nil && service.clock != nil &&
+		secretaccess.VerifyAdminGrant(service.adminAccess, grant, snapshot.ID, binding.Key.ActorID, service.clock.Now())
 	return service.confirmAuthorizedResult(ctx, repository, result, binding, authorized)
 }
 

@@ -31,6 +31,7 @@ type (
 	RateLimitHMACKeyPurpose  struct{}
 	UserChallengeKeyPurpose  struct{}
 	AdminChallengeKeyPurpose struct{}
+	AdminSessionKeyPurpose   struct{}
 )
 
 // AESKeyPurpose restricts encryption keyrings to the three independently encrypted data domains.
@@ -40,7 +41,7 @@ type AESKeyPurpose interface {
 
 // HMACKeyPurpose restricts digest keyrings to one authentication or indexing domain.
 type HMACKeyPurpose interface {
-	DeviceHMACKeyPurpose | RateLimitHMACKeyPurpose | UserChallengeKeyPurpose | AdminChallengeKeyPurpose
+	DeviceHMACKeyPurpose | RateLimitHMACKeyPurpose | UserChallengeKeyPurpose | AdminChallengeKeyPurpose | AdminSessionKeyPurpose
 }
 
 type keyringDocument struct {

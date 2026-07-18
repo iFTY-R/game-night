@@ -40,6 +40,7 @@ const (
 	rateLimitKeyringFileEnvironment          = "GAME_NIGHT_RATE_LIMIT_KEYRING_FILE"
 	userChallengeKeyringFileEnvironment      = "GAME_NIGHT_USER_CHALLENGE_KEYRING_FILE"
 	adminChallengeKeyringFileEnvironment     = "GAME_NIGHT_ADMIN_CHALLENGE_KEYRING_FILE"
+	adminSessionKeyringFileEnvironment       = "GAME_NIGHT_ADMIN_SESSION_KEYRING_FILE"
 	auditKeyringFileEnvironment              = "GAME_NIGHT_AUDIT_KEYRING_FILE"
 	// Pool defaults limit connection pressure while allowing operators to tune within a hard process cap.
 	defaultDatabaseSchema                = "public"
@@ -304,6 +305,10 @@ func loadKeyringFiles(reader environmentReader) (KeyringFiles, error) {
 	if err != nil {
 		return KeyringFiles{}, err
 	}
+	adminSession, err := requiredAbsolutePath(reader, adminSessionKeyringFileEnvironment)
+	if err != nil {
+		return KeyringFiles{}, err
+	}
 	audit, err := requiredAbsolutePath(reader, auditKeyringFileEnvironment)
 	if err != nil {
 		return KeyringFiles{}, err
@@ -319,6 +324,7 @@ func loadKeyringFiles(reader environmentReader) (KeyringFiles, error) {
 		{field: rateLimitKeyringFileEnvironment, path: rateLimit},
 		{field: userChallengeKeyringFileEnvironment, path: userChallenge},
 		{field: adminChallengeKeyringFileEnvironment, path: adminChallenge},
+		{field: adminSessionKeyringFileEnvironment, path: adminSession},
 		{field: auditKeyringFileEnvironment, path: audit},
 	}
 	seenPaths := make(map[string]struct{}, len(keyringPaths))
@@ -337,6 +343,7 @@ func loadKeyringFiles(reader environmentReader) (KeyringFiles, error) {
 		RateLimit:      RateLimitKeyringFile(rateLimit),
 		UserChallenge:  UserChallengeKeyringFile(userChallenge),
 		AdminChallenge: AdminChallengeKeyringFile(adminChallenge),
+		AdminSession:   AdminSessionKeyringFile(adminSession),
 		Audit:          AuditKeyringFile(audit),
 	}, nil
 }

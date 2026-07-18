@@ -202,6 +202,14 @@ WHERE admin_id = sqlc.arg(admin_id)
   AND status = 'pending'
 FOR UPDATE;
 
+-- name: GetActiveAdminTotpEnrollmentForUpdate :one
+SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+       operation_id, created_at, expires_at, activated_at, disabled_at
+FROM admin_totp_enrollments
+WHERE admin_id = sqlc.arg(admin_id)
+  AND status = 'active'
+FOR UPDATE;
+
 -- name: DisableActiveAdminTotpEnrollmentCAS :one
 UPDATE admin_totp_enrollments
 SET status = 'disabled',
@@ -273,6 +281,13 @@ FROM admin_sessions
 WHERE selector = sqlc.arg(selector)
 FOR UPDATE;
 
+-- name: GetAdminRecoveryCodeForUpdate :one
+SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
+       created_at, consumed_at, revoked_at
+FROM admin_recovery_codes
+WHERE selector = sqlc.arg(selector)
+FOR UPDATE;
+
 -- name: TouchAdminSessionCAS :one
 UPDATE admin_sessions
 SET last_seen_at = sqlc.arg(seen_at),
@@ -337,6 +352,13 @@ SET status = 'revoked',
     revoked_at = sqlc.arg(revoked_at)
 WHERE admin_id = sqlc.arg(admin_id)
   AND set_version = sqlc.arg(set_version)
+  AND status = 'active';
+
+-- name: RevokeAllAdminRecoveryCodeSets :execrows
+UPDATE admin_recovery_codes
+SET status = 'revoked',
+    revoked_at = sqlc.arg(revoked_at)
+WHERE admin_id = sqlc.arg(admin_id)
   AND status = 'active';
 
 -- name: CreateAdminAssistedRecoveryGrant :one

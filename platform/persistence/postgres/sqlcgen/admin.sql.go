@@ -1030,6 +1030,47 @@ func (q *Queries) DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg D
 	return i, err
 }
 
+const getActiveAdminTotpEnrollmentForUpdate = `-- name: GetActiveAdminTotpEnrollmentForUpdate :one
+SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+       operation_id, created_at, expires_at, activated_at, disabled_at
+FROM admin_totp_enrollments
+WHERE admin_id = $1
+  AND status = 'active'
+FOR UPDATE
+`
+
+type GetActiveAdminTotpEnrollmentForUpdateParams struct {
+	AdminID pgtype.UUID `json:"admin_id"`
+}
+
+// GetActiveAdminTotpEnrollmentForUpdate
+//
+//	SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+//	       operation_id, created_at, expires_at, activated_at, disabled_at
+//	FROM admin_totp_enrollments
+//	WHERE admin_id = $1
+//	  AND status = 'active'
+//	FOR UPDATE
+func (q *Queries) GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error) {
+	row := q.db.QueryRow(ctx, getActiveAdminTotpEnrollmentForUpdate, arg.AdminID)
+	var i AdminTotpEnrollment
+	err := row.Scan(
+		&i.EnrollmentID,
+		&i.AdminID,
+		&i.Ciphertext,
+		&i.Nonce,
+		&i.KeyVersion,
+		&i.Status,
+		&i.AdminVersion,
+		&i.OperationID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ActivatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
 const getAdminAssistedRecoveryGrantBySelector = `-- name: GetAdminAssistedRecoveryGrantBySelector :one
 SELECT assisted_grant_id, user_id, selector, secret_hash, purpose, status,
        attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
@@ -1206,6 +1247,42 @@ func (q *Queries) GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminCh
 		&i.OperationID,
 		&i.RequestDigest,
 		&i.ResultID,
+	)
+	return i, err
+}
+
+const getAdminRecoveryCodeForUpdate = `-- name: GetAdminRecoveryCodeForUpdate :one
+SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
+       created_at, consumed_at, revoked_at
+FROM admin_recovery_codes
+WHERE selector = $1
+FOR UPDATE
+`
+
+type GetAdminRecoveryCodeForUpdateParams struct {
+	Selector string `json:"selector"`
+}
+
+// GetAdminRecoveryCodeForUpdate
+//
+//	SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
+//	       created_at, consumed_at, revoked_at
+//	FROM admin_recovery_codes
+//	WHERE selector = $1
+//	FOR UPDATE
+func (q *Queries) GetAdminRecoveryCodeForUpdate(ctx context.Context, arg GetAdminRecoveryCodeForUpdateParams) (AdminRecoveryCode, error) {
+	row := q.db.QueryRow(ctx, getAdminRecoveryCodeForUpdate, arg.Selector)
+	var i AdminRecoveryCode
+	err := row.Scan(
+		&i.RecoveryCodeID,
+		&i.AdminID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.SetVersion,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
 	)
 	return i, err
 }
@@ -1574,6 +1651,34 @@ func (q *Queries) RevokeAdminSessionCAS(ctx context.Context, arg RevokeAdminSess
 	var i RevokeAdminSessionCASRow
 	err := row.Scan(&i.SessionID, &i.RevokedAt, &i.RevokeReason)
 	return i, err
+}
+
+const revokeAllAdminRecoveryCodeSets = `-- name: RevokeAllAdminRecoveryCodeSets :execrows
+UPDATE admin_recovery_codes
+SET status = 'revoked',
+    revoked_at = $1
+WHERE admin_id = $2
+  AND status = 'active'
+`
+
+type RevokeAllAdminRecoveryCodeSetsParams struct {
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	AdminID   pgtype.UUID        `json:"admin_id"`
+}
+
+// RevokeAllAdminRecoveryCodeSets
+//
+//	UPDATE admin_recovery_codes
+//	SET status = 'revoked',
+//	    revoked_at = $1
+//	WHERE admin_id = $2
+//	  AND status = 'active'
+func (q *Queries) RevokeAllAdminRecoveryCodeSets(ctx context.Context, arg RevokeAllAdminRecoveryCodeSetsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllAdminRecoveryCodeSets, arg.RevokedAt, arg.AdminID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const revokeAllAdminSessions = `-- name: RevokeAllAdminSessions :execrows

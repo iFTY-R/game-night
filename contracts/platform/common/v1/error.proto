@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package platform.common.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/common/v1/common.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1";
+
+// BusinessErrorCode is stable across transport and internal implementation changes.
+enum BusinessErrorCode {
+  BUSINESS_ERROR_CODE_UNSPECIFIED = 0;
+  BUSINESS_ERROR_CODE_IDENTITY_ONBOARDING_REQUIRED = 1;
+  BUSINESS_ERROR_CODE_USERNAME_INVALID = 2;
+  BUSINESS_ERROR_CODE_USERNAME_TAKEN = 3;
+  BUSINESS_ERROR_CODE_USERNAME_CHANGE_COOLDOWN = 4;
+  BUSINESS_ERROR_CODE_DEVICE_CREDENTIAL_INVALID = 5;
+  BUSINESS_ERROR_CODE_DEVICE_REVOKED = 6;
+  BUSINESS_ERROR_CODE_ACCOUNT_SUSPENDED = 7;
+  BUSINESS_ERROR_CODE_ACCOUNT_DELETED = 8;
+  BUSINESS_ERROR_CODE_RECOVERY_INVALID = 9;
+  BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT = 10;
+  BUSINESS_ERROR_CODE_SECRET_RESULT_NO_LONGER_AVAILABLE = 11;
+  BUSINESS_ERROR_CODE_CSRF_INVALID = 12;
+  BUSINESS_ERROR_CODE_ORIGIN_NOT_ALLOWED = 13;
+  BUSINESS_ERROR_CODE_RATE_LIMITED = 14;
+  BUSINESS_ERROR_CODE_ADMIN_SETUP_REQUIRED = 15;
+  BUSINESS_ERROR_CODE_ADMIN_PASSWORD_CHANGE_REQUIRED = 16;
+  BUSINESS_ERROR_CODE_MFA_REQUIRED = 17;
+  BUSINESS_ERROR_CODE_MFA_INVALID = 18;
+  BUSINESS_ERROR_CODE_AUTH_INVALID = 19;
+  BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE = 20;
+  BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED = 21;
+  BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE = 22;
+}
+
+// BusinessErrorDetail contains only information safe to expose to clients.
+message BusinessErrorDetail {
+  BusinessErrorCode code = 1;
+  string message_key = 2;
+  google.protobuf.Timestamp retry_at = 3;
+  repeated FieldViolation field_violations = 4;
+}

@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package platform.audit.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1;auditv1";
+
+enum AuditActorType {
+  AUDIT_ACTOR_TYPE_UNSPECIFIED = 0;
+  AUDIT_ACTOR_TYPE_USER = 1;
+  AUDIT_ACTOR_TYPE_ADMIN = 2;
+  AUDIT_ACTOR_TYPE_SYSTEM = 3;
+}
+
+enum AuditTargetType {
+  AUDIT_TARGET_TYPE_UNSPECIFIED = 0;
+  AUDIT_TARGET_TYPE_USER = 1;
+  AUDIT_TARGET_TYPE_DEVICE = 2;
+  AUDIT_TARGET_TYPE_PROFILE_EXPORT = 3;
+  AUDIT_TARGET_TYPE_ADMIN = 4;
+  AUDIT_TARGET_TYPE_SYSTEM = 5;
+}
+
+enum AuditAction {
+  AUDIT_ACTION_UNSPECIFIED = 0;
+  AUDIT_ACTION_IDENTITY_ONBOARDED = 1;
+  AUDIT_ACTION_IDENTITY_RECOVERED = 2;
+  AUDIT_ACTION_RECOVERY_CODE_ROTATED = 3;
+  AUDIT_ACTION_DEVICE_REVOKED = 4;
+  AUDIT_ACTION_USERNAME_CHANGED = 5;
+  AUDIT_ACTION_USERNAME_FORCE_CHANGED = 6;
+  AUDIT_ACTION_USER_SUSPENDED = 7;
+  AUDIT_ACTION_USER_UNSUSPENDED = 8;
+  AUDIT_ACTION_USER_DELETED = 9;
+  AUDIT_ACTION_ASSISTED_RECOVERY_CREATED = 10;
+  AUDIT_ACTION_REAL_NAME_READ = 11;
+  AUDIT_ACTION_REAL_NAME_UPDATED = 12;
+  AUDIT_ACTION_PROFILE_EXPORT_CREATED = 13;
+  AUDIT_ACTION_PROFILE_EXPORT_PAGE_READ = 14;
+  AUDIT_ACTION_PROFILE_EXPORT_COMPLETED = 15;
+  AUDIT_ACTION_PROFILE_EXPORT_ABORTED = 16;
+  AUDIT_ACTION_PROFILE_EXPORT_EXPIRED = 17;
+  AUDIT_ACTION_ADMIN_SETUP_COMPLETED = 18;
+  AUDIT_ACTION_ADMIN_PASSWORD_CHANGED = 19;
+  AUDIT_ACTION_ADMIN_TOTP_REBOUND = 20;
+  AUDIT_ACTION_ADMIN_RECOVERY_USED = 21;
+  AUDIT_ACTION_ADMIN_SESSIONS_REVOKED = 22;
+  AUDIT_ACTION_ADMIN_OFFLINE_RESET = 23;
+  AUDIT_ACTION_AUDIT_EVENTS_READ = 24;
+  AUDIT_ACTION_KEY_ROTATION_STARTED = 25;
+  AUDIT_ACTION_KEY_ROTATION_BATCH_COMPLETED = 26;
+  AUDIT_ACTION_KEY_ROTATION_COMPLETED = 27;
+}
+
+message AuditActor {
+  AuditActorType type = 1;
+  string actor_id = 2;
+}
+
+message AuditTarget {
+  AuditTargetType type = 1;
+  string target_id = 2;
+}
+
+// AuditEvent is deterministically encoded before hashing and signing; it intentionally contains no map or float fields.
+message AuditEvent {
+  uint32 schema_version = 1;
+  string chain_id = 2;
+  string event_id = 3;
+  uint64 sequence = 4;
+  bytes previous_hash = 5;
+  string request_id = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  AuditActor actor = 8;
+  AuditTarget target = 9;
+  AuditAction action = 10;
+  string reason_code = 11;
+  bytes detail_digest = 12;
+  uint32 signing_key_version = 13;
+}
+
+message SignedAuditEvent {
+  AuditEvent event = 1;
+  bytes canonical_event = 2;
+  bytes event_hash = 3;
+  bytes signature = 4;
+}
+
+message AuditCheckpoint {
+  string chain_id = 1;
+  uint64 sequence = 2;
+  bytes chain_hash = 3;
+  bytes checkpoint_signature = 4;
+  uint32 signing_key_version = 5;
+  google.protobuf.Timestamp created_at = 6;
+}

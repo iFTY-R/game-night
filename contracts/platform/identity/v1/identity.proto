@@ -1,0 +1,197 @@
+syntax = "proto3";
+
+package platform.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/common/v1/common.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1;identityv1";
+
+// IdentityService owns device identity, onboarding, recovery, and device management.
+service IdentityService {
+  rpc BeginIdentityBootstrap(BeginIdentityBootstrapRequest) returns (BeginIdentityBootstrapResponse);
+  rpc BootstrapIdentity(BootstrapIdentityRequest) returns (BootstrapIdentityResponse);
+  rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
+  rpc GetCurrentIdentity(GetCurrentIdentityRequest) returns (GetCurrentIdentityResponse);
+  rpc ChangeUsername(ChangeUsernameRequest) returns (ChangeUsernameResponse);
+  rpc RotateRecoveryCode(RotateRecoveryCodeRequest) returns (RotateRecoveryCodeResponse);
+  rpc BeginRecoveryChallenge(BeginRecoveryChallengeRequest) returns (BeginRecoveryChallengeResponse);
+  rpc BeginRecovery(BeginRecoveryRequest) returns (BeginRecoveryResponse);
+  rpc CompleteRecovery(CompleteRecoveryRequest) returns (CompleteRecoveryResponse);
+  rpc ConfirmSecretReceipt(ConfirmSecretReceiptRequest) returns (ConfirmSecretReceiptResponse);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ONBOARDING = 1;
+  USER_STATUS_ACTIVE = 2;
+  USER_STATUS_SUSPENDED = 3;
+  USER_STATUS_DELETED = 4;
+}
+
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  DEVICE_STATUS_ACTIVE = 1;
+  DEVICE_STATUS_REVOKED = 2;
+  DEVICE_STATUS_EXPIRED = 3;
+}
+
+enum RecoveryDevicePolicy {
+  RECOVERY_DEVICE_POLICY_UNSPECIFIED = 0;
+  RECOVERY_DEVICE_POLICY_KEEP_OTHER_DEVICES = 1;
+  RECOVERY_DEVICE_POLICY_REVOKE_OTHER_DEVICES = 2;
+}
+
+enum CredentialInstruction {
+  CREDENTIAL_INSTRUCTION_UNSPECIFIED = 0;
+  CREDENTIAL_INSTRUCTION_KEEP_COOKIE = 1;
+  CREDENTIAL_INSTRUCTION_CLEAR_COOKIE = 2;
+}
+
+enum IdentitySecretOperation {
+  IDENTITY_SECRET_OPERATION_UNSPECIFIED = 0;
+  IDENTITY_SECRET_OPERATION_BOOTSTRAP = 1;
+  IDENTITY_SECRET_OPERATION_ONBOARDING = 2;
+  IDENTITY_SECRET_OPERATION_RECOVERY = 3;
+  IDENTITY_SECRET_OPERATION_RECOVERY_CODE_ROTATION = 4;
+}
+
+message UserSummary {
+  string user_id = 1;
+  UserStatus status = 2;
+  string username = 3;
+  google.protobuf.Timestamp username_changed_at = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message DeviceSummary {
+  string credential_id = 1;
+  string label = 2;
+  DeviceStatus status = 3;
+  bool current_device = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp last_seen_at = 6;
+  google.protobuf.Timestamp idle_expires_at = 7;
+  google.protobuf.Timestamp absolute_expires_at = 8;
+  google.protobuf.Timestamp revoked_at = 9;
+}
+
+message BeginIdentityBootstrapRequest {
+  string request_flow_id = 1;
+}
+
+message BeginIdentityBootstrapResponse {
+  platform.common.v1.AnonymousChallenge challenge = 1;
+}
+
+message BootstrapIdentityRequest {
+  string challenge_proof = 1;
+  string operation_id = 2;
+  string device_label = 3;
+}
+
+message BootstrapIdentityResponse {
+  platform.common.v1.OperationResult result = 1;
+  UserSummary user = 2;
+  DeviceSummary device = 3;
+  CredentialInstruction credential_instruction = 4;
+}
+
+message CompleteOnboardingRequest {
+  string username = 1;
+  string operation_id = 2;
+}
+
+message CompleteOnboardingResponse {
+  platform.common.v1.OperationResult result = 1;
+  UserSummary user = 2;
+  string recovery_code = 3;
+}
+
+message GetCurrentIdentityRequest {}
+
+message GetCurrentIdentityResponse {
+  UserSummary user = 1;
+  DeviceSummary current_device = 2;
+}
+
+message ChangeUsernameRequest {
+  string username = 1;
+}
+
+message ChangeUsernameResponse {
+  UserSummary user = 1;
+}
+
+message RotateRecoveryCodeRequest {
+  string operation_id = 1;
+}
+
+message RotateRecoveryCodeResponse {
+  platform.common.v1.OperationResult result = 1;
+  string recovery_code = 2;
+}
+
+message BeginRecoveryChallengeRequest {
+  string request_flow_id = 1;
+}
+
+message BeginRecoveryChallengeResponse {
+  platform.common.v1.AnonymousChallenge challenge = 1;
+}
+
+message BeginRecoveryRequest {
+  string challenge_proof = 1;
+  string recovery_code = 2;
+}
+
+message BeginRecoveryResponse {
+  string recovery_grant = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message CompleteRecoveryRequest {
+  string recovery_grant = 1;
+  string operation_id = 2;
+  string device_label = 3;
+  RecoveryDevicePolicy device_policy = 4;
+}
+
+message CompleteRecoveryResponse {
+  platform.common.v1.OperationResult result = 1;
+  UserSummary user = 2;
+  DeviceSummary device = 3;
+  string recovery_code = 4;
+}
+
+message ConfirmSecretReceiptRequest {
+  IdentitySecretOperation operation = 1;
+  string operation_id = 2;
+  string result_id = 3;
+}
+
+message ConfirmSecretReceiptResponse {
+  bool confirmed = 1;
+}
+
+message ListDevicesRequest {
+  bool include_revoked = 1;
+  platform.common.v1.PageRequest page = 2;
+}
+
+message ListDevicesResponse {
+  repeated DeviceSummary devices = 1;
+  platform.common.v1.PageInfo page = 2;
+}
+
+message RevokeDeviceRequest {
+  string credential_id = 1;
+  string reason = 2;
+}
+
+message RevokeDeviceResponse {
+  bool current_device_revoked = 1;
+}

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package platform.common.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1";
+
+// PageRequest defines bounded cursor pagination for unary APIs.
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// PageInfo reports the next stable cursor when more records exist.
+message PageInfo {
+  string next_page_token = 1;
+}
+
+// OperationResult identifies an idempotently committed operation and its retrievable secret result.
+message OperationResult {
+  string operation_id = 1;
+  string result_id = 2;
+  google.protobuf.Timestamp secret_expires_at = 3;
+  bool replayed = 4;
+}
+
+// AnonymousChallenge pairs a response proof with an HttpOnly challenge cookie set by the transport.
+message AnonymousChallenge {
+  string challenge_proof = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+// FieldViolation describes one safe client-correctable validation error.
+message FieldViolation {
+  string field = 1;
+  string reason = 2;
+}

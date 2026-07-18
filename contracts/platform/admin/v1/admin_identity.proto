@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+package platform.admin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/audit/v1/audit.proto";
+import "platform/common/v1/common.proto";
+import "platform/identity/v1/identity.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1";
+
+// AdminIdentityService exposes permission-checked identity, PII, governance, and audit operations.
+service AdminIdentityService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetRealName(GetRealNameRequest) returns (GetRealNameResponse);
+  rpc UpdateRealName(UpdateRealNameRequest) returns (UpdateRealNameResponse);
+  rpc CreateUserProfileExport(CreateUserProfileExportRequest) returns (CreateUserProfileExportResponse);
+  rpc GetUserProfileExportPage(GetUserProfileExportPageRequest) returns (GetUserProfileExportPageResponse);
+  rpc CompleteUserProfileExport(CompleteUserProfileExportRequest) returns (CompleteUserProfileExportResponse);
+  rpc AbortUserProfileExport(AbortUserProfileExportRequest) returns (AbortUserProfileExportResponse);
+  rpc CreateAssistedRecoveryGrant(CreateAssistedRecoveryGrantRequest) returns (CreateAssistedRecoveryGrantResponse);
+  rpc ForceChangeUsername(ForceChangeUsernameRequest) returns (ForceChangeUsernameResponse);
+  rpc SuspendUser(SuspendUserRequest) returns (SuspendUserResponse);
+  rpc UnsuspendUser(UnsuspendUserRequest) returns (UnsuspendUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc RevokeUserDevice(RevokeUserDeviceRequest) returns (RevokeUserDeviceResponse);
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+}
+
+enum ProfileField {
+  PROFILE_FIELD_UNSPECIFIED = 0;
+  PROFILE_FIELD_REAL_NAME = 1;
+}
+
+message AdminUserView {
+  string user_id = 1;
+  platform.identity.v1.UserStatus status = 2;
+  string username = 3;
+  google.protobuf.Timestamp username_changed_at = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message RealNameProfile {
+  string user_id = 1;
+  string real_name = 2;
+  uint64 profile_version = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  string updated_by_admin_id = 5;
+}
+
+message GetUserRequest {
+  oneof lookup {
+    string user_id = 1;
+    string username = 2;
+  }
+}
+
+message GetUserResponse {
+  AdminUserView user = 1;
+}
+
+message GetRealNameRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message GetRealNameResponse {
+  RealNameProfile profile = 1;
+}
+
+message UpdateRealNameRequest {
+  string user_id = 1;
+  string real_name = 2;
+  string reason = 3;
+}
+
+message UpdateRealNameResponse {
+  RealNameProfile profile = 1;
+}
+
+message ProfileExportFilter {
+  repeated string user_ids = 1;
+  repeated platform.identity.v1.UserStatus statuses = 2;
+}
+
+message CreateUserProfileExportRequest {
+  ProfileExportFilter filter = 1;
+  repeated ProfileField fields = 2;
+  string reason = 3;
+}
+
+message CreateUserProfileExportResponse {
+  string export_id = 1;
+  uint32 schema_version = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ProfileExportRecord {
+  string user_id = 1;
+  string username = 2;
+  string real_name = 3;
+  uint64 profile_version = 4;
+}
+
+message GetUserProfileExportPageRequest {
+  string export_id = 1;
+  string cursor = 2;
+  int32 page_size = 3;
+}
+
+message GetUserProfileExportPageResponse {
+  repeated ProfileExportRecord records = 1;
+  string next_cursor = 2;
+  bool complete = 3;
+}
+
+message CompleteUserProfileExportRequest {
+  string export_id = 1;
+}
+
+message CompleteUserProfileExportResponse {
+  bool completed = 1;
+}
+
+message AbortUserProfileExportRequest {
+  string export_id = 1;
+  string reason = 2;
+}
+
+message AbortUserProfileExportResponse {
+  bool aborted = 1;
+}
+
+message CreateAssistedRecoveryGrantRequest {
+  string user_id = 1;
+  string operation_id = 2;
+  bool revoke_other_devices = 3;
+  string reason = 4;
+}
+
+message CreateAssistedRecoveryGrantResponse {
+  platform.common.v1.OperationResult result = 1;
+  string assisted_recovery_grant = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ForceChangeUsernameRequest {
+  string user_id = 1;
+  string username = 2;
+  string reason = 3;
+}
+
+message ForceChangeUsernameResponse {
+  AdminUserView user = 1;
+}
+
+message SuspendUserRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message SuspendUserResponse {
+  AdminUserView user = 1;
+}
+
+message UnsuspendUserRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message UnsuspendUserResponse {
+  AdminUserView user = 1;
+}
+
+message DeleteUserRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message DeleteUserResponse {
+  AdminUserView user = 1;
+}
+
+message RevokeUserDeviceRequest {
+  string user_id = 1;
+  string credential_id = 2;
+  string reason = 3;
+}
+
+message RevokeUserDeviceResponse {
+  bool revoked = 1;
+}
+
+message ListAuditEventsRequest {
+  string actor_admin_id = 1;
+  string target_user_id = 2;
+  repeated platform.audit.v1.AuditAction actions = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp ended_at = 5;
+  platform.common.v1.PageRequest page = 6;
+}
+
+message ListAuditEventsResponse {
+  repeated platform.audit.v1.SignedAuditEvent events = 1;
+  platform.common.v1.PageInfo page = 2;
+}

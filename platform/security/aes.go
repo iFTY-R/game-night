@@ -36,6 +36,12 @@ func LoadAESKeyring[P AESKeyPurpose](path string, now time.Time) (*AESKeyring[P]
 	return &AESKeyring[P]{keys: keys}, nil
 }
 
+// ActiveVersion returns the immutable key version needed when callers include it in canonical AAD.
+func (keyring *AESKeyring[P]) ActiveVersion() uint32 {
+	version, _ := keyring.keys.active()
+	return version
+}
+
 // Encrypt seals non-empty plaintext under the active key and caller-supplied domain AAD.
 func (keyring *AESKeyring[P]) Encrypt(plaintext, associatedData []byte) (Encrypted[P], error) {
 	if len(plaintext) == 0 || len(associatedData) == 0 {

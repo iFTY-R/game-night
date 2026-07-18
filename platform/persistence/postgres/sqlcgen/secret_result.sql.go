@@ -24,6 +24,7 @@ WHERE result_id = $2
   AND operation_id = $5
   AND request_digest = $6
   AND result_type = $7
+  AND result_version = $8
   AND status = 'available'
   AND secret_expires_at > $1
 RETURNING result_id, status, confirmed_at, tombstone_expires_at
@@ -37,6 +38,7 @@ type ConfirmSecretOperationResultCASParams struct {
 	OperationID        string             `json:"operation_id"`
 	RequestDigest      []byte             `json:"request_digest"`
 	ResultType         string             `json:"result_type"`
+	ResultVersion      int32              `json:"result_version"`
 }
 
 type ConfirmSecretOperationResultCASRow struct {
@@ -60,6 +62,7 @@ type ConfirmSecretOperationResultCASRow struct {
 //	  AND operation_id = $5
 //	  AND request_digest = $6
 //	  AND result_type = $7
+//	  AND result_version = $8
 //	  AND status = 'available'
 //	  AND secret_expires_at > $1
 //	RETURNING result_id, status, confirmed_at, tombstone_expires_at
@@ -72,6 +75,7 @@ func (q *Queries) ConfirmSecretOperationResultCAS(ctx context.Context, arg Confi
 		arg.OperationID,
 		arg.RequestDigest,
 		arg.ResultType,
+		arg.ResultVersion,
 	)
 	var i ConfirmSecretOperationResultCASRow
 	err := row.Scan(
@@ -146,6 +150,42 @@ func (q *Queries) ConsumeAnonymousChallengeCAS(ctx context.Context, arg ConsumeA
 		&i.RequestDigest,
 		&i.ResultID,
 	)
+	return i, err
+}
+
+const consumeAnonymousChallengeWithoutReplayCAS = `-- name: ConsumeAnonymousChallengeWithoutReplayCAS :one
+UPDATE anonymous_challenges
+SET consumed_at = $1
+WHERE challenge_id = $2
+  AND consumed_at IS NULL
+  AND expires_at > $1
+  AND attempt_count < max_attempts
+RETURNING challenge_id, consumed_at
+`
+
+type ConsumeAnonymousChallengeWithoutReplayCASParams struct {
+	ConsumedAt  pgtype.Timestamptz `json:"consumed_at"`
+	ChallengeID pgtype.UUID        `json:"challenge_id"`
+}
+
+type ConsumeAnonymousChallengeWithoutReplayCASRow struct {
+	ChallengeID pgtype.UUID        `json:"challenge_id"`
+	ConsumedAt  pgtype.Timestamptz `json:"consumed_at"`
+}
+
+// ConsumeAnonymousChallengeWithoutReplayCAS
+//
+//	UPDATE anonymous_challenges
+//	SET consumed_at = $1
+//	WHERE challenge_id = $2
+//	  AND consumed_at IS NULL
+//	  AND expires_at > $1
+//	  AND attempt_count < max_attempts
+//	RETURNING challenge_id, consumed_at
+func (q *Queries) ConsumeAnonymousChallengeWithoutReplayCAS(ctx context.Context, arg ConsumeAnonymousChallengeWithoutReplayCASParams) (ConsumeAnonymousChallengeWithoutReplayCASRow, error) {
+	row := q.db.QueryRow(ctx, consumeAnonymousChallengeWithoutReplayCAS, arg.ConsumedAt, arg.ChallengeID)
+	var i ConsumeAnonymousChallengeWithoutReplayCASRow
+	err := row.Scan(&i.ChallengeID, &i.ConsumedAt)
 	return i, err
 }
 
@@ -713,6 +753,57 @@ type GetSecretOperationResultByOperationParams struct {
 //	  AND operation_id = $3
 func (q *Queries) GetSecretOperationResultByOperation(ctx context.Context, arg GetSecretOperationResultByOperationParams) (SecretOperationResult, error) {
 	row := q.db.QueryRow(ctx, getSecretOperationResultByOperation, arg.OperationScope, arg.ActorOrChallengeID, arg.OperationID)
+	var i SecretOperationResult
+	err := row.Scan(
+		&i.ResultID,
+		&i.OperationScope,
+		&i.ActorOrChallengeID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.ResultType,
+		&i.ResultVersion,
+		&i.Ciphertext,
+		&i.Nonce,
+		&i.WrappedDataKey,
+		&i.KeyVersion,
+		&i.Status,
+		&i.SecretExpiresAt,
+		&i.ConfirmedAt,
+		&i.CompletedAt,
+		&i.TombstoneExpiresAt,
+	)
+	return i, err
+}
+
+const getSecretOperationResultByOperationForUpdate = `-- name: GetSecretOperationResultByOperationForUpdate :one
+SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+FROM secret_operation_results
+WHERE operation_scope = $1
+  AND actor_or_challenge_id = $2
+  AND operation_id = $3
+FOR UPDATE
+`
+
+type GetSecretOperationResultByOperationForUpdateParams struct {
+	OperationScope     string      `json:"operation_scope"`
+	ActorOrChallengeID pgtype.UUID `json:"actor_or_challenge_id"`
+	OperationID        string      `json:"operation_id"`
+}
+
+// GetSecretOperationResultByOperationForUpdate
+//
+//	SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+//	       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+//	       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+//	FROM secret_operation_results
+//	WHERE operation_scope = $1
+//	  AND actor_or_challenge_id = $2
+//	  AND operation_id = $3
+//	FOR UPDATE
+func (q *Queries) GetSecretOperationResultByOperationForUpdate(ctx context.Context, arg GetSecretOperationResultByOperationForUpdateParams) (SecretOperationResult, error) {
+	row := q.db.QueryRow(ctx, getSecretOperationResultByOperationForUpdate, arg.OperationScope, arg.ActorOrChallengeID, arg.OperationID)
 	var i SecretOperationResult
 	err := row.Scan(
 		&i.ResultID,

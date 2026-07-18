@@ -28,6 +28,50 @@ type transactionHandle interface {
 
 type beginTransaction func(context.Context, pgx.TxOptions) (transactionHandle, error)
 
+// transactionLifecycleError marks failures owned by the transaction runner so domain adapters can
+// hide driver diagnostics without treating callback business errors as infrastructure failures.
+type transactionLifecycleError struct {
+	operation string
+	cause     error
+}
+
+func (failure *transactionLifecycleError) Error() string {
+	return failure.operation + ": " + failure.cause.Error()
+}
+
+func (failure *transactionLifecycleError) Unwrap() error {
+	return failure.cause
+}
+
+func newTransactionLifecycleError(operation string, cause error) error {
+	return &transactionLifecycleError{operation: operation, cause: cause}
+}
+
+// mapUnitOfWorkError prevents transaction lifecycle diagnostics from crossing a domain boundary.
+// Callback errors remain distinguishable: context termination and known domain sentinels are
+// normalized, while unexpected callback errors remain available to their owning application layer.
+func mapUnitOfWorkError(err, repositoryUnavailable error, domainErrors ...error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	var lifecycleFailure *transactionLifecycleError
+	if errors.As(err, &lifecycleFailure) {
+		return repositoryUnavailable
+	}
+	for _, domainErr := range domainErrors {
+		if errors.Is(err, domainErr) {
+			return domainErr
+		}
+	}
+	return err
+}
+
 // TransactionRunner owns begin, commit, rollback, and panic cleanup for PostgreSQL units of work.
 type TransactionRunner struct {
 	begin beginTransaction
@@ -59,7 +103,7 @@ func (runner *TransactionRunner) RunWithOptions(ctx context.Context, options pgx
 	}
 	transaction, err := runner.begin(ctx, options)
 	if err != nil {
-		return fmt.Errorf("begin PostgreSQL transaction: %w", err)
+		return newTransactionLifecycleError("begin PostgreSQL transaction", err)
 	}
 	// finished prevents a successful commit from being followed by the deferred rollback path.
 	finished := false
@@ -68,7 +112,7 @@ func (runner *TransactionRunner) RunWithOptions(ctx context.Context, options pgx
 		if !finished {
 			rollbackErr := rollbackTransaction(ctx, transaction)
 			if recovered == nil && rollbackErr != nil {
-				err = errors.Join(err, fmt.Errorf("rollback PostgreSQL transaction: %w", rollbackErr))
+				err = errors.Join(err, newTransactionLifecycleError("rollback PostgreSQL transaction", rollbackErr))
 			}
 		}
 		if recovered != nil {
@@ -81,7 +125,7 @@ func (runner *TransactionRunner) RunWithOptions(ctx context.Context, options pgx
 		return fmt.Errorf("run PostgreSQL transaction work: %w", workErr)
 	}
 	if commitErr := transaction.Commit(ctx); commitErr != nil {
-		return fmt.Errorf("commit PostgreSQL transaction: %w", commitErr)
+		return newTransactionLifecycleError("commit PostgreSQL transaction", commitErr)
 	}
 	finished = true
 	return nil

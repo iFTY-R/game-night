@@ -100,13 +100,26 @@ RETURNING challenge_id, admin_id, selector, secret_hash, secret_key_version, pur
           revoked_at, replay_until, operation_id, request_digest, result_id;
 
 -- name: GetAdminChallengeForUpdate :one
-SELECT challenge_id, admin_id, selector, secret_hash, secret_key_version, purpose,
-       audience, admin_version, password_version, origin_hash, request_flow_id,
-       attempt_count, max_attempts, status, created_at, expires_at, consumed_at,
-       revoked_at, replay_until, operation_id, request_digest, result_id
-FROM admin_challenges
-WHERE selector = sqlc.arg(selector)
-FOR UPDATE;
+WITH current_admin AS MATERIALIZED (
+    -- Lock the account generation before the challenge to match every security-state transition.
+    SELECT admin_id, admin_version, password_version
+    FROM admin_accounts
+    WHERE singleton_id = 1
+    FOR UPDATE
+)
+SELECT challenge.challenge_id, challenge.admin_id, challenge.selector, challenge.secret_hash,
+       challenge.secret_key_version, challenge.purpose, challenge.audience,
+       challenge.admin_version, challenge.password_version, challenge.origin_hash,
+       challenge.request_flow_id, challenge.attempt_count, challenge.max_attempts,
+       challenge.status, challenge.created_at, challenge.expires_at, challenge.consumed_at,
+       challenge.revoked_at, challenge.replay_until, challenge.operation_id,
+       challenge.request_digest, challenge.result_id
+FROM current_admin
+JOIN admin_challenges AS challenge ON challenge.admin_id = current_admin.admin_id
+WHERE challenge.selector = sqlc.arg(selector)
+  AND challenge.admin_version = current_admin.admin_version
+  AND challenge.password_version = current_admin.password_version
+FOR UPDATE OF challenge;
 
 -- name: RecordAdminChallengeFailureCAS :one
 UPDATE admin_challenges
@@ -118,20 +131,33 @@ WHERE challenge_id = sqlc.arg(challenge_id)
 RETURNING challenge_id, attempt_count, max_attempts, status, expires_at;
 
 -- name: ConsumeAdminChallengeCAS :one
-UPDATE admin_challenges
+WITH current_admin AS MATERIALIZED (
+    -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
+    SELECT admin_id, admin_version, password_version
+    FROM admin_accounts
+    WHERE singleton_id = 1
+    FOR UPDATE
+)
+UPDATE admin_challenges AS challenge
 SET status = 'consumed',
     consumed_at = sqlc.arg(consumed_at),
     replay_until = sqlc.arg(replay_until),
     operation_id = sqlc.arg(operation_id),
     request_digest = sqlc.arg(request_digest),
     result_id = sqlc.arg(result_id)
-WHERE challenge_id = sqlc.arg(challenge_id)
-  AND status = 'active'
-  AND expires_at > sqlc.arg(consumed_at)
-  AND attempt_count < max_attempts
-  AND admin_version = sqlc.arg(expected_admin_version)
-  AND password_version = sqlc.arg(expected_password_version)
-RETURNING challenge_id, status, consumed_at, replay_until, operation_id, request_digest, result_id;
+FROM current_admin
+WHERE challenge.challenge_id = sqlc.arg(challenge_id)
+  AND challenge.admin_id = current_admin.admin_id
+  AND challenge.status = 'active'
+  AND challenge.expires_at > sqlc.arg(consumed_at)
+  AND challenge.attempt_count < challenge.max_attempts
+  AND challenge.admin_version = sqlc.arg(expected_admin_version)
+  AND challenge.password_version = sqlc.arg(expected_password_version)
+  AND challenge.admin_version = current_admin.admin_version
+  AND challenge.password_version = current_admin.password_version
+RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
+          challenge.replay_until, challenge.operation_id, challenge.request_digest,
+          challenge.result_id;
 
 -- name: RevokeAdminChallenges :execrows
 UPDATE admin_challenges

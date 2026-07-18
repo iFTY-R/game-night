@@ -46,6 +46,16 @@ WHERE operation_scope = sqlc.arg(operation_scope)
   AND actor_or_challenge_id = sqlc.arg(actor_or_challenge_id)
   AND operation_id = sqlc.arg(operation_id);
 
+-- name: GetSecretOperationResultByOperationForUpdate :one
+SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+       result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+       status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+FROM secret_operation_results
+WHERE operation_scope = sqlc.arg(operation_scope)
+  AND actor_or_challenge_id = sqlc.arg(actor_or_challenge_id)
+  AND operation_id = sqlc.arg(operation_id)
+FOR UPDATE;
+
 -- name: ConfirmSecretOperationResultCAS :one
 UPDATE secret_operation_results
 SET status = 'confirmed',
@@ -59,6 +69,7 @@ WHERE result_id = sqlc.arg(result_id)
   AND operation_id = sqlc.arg(operation_id)
   AND request_digest = sqlc.arg(request_digest)
   AND result_type = sqlc.arg(result_type)
+  AND result_version = sqlc.arg(result_version)
   AND status = 'available'
   AND secret_expires_at > sqlc.arg(confirmed_at)
 RETURNING result_id, status, confirmed_at, tombstone_expires_at;
@@ -135,6 +146,15 @@ WHERE challenge_id = sqlc.arg(challenge_id)
   AND expires_at > sqlc.arg(consumed_at)
   AND attempt_count < max_attempts
 RETURNING challenge_id, consumed_at, replay_until, operation_id, request_digest, result_id;
+
+-- name: ConsumeAnonymousChallengeWithoutReplayCAS :one
+UPDATE anonymous_challenges
+SET consumed_at = sqlc.arg(consumed_at)
+WHERE challenge_id = sqlc.arg(challenge_id)
+  AND consumed_at IS NULL
+  AND expires_at > sqlc.arg(consumed_at)
+  AND attempt_count < max_attempts
+RETURNING challenge_id, consumed_at;
 
 -- name: CreateUserRecoveryAttempt :one
 INSERT INTO user_recovery_attempts (

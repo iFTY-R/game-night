@@ -86,6 +86,21 @@ func TestAESKeyringRejectsUnknownOrWrongKey(t *testing.T) {
 	}
 }
 
+func TestAESKeyringReportsImmutableActiveVersion(t *testing.T) {
+	now := time.Now().UTC()
+	path := writeSymmetricKeyring(t, keyringDocument{
+		ActiveVersion: 9,
+		Keys:          []keyDocument{testKeyDocument(9, randomTestBytes(t, 32), now.Add(-time.Hour), time.Time{})},
+	})
+	keyring, err := LoadAESKeyring[ResultEnvelopeKeyPurpose](path, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyring.ActiveVersion() != 9 {
+		t.Fatalf("active version = %d, want 9", keyring.ActiveVersion())
+	}
+}
+
 func TestHMACKeyringVersionedDigest(t *testing.T) {
 	now := time.Now().UTC()
 	path := writeSymmetricKeyring(t, keyringDocument{

@@ -48,6 +48,94 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	assertExpectedTables(t, ctx, fixture.Pool)
 }
 
+func TestSecretResultWorkflowDownRemovesConsumedChallengesWithoutReplay(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting:       currentUser,
+		auditWriterRoleSetting: currentUser,
+		migrationRoleSetting:   currentUser,
+		runtimeRoleSetting:     currentUser,
+		workerRoleSetting:      currentUser,
+	})
+	migrationsDir := migrationDirectory(t)
+	if err := Run(ctx, database, migrationsDir, "up"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := fixture.Pool.Exec(ctx, `
+		INSERT INTO users (user_id, status, created_at, updated_at)
+		VALUES ('10000000-0000-4000-8000-000000000001', 'onboarding', transaction_timestamp(), transaction_timestamp());
+
+		INSERT INTO user_recovery_credentials (
+			recovery_credential_id, user_id, selector, secret_hash, version, status, created_at
+		) VALUES (
+			'20000000-0000-4000-8000-000000000001',
+			'10000000-0000-4000-8000-000000000001',
+			'downgrade-recovery-credential', 'argon2id hash', 1, 'active', transaction_timestamp()
+		);
+
+		INSERT INTO anonymous_challenges (
+			challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
+			origin_hash, request_flow_id, max_attempts, created_at, expires_at, consumed_at
+		) VALUES (
+			'30000000-0000-4000-8000-000000000001',
+			'downgrade-consumed-challenge', decode(repeat('11', 32), 'hex'), 1,
+			'identity.recovery', 'identity.v1.IdentityService', decode(repeat('22', 32), 'hex'),
+			'downgrade-flow', 5, transaction_timestamp() - interval '1 minute',
+			transaction_timestamp() + interval '4 minutes', transaction_timestamp()
+		);
+
+		INSERT INTO user_recovery_attempts (
+			recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version, user_id,
+			recovery_credential_id, recovery_credential_version, challenge_id, origin_hash,
+			purpose, attempt_count, max_attempts, status, created_at, expires_at
+		) VALUES (
+			'40000000-0000-4000-8000-000000000001', 'downgrade-recovery-grant',
+			decode(repeat('33', 32), 'hex'), 1, '10000000-0000-4000-8000-000000000001',
+			'20000000-0000-4000-8000-000000000001', 1,
+			'30000000-0000-4000-8000-000000000001', decode(repeat('22', 32), 'hex'),
+			'identity.recovery', 0, 5, 'active', transaction_timestamp(),
+			transaction_timestamp() + interval '4 minutes'
+		)
+	`)
+	if err != nil {
+		t.Fatalf("insert migration-6-only recovery state: %v", err)
+	}
+
+	if err := goose.DownToContext(ctx, database, migrationsDir, 5); err != nil {
+		t.Fatalf("downgrade migration 6: %v", err)
+	}
+	for _, table := range []string{"user_recovery_attempts", "anonymous_challenges"} {
+		var count int
+		if err := fixture.Pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("%s retained %d migration-6-only rows", table, count)
+		}
+	}
+
+	assertQueryFails(t, ctx, fixture.Pool, `
+		INSERT INTO anonymous_challenges (
+			challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
+			origin_hash, request_flow_id, max_attempts, created_at, expires_at, consumed_at
+		) VALUES (
+			'30000000-0000-4000-8000-000000000002',
+			'downgrade-rejected-challenge', decode(repeat('44', 32), 'hex'), 1,
+			'identity.recovery', 'identity.v1.IdentityService', decode(repeat('55', 32), 'hex'),
+			'downgrade-rejected-flow', 5, transaction_timestamp() - interval '1 minute',
+			transaction_timestamp() + interval '4 minutes', transaction_timestamp()
+		)
+	`, "anonymous_challenges_consumption_shape_check")
+}
+
 func TestMigrationPrivileges(t *testing.T) {
 	fixture := integrationtest.OpenPrivilegeDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)

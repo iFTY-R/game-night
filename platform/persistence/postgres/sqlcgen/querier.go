@@ -221,6 +221,7 @@ type Querier interface {
 	//    AND operation_id = $5
 	//    AND request_digest = $6
 	//    AND result_type = $7
+	//    AND result_version = $8
 	//    AND status = 'available'
 	//    AND secret_expires_at > $1
 	//  RETURNING result_id, status, confirmed_at, tombstone_expires_at
@@ -239,20 +240,33 @@ type Querier interface {
 	ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (ConsumeAdminAssistedRecoveryGrantCASRow, error)
 	//ConsumeAdminChallengeCAS
 	//
-	//  UPDATE admin_challenges
+	//  WITH current_admin AS MATERIALIZED (
+	//      -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
+	//      SELECT admin_id, admin_version, password_version
+	//      FROM admin_accounts
+	//      WHERE singleton_id = 1
+	//      FOR UPDATE
+	//  )
+	//  UPDATE admin_challenges AS challenge
 	//  SET status = 'consumed',
 	//      consumed_at = $1,
 	//      replay_until = $2,
 	//      operation_id = $3,
 	//      request_digest = $4,
 	//      result_id = $5
-	//  WHERE challenge_id = $6
-	//    AND status = 'active'
-	//    AND expires_at > $1
-	//    AND attempt_count < max_attempts
-	//    AND admin_version = $7
-	//    AND password_version = $8
-	//  RETURNING challenge_id, status, consumed_at, replay_until, operation_id, request_digest, result_id
+	//  FROM current_admin
+	//  WHERE challenge.challenge_id = $6
+	//    AND challenge.admin_id = current_admin.admin_id
+	//    AND challenge.status = 'active'
+	//    AND challenge.expires_at > $1
+	//    AND challenge.attempt_count < challenge.max_attempts
+	//    AND challenge.admin_version = $7
+	//    AND challenge.password_version = $8
+	//    AND challenge.admin_version = current_admin.admin_version
+	//    AND challenge.password_version = current_admin.password_version
+	//  RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
+	//            challenge.replay_until, challenge.operation_id, challenge.request_digest,
+	//            challenge.result_id
 	ConsumeAdminChallengeCAS(ctx context.Context, arg ConsumeAdminChallengeCASParams) (ConsumeAdminChallengeCASRow, error)
 	//ConsumeAdminRecoveryCodeCAS
 	//
@@ -279,6 +293,16 @@ type Querier interface {
 	//    AND attempt_count < max_attempts
 	//  RETURNING challenge_id, consumed_at, replay_until, operation_id, request_digest, result_id
 	ConsumeAnonymousChallengeCAS(ctx context.Context, arg ConsumeAnonymousChallengeCASParams) (ConsumeAnonymousChallengeCASRow, error)
+	//ConsumeAnonymousChallengeWithoutReplayCAS
+	//
+	//  UPDATE anonymous_challenges
+	//  SET consumed_at = $1
+	//  WHERE challenge_id = $2
+	//    AND consumed_at IS NULL
+	//    AND expires_at > $1
+	//    AND attempt_count < max_attempts
+	//  RETURNING challenge_id, consumed_at
+	ConsumeAnonymousChallengeWithoutReplayCAS(ctx context.Context, arg ConsumeAnonymousChallengeWithoutReplayCASParams) (ConsumeAnonymousChallengeWithoutReplayCASRow, error)
 	//ConsumeUserRecoveryAttemptCAS
 	//
 	//  UPDATE user_recovery_attempts
@@ -855,13 +879,26 @@ type Querier interface {
 	GetAdminAssistedRecoveryGrantForUpdate(ctx context.Context, arg GetAdminAssistedRecoveryGrantForUpdateParams) (AdminAssistedRecoveryGrant, error)
 	//GetAdminChallengeForUpdate
 	//
-	//  SELECT challenge_id, admin_id, selector, secret_hash, secret_key_version, purpose,
-	//         audience, admin_version, password_version, origin_hash, request_flow_id,
-	//         attempt_count, max_attempts, status, created_at, expires_at, consumed_at,
-	//         revoked_at, replay_until, operation_id, request_digest, result_id
-	//  FROM admin_challenges
-	//  WHERE selector = $1
-	//  FOR UPDATE
+	//  WITH current_admin AS MATERIALIZED (
+	//      -- Lock the account generation before the challenge to match every security-state transition.
+	//      SELECT admin_id, admin_version, password_version
+	//      FROM admin_accounts
+	//      WHERE singleton_id = 1
+	//      FOR UPDATE
+	//  )
+	//  SELECT challenge.challenge_id, challenge.admin_id, challenge.selector, challenge.secret_hash,
+	//         challenge.secret_key_version, challenge.purpose, challenge.audience,
+	//         challenge.admin_version, challenge.password_version, challenge.origin_hash,
+	//         challenge.request_flow_id, challenge.attempt_count, challenge.max_attempts,
+	//         challenge.status, challenge.created_at, challenge.expires_at, challenge.consumed_at,
+	//         challenge.revoked_at, challenge.replay_until, challenge.operation_id,
+	//         challenge.request_digest, challenge.result_id
+	//  FROM current_admin
+	//  JOIN admin_challenges AS challenge ON challenge.admin_id = current_admin.admin_id
+	//  WHERE challenge.selector = $1
+	//    AND challenge.admin_version = current_admin.admin_version
+	//    AND challenge.password_version = current_admin.password_version
+	//  FOR UPDATE OF challenge
 	GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminChallengeForUpdateParams) (AdminChallenge, error)
 	//GetAdminSessionForUpdate
 	//
@@ -933,6 +970,17 @@ type Querier interface {
 	//    AND actor_or_challenge_id = $2
 	//    AND operation_id = $3
 	GetSecretOperationResultByOperation(ctx context.Context, arg GetSecretOperationResultByOperationParams) (SecretOperationResult, error)
+	//GetSecretOperationResultByOperationForUpdate
+	//
+	//  SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
+	//         result_type, result_version, ciphertext, nonce, wrapped_data_key, key_version,
+	//         status, secret_expires_at, confirmed_at, completed_at, tombstone_expires_at
+	//  FROM secret_operation_results
+	//  WHERE operation_scope = $1
+	//    AND actor_or_challenge_id = $2
+	//    AND operation_id = $3
+	//  FOR UPDATE
+	GetSecretOperationResultByOperationForUpdate(ctx context.Context, arg GetSecretOperationResultByOperationForUpdateParams) (SecretOperationResult, error)
 	//GetSingletonAdminForUpdate
 	//
 	//  SELECT singleton_id, admin_id, username, status, password_hash, password_algorithm,

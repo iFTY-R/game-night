@@ -243,20 +243,33 @@ func (q *Queries) ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg 
 }
 
 const consumeAdminChallengeCAS = `-- name: ConsumeAdminChallengeCAS :one
-UPDATE admin_challenges
+WITH current_admin AS MATERIALIZED (
+    -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
+    SELECT admin_id, admin_version, password_version
+    FROM admin_accounts
+    WHERE singleton_id = 1
+    FOR UPDATE
+)
+UPDATE admin_challenges AS challenge
 SET status = 'consumed',
     consumed_at = $1,
     replay_until = $2,
     operation_id = $3,
     request_digest = $4,
     result_id = $5
-WHERE challenge_id = $6
-  AND status = 'active'
-  AND expires_at > $1
-  AND attempt_count < max_attempts
-  AND admin_version = $7
-  AND password_version = $8
-RETURNING challenge_id, status, consumed_at, replay_until, operation_id, request_digest, result_id
+FROM current_admin
+WHERE challenge.challenge_id = $6
+  AND challenge.admin_id = current_admin.admin_id
+  AND challenge.status = 'active'
+  AND challenge.expires_at > $1
+  AND challenge.attempt_count < challenge.max_attempts
+  AND challenge.admin_version = $7
+  AND challenge.password_version = $8
+  AND challenge.admin_version = current_admin.admin_version
+  AND challenge.password_version = current_admin.password_version
+RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
+          challenge.replay_until, challenge.operation_id, challenge.request_digest,
+          challenge.result_id
 `
 
 type ConsumeAdminChallengeCASParams struct {
@@ -282,20 +295,33 @@ type ConsumeAdminChallengeCASRow struct {
 
 // ConsumeAdminChallengeCAS
 //
-//	UPDATE admin_challenges
+//	WITH current_admin AS MATERIALIZED (
+//	    -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
+//	    SELECT admin_id, admin_version, password_version
+//	    FROM admin_accounts
+//	    WHERE singleton_id = 1
+//	    FOR UPDATE
+//	)
+//	UPDATE admin_challenges AS challenge
 //	SET status = 'consumed',
 //	    consumed_at = $1,
 //	    replay_until = $2,
 //	    operation_id = $3,
 //	    request_digest = $4,
 //	    result_id = $5
-//	WHERE challenge_id = $6
-//	  AND status = 'active'
-//	  AND expires_at > $1
-//	  AND attempt_count < max_attempts
-//	  AND admin_version = $7
-//	  AND password_version = $8
-//	RETURNING challenge_id, status, consumed_at, replay_until, operation_id, request_digest, result_id
+//	FROM current_admin
+//	WHERE challenge.challenge_id = $6
+//	  AND challenge.admin_id = current_admin.admin_id
+//	  AND challenge.status = 'active'
+//	  AND challenge.expires_at > $1
+//	  AND challenge.attempt_count < challenge.max_attempts
+//	  AND challenge.admin_version = $7
+//	  AND challenge.password_version = $8
+//	  AND challenge.admin_version = current_admin.admin_version
+//	  AND challenge.password_version = current_admin.password_version
+//	RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
+//	          challenge.replay_until, challenge.operation_id, challenge.request_digest,
+//	          challenge.result_id
 func (q *Queries) ConsumeAdminChallengeCAS(ctx context.Context, arg ConsumeAdminChallengeCASParams) (ConsumeAdminChallengeCASRow, error) {
 	row := q.db.QueryRow(ctx, consumeAdminChallengeCAS,
 		arg.ConsumedAt,
@@ -1031,13 +1057,26 @@ func (q *Queries) GetAdminAssistedRecoveryGrantForUpdate(ctx context.Context, ar
 }
 
 const getAdminChallengeForUpdate = `-- name: GetAdminChallengeForUpdate :one
-SELECT challenge_id, admin_id, selector, secret_hash, secret_key_version, purpose,
-       audience, admin_version, password_version, origin_hash, request_flow_id,
-       attempt_count, max_attempts, status, created_at, expires_at, consumed_at,
-       revoked_at, replay_until, operation_id, request_digest, result_id
-FROM admin_challenges
-WHERE selector = $1
-FOR UPDATE
+WITH current_admin AS MATERIALIZED (
+    -- Lock the account generation before the challenge to match every security-state transition.
+    SELECT admin_id, admin_version, password_version
+    FROM admin_accounts
+    WHERE singleton_id = 1
+    FOR UPDATE
+)
+SELECT challenge.challenge_id, challenge.admin_id, challenge.selector, challenge.secret_hash,
+       challenge.secret_key_version, challenge.purpose, challenge.audience,
+       challenge.admin_version, challenge.password_version, challenge.origin_hash,
+       challenge.request_flow_id, challenge.attempt_count, challenge.max_attempts,
+       challenge.status, challenge.created_at, challenge.expires_at, challenge.consumed_at,
+       challenge.revoked_at, challenge.replay_until, challenge.operation_id,
+       challenge.request_digest, challenge.result_id
+FROM current_admin
+JOIN admin_challenges AS challenge ON challenge.admin_id = current_admin.admin_id
+WHERE challenge.selector = $1
+  AND challenge.admin_version = current_admin.admin_version
+  AND challenge.password_version = current_admin.password_version
+FOR UPDATE OF challenge
 `
 
 type GetAdminChallengeForUpdateParams struct {
@@ -1046,13 +1085,26 @@ type GetAdminChallengeForUpdateParams struct {
 
 // GetAdminChallengeForUpdate
 //
-//	SELECT challenge_id, admin_id, selector, secret_hash, secret_key_version, purpose,
-//	       audience, admin_version, password_version, origin_hash, request_flow_id,
-//	       attempt_count, max_attempts, status, created_at, expires_at, consumed_at,
-//	       revoked_at, replay_until, operation_id, request_digest, result_id
-//	FROM admin_challenges
-//	WHERE selector = $1
-//	FOR UPDATE
+//	WITH current_admin AS MATERIALIZED (
+//	    -- Lock the account generation before the challenge to match every security-state transition.
+//	    SELECT admin_id, admin_version, password_version
+//	    FROM admin_accounts
+//	    WHERE singleton_id = 1
+//	    FOR UPDATE
+//	)
+//	SELECT challenge.challenge_id, challenge.admin_id, challenge.selector, challenge.secret_hash,
+//	       challenge.secret_key_version, challenge.purpose, challenge.audience,
+//	       challenge.admin_version, challenge.password_version, challenge.origin_hash,
+//	       challenge.request_flow_id, challenge.attempt_count, challenge.max_attempts,
+//	       challenge.status, challenge.created_at, challenge.expires_at, challenge.consumed_at,
+//	       challenge.revoked_at, challenge.replay_until, challenge.operation_id,
+//	       challenge.request_digest, challenge.result_id
+//	FROM current_admin
+//	JOIN admin_challenges AS challenge ON challenge.admin_id = current_admin.admin_id
+//	WHERE challenge.selector = $1
+//	  AND challenge.admin_version = current_admin.admin_version
+//	  AND challenge.password_version = current_admin.password_version
+//	FOR UPDATE OF challenge
 func (q *Queries) GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminChallengeForUpdateParams) (AdminChallenge, error) {
 	row := q.db.QueryRow(ctx, getAdminChallengeForUpdate, arg.Selector)
 	var i AdminChallenge

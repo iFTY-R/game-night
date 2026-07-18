@@ -6,7 +6,9 @@ CREATE TABLE key_rotation_jobs (
     source_key_version integer NOT NULL CHECK (source_key_version > 0),
     target_key_version integer NOT NULL CHECK (target_key_version > 0),
     status text NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    cursor_scope text NOT NULL CHECK (cursor_scope IN ('user_profiles', 'profile_export_items', 'admin_totp_enrollments')),
     cursor_id uuid,
+    cursor_ordinal bigint CHECK (cursor_ordinal IS NULL OR cursor_ordinal > 0),
     processed_count bigint NOT NULL DEFAULT 0 CHECK (processed_count >= 0),
     conflict_count bigint NOT NULL DEFAULT 0 CHECK (conflict_count >= 0),
     lease_owner text,
@@ -17,6 +19,20 @@ CREATE TABLE key_rotation_jobs (
     updated_at timestamptz NOT NULL,
     completed_at timestamptz,
     CHECK (source_key_version <> target_key_version),
+    CHECK (
+        (purpose = 'pii' AND cursor_scope IN ('user_profiles', 'profile_export_items'))
+        OR (purpose = 'totp' AND cursor_scope = 'admin_totp_enrollments')
+    ),
+    CHECK (
+        (cursor_scope <> 'profile_export_items' AND cursor_ordinal IS NULL)
+        OR (
+            cursor_scope = 'profile_export_items'
+            AND (
+                (cursor_id IS NULL AND cursor_ordinal IS NULL)
+                OR (cursor_id IS NOT NULL AND cursor_ordinal IS NOT NULL)
+            )
+        )
+    ),
     CHECK (
         (lease_owner IS NULL AND lease_until IS NULL)
         OR (lease_owner IS NOT NULL AND lease_until IS NOT NULL)
@@ -271,6 +287,8 @@ BEGIN
     EXECUTE format('GRANT SELECT ON TABLE %I.user_profiles, %I.admin_totp_enrollments TO %I', trusted_schema, trusted_schema, worker_role);
     EXECUTE format('GRANT UPDATE (real_name_ciphertext, real_name_nonce, real_name_key_version) ON TABLE %I.user_profiles TO %I', trusted_schema, worker_role);
     EXECUTE format('GRANT UPDATE (ciphertext, nonce, key_version) ON TABLE %I.admin_totp_enrollments TO %I', trusted_schema, worker_role);
+    EXECUTE format('GRANT SELECT ON TABLE %I.profile_export_items TO %I', trusted_schema, worker_role);
+    EXECUTE format('GRANT UPDATE (real_name_ciphertext, real_name_nonce, real_name_key_version) ON TABLE %I.profile_export_items TO %I', trusted_schema, worker_role);
     EXECUTE format('GRANT SELECT ON TABLE %I.outbox_events TO %I', trusted_schema, worker_role);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE ON TABLE %I.outbox_consumers TO %I', trusted_schema, worker_role);
     EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO %I', trusted_schema, worker_role);

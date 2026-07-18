@@ -1,0 +1,17 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "../../infra/migrations"
+      - "schema"
+    queries: "queries"
+    gen:
+      go:
+        package: "sqlcgen"
+        out: "../../platform/persistence/postgres/sqlcgen"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_interface: true
+        emit_json_tags: true
+        emit_sql_as_comment: true
+        query_parameter_limit: 0

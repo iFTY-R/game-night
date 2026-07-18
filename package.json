@@ -10,7 +10,10 @@
     "build": "turbo run build",
     "check": "pnpm run check:boundaries && turbo run check",
     "check:boundaries": "go run ./tooling/cmd/boundarycheck",
+    "check:generated": "node tooling/scripts/check-generated.mjs",
+    "generate": "pnpm run generate:contracts && pnpm run generate:sql",
     "generate:contracts": "node tooling/scripts/generate-contracts.mjs",
+    "generate:sql": "go tool sqlc generate -f tooling/sqlc/sqlc.yaml",
     "test": "go test ./... && turbo run test"
   },
   "devDependencies": {

@@ -91,11 +91,15 @@ func TestMigrationPrivileges(t *testing.T) {
 
 	assertQuerySucceeds(t, ctx, workerPool, "SELECT count(*) FROM outbox_consumers")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE outbox_consumers SET updated_at = updated_at WHERE consumer_id = 'audit.checkpoint'")
+	assertQuerySucceeds(t, ctx, workerPool, "UPDATE user_profiles SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
+	assertQuerySucceeds(t, ctx, workerPool, "UPDATE profile_export_items SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
+	assertQuerySucceeds(t, ctx, workerPool, "UPDATE admin_totp_enrollments SET ciphertext = ciphertext, nonce = nonce, key_version = key_version WHERE false")
 	assertQueryFails(t, ctx, workerPool, "UPDATE outbox_events SET payload = payload", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM admin_accounts", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM users", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "DELETE FROM anonymous_challenges", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "UPDATE admin_totp_enrollments SET status = status", "permission denied")
+	assertQueryFails(t, ctx, workerPool, "UPDATE profile_export_items SET username = username", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM audit_events", "permission denied")
 	assertResetDenied(t, ctx, workerPool)
 }

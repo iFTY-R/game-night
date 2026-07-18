@@ -38,6 +38,14 @@ type AuditKeyring struct {
 	keys          map[uint32]auditKey
 }
 
+// ActiveVersion returns the key version that will sign newly created audit records.
+func (keyring *AuditKeyring) ActiveVersion() uint32 {
+	if keyring == nil {
+		return 0
+	}
+	return keyring.activeVersion
+}
+
 // LoadAuditKeyring validates read-only key material and requires the active version to include a private key.
 func LoadAuditKeyring(path string, now time.Time) (*AuditKeyring, error) {
 	var document auditKeyringDocument

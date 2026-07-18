@@ -242,7 +242,7 @@ func TestAuditKeyringSignsAndVerifiesHistoricalKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if signature.KeyVersion != 2 || !ring.Verify([]byte("canonical audit event"), signature) {
+	if ring.ActiveVersion() != 2 || signature.KeyVersion != 2 || !ring.Verify([]byte("canonical audit event"), signature) {
 		t.Fatal("active audit signature did not verify")
 	}
 	historical := AuditSignature{KeyVersion: 1, Value: ed25519.Sign(firstPrivate, []byte("old event"))}

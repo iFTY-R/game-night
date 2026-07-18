@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	adminDomain "github.com/iFTY-R/game-night/platform/admin"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/jackc/pgx/v5"
 )
@@ -113,6 +115,15 @@ func TestChallengeUnitOfWorksRejectNilWorkWithChallengeError(t *testing.T) {
 	}
 }
 
+func TestAuditAndOutboxUnitOfWorksRejectNilWork(t *testing.T) {
+	if err := (&AuditOutboxUnitOfWork{}).Run(context.Background(), nil); err != audit.ErrInvalidInput {
+		t.Fatalf("audit nil-work error = %v", err)
+	}
+	if err := (&OutboxUnitOfWork{}).Run(context.Background(), nil); err != outbox.ErrInvalidInput {
+		t.Fatalf("outbox nil-work error = %v", err)
+	}
+}
+
 func unitOfWorkTestCases() []unitOfWorkTestCase {
 	return []unitOfWorkTestCase{
 		{
@@ -144,6 +155,32 @@ func unitOfWorkTestCases() []unitOfWorkTestCase {
 			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
 				unitOfWork := &AdminChallengeUnitOfWork{runner: runner}
 				return unitOfWork.Run(ctx, func(context.Context, adminDomain.ChallengeTransaction) error {
+					return callbackErr
+				})
+			},
+		},
+		{
+			name:                  "audit_outbox",
+			repositoryUnavailable: audit.ErrRepositoryUnavailable,
+			domainErrors:          auditOutboxDomainErrors,
+			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
+				verifier, err := audit.NewService(newRepositoryAuditKeyring())
+				if err != nil {
+					return err
+				}
+				unitOfWork := &AuditOutboxUnitOfWork{runner: runner, verifier: verifier}
+				return unitOfWork.Run(ctx, func(context.Context, audit.Transaction) error {
+					return callbackErr
+				})
+			},
+		},
+		{
+			name:                  "outbox",
+			repositoryUnavailable: outbox.ErrRepositoryUnavailable,
+			domainErrors:          outboxDomainErrors,
+			run: func(ctx context.Context, runner *TransactionRunner, callbackErr error) error {
+				unitOfWork := &OutboxUnitOfWork{runner: runner}
+				return unitOfWork.Run(ctx, func(context.Context, outbox.Transaction) error {
 					return callbackErr
 				})
 			},

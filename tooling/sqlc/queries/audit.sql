@@ -4,7 +4,17 @@ WITH result AS (
     FROM read_audit_head(sqlc.arg(chain_id)) AS function_row
 )
 SELECT (result.payload ->> 'sequence')::bigint AS sequence,
-       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash
+       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash,
+       (result.payload ->> 'updated_at')::timestamptz AS updated_at
+FROM result;
+
+-- name: ReadAuditAnchor :one
+WITH result AS (
+    SELECT pg_catalog.to_jsonb(function_row) AS payload
+    FROM read_audit_anchor(sqlc.arg(chain_id)::text, sqlc.arg(sequence)::bigint) AS function_row
+)
+SELECT decode(pg_catalog.substring(result.payload ->> 'event_hash', 3), 'hex') AS event_hash,
+       (result.payload ->> 'created_at')::timestamptz AS created_at
 FROM result;
 
 -- name: AppendAuditEvent :one

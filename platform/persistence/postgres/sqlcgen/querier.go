@@ -41,11 +41,31 @@ type Querier interface {
 	//      updated_at = $2
 	//  WHERE consumer_id = $3
 	//    AND lease_owner = $4
-	//    AND lease_until > $2
-	//    AND last_acked_sequence = $5
-	//    AND $1::bigint > $5::bigint
-	//  RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count, updated_at
-	AckOutboxConsumerOffsetCAS(ctx context.Context, arg AckOutboxConsumerOffsetCASParams) (AckOutboxConsumerOffsetCASRow, error)
+	//    AND lease_until = $5
+	//    AND last_acked_sequence = $6
+	//    AND retry_count = $7
+	//    AND next_attempt_at IS NOT DISTINCT FROM $8
+	//    AND last_error_code IS NOT DISTINCT FROM $9
+	//    AND updated_at = $10
+	//    AND lease_until > pg_catalog.clock_timestamp()
+	//    AND $1::bigint > $6::bigint
+	//    AND EXISTS (
+	//        SELECT 1
+	//        FROM outbox_events AS event
+	//        WHERE event.event_sequence = $1
+	//          AND event.event_type = ANY(outbox_consumers.subscriptions)
+	//          AND event.available_at <= pg_catalog.clock_timestamp()
+	//    )
+	//    AND NOT EXISTS (
+	//        SELECT 1
+	//        FROM outbox_events AS skipped
+	//        WHERE skipped.event_sequence > $6
+	//          AND skipped.event_sequence < $1
+	//          AND skipped.event_type = ANY(outbox_consumers.subscriptions)
+	//    )
+	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
+	AckOutboxConsumerOffsetCAS(ctx context.Context, arg AckOutboxConsumerOffsetCASParams) (OutboxConsumer, error)
 	//AcquireKeyRotationJobLease
 	//
 	//  WITH candidate AS (
@@ -77,12 +97,16 @@ type Querier interface {
 	//      lease_until = $2,
 	//      updated_at = $3
 	//  WHERE consumer_id = $4
-	//    AND (
-	//        lease_owner IS NULL
-	//        OR lease_until <= $3
-	//        OR lease_owner = $1
-	//    )
-	//    AND (next_attempt_at IS NULL OR next_attempt_at <= $3)
+	//    AND lease_owner IS NOT DISTINCT FROM $5
+	//    AND lease_until IS NOT DISTINCT FROM $6
+	//    AND last_acked_sequence = $7
+	//    AND retry_count = $8
+	//    AND next_attempt_at IS NOT DISTINCT FROM $9
+	//    AND last_error_code IS NOT DISTINCT FROM $10
+	//    AND updated_at = $11
+	//    AND (lease_until IS NULL OR lease_until <= pg_catalog.clock_timestamp())
+	//    AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+	//    AND $2 > pg_catalog.clock_timestamp()
 	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
 	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
 	AcquireOutboxConsumerLeaseCAS(ctx context.Context, arg AcquireOutboxConsumerLeaseCASParams) (OutboxConsumer, error)
@@ -572,8 +596,31 @@ type Querier interface {
 	//            cursor_id, cursor_ordinal, processed_count, conflict_count, lease_owner,
 	//            lease_until, last_error_code, created_at, started_at, updated_at, completed_at
 	CreateKeyRotationJob(ctx context.Context, arg CreateKeyRotationJobParams) (KeyRotationJob, error)
+	//CreateOutboxConsumer
+	//
+	//  INSERT INTO outbox_consumers (
+	//      consumer_id,
+	//      subscriptions,
+	//      last_acked_sequence,
+	//      created_at,
+	//      updated_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $4
+	//  )
+	//  ON CONFLICT (consumer_id) DO NOTHING
+	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
+	CreateOutboxConsumer(ctx context.Context, arg CreateOutboxConsumerParams) (OutboxConsumer, error)
 	//CreateOutboxEvent
 	//
+	//  WITH serialized AS MATERIALIZED (
+	//      -- Transaction-level serialization makes identity sequence order match commit order for offset safety.
+	//      SELECT pg_catalog.pg_advisory_xact_lock(1196314434, 1)
+	//  )
 	//  INSERT INTO outbox_events (
 	//      event_id,
 	//      event_type,
@@ -582,7 +629,7 @@ type Querier interface {
 	//      payload,
 	//      created_at,
 	//      available_at
-	//  ) VALUES (
+	//  ) SELECT
 	//      $1,
 	//      $2,
 	//      $3,
@@ -590,7 +637,7 @@ type Querier interface {
 	//      $5,
 	//      $6,
 	//      $7
-	//  )
+	//  FROM serialized
 	//  ON CONFLICT (event_id) DO NOTHING
 	//  RETURNING event_sequence, event_id, event_type, aggregate_type, aggregate_id,
 	//            payload, created_at, available_at
@@ -936,6 +983,19 @@ type Querier interface {
 	//  FROM key_rotation_jobs
 	//  WHERE job_id = $1
 	GetKeyRotationJob(ctx context.Context, arg GetKeyRotationJobParams) (KeyRotationJob, error)
+	//GetLatestAckedOutboxEventByType
+	//
+	//  SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+	//         event.aggregate_id, event.payload, event.created_at, event.available_at
+	//  FROM outbox_events AS event
+	//  JOIN outbox_consumers AS consumer
+	//    ON consumer.consumer_id = $1
+	//  WHERE event.event_sequence <= consumer.last_acked_sequence
+	//    AND event.event_type = $2
+	//    AND event.event_type = ANY(consumer.subscriptions)
+	//  ORDER BY event.event_sequence DESC
+	//  LIMIT 1
+	GetLatestAckedOutboxEventByType(ctx context.Context, arg GetLatestAckedOutboxEventByTypeParams) (OutboxEvent, error)
 	//GetOutboxConsumer
 	//
 	//  SELECT consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
@@ -943,6 +1003,13 @@ type Querier interface {
 	//  FROM outbox_consumers
 	//  WHERE consumer_id = $1
 	GetOutboxConsumer(ctx context.Context, arg GetOutboxConsumerParams) (OutboxConsumer, error)
+	//GetOutboxEventByID
+	//
+	//  SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+	//         payload, created_at, available_at
+	//  FROM outbox_events
+	//  WHERE event_id = $1
+	GetOutboxEventByID(ctx context.Context, arg GetOutboxEventByIDParams) (OutboxEvent, error)
 	//GetPendingAdminTotpEnrollmentForUpdate
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
@@ -1051,19 +1118,36 @@ type Querier interface {
 	ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]AuditEventsRedacted, error)
 	//ListOutboxEventsForConsumer
 	//
-	//  SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
-	//         event.aggregate_id, event.payload, event.created_at, event.available_at
-	//  FROM outbox_events AS event
-	//  JOIN outbox_consumers AS consumer
-	//    ON consumer.consumer_id = $1
-	//  WHERE consumer.lease_owner = $2
-	//    AND consumer.lease_until > $3
-	//    AND event.event_sequence > consumer.last_acked_sequence
-	//    AND event.available_at <= $3
-	//    AND event.event_type = ANY(consumer.subscriptions)
+	//  WITH consumer_state AS MATERIALIZED (
+	//      SELECT subscriptions, last_acked_sequence
+	//      FROM outbox_consumers
+	//      WHERE consumer_id = $1
+	//        AND lease_owner = $2
+	//        AND lease_until > pg_catalog.clock_timestamp()
+	//        AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+	//        AND $3::timestamptz <= pg_catalog.clock_timestamp()
+	//  ), candidates AS MATERIALIZED (
+	//      SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+	//             event.aggregate_id, event.payload, event.created_at, event.available_at
+	//      FROM outbox_events AS event
+	//      CROSS JOIN consumer_state AS consumer
+	//      WHERE event.event_sequence > consumer.last_acked_sequence
+	//        AND event.event_type = ANY(consumer.subscriptions)
+	//      ORDER BY event.event_sequence
+	//      LIMIT $4
+	//  )
+	//  SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+	//         payload, created_at, available_at
+	//  FROM candidates AS event
+	//  WHERE event.available_at <= pg_catalog.clock_timestamp()
+	//    AND NOT EXISTS (
+	//        SELECT 1
+	//        FROM candidates AS earlier
+	//        WHERE earlier.event_sequence < event.event_sequence
+	//          AND earlier.available_at > pg_catalog.clock_timestamp()
+	//    )
 	//  ORDER BY event.event_sequence
-	//  LIMIT $4
-	ListOutboxEventsForConsumer(ctx context.Context, arg ListOutboxEventsForConsumerParams) ([]OutboxEvent, error)
+	ListOutboxEventsForConsumer(ctx context.Context, arg ListOutboxEventsForConsumerParams) ([]ListOutboxEventsForConsumerRow, error)
 	//ListProfileExportItems
 	//
 	//  SELECT export_id, ordinal, user_id, username, profile_version,
@@ -1110,6 +1194,16 @@ type Querier interface {
 	//  ORDER BY user_id
 	//  LIMIT $3
 	ListUserProfilesForKeyRotation(ctx context.Context, arg ListUserProfilesForKeyRotationParams) ([]UserProfile, error)
+	//ReadAuditAnchor
+	//
+	//  WITH result AS (
+	//      SELECT pg_catalog.to_jsonb(function_row) AS payload
+	//      FROM read_audit_anchor($1::text, $2::bigint) AS function_row
+	//  )
+	//  SELECT decode(pg_catalog.substring(result.payload ->> 'event_hash', 3), 'hex') AS event_hash,
+	//         (result.payload ->> 'created_at')::timestamptz AS created_at
+	//  FROM result
+	ReadAuditAnchor(ctx context.Context, arg ReadAuditAnchorParams) (ReadAuditAnchorRow, error)
 	//ReadAuditHead
 	//
 	//  WITH result AS (
@@ -1117,7 +1211,8 @@ type Querier interface {
 	//      FROM read_audit_head($1) AS function_row
 	//  )
 	//  SELECT (result.payload ->> 'sequence')::bigint AS sequence,
-	//         decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash
+	//         decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash,
+	//         (result.payload ->> 'updated_at')::timestamptz AS updated_at
 	//  FROM result
 	ReadAuditHead(ctx context.Context, arg ReadAuditHeadParams) (ReadAuditHeadRow, error)
 	//RecordAdminAssistedRecoveryFailureCAS
@@ -1153,16 +1248,22 @@ type Querier interface {
 	//RecordOutboxConsumerRetryCAS
 	//
 	//  UPDATE outbox_consumers
-	//  SET retry_count = retry_count + 1,
-	//      next_attempt_at = $1,
-	//      last_error_code = $2,
-	//      updated_at = $3
-	//  WHERE consumer_id = $4
-	//    AND lease_owner = $5
-	//    AND lease_until > $3
-	//  RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count,
-	//            next_attempt_at, last_error_code, updated_at
-	RecordOutboxConsumerRetryCAS(ctx context.Context, arg RecordOutboxConsumerRetryCASParams) (RecordOutboxConsumerRetryCASRow, error)
+	//  SET retry_count = $1,
+	//      next_attempt_at = $2,
+	//      last_error_code = $3,
+	//      updated_at = $4
+	//  WHERE consumer_id = $5
+	//    AND lease_owner = $6
+	//    AND lease_until = $7
+	//    AND last_acked_sequence = $8
+	//    AND retry_count = $9
+	//    AND next_attempt_at IS NOT DISTINCT FROM $10
+	//    AND last_error_code IS NOT DISTINCT FROM $11
+	//    AND updated_at = $12
+	//    AND lease_until > pg_catalog.clock_timestamp()
+	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
+	RecordOutboxConsumerRetryCAS(ctx context.Context, arg RecordOutboxConsumerRetryCASParams) (OutboxConsumer, error)
 	//RecordUserRecoveryAttemptFailureCAS
 	//
 	//  UPDATE user_recovery_attempts
@@ -1181,8 +1282,16 @@ type Querier interface {
 	//      updated_at = $1
 	//  WHERE consumer_id = $2
 	//    AND lease_owner = $3
-	//  RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
-	ReleaseOutboxConsumerLeaseCAS(ctx context.Context, arg ReleaseOutboxConsumerLeaseCASParams) (ReleaseOutboxConsumerLeaseCASRow, error)
+	//    AND lease_until = $4
+	//    AND last_acked_sequence = $5
+	//    AND retry_count = $6
+	//    AND next_attempt_at IS NOT DISTINCT FROM $7
+	//    AND last_error_code IS NOT DISTINCT FROM $8
+	//    AND updated_at = $9
+	//    AND lease_until > pg_catalog.clock_timestamp()
+	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
+	ReleaseOutboxConsumerLeaseCAS(ctx context.Context, arg ReleaseOutboxConsumerLeaseCASParams) (OutboxConsumer, error)
 	//RenewKeyRotationJobLeaseCAS
 	//
 	//  UPDATE key_rotation_jobs
@@ -1202,9 +1311,17 @@ type Querier interface {
 	//      updated_at = $2
 	//  WHERE consumer_id = $3
 	//    AND lease_owner = $4
-	//    AND lease_until > $2
-	//  RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
-	RenewOutboxConsumerLeaseCAS(ctx context.Context, arg RenewOutboxConsumerLeaseCASParams) (RenewOutboxConsumerLeaseCASRow, error)
+	//    AND lease_until = $5
+	//    AND last_acked_sequence = $6
+	//    AND retry_count = $7
+	//    AND next_attempt_at IS NOT DISTINCT FROM $8
+	//    AND last_error_code IS NOT DISTINCT FROM $9
+	//    AND updated_at = $10
+	//    AND lease_until > pg_catalog.clock_timestamp()
+	//    AND $1 > pg_catalog.clock_timestamp()
+	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
+	RenewOutboxConsumerLeaseCAS(ctx context.Context, arg RenewOutboxConsumerLeaseCASParams) (OutboxConsumer, error)
 	//ReserveUsernameClaimCAS
 	//
 	//  UPDATE username_claims

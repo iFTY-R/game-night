@@ -20,27 +20,43 @@ SET last_acked_sequence = $1,
     updated_at = $2
 WHERE consumer_id = $3
   AND lease_owner = $4
-  AND lease_until > $2
-  AND last_acked_sequence = $5
-  AND $1::bigint > $5::bigint
-RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count, updated_at
+  AND lease_until = $5
+  AND last_acked_sequence = $6
+  AND retry_count = $7
+  AND next_attempt_at IS NOT DISTINCT FROM $8
+  AND last_error_code IS NOT DISTINCT FROM $9
+  AND updated_at = $10
+  AND lease_until > pg_catalog.clock_timestamp()
+  AND $1::bigint > $6::bigint
+  AND EXISTS (
+      SELECT 1
+      FROM outbox_events AS event
+      WHERE event.event_sequence = $1
+        AND event.event_type = ANY(outbox_consumers.subscriptions)
+        AND event.available_at <= pg_catalog.clock_timestamp()
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM outbox_events AS skipped
+      WHERE skipped.event_sequence > $6
+        AND skipped.event_sequence < $1
+        AND skipped.event_type = ANY(outbox_consumers.subscriptions)
+  )
+RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+          retry_count, next_attempt_at, last_error_code, created_at, updated_at
 `
 
 type AckOutboxConsumerOffsetCASParams struct {
-	AckedSequence    int64              `json:"acked_sequence"`
-	AckedAt          pgtype.Timestamptz `json:"acked_at"`
-	ConsumerID       string             `json:"consumer_id"`
-	LeaseOwner       pgtype.Text        `json:"lease_owner"`
-	ExpectedSequence int64              `json:"expected_sequence"`
-}
-
-type AckOutboxConsumerOffsetCASRow struct {
-	ConsumerID        string             `json:"consumer_id"`
-	LastAckedSequence int64              `json:"last_acked_sequence"`
-	LeaseOwner        pgtype.Text        `json:"lease_owner"`
-	LeaseUntil        pgtype.Timestamptz `json:"lease_until"`
-	RetryCount        int32              `json:"retry_count"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	AckedSequence         int64              `json:"acked_sequence"`
+	AckedAt               pgtype.Timestamptz `json:"acked_at"`
+	ConsumerID            string             `json:"consumer_id"`
+	ExpectedLeaseOwner    pgtype.Text        `json:"expected_lease_owner"`
+	ExpectedLeaseUntil    pgtype.Timestamptz `json:"expected_lease_until"`
+	ExpectedSequence      int64              `json:"expected_sequence"`
+	ExpectedRetryCount    int32              `json:"expected_retry_count"`
+	ExpectedNextAttemptAt pgtype.Timestamptz `json:"expected_next_attempt_at"`
+	ExpectedErrorCode     pgtype.Text        `json:"expected_error_code"`
+	ExpectedUpdatedAt     pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // AckOutboxConsumerOffsetCAS
@@ -53,25 +69,54 @@ type AckOutboxConsumerOffsetCASRow struct {
 //	    updated_at = $2
 //	WHERE consumer_id = $3
 //	  AND lease_owner = $4
-//	  AND lease_until > $2
-//	  AND last_acked_sequence = $5
-//	  AND $1::bigint > $5::bigint
-//	RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count, updated_at
-func (q *Queries) AckOutboxConsumerOffsetCAS(ctx context.Context, arg AckOutboxConsumerOffsetCASParams) (AckOutboxConsumerOffsetCASRow, error) {
+//	  AND lease_until = $5
+//	  AND last_acked_sequence = $6
+//	  AND retry_count = $7
+//	  AND next_attempt_at IS NOT DISTINCT FROM $8
+//	  AND last_error_code IS NOT DISTINCT FROM $9
+//	  AND updated_at = $10
+//	  AND lease_until > pg_catalog.clock_timestamp()
+//	  AND $1::bigint > $6::bigint
+//	  AND EXISTS (
+//	      SELECT 1
+//	      FROM outbox_events AS event
+//	      WHERE event.event_sequence = $1
+//	        AND event.event_type = ANY(outbox_consumers.subscriptions)
+//	        AND event.available_at <= pg_catalog.clock_timestamp()
+//	  )
+//	  AND NOT EXISTS (
+//	      SELECT 1
+//	      FROM outbox_events AS skipped
+//	      WHERE skipped.event_sequence > $6
+//	        AND skipped.event_sequence < $1
+//	        AND skipped.event_type = ANY(outbox_consumers.subscriptions)
+//	  )
+//	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+//	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+func (q *Queries) AckOutboxConsumerOffsetCAS(ctx context.Context, arg AckOutboxConsumerOffsetCASParams) (OutboxConsumer, error) {
 	row := q.db.QueryRow(ctx, ackOutboxConsumerOffsetCAS,
 		arg.AckedSequence,
 		arg.AckedAt,
 		arg.ConsumerID,
-		arg.LeaseOwner,
+		arg.ExpectedLeaseOwner,
+		arg.ExpectedLeaseUntil,
 		arg.ExpectedSequence,
+		arg.ExpectedRetryCount,
+		arg.ExpectedNextAttemptAt,
+		arg.ExpectedErrorCode,
+		arg.ExpectedUpdatedAt,
 	)
-	var i AckOutboxConsumerOffsetCASRow
+	var i OutboxConsumer
 	err := row.Scan(
 		&i.ConsumerID,
+		&i.Subscriptions,
 		&i.LastAckedSequence,
 		&i.LeaseOwner,
 		&i.LeaseUntil,
 		&i.RetryCount,
+		&i.NextAttemptAt,
+		&i.LastErrorCode,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -83,21 +128,32 @@ SET lease_owner = $1,
     lease_until = $2,
     updated_at = $3
 WHERE consumer_id = $4
-  AND (
-      lease_owner IS NULL
-      OR lease_until <= $3
-      OR lease_owner = $1
-  )
-  AND (next_attempt_at IS NULL OR next_attempt_at <= $3)
+  AND lease_owner IS NOT DISTINCT FROM $5
+  AND lease_until IS NOT DISTINCT FROM $6
+  AND last_acked_sequence = $7
+  AND retry_count = $8
+  AND next_attempt_at IS NOT DISTINCT FROM $9
+  AND last_error_code IS NOT DISTINCT FROM $10
+  AND updated_at = $11
+  AND (lease_until IS NULL OR lease_until <= pg_catalog.clock_timestamp())
+  AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+  AND $2 > pg_catalog.clock_timestamp()
 RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
           retry_count, next_attempt_at, last_error_code, created_at, updated_at
 `
 
 type AcquireOutboxConsumerLeaseCASParams struct {
-	LeaseOwner pgtype.Text        `json:"lease_owner"`
-	LeaseUntil pgtype.Timestamptz `json:"lease_until"`
-	AcquiredAt pgtype.Timestamptz `json:"acquired_at"`
-	ConsumerID string             `json:"consumer_id"`
+	NextLeaseOwner        pgtype.Text        `json:"next_lease_owner"`
+	NextLeaseUntil        pgtype.Timestamptz `json:"next_lease_until"`
+	NextUpdatedAt         pgtype.Timestamptz `json:"next_updated_at"`
+	ConsumerID            string             `json:"consumer_id"`
+	ExpectedLeaseOwner    pgtype.Text        `json:"expected_lease_owner"`
+	ExpectedLeaseUntil    pgtype.Timestamptz `json:"expected_lease_until"`
+	ExpectedSequence      int64              `json:"expected_sequence"`
+	ExpectedRetryCount    int32              `json:"expected_retry_count"`
+	ExpectedNextAttemptAt pgtype.Timestamptz `json:"expected_next_attempt_at"`
+	ExpectedErrorCode     pgtype.Text        `json:"expected_error_code"`
+	ExpectedUpdatedAt     pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // AcquireOutboxConsumerLeaseCAS
@@ -107,20 +163,98 @@ type AcquireOutboxConsumerLeaseCASParams struct {
 //	    lease_until = $2,
 //	    updated_at = $3
 //	WHERE consumer_id = $4
-//	  AND (
-//	      lease_owner IS NULL
-//	      OR lease_until <= $3
-//	      OR lease_owner = $1
-//	  )
-//	  AND (next_attempt_at IS NULL OR next_attempt_at <= $3)
+//	  AND lease_owner IS NOT DISTINCT FROM $5
+//	  AND lease_until IS NOT DISTINCT FROM $6
+//	  AND last_acked_sequence = $7
+//	  AND retry_count = $8
+//	  AND next_attempt_at IS NOT DISTINCT FROM $9
+//	  AND last_error_code IS NOT DISTINCT FROM $10
+//	  AND updated_at = $11
+//	  AND (lease_until IS NULL OR lease_until <= pg_catalog.clock_timestamp())
+//	  AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+//	  AND $2 > pg_catalog.clock_timestamp()
 //	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
 //	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
 func (q *Queries) AcquireOutboxConsumerLeaseCAS(ctx context.Context, arg AcquireOutboxConsumerLeaseCASParams) (OutboxConsumer, error) {
 	row := q.db.QueryRow(ctx, acquireOutboxConsumerLeaseCAS,
-		arg.LeaseOwner,
-		arg.LeaseUntil,
-		arg.AcquiredAt,
+		arg.NextLeaseOwner,
+		arg.NextLeaseUntil,
+		arg.NextUpdatedAt,
 		arg.ConsumerID,
+		arg.ExpectedLeaseOwner,
+		arg.ExpectedLeaseUntil,
+		arg.ExpectedSequence,
+		arg.ExpectedRetryCount,
+		arg.ExpectedNextAttemptAt,
+		arg.ExpectedErrorCode,
+		arg.ExpectedUpdatedAt,
+	)
+	var i OutboxConsumer
+	err := row.Scan(
+		&i.ConsumerID,
+		&i.Subscriptions,
+		&i.LastAckedSequence,
+		&i.LeaseOwner,
+		&i.LeaseUntil,
+		&i.RetryCount,
+		&i.NextAttemptAt,
+		&i.LastErrorCode,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createOutboxConsumer = `-- name: CreateOutboxConsumer :one
+INSERT INTO outbox_consumers (
+    consumer_id,
+    subscriptions,
+    last_acked_sequence,
+    created_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $4
+)
+ON CONFLICT (consumer_id) DO NOTHING
+RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+`
+
+type CreateOutboxConsumerParams struct {
+	ConsumerID        string             `json:"consumer_id"`
+	Subscriptions     []string           `json:"subscriptions"`
+	LastAckedSequence int64              `json:"last_acked_sequence"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+// CreateOutboxConsumer
+//
+//	INSERT INTO outbox_consumers (
+//	    consumer_id,
+//	    subscriptions,
+//	    last_acked_sequence,
+//	    created_at,
+//	    updated_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $4
+//	)
+//	ON CONFLICT (consumer_id) DO NOTHING
+//	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+//	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+func (q *Queries) CreateOutboxConsumer(ctx context.Context, arg CreateOutboxConsumerParams) (OutboxConsumer, error) {
+	row := q.db.QueryRow(ctx, createOutboxConsumer,
+		arg.ConsumerID,
+		arg.Subscriptions,
+		arg.LastAckedSequence,
+		arg.CreatedAt,
 	)
 	var i OutboxConsumer
 	err := row.Scan(
@@ -139,6 +273,10 @@ func (q *Queries) AcquireOutboxConsumerLeaseCAS(ctx context.Context, arg Acquire
 }
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :one
+WITH serialized AS MATERIALIZED (
+    -- Transaction-level serialization makes identity sequence order match commit order for offset safety.
+    SELECT pg_catalog.pg_advisory_xact_lock(1196314434, 1)
+)
 INSERT INTO outbox_events (
     event_id,
     event_type,
@@ -147,7 +285,7 @@ INSERT INTO outbox_events (
     payload,
     created_at,
     available_at
-) VALUES (
+) SELECT
     $1,
     $2,
     $3,
@@ -155,7 +293,7 @@ INSERT INTO outbox_events (
     $5,
     $6,
     $7
-)
+FROM serialized
 ON CONFLICT (event_id) DO NOTHING
 RETURNING event_sequence, event_id, event_type, aggregate_type, aggregate_id,
           payload, created_at, available_at
@@ -173,6 +311,10 @@ type CreateOutboxEventParams struct {
 
 // CreateOutboxEvent
 //
+//	WITH serialized AS MATERIALIZED (
+//	    -- Transaction-level serialization makes identity sequence order match commit order for offset safety.
+//	    SELECT pg_catalog.pg_advisory_xact_lock(1196314434, 1)
+//	)
 //	INSERT INTO outbox_events (
 //	    event_id,
 //	    event_type,
@@ -181,7 +323,7 @@ type CreateOutboxEventParams struct {
 //	    payload,
 //	    created_at,
 //	    available_at
-//	) VALUES (
+//	) SELECT
 //	    $1,
 //	    $2,
 //	    $3,
@@ -189,7 +331,7 @@ type CreateOutboxEventParams struct {
 //	    $5,
 //	    $6,
 //	    $7
-//	)
+//	FROM serialized
 //	ON CONFLICT (event_id) DO NOTHING
 //	RETURNING event_sequence, event_id, event_type, aggregate_type, aggregate_id,
 //	          payload, created_at, available_at
@@ -203,6 +345,52 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		arg.CreatedAt,
 		arg.AvailableAt,
 	)
+	var i OutboxEvent
+	err := row.Scan(
+		&i.EventSequence,
+		&i.EventID,
+		&i.EventType,
+		&i.AggregateType,
+		&i.AggregateID,
+		&i.Payload,
+		&i.CreatedAt,
+		&i.AvailableAt,
+	)
+	return i, err
+}
+
+const getLatestAckedOutboxEventByType = `-- name: GetLatestAckedOutboxEventByType :one
+SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+       event.aggregate_id, event.payload, event.created_at, event.available_at
+FROM outbox_events AS event
+JOIN outbox_consumers AS consumer
+  ON consumer.consumer_id = $1
+WHERE event.event_sequence <= consumer.last_acked_sequence
+  AND event.event_type = $2
+  AND event.event_type = ANY(consumer.subscriptions)
+ORDER BY event.event_sequence DESC
+LIMIT 1
+`
+
+type GetLatestAckedOutboxEventByTypeParams struct {
+	ConsumerID string `json:"consumer_id"`
+	EventType  string `json:"event_type"`
+}
+
+// GetLatestAckedOutboxEventByType
+//
+//	SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+//	       event.aggregate_id, event.payload, event.created_at, event.available_at
+//	FROM outbox_events AS event
+//	JOIN outbox_consumers AS consumer
+//	  ON consumer.consumer_id = $1
+//	WHERE event.event_sequence <= consumer.last_acked_sequence
+//	  AND event.event_type = $2
+//	  AND event.event_type = ANY(consumer.subscriptions)
+//	ORDER BY event.event_sequence DESC
+//	LIMIT 1
+func (q *Queries) GetLatestAckedOutboxEventByType(ctx context.Context, arg GetLatestAckedOutboxEventByTypeParams) (OutboxEvent, error) {
+	row := q.db.QueryRow(ctx, getLatestAckedOutboxEventByType, arg.ConsumerID, arg.EventType)
 	var i OutboxEvent
 	err := row.Scan(
 		&i.EventSequence,
@@ -252,19 +440,69 @@ func (q *Queries) GetOutboxConsumer(ctx context.Context, arg GetOutboxConsumerPa
 	return i, err
 }
 
+const getOutboxEventByID = `-- name: GetOutboxEventByID :one
+SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+       payload, created_at, available_at
+FROM outbox_events
+WHERE event_id = $1
+`
+
+type GetOutboxEventByIDParams struct {
+	EventID pgtype.UUID `json:"event_id"`
+}
+
+// GetOutboxEventByID
+//
+//	SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+//	       payload, created_at, available_at
+//	FROM outbox_events
+//	WHERE event_id = $1
+func (q *Queries) GetOutboxEventByID(ctx context.Context, arg GetOutboxEventByIDParams) (OutboxEvent, error) {
+	row := q.db.QueryRow(ctx, getOutboxEventByID, arg.EventID)
+	var i OutboxEvent
+	err := row.Scan(
+		&i.EventSequence,
+		&i.EventID,
+		&i.EventType,
+		&i.AggregateType,
+		&i.AggregateID,
+		&i.Payload,
+		&i.CreatedAt,
+		&i.AvailableAt,
+	)
+	return i, err
+}
+
 const listOutboxEventsForConsumer = `-- name: ListOutboxEventsForConsumer :many
-SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
-       event.aggregate_id, event.payload, event.created_at, event.available_at
-FROM outbox_events AS event
-JOIN outbox_consumers AS consumer
-  ON consumer.consumer_id = $1
-WHERE consumer.lease_owner = $2
-  AND consumer.lease_until > $3
-  AND event.event_sequence > consumer.last_acked_sequence
-  AND event.available_at <= $3
-  AND event.event_type = ANY(consumer.subscriptions)
+WITH consumer_state AS MATERIALIZED (
+    SELECT subscriptions, last_acked_sequence
+    FROM outbox_consumers
+    WHERE consumer_id = $1
+      AND lease_owner = $2
+      AND lease_until > pg_catalog.clock_timestamp()
+      AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+      AND $3::timestamptz <= pg_catalog.clock_timestamp()
+), candidates AS MATERIALIZED (
+    SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+           event.aggregate_id, event.payload, event.created_at, event.available_at
+    FROM outbox_events AS event
+    CROSS JOIN consumer_state AS consumer
+    WHERE event.event_sequence > consumer.last_acked_sequence
+      AND event.event_type = ANY(consumer.subscriptions)
+    ORDER BY event.event_sequence
+    LIMIT $4
+)
+SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+       payload, created_at, available_at
+FROM candidates AS event
+WHERE event.available_at <= pg_catalog.clock_timestamp()
+  AND NOT EXISTS (
+      SELECT 1
+      FROM candidates AS earlier
+      WHERE earlier.event_sequence < event.event_sequence
+        AND earlier.available_at > pg_catalog.clock_timestamp()
+  )
 ORDER BY event.event_sequence
-LIMIT $4
 `
 
 type ListOutboxEventsForConsumerParams struct {
@@ -274,21 +512,49 @@ type ListOutboxEventsForConsumerParams struct {
 	BatchSize  int32              `json:"batch_size"`
 }
 
+type ListOutboxEventsForConsumerRow struct {
+	EventSequence int64              `json:"event_sequence"`
+	EventID       pgtype.UUID        `json:"event_id"`
+	EventType     string             `json:"event_type"`
+	AggregateType string             `json:"aggregate_type"`
+	AggregateID   pgtype.UUID        `json:"aggregate_id"`
+	Payload       []byte             `json:"payload"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	AvailableAt   pgtype.Timestamptz `json:"available_at"`
+}
+
 // ListOutboxEventsForConsumer
 //
-//	SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
-//	       event.aggregate_id, event.payload, event.created_at, event.available_at
-//	FROM outbox_events AS event
-//	JOIN outbox_consumers AS consumer
-//	  ON consumer.consumer_id = $1
-//	WHERE consumer.lease_owner = $2
-//	  AND consumer.lease_until > $3
-//	  AND event.event_sequence > consumer.last_acked_sequence
-//	  AND event.available_at <= $3
-//	  AND event.event_type = ANY(consumer.subscriptions)
+//	WITH consumer_state AS MATERIALIZED (
+//	    SELECT subscriptions, last_acked_sequence
+//	    FROM outbox_consumers
+//	    WHERE consumer_id = $1
+//	      AND lease_owner = $2
+//	      AND lease_until > pg_catalog.clock_timestamp()
+//	      AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
+//	      AND $3::timestamptz <= pg_catalog.clock_timestamp()
+//	), candidates AS MATERIALIZED (
+//	    SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
+//	           event.aggregate_id, event.payload, event.created_at, event.available_at
+//	    FROM outbox_events AS event
+//	    CROSS JOIN consumer_state AS consumer
+//	    WHERE event.event_sequence > consumer.last_acked_sequence
+//	      AND event.event_type = ANY(consumer.subscriptions)
+//	    ORDER BY event.event_sequence
+//	    LIMIT $4
+//	)
+//	SELECT event_sequence, event_id, event_type, aggregate_type, aggregate_id,
+//	       payload, created_at, available_at
+//	FROM candidates AS event
+//	WHERE event.available_at <= pg_catalog.clock_timestamp()
+//	  AND NOT EXISTS (
+//	      SELECT 1
+//	      FROM candidates AS earlier
+//	      WHERE earlier.event_sequence < event.event_sequence
+//	        AND earlier.available_at > pg_catalog.clock_timestamp()
+//	  )
 //	ORDER BY event.event_sequence
-//	LIMIT $4
-func (q *Queries) ListOutboxEventsForConsumer(ctx context.Context, arg ListOutboxEventsForConsumerParams) ([]OutboxEvent, error) {
+func (q *Queries) ListOutboxEventsForConsumer(ctx context.Context, arg ListOutboxEventsForConsumerParams) ([]ListOutboxEventsForConsumerRow, error) {
 	rows, err := q.db.Query(ctx, listOutboxEventsForConsumer,
 		arg.ConsumerID,
 		arg.LeaseOwner,
@@ -299,9 +565,9 @@ func (q *Queries) ListOutboxEventsForConsumer(ctx context.Context, arg ListOutbo
 		return nil, err
 	}
 	defer rows.Close()
-	items := []OutboxEvent{}
+	items := []ListOutboxEventsForConsumerRow{}
 	for rows.Next() {
-		var i OutboxEvent
+		var i ListOutboxEventsForConsumerRow
 		if err := rows.Scan(
 			&i.EventSequence,
 			&i.EventID,
@@ -324,65 +590,82 @@ func (q *Queries) ListOutboxEventsForConsumer(ctx context.Context, arg ListOutbo
 
 const recordOutboxConsumerRetryCAS = `-- name: RecordOutboxConsumerRetryCAS :one
 UPDATE outbox_consumers
-SET retry_count = retry_count + 1,
-    next_attempt_at = $1,
-    last_error_code = $2,
-    updated_at = $3
-WHERE consumer_id = $4
-  AND lease_owner = $5
-  AND lease_until > $3
-RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count,
-          next_attempt_at, last_error_code, updated_at
+SET retry_count = $1,
+    next_attempt_at = $2,
+    last_error_code = $3,
+    updated_at = $4
+WHERE consumer_id = $5
+  AND lease_owner = $6
+  AND lease_until = $7
+  AND last_acked_sequence = $8
+  AND retry_count = $9
+  AND next_attempt_at IS NOT DISTINCT FROM $10
+  AND last_error_code IS NOT DISTINCT FROM $11
+  AND updated_at = $12
+  AND lease_until > pg_catalog.clock_timestamp()
+RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+          retry_count, next_attempt_at, last_error_code, created_at, updated_at
 `
 
 type RecordOutboxConsumerRetryCASParams struct {
-	NextAttemptAt pgtype.Timestamptz `json:"next_attempt_at"`
-	ErrorCode     pgtype.Text        `json:"error_code"`
-	FailedAt      pgtype.Timestamptz `json:"failed_at"`
-	ConsumerID    string             `json:"consumer_id"`
-	LeaseOwner    pgtype.Text        `json:"lease_owner"`
-}
-
-type RecordOutboxConsumerRetryCASRow struct {
-	ConsumerID        string             `json:"consumer_id"`
-	LastAckedSequence int64              `json:"last_acked_sequence"`
-	LeaseOwner        pgtype.Text        `json:"lease_owner"`
-	LeaseUntil        pgtype.Timestamptz `json:"lease_until"`
-	RetryCount        int32              `json:"retry_count"`
-	NextAttemptAt     pgtype.Timestamptz `json:"next_attempt_at"`
-	LastErrorCode     pgtype.Text        `json:"last_error_code"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	NextRetryCount        int32              `json:"next_retry_count"`
+	NextAttemptAt         pgtype.Timestamptz `json:"next_attempt_at"`
+	ErrorCode             pgtype.Text        `json:"error_code"`
+	FailedAt              pgtype.Timestamptz `json:"failed_at"`
+	ConsumerID            string             `json:"consumer_id"`
+	ExpectedLeaseOwner    pgtype.Text        `json:"expected_lease_owner"`
+	ExpectedLeaseUntil    pgtype.Timestamptz `json:"expected_lease_until"`
+	ExpectedSequence      int64              `json:"expected_sequence"`
+	ExpectedRetryCount    int32              `json:"expected_retry_count"`
+	ExpectedNextAttemptAt pgtype.Timestamptz `json:"expected_next_attempt_at"`
+	ExpectedErrorCode     pgtype.Text        `json:"expected_error_code"`
+	ExpectedUpdatedAt     pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // RecordOutboxConsumerRetryCAS
 //
 //	UPDATE outbox_consumers
-//	SET retry_count = retry_count + 1,
-//	    next_attempt_at = $1,
-//	    last_error_code = $2,
-//	    updated_at = $3
-//	WHERE consumer_id = $4
-//	  AND lease_owner = $5
-//	  AND lease_until > $3
-//	RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, retry_count,
-//	          next_attempt_at, last_error_code, updated_at
-func (q *Queries) RecordOutboxConsumerRetryCAS(ctx context.Context, arg RecordOutboxConsumerRetryCASParams) (RecordOutboxConsumerRetryCASRow, error) {
+//	SET retry_count = $1,
+//	    next_attempt_at = $2,
+//	    last_error_code = $3,
+//	    updated_at = $4
+//	WHERE consumer_id = $5
+//	  AND lease_owner = $6
+//	  AND lease_until = $7
+//	  AND last_acked_sequence = $8
+//	  AND retry_count = $9
+//	  AND next_attempt_at IS NOT DISTINCT FROM $10
+//	  AND last_error_code IS NOT DISTINCT FROM $11
+//	  AND updated_at = $12
+//	  AND lease_until > pg_catalog.clock_timestamp()
+//	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+//	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+func (q *Queries) RecordOutboxConsumerRetryCAS(ctx context.Context, arg RecordOutboxConsumerRetryCASParams) (OutboxConsumer, error) {
 	row := q.db.QueryRow(ctx, recordOutboxConsumerRetryCAS,
+		arg.NextRetryCount,
 		arg.NextAttemptAt,
 		arg.ErrorCode,
 		arg.FailedAt,
 		arg.ConsumerID,
-		arg.LeaseOwner,
+		arg.ExpectedLeaseOwner,
+		arg.ExpectedLeaseUntil,
+		arg.ExpectedSequence,
+		arg.ExpectedRetryCount,
+		arg.ExpectedNextAttemptAt,
+		arg.ExpectedErrorCode,
+		arg.ExpectedUpdatedAt,
 	)
-	var i RecordOutboxConsumerRetryCASRow
+	var i OutboxConsumer
 	err := row.Scan(
 		&i.ConsumerID,
+		&i.Subscriptions,
 		&i.LastAckedSequence,
 		&i.LeaseOwner,
 		&i.LeaseUntil,
 		&i.RetryCount,
 		&i.NextAttemptAt,
 		&i.LastErrorCode,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -395,21 +678,27 @@ SET lease_owner = NULL,
     updated_at = $1
 WHERE consumer_id = $2
   AND lease_owner = $3
-RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
+  AND lease_until = $4
+  AND last_acked_sequence = $5
+  AND retry_count = $6
+  AND next_attempt_at IS NOT DISTINCT FROM $7
+  AND last_error_code IS NOT DISTINCT FROM $8
+  AND updated_at = $9
+  AND lease_until > pg_catalog.clock_timestamp()
+RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+          retry_count, next_attempt_at, last_error_code, created_at, updated_at
 `
 
 type ReleaseOutboxConsumerLeaseCASParams struct {
-	ReleasedAt pgtype.Timestamptz `json:"released_at"`
-	ConsumerID string             `json:"consumer_id"`
-	LeaseOwner pgtype.Text        `json:"lease_owner"`
-}
-
-type ReleaseOutboxConsumerLeaseCASRow struct {
-	ConsumerID        string             `json:"consumer_id"`
-	LastAckedSequence int64              `json:"last_acked_sequence"`
-	LeaseOwner        pgtype.Text        `json:"lease_owner"`
-	LeaseUntil        pgtype.Timestamptz `json:"lease_until"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ReleasedAt            pgtype.Timestamptz `json:"released_at"`
+	ConsumerID            string             `json:"consumer_id"`
+	ExpectedLeaseOwner    pgtype.Text        `json:"expected_lease_owner"`
+	ExpectedLeaseUntil    pgtype.Timestamptz `json:"expected_lease_until"`
+	ExpectedSequence      int64              `json:"expected_sequence"`
+	ExpectedRetryCount    int32              `json:"expected_retry_count"`
+	ExpectedNextAttemptAt pgtype.Timestamptz `json:"expected_next_attempt_at"`
+	ExpectedErrorCode     pgtype.Text        `json:"expected_error_code"`
+	ExpectedUpdatedAt     pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // ReleaseOutboxConsumerLeaseCAS
@@ -420,15 +709,38 @@ type ReleaseOutboxConsumerLeaseCASRow struct {
 //	    updated_at = $1
 //	WHERE consumer_id = $2
 //	  AND lease_owner = $3
-//	RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
-func (q *Queries) ReleaseOutboxConsumerLeaseCAS(ctx context.Context, arg ReleaseOutboxConsumerLeaseCASParams) (ReleaseOutboxConsumerLeaseCASRow, error) {
-	row := q.db.QueryRow(ctx, releaseOutboxConsumerLeaseCAS, arg.ReleasedAt, arg.ConsumerID, arg.LeaseOwner)
-	var i ReleaseOutboxConsumerLeaseCASRow
+//	  AND lease_until = $4
+//	  AND last_acked_sequence = $5
+//	  AND retry_count = $6
+//	  AND next_attempt_at IS NOT DISTINCT FROM $7
+//	  AND last_error_code IS NOT DISTINCT FROM $8
+//	  AND updated_at = $9
+//	  AND lease_until > pg_catalog.clock_timestamp()
+//	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+//	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+func (q *Queries) ReleaseOutboxConsumerLeaseCAS(ctx context.Context, arg ReleaseOutboxConsumerLeaseCASParams) (OutboxConsumer, error) {
+	row := q.db.QueryRow(ctx, releaseOutboxConsumerLeaseCAS,
+		arg.ReleasedAt,
+		arg.ConsumerID,
+		arg.ExpectedLeaseOwner,
+		arg.ExpectedLeaseUntil,
+		arg.ExpectedSequence,
+		arg.ExpectedRetryCount,
+		arg.ExpectedNextAttemptAt,
+		arg.ExpectedErrorCode,
+		arg.ExpectedUpdatedAt,
+	)
+	var i OutboxConsumer
 	err := row.Scan(
 		&i.ConsumerID,
+		&i.Subscriptions,
 		&i.LastAckedSequence,
 		&i.LeaseOwner,
 		&i.LeaseUntil,
+		&i.RetryCount,
+		&i.NextAttemptAt,
+		&i.LastErrorCode,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -440,23 +752,29 @@ SET lease_until = $1,
     updated_at = $2
 WHERE consumer_id = $3
   AND lease_owner = $4
-  AND lease_until > $2
-RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
+  AND lease_until = $5
+  AND last_acked_sequence = $6
+  AND retry_count = $7
+  AND next_attempt_at IS NOT DISTINCT FROM $8
+  AND last_error_code IS NOT DISTINCT FROM $9
+  AND updated_at = $10
+  AND lease_until > pg_catalog.clock_timestamp()
+  AND $1 > pg_catalog.clock_timestamp()
+RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+          retry_count, next_attempt_at, last_error_code, created_at, updated_at
 `
 
 type RenewOutboxConsumerLeaseCASParams struct {
-	LeaseUntil pgtype.Timestamptz `json:"lease_until"`
-	RenewedAt  pgtype.Timestamptz `json:"renewed_at"`
-	ConsumerID string             `json:"consumer_id"`
-	LeaseOwner pgtype.Text        `json:"lease_owner"`
-}
-
-type RenewOutboxConsumerLeaseCASRow struct {
-	ConsumerID        string             `json:"consumer_id"`
-	LastAckedSequence int64              `json:"last_acked_sequence"`
-	LeaseOwner        pgtype.Text        `json:"lease_owner"`
-	LeaseUntil        pgtype.Timestamptz `json:"lease_until"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	NextLeaseUntil        pgtype.Timestamptz `json:"next_lease_until"`
+	NextUpdatedAt         pgtype.Timestamptz `json:"next_updated_at"`
+	ConsumerID            string             `json:"consumer_id"`
+	ExpectedLeaseOwner    pgtype.Text        `json:"expected_lease_owner"`
+	ExpectedLeaseUntil    pgtype.Timestamptz `json:"expected_lease_until"`
+	ExpectedSequence      int64              `json:"expected_sequence"`
+	ExpectedRetryCount    int32              `json:"expected_retry_count"`
+	ExpectedNextAttemptAt pgtype.Timestamptz `json:"expected_next_attempt_at"`
+	ExpectedErrorCode     pgtype.Text        `json:"expected_error_code"`
+	ExpectedUpdatedAt     pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // RenewOutboxConsumerLeaseCAS
@@ -466,21 +784,40 @@ type RenewOutboxConsumerLeaseCASRow struct {
 //	    updated_at = $2
 //	WHERE consumer_id = $3
 //	  AND lease_owner = $4
-//	  AND lease_until > $2
-//	RETURNING consumer_id, last_acked_sequence, lease_owner, lease_until, updated_at
-func (q *Queries) RenewOutboxConsumerLeaseCAS(ctx context.Context, arg RenewOutboxConsumerLeaseCASParams) (RenewOutboxConsumerLeaseCASRow, error) {
+//	  AND lease_until = $5
+//	  AND last_acked_sequence = $6
+//	  AND retry_count = $7
+//	  AND next_attempt_at IS NOT DISTINCT FROM $8
+//	  AND last_error_code IS NOT DISTINCT FROM $9
+//	  AND updated_at = $10
+//	  AND lease_until > pg_catalog.clock_timestamp()
+//	  AND $1 > pg_catalog.clock_timestamp()
+//	RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
+//	          retry_count, next_attempt_at, last_error_code, created_at, updated_at
+func (q *Queries) RenewOutboxConsumerLeaseCAS(ctx context.Context, arg RenewOutboxConsumerLeaseCASParams) (OutboxConsumer, error) {
 	row := q.db.QueryRow(ctx, renewOutboxConsumerLeaseCAS,
-		arg.LeaseUntil,
-		arg.RenewedAt,
+		arg.NextLeaseUntil,
+		arg.NextUpdatedAt,
 		arg.ConsumerID,
-		arg.LeaseOwner,
+		arg.ExpectedLeaseOwner,
+		arg.ExpectedLeaseUntil,
+		arg.ExpectedSequence,
+		arg.ExpectedRetryCount,
+		arg.ExpectedNextAttemptAt,
+		arg.ExpectedErrorCode,
+		arg.ExpectedUpdatedAt,
 	)
-	var i RenewOutboxConsumerLeaseCASRow
+	var i OutboxConsumer
 	err := row.Scan(
 		&i.ConsumerID,
+		&i.Subscriptions,
 		&i.LastAckedSequence,
 		&i.LeaseOwner,
 		&i.LeaseUntil,
+		&i.RetryCount,
+		&i.NextAttemptAt,
+		&i.LastErrorCode,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err

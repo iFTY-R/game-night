@@ -16,7 +16,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 		t.Fatalf("collect migrations: %v", err)
 	}
 
-	wantVersions := []int64{1, 2, 3, 4, 5, 6}
+	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8}
 	if len(migrations) != len(wantVersions) {
 		t.Fatalf("expected %d migrations, got %d", len(wantVersions), len(migrations))
 	}
@@ -59,5 +59,20 @@ func TestSecretResultWorkflowDownCleansUnrepresentableChallengesBeforeRestoringC
 		if strings.Count(migration[recoveryDeleteIndex:restoredConstraintIndex], condition) < 2 {
 			t.Errorf("migration 00006 downgrade cleanup is missing repeated guard %q", condition)
 		}
+	}
+}
+
+func TestAdminResetOutboxProtocolMigrationIsReversible(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00008_admin_reset_outbox_protocol.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(contents)
+	downIndex := strings.Index(migration, "-- +goose Down")
+	if downIndex < 0 || !strings.Contains(migration[:downIndex], "'audit.chain'") ||
+		strings.Contains(migration[:downIndex], "'audit_chain'") || !strings.Contains(migration[downIndex:], "'audit_chain'") ||
+		!strings.Contains(migration[:downIndex], "pg_advisory_xact_lock(1196314434, 1)") ||
+		!strings.Contains(migration[:downIndex], "'9c26d493-92b3-59a5-a787-3a1a3df235aa'::uuid") {
+		t.Fatal("migration 00008 must serialize the upgraded dotted checkpoint event and restore the legacy value on downgrade")
 	}
 }

@@ -167,6 +167,7 @@ func TestMigrationPrivileges(t *testing.T) {
 	assertPublicAndTemporaryShadowingCannotRedirect(t, ctx, migrationPool, runtimePool)
 
 	assertQuerySucceeds(t, ctx, runtimePool, "SELECT sequence FROM read_audit_head('admin')")
+	assertQuerySucceeds(t, ctx, runtimePool, "SELECT event_hash FROM read_audit_anchor('admin', 1)")
 	assertQuerySucceeds(t, ctx, runtimePool, "SELECT status FROM admin_accounts WHERE singleton_id = 1")
 	assertQueryFails(t, ctx, runtimePool, "SELECT count(*) FROM audit_events", "permission denied")
 	assertQueryFails(t, ctx, runtimePool, "UPDATE audit_chain_head SET sequence = sequence", "permission denied")
@@ -178,6 +179,7 @@ func TestMigrationPrivileges(t *testing.T) {
 	assertResetDenied(t, ctx, runtimePool)
 
 	assertQuerySucceeds(t, ctx, workerPool, "SELECT count(*) FROM outbox_consumers")
+	assertQuerySucceeds(t, ctx, workerPool, "SELECT event_hash FROM read_audit_anchor('admin', 1)")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE outbox_consumers SET updated_at = updated_at WHERE consumer_id = 'audit.checkpoint'")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE user_profiles SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE profile_export_items SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
@@ -254,7 +256,7 @@ func assertSecurityDefinerConfiguration(t testing.TB, ctx context.Context, pool 
 		JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
 		JOIN pg_catalog.pg_roles AS owner ON owner.oid = procedure.proowner
 		WHERE namespace.nspname = current_schema()
-		  AND procedure.proname IN ('read_audit_head', 'append_audit_event', 'reset_admin_account')
+		  AND procedure.proname IN ('read_audit_head', 'read_audit_anchor', 'append_audit_event', 'reset_admin_account')
 		ORDER BY procedure.proname
 	`)
 	if err != nil {
@@ -285,8 +287,8 @@ func assertSecurityDefinerConfiguration(t testing.TB, ctx context.Context, pool 
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if functionCount != 3 {
-		t.Fatalf("expected 3 SECURITY DEFINER functions, got %d", functionCount)
+	if functionCount != 4 {
+		t.Fatalf("expected 4 SECURITY DEFINER functions, got %d", functionCount)
 	}
 }
 

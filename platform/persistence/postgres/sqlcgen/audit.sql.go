@@ -131,13 +131,50 @@ func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams
 	return items, nil
 }
 
+const readAuditAnchor = `-- name: ReadAuditAnchor :one
+WITH result AS (
+    SELECT pg_catalog.to_jsonb(function_row) AS payload
+    FROM read_audit_anchor($1::text, $2::bigint) AS function_row
+)
+SELECT decode(pg_catalog.substring(result.payload ->> 'event_hash', 3), 'hex') AS event_hash,
+       (result.payload ->> 'created_at')::timestamptz AS created_at
+FROM result
+`
+
+type ReadAuditAnchorParams struct {
+	ChainID  string `json:"chain_id"`
+	Sequence int64  `json:"sequence"`
+}
+
+type ReadAuditAnchorRow struct {
+	EventHash []byte             `json:"event_hash"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// ReadAuditAnchor
+//
+//	WITH result AS (
+//	    SELECT pg_catalog.to_jsonb(function_row) AS payload
+//	    FROM read_audit_anchor($1::text, $2::bigint) AS function_row
+//	)
+//	SELECT decode(pg_catalog.substring(result.payload ->> 'event_hash', 3), 'hex') AS event_hash,
+//	       (result.payload ->> 'created_at')::timestamptz AS created_at
+//	FROM result
+func (q *Queries) ReadAuditAnchor(ctx context.Context, arg ReadAuditAnchorParams) (ReadAuditAnchorRow, error) {
+	row := q.db.QueryRow(ctx, readAuditAnchor, arg.ChainID, arg.Sequence)
+	var i ReadAuditAnchorRow
+	err := row.Scan(&i.EventHash, &i.CreatedAt)
+	return i, err
+}
+
 const readAuditHead = `-- name: ReadAuditHead :one
 WITH result AS (
     SELECT pg_catalog.to_jsonb(function_row) AS payload
     FROM read_audit_head($1) AS function_row
 )
 SELECT (result.payload ->> 'sequence')::bigint AS sequence,
-       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash
+       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash,
+       (result.payload ->> 'updated_at')::timestamptz AS updated_at
 FROM result
 `
 
@@ -146,8 +183,9 @@ type ReadAuditHeadParams struct {
 }
 
 type ReadAuditHeadRow struct {
-	Sequence int64  `json:"sequence"`
-	HeadHash []byte `json:"head_hash"`
+	Sequence  int64              `json:"sequence"`
+	HeadHash  []byte             `json:"head_hash"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 // ReadAuditHead
@@ -157,12 +195,13 @@ type ReadAuditHeadRow struct {
 //	    FROM read_audit_head($1) AS function_row
 //	)
 //	SELECT (result.payload ->> 'sequence')::bigint AS sequence,
-//	       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash
+//	       decode(pg_catalog.substring(result.payload ->> 'head_hash', 3), 'hex') AS head_hash,
+//	       (result.payload ->> 'updated_at')::timestamptz AS updated_at
 //	FROM result
 func (q *Queries) ReadAuditHead(ctx context.Context, arg ReadAuditHeadParams) (ReadAuditHeadRow, error) {
 	row := q.db.QueryRow(ctx, readAuditHead, arg.ChainID)
 	var i ReadAuditHeadRow
-	err := row.Scan(&i.Sequence, &i.HeadHash)
+	err := row.Scan(&i.Sequence, &i.HeadHash, &i.UpdatedAt)
 	return i, err
 }
 

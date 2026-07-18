@@ -10,6 +10,7 @@
     "build": "turbo run build",
     "check": "pnpm run check:boundaries && turbo run check",
     "check:boundaries": "go run ./tooling/cmd/boundarycheck",
+    "generate:contracts": "node tooling/scripts/generate-contracts.mjs",
     "test": "go test ./... && turbo run test"
   },
   "devDependencies": {

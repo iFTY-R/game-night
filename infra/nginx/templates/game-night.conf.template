@@ -1,0 +1,126 @@
+upstream game_night_identity_api {
+    server ${GAME_NIGHT_IDENTITY_UPSTREAM};
+    keepalive 16;
+}
+
+upstream game_night_admin_api {
+    server ${GAME_NIGHT_ADMIN_UPSTREAM};
+    keepalive 16;
+}
+
+# Unknown SNI/Host values terminate at this server and never reach an application upstream.
+server {
+    listen 8443 ssl default_server;
+    server_name _;
+
+    ssl_certificate /etc/nginx/tls/tls.crt;
+    ssl_certificate_key /etc/nginx/tls/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+
+    return 404;
+}
+
+server {
+    listen 8443 ssl;
+    server_name ${GAME_NIGHT_USER_HOST};
+
+    ssl_certificate /etc/nginx/tls/tls.crt;
+    ssl_certificate_key /etc/nginx/tls/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+
+    client_max_body_size 1m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location ^~ /platform.identity.v1.IdentityService/ {
+        proxy_pass http://game_night_identity_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        # Replace every client-supplied forwarding identity with the direct socket peer.
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Pragma;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    server_name ${GAME_NIGHT_ADMIN_HOST};
+
+    ssl_certificate /etc/nginx/tls/tls.crt;
+    ssl_certificate_key /etc/nginx/tls/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+
+    client_max_body_size 1m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location ^~ /platform.admin.v1.AdminAuthService/ {
+        proxy_pass http://game_night_admin_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Pragma;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location ^~ /platform.admin.v1.AdminIdentityService/ {
+        proxy_pass http://game_night_admin_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Pragma;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location / {
+        return 404;
+    }
+}

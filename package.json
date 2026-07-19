@@ -14,7 +14,8 @@
     "generate": "pnpm run generate:contracts && pnpm run generate:sql",
     "generate:contracts": "node tooling/scripts/generate-contracts.mjs",
     "generate:sql": "go tool sqlc generate -f tooling/sqlc/sqlc.yaml",
-    "test": "go test ./... && turbo run test"
+    "test": "go test ./... && turbo run test",
+    "test:backend:integration": "go test -p 1 -race ./platform/... ./apps/... ./internal/integrationtest/... ./infra/nginx/test/..."
   },
   "devDependencies": {
     "turbo": "2.10.5"

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"runtime"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
+// testRedisURLEnvironment opts into the real Redis suite without accepting ambient client configuration.
 const testRedisURLEnvironment = "GAME_NIGHT_TEST_REDIS_URL"
 
 func TestLimiterIntegration(t *testing.T) {
@@ -124,6 +126,33 @@ func TestLimiterIntegration(t *testing.T) {
 			if strings.Contains(key, firstRaw) || strings.Contains(key, secondRaw) || !strings.Contains(key, ":v7:") {
 				t.Fatalf("unsafe or unversioned Redis key %q", key)
 			}
+		}
+	})
+
+	t.Run("fails closed after Redis disconnect", func(t *testing.T) {
+		redisURL := integrationtest.RequireEnvironment(t, integrationtest.DependencyRedis, testRedisURLEnvironment)[0]
+		options, err := goredis.ParseURL(redisURL)
+		if err != nil {
+			t.Fatal("parse Redis integration URL")
+		}
+		disconnectedClient := goredis.NewClient(options)
+		if err := disconnectedClient.Ping(t.Context()).Err(); err != nil {
+			t.Fatal("connect Redis outage fixture")
+		}
+		limiter, err := NewLimiter(disconnectedClient, keyring, Config{
+			KeyPrefix: randomIntegrationPrefix(t), Timeout: 2 * time.Second, Rules: StandardRules(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Closing only this client deterministically models a severed connection without destabilizing the shared CI service.
+		if err := disconnectedClient.Close(); err != nil {
+			t.Fatal(err)
+		}
+		request := integrationConsumptionRequest(t, ratelimit.OperationIdentityBootstrap, ratelimit.DimensionIP, "203.0.113.13")
+		decision, err := limiter.Consume(t.Context(), request)
+		if !errors.Is(err, ErrUnavailable) || decision.Allowed || decision.RetryAfter != 0 {
+			t.Fatalf("disconnected Redis decision = %+v, error = %v", decision, err)
 		}
 	})
 }

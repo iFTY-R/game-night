@@ -125,3 +125,134 @@ jobs:
           else
             echo "SKIPPED: no production Proto baseline"
           fi
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: game_night_ci_admin
+          POSTGRES_PASSWORD: game-night-ci-postgres-secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U game_night_ci_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      GAME_NIGHT_REQUIRE_INTEGRATION: postgres,postgres-privileges,redis,object-storage,nginx
+      GAME_NIGHT_TEST_DATABASE_URL: postgresql://game_night_ci_admin:game-night-ci-postgres-secret@127.0.0.1:5432/postgres?sslmode=disable
+      GAME_NIGHT_TEST_ADMIN_DATABASE_URL: postgresql://game_night_ci_admin:game-night-ci-postgres-secret@127.0.0.1:5432/postgres?sslmode=disable
+      GAME_NIGHT_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+      GAME_NIGHT_TEST_S3_ENDPOINT: http://127.0.0.1:9000
+      GAME_NIGHT_TEST_S3_REGION: us-east-1
+      GAME_NIGHT_TEST_S3_BUCKET: game-night-audit-ci
+      GAME_NIGHT_TEST_S3_ACCESS_KEY: game-night-ci-audit
+      GAME_NIGHT_TEST_S3_SECRET_KEY: game-night-ci-audit-secret
+      GAME_NIGHT_TEST_NGINX_IMAGE: nginx:1.29.0-alpine@sha256:d67ea0d64d518b1bb04acde3b00f722ac3e9764b3209a9b0a98924ba35e4b779
+      MINIO_SERVER_IMAGE: minio/minio:RELEASE.2025-04-22T22-12-26Z@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
+      MINIO_CLIENT_IMAGE: minio/mc:RELEASE.2025-04-16T18-13-26Z@sha256:aead63c77f9db9107f1696fb08ecb0faeda23729cde94b0f663edf4fe09728e3
+      MINIO_ROOT_USER: game-night-ci-root
+      MINIO_ROOT_PASSWORD: game-night-ci-root-secret
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.66.0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Start immutable Object Lock storage
+        run: |
+          set -euo pipefail
+          docker run --detach --name game-night-minio \
+            --publish 127.0.0.1:9000:9000 \
+            --env MINIO_ROOT_USER \
+            --env MINIO_ROOT_PASSWORD \
+            "$MINIO_SERVER_IMAGE" server /data --address :9000
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:9000/minio/health/ready >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == 60 ]]; then
+              docker logs game-night-minio
+              exit 1
+            fi
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint /bin/sh \
+            --env MINIO_ROOT_USER \
+            --env MINIO_ROOT_PASSWORD \
+            --env GAME_NIGHT_TEST_S3_ACCESS_KEY \
+            --env GAME_NIGHT_TEST_S3_SECRET_KEY \
+            --volume "${{ github.workspace }}/infra/minio/ci-app-policy.json:/policy.json:ro" \
+            "$MINIO_CLIENT_IMAGE" -ceu '
+              mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+              mc mb --with-lock local/game-night-audit-ci
+              mc retention set --default COMPLIANCE 2d local/game-night-audit-ci
+              mc admin user add local "$GAME_NIGHT_TEST_S3_ACCESS_KEY" "$GAME_NIGHT_TEST_S3_SECRET_KEY"
+              mc admin policy create local game-night-audit-ci /policy.json
+              mc admin policy attach local game-night-audit-ci --user "$GAME_NIGHT_TEST_S3_ACCESS_KEY"
+            '
+      - name: Verify generated contracts and queries are clean
+        run: |
+          pnpm run check:generated
+          git diff --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
+      - name: Run required backend integrations
+        run: |
+          set -o pipefail
+          # Migration tests change shared PostgreSQL catalogs; serialize packages while race still exercises in-package concurrency.
+          go test -p 1 ./... 2>&1 | tee "$RUNNER_TEMP/backend-integration.log"
+          pnpm run test:backend:integration 2>&1 | tee -a "$RUNNER_TEMP/backend-integration.log"
+      - name: Reject sensitive values in captured test output
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/backend-integration.log"
+          for sensitive_value in \
+            "$MINIO_ROOT_PASSWORD" \
+            "$GAME_NIGHT_TEST_S3_SECRET_KEY" \
+            "game-night-ci-postgres-secret"; do
+            if grep --fixed-strings -- "$sensitive_value" "$RUNNER_TEMP/backend-integration.log"; then
+              echo "captured backend output contains a configured test secret"
+              exit 1
+            fi
+          done
+      - name: Run backend static checks
+        run: |
+          go vet ./...
+          pnpm run check
+          git diff --check
+          git diff --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"

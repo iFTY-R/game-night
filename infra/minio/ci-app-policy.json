@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::game-night-audit-ci"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:DeleteObjectVersion",
+        "s3:GetObject",
+        "s3:GetObjectRetention",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:PutObjectRetention"
+      ],
+      "Resource": "arn:aws:s3:::game-night-audit-ci/*"
+    }
+  ]
+}

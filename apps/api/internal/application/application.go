@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/apps/api/internal/bootstrap"
@@ -44,10 +45,14 @@ var (
 	errInitializeKeyrings   = errors.New("initialize API keyrings")
 	errInitializePostgreSQL = errors.New("initialize API PostgreSQL")
 	errInitializeRedis      = errors.New("initialize API Redis")
+	errInitializeClock      = errors.New("initialize API database clock")
 	errInitializeServices   = errors.New("initialize API services")
 	errInitializeBootstrap  = errors.New("initialize administrator bootstrap")
 	errInitializeTransport  = errors.New("initialize API transport")
 )
+
+// maximumDatabaseClockSkew fails startup when infrastructure clocks are too far apart for security expiry decisions.
+const maximumDatabaseClockSkew = 5 * time.Minute
 
 // Options supplies process-owned observers and the current durable checkpoint sink probe.
 type Options struct {
@@ -72,7 +77,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if ctx == nil || options.Logger == nil || options.Metrics == nil || options.CheckpointSink == nil {
 		return nil, errInvalidOptions
 	}
-	source := clock.System{}
+	var source clock.Clock = clock.System{}
 	keyrings, err := security.LoadKeyrings(config.Shared.Keyrings.SecurityPaths(), source.Now())
 	if err != nil {
 		return nil, errInitializeKeyrings
@@ -93,6 +98,10 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 			_ = application.closeDependencies()
 		}
 	}()
+	source, err = newDatabaseClock(ctx, pool)
+	if err != nil {
+		return nil, errInitializeClock
+	}
 	if err := postgres.NewKeyringReferenceChecker(pool, keyrings).Check(ctx); err != nil {
 		return nil, errInitializeKeyrings
 	}
@@ -172,6 +181,47 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	return application, nil
 }
+
+// databaseClock keeps process-side expiry and mutation timestamps aligned with PostgreSQL's authoritative timeline.
+type databaseClock struct {
+	// offset is the bounded database-minus-process duration sampled once before any domain service is created.
+	offset time.Duration
+}
+
+// Now applies the startup calibration without retaining monotonic or process-local timezone metadata.
+func (source databaseClock) Now() time.Time {
+	return time.Now().Round(0).UTC().Add(source.offset)
+}
+
+// newDatabaseClock estimates offset at the network round-trip midpoint and rejects unsafe infrastructure skew.
+func newDatabaseClock(ctx context.Context, pool *pgxpool.Pool) (clock.Clock, error) {
+	if ctx == nil || pool == nil {
+		return nil, errInitializeClock
+	}
+	startedAt := time.Now().Round(0).UTC()
+	var databaseNow time.Time
+	if err := pool.QueryRow(ctx, "SELECT pg_catalog.clock_timestamp()").Scan(&databaseNow); err != nil {
+		return nil, errInitializeClock
+	}
+	finishedAt := time.Now().Round(0).UTC()
+	return databaseClockFromSamples(startedAt, databaseNow, finishedAt)
+}
+
+// databaseClockFromSamples validates the observation window before deriving the midpoint offset.
+func databaseClockFromSamples(startedAt, databaseNow, finishedAt time.Time) (clock.Clock, error) {
+	startedAt, databaseNow, finishedAt = startedAt.Round(0).UTC(), databaseNow.Round(0).UTC(), finishedAt.Round(0).UTC()
+	if startedAt.IsZero() || databaseNow.IsZero() || finishedAt.Before(startedAt) {
+		return nil, errInitializeClock
+	}
+	midpoint := startedAt.Add(finishedAt.Sub(startedAt) / 2)
+	offset := databaseNow.Sub(midpoint)
+	if offset > maximumDatabaseClockSkew || offset < -maximumDatabaseClockSkew {
+		return nil, errInitializeClock
+	}
+	return databaseClock{offset: offset}, nil
+}
+
+var _ clock.Clock = databaseClock{}
 
 // ListenAndServe opens the configured API listener after the dependency graph is complete.
 func (application *Application) ListenAndServe() error {

@@ -67,7 +67,9 @@ func (repository *adminAccountRepository) TransitionStatusCAS(ctx context.Contex
 }
 
 func (repository *adminAccountRepository) AcceptTOTPStepCAS(ctx context.Context, current adminDomain.Account, step int64, at time.Time) (adminDomain.Account, error) {
-	if current.Snapshot().Status != adminDomain.AccountStatusActive {
+	status := current.Snapshot().Status
+	// Setup, ordinary MFA, and recovery rebind all accept a monotonic TOTP step before any following status transition.
+	if status != adminDomain.AccountStatusSetupRequired && status != adminDomain.AccountStatusRecoveryPending && status != adminDomain.AccountStatusActive {
 		return adminDomain.Account{}, adminDomain.ErrConcurrentTransition
 	}
 	row, err := repository.queries.AcceptAdminTotpStepCAS(ctx, sqlcgen.AcceptAdminTotpStepCASParams{

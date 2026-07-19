@@ -222,11 +222,12 @@ func execFormattedStatement(t testing.TB, ctx context.Context, pool *pgxpool.Poo
 	t.Helper()
 
 	placeholders := make([]string, len(args)+1)
-	placeholders[0] = "$1"
+	// PostgreSQL cannot infer unknown parameter types for format's variadic text arguments; cast every fixture value explicitly.
+	placeholders[0] = "$1::text"
 	queryArgs := make([]any, 0, len(args)+1)
 	queryArgs = append(queryArgs, template)
 	for index, argument := range args {
-		placeholders[index+1] = fmt.Sprintf("$%d", index+2)
+		placeholders[index+1] = fmt.Sprintf("$%d::text", index+2)
 		queryArgs = append(queryArgs, argument)
 	}
 	var statement string
@@ -272,7 +273,7 @@ func cleanupPrivilegeDatabase(t testing.TB, adminPool *pgxpool.Pool, fixture *Pr
 		{template: "DROP ROLE IF EXISTS %I", name: fixture.OwnerRole},
 	} {
 		var sqlStatement string
-		if err := adminPool.QueryRow(ctx, "SELECT pg_catalog.format($1, $2)", statement.template, statement.name).Scan(&sqlStatement); err != nil {
+		if err := adminPool.QueryRow(ctx, "SELECT pg_catalog.format($1::text, $2::text)", statement.template, statement.name).Scan(&sqlStatement); err != nil {
 			t.Errorf("format PostgreSQL cleanup statement: %v", err)
 			continue
 		}

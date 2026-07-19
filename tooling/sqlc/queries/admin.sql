@@ -53,7 +53,7 @@ SET last_accepted_totp_step = sqlc.arg(totp_step),
     updated_at = sqlc.arg(accepted_at)
 WHERE singleton_id = 1
   AND admin_id = sqlc.arg(admin_id)
-  AND status = 'active'
+  AND status IN ('setup_required', 'recovery_pending', 'active')
   AND admin_version = sqlc.arg(expected_admin_version)
   AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < sqlc.arg(totp_step))
 RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at;

@@ -28,7 +28,7 @@ type Querier interface {
 	//      updated_at = $2
 	//  WHERE singleton_id = 1
 	//    AND admin_id = $3
-	//    AND status = 'active'
+	//    AND status IN ('setup_required', 'recovery_pending', 'active')
 	//    AND admin_version = $4
 	//    AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < $1)
 	//  RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at

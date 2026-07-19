@@ -82,7 +82,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		owner, _ := outbox.ParseLeaseOwner("checkpoint-worker")
-		acquiredAt := time.Now().UTC()
+		acquiredAt := databaseIntegrationTime(t, ctx, fixture)
 		leased, transition, err := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(time.Minute))
 		if err != nil {
 			t.Fatal(err)
@@ -163,7 +163,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		eventTypeA, _ := outbox.ParseEventType("test.event_a")
 		eventTypeB, _ := outbox.ParseEventType("test.event_b")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		eventA, _ := outbox.NewEvent(uuid.New(), eventTypeA, aggregateType, uuid.New(), []byte("a"), createdAt, createdAt)
 		eventB, _ := outbox.NewEvent(uuid.New(), eventTypeB, aggregateType, uuid.New(), []byte("b"), createdAt, createdAt)
 		eventRepository := newOutboxEventRepository(sqlcgen.New(fixture.Pool))
@@ -179,7 +179,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
 		consumerA := registerIntegrationConsumer(t, ctx, consumerRepository, "test.consumer_a", eventTypeA, createdAt)
 		consumerB := registerIntegrationConsumer(t, ctx, consumerRepository, "test.consumer_b", eventTypeB, createdAt)
-		ackedA := leaseAndAckIntegrationConsumer(t, ctx, consumerRepository, consumerA, "worker-a", persistedA)
+		ackedA := leaseAndAckIntegrationConsumer(t, ctx, fixture, consumerRepository, consumerA, "worker-a", persistedA)
 		beforeB, err := consumerRepository.Get(ctx, consumerB.Snapshot().ID)
 		if err != nil {
 			t.Fatal(err)
@@ -187,7 +187,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		if beforeB.Snapshot().LastAckedSequence != 0 || beforeB.Snapshot().LeaseOwner != "" {
 			t.Fatal("consumer A transition changed consumer B state")
 		}
-		ackedB := leaseAndAckIntegrationConsumer(t, ctx, consumerRepository, beforeB, "worker-b", persistedB)
+		ackedB := leaseAndAckIntegrationConsumer(t, ctx, fixture, consumerRepository, beforeB, "worker-b", persistedB)
 		if ackedA.Snapshot().LastAckedSequence == ackedB.Snapshot().LastAckedSequence {
 			t.Fatal("independent consumers unexpectedly share an offset")
 		}
@@ -196,7 +196,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 	t.Run("consumer cannot skip an available subscribed event", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.ordered")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		eventRepository := newOutboxEventRepository(sqlcgen.New(fixture.Pool))
 		first, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("first"), createdAt, createdAt)
 		second, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("second"), createdAt, createdAt)
@@ -212,7 +212,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
 		consumer := registerIntegrationConsumer(t, ctx, consumerRepository, "test.ordered_consumer", eventType, createdAt)
 		owner, _ := outbox.ParseLeaseOwner("ordered-worker")
-		acquiredAt := time.Now().UTC()
+		acquiredAt := databaseIntegrationTime(t, ctx, fixture)
 		leased, transition, err := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(time.Minute))
 		if err != nil {
 			t.Fatal(err)
@@ -244,7 +244,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 	t.Run("outbox sequence allocation is serialized until producer commit", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.commit_order")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		first, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("first"), createdAt, createdAt)
 		second, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("second"), createdAt, createdAt)
 
@@ -302,7 +302,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 	t.Run("delayed subscribed event blocks later offset", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.delayed")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		first, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("delayed"), createdAt, createdAt.Add(time.Minute))
 		second, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("ready"), createdAt, createdAt)
 		eventRepository := newOutboxEventRepository(sqlcgen.New(fixture.Pool))
@@ -318,7 +318,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
 		consumer := registerIntegrationConsumer(t, ctx, consumerRepository, "test.delayed_consumer", eventType, createdAt)
 		owner, _ := outbox.ParseLeaseOwner("delayed-worker")
-		acquiredAt := time.Now().UTC()
+		acquiredAt := databaseIntegrationTime(t, ctx, fixture)
 		leased, transition, _ := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(time.Minute))
 		leased, err = consumerRepository.AcquireLeaseCAS(ctx, transition)
 		if err != nil {
@@ -343,7 +343,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 	t.Run("retry backoff blocks list while lease remains owned", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.retry")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		event, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("retry"), createdAt, createdAt)
 		if _, err := newOutboxEventRepository(sqlcgen.New(fixture.Pool)).Insert(ctx, event); err != nil {
 			t.Fatal(err)
@@ -351,7 +351,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
 		consumer := registerIntegrationConsumer(t, ctx, consumerRepository, "test.retry_consumer", eventType, createdAt)
 		owner, _ := outbox.ParseLeaseOwner("retry-worker")
-		acquiredAt := time.Now().UTC()
+		acquiredAt := databaseIntegrationTime(t, ctx, fixture)
 		leased, transition, _ := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(time.Minute))
 		leased, err := consumerRepository.AcquireLeaseCAS(ctx, transition)
 		if err != nil {
@@ -363,7 +363,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		batch, _ := outbox.NewEventBatch(retrying.Snapshot().ID, owner, time.Now().UTC(), 10)
+		batch, _ := outbox.NewEventBatch(retrying.Snapshot().ID, owner, databaseIntegrationTime(t, ctx, fixture), 10)
 		available, err := consumerRepository.ListAvailable(ctx, batch)
 		if err != nil {
 			t.Fatal(err)
@@ -376,7 +376,7 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 	t.Run("expired lease rejects a preconstructed acknowledgement", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.expired_lease")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
-		createdAt := time.Now().UTC()
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
 		event, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("expired"), createdAt, createdAt)
 		persisted, err := newOutboxEventRepository(sqlcgen.New(fixture.Pool)).Insert(ctx, event)
 		if err != nil {
@@ -385,8 +385,8 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
 		consumer := registerIntegrationConsumer(t, ctx, consumerRepository, "test.expired_consumer", eventType, createdAt)
 		owner, _ := outbox.ParseLeaseOwner("expired-worker")
-		acquiredAt := time.Now().UTC()
-		leased, transition, _ := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(50*time.Millisecond))
+		acquiredAt := databaseIntegrationTime(t, ctx, fixture)
+		leased, transition, _ := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(2*time.Second))
 		leased, err = consumerRepository.AcquireLeaseCAS(ctx, transition)
 		if err != nil {
 			t.Fatal(err)
@@ -394,7 +394,10 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		_, ackTransition, _ := leased.Acknowledge(
 			owner, leased.Snapshot().LastAckedSequence, persisted.Snapshot().Sequence, acquiredAt.Add(time.Microsecond),
 		)
-		time.Sleep(75 * time.Millisecond)
+		// Waiting on the database clock avoids making lease expiry depend on client/server clock synchronization.
+		if _, err := fixture.Pool.Exec(ctx, "SELECT pg_catalog.pg_sleep(2.1)"); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := consumerRepository.AcknowledgeCAS(ctx, ackTransition); !errors.Is(err, outbox.ErrConcurrentTransition) {
 			t.Fatalf("expired ack error = %v, want concurrent transition", err)
 		}
@@ -456,6 +459,7 @@ func registerIntegrationConsumer(
 func leaseAndAckIntegrationConsumer(
 	t testing.TB,
 	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
 	repository *OutboxConsumerRepository,
 	consumer outbox.Consumer,
 	ownerValue string,
@@ -466,7 +470,7 @@ func leaseAndAckIntegrationConsumer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	acquiredAt := time.Now().UTC()
+	acquiredAt := databaseIntegrationTime(t, ctx, fixture)
 	leased, transition, err := consumer.AcquireLease(owner, acquiredAt, acquiredAt.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)

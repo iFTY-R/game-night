@@ -35,14 +35,19 @@ func TestIdentityAssistedRecoveryRepositoryConsumesAndRevokesActiveGrant(t *test
 	}
 	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO users (user_id, status, created_at, updated_at)
-		VALUES ($1, 'onboarding', $2, $2);
+		VALUES ($1, 'onboarding', $2, $2)
+	`, userID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO admin_assisted_recovery_grants (
 			assisted_grant_id, user_id, selector, secret_hash, purpose, status,
 			attempt_count, max_attempts, created_by_admin_id, created_at, expires_at
 		) VALUES (
-			$3, $1, $4, $5, 'identity.assisted_recovery', 'active', 0, 5, $6, $2, $7
+			$1, $2, $3, $4, 'identity.assisted_recovery', 'active', 0, 5, $5, $6, $7
 		)
-	`, userID, now, firstGrantID, firstSelector.Value(), persistenceRecoveryPHC, adminID,
+	`, firstGrantID, userID, firstSelector.Value(), persistenceRecoveryPHC, adminID, now,
 		now.Add(identityDomain.AssistedRecoveryTTL))
 	if err != nil {
 		t.Fatal(err)
@@ -110,15 +115,20 @@ func TestIdentityDeviceRepositoryListsAndRevokesWithoutExposingSecrets(t *testin
 	directRevokedID := uuid.New()
 	_, err := fixture.Pool.Exec(ctx, `
 		INSERT INTO users (user_id, status, created_at, updated_at)
-		VALUES ($1, 'onboarding', $2, $2);
+		VALUES ($1, 'onboarding', $2, $2)
+	`, userID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO device_credentials (
 			credential_id, user_id, secret_hash, secret_key_version, csrf_hash, generation, label,
 			created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at
 		) VALUES
-			($3, $1, decode(repeat('11', 32), 'hex'), 1, decode(repeat('21', 32), 'hex'), 1, 'Preserved', $2, $2, $2, $4, $5),
-			($6, $1, decode(repeat('12', 32), 'hex'), 1, decode(repeat('22', 32), 'hex'), 1, 'Bulk revoked', $2, $2, $2, $4, $5),
-			($7, $1, decode(repeat('13', 32), 'hex'), 1, decode(repeat('23', 32), 'hex'), 1, 'Direct revoked', $2, $2, $2, $4, $5)
-	`, userID, now, preservedID, now.Add(identityDomain.DeviceIdleTTL),
+			($1, $2, decode(repeat('11', 32), 'hex'), 1, decode(repeat('21', 32), 'hex'), 1, 'Preserved', $3, $3, $3, $4, $5),
+			($6, $2, decode(repeat('12', 32), 'hex'), 1, decode(repeat('22', 32), 'hex'), 1, 'Bulk revoked', $3, $3, $3, $4, $5),
+			($7, $2, decode(repeat('13', 32), 'hex'), 1, decode(repeat('23', 32), 'hex'), 1, 'Direct revoked', $3, $3, $3, $4, $5)
+	`, preservedID, userID, now, now.Add(identityDomain.DeviceIdleTTL),
 		now.Add(identityDomain.DeviceAbsoluteTTL), bulkRevokedID, directRevokedID)
 	if err != nil {
 		t.Fatal(err)

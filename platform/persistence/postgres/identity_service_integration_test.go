@@ -596,7 +596,7 @@ func integrationIdentityService(t testing.TB, fixture *integrationtest.PostgresS
 
 func newIntegrationIdentityRuntime(t testing.TB, fixture *integrationtest.PostgresSchema) integrationIdentityRuntime {
 	t.Helper()
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := databaseIntegrationTime(t, context.Background(), fixture)
 	serviceClock := clock.NewFake(now)
 	challengeKeyring := integrationChallengeKeyring[security.UserChallengeKeyPurpose](t, now)
 	challengeService, err := identityDomain.NewChallengeService(challengeKeyring, serviceClock)

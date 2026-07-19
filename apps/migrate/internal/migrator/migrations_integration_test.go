@@ -383,7 +383,7 @@ func migrationNineRecoveryAttemptSQL(attemptUserID, expiryInterval string) strin
 			'a3000000-0000-4000-8000-000000000001', decode(repeat('22', 32), 'hex'),
 			'identity.recovery', NULL, 0, 5, 'active',
 			transaction_timestamp(), transaction_timestamp() + interval '%s'
-		)
+		);
 	`, attemptUserID, expiryInterval)
 }
 
@@ -631,10 +631,18 @@ func TestResetAdminAccountRejectsMissingSingleton(t *testing.T) {
 		runtimeRoleSetting:     currentUser,
 		workerRoleSetting:      currentUser,
 	})
-	if err := Run(ctx, database, migrationDirectory(t), "up"); err != nil {
+	migrationsDir := migrationDirectory(t)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationsDir, 4); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fixture.Pool.Exec(ctx, "DELETE FROM admin_accounts WHERE singleton_id = 1"); err != nil {
+		t.Fatal(err)
+	}
+	// Later migrations revoke direct singleton deletion, so construct the missing-row state before applying them.
+	if err := Run(ctx, database, migrationsDir, "up"); err != nil {
 		t.Fatal(err)
 	}
 

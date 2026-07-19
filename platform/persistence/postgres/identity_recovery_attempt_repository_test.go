@@ -68,21 +68,34 @@ func TestIdentityRecoveryAttemptRepositoryPersistsNullThenConsumedDigest(t *test
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	current := recoveryAttemptFixture(t, now)
 	snapshot := current.Snapshot()
-	_, err := fixture.Pool.Exec(ctx, `
+	sourceSelector, err := identifier.NewSelector(bytes.Repeat([]byte{0x88}, identityDomain.RecoverySelectorBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO users (user_id, status, created_at, updated_at)
-		VALUES ($1, 'onboarding', $2, $2);
+		VALUES ($1, 'onboarding', $2, $2)
+	`, snapshot.Binding.UserID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO user_recovery_credentials (
 			recovery_credential_id, user_id, selector, secret_hash, version, status, created_at
-		) VALUES ($3, $1, 'integration-recovery-source', $7, 1, 'active', $2);
+		) VALUES ($1, $2, $3, $4, 1, 'active', $5)
+	`, snapshot.Binding.RecoveryCredentialID, snapshot.Binding.UserID, sourceSelector.Value(), persistenceRecoveryPHC, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.Pool.Exec(ctx, `
 		INSERT INTO anonymous_challenges (
 			challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
 			origin_hash, request_flow_id, max_attempts, created_at, expires_at
 		) VALUES (
-			$4, 'integration-recovery-challenge', decode(repeat('11', 32), 'hex'), 1,
-			'identity.recovery', 'identity.v1.IdentityService', $5, 'integration-recovery-flow', 5, $2, $6
+			$1, 'integration-recovery-challenge', decode(repeat('11', 32), 'hex'), 1,
+			'identity.recovery', 'identity.v1.IdentityService', $2, 'integration-recovery-flow', 5, $3, $4
 		)
-	`, snapshot.Binding.UserID, now, snapshot.Binding.RecoveryCredentialID,
-		snapshot.Binding.ChallengeID, snapshot.Binding.Origin[:], now.Add(5*time.Minute), persistenceRecoveryPHC)
+	`, snapshot.Binding.ChallengeID, snapshot.Binding.Origin[:], now, now.Add(5*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,6 +120,8 @@ func TestIdentityRecoveryAttemptRepositoryPersistsNullThenConsumedDigest(t *test
 	resultBinding := integrationResultBinding(t, snapshot.Binding.UserID, 0x66)
 	result := integrationAvailableResult(t, uuid.New(), resultBinding, now, now.Add(4*time.Minute))
 	next := consumedRecoveryAttempt(t, current, now.Add(time.Minute), result.Snapshot().ID, 0x77)
+	// UnitOfWork normalizes domain errors, so retain the active repository step for actionable failures.
+	failedStep := "get recovery credential"
 	if err := unitOfWork.RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
 		source, getErr := transaction.RecoveryCredentials().GetForUpdate(
 			ctx, snapshot.Binding.RecoveryCredentialID, snapshot.Binding.UserID, snapshot.Binding.RecoveryCredentialVersion,
@@ -114,24 +129,29 @@ func TestIdentityRecoveryAttemptRepositoryPersistsNullThenConsumedDigest(t *test
 		if getErr != nil {
 			return getErr
 		}
+		failedStep = "consume recovery credential domain state"
 		consumedSource, getErr := source.Consume(now.Add(time.Minute))
 		if getErr != nil {
 			return getErr
 		}
+		failedStep = "persist consumed recovery credential"
 		if _, getErr = transaction.RecoveryCredentials().ConsumeCAS(ctx, source, consumedSource); getErr != nil {
 			return getErr
 		}
+		failedStep = "lock recovery attempt"
 		locked, getErr := transaction.RecoveryAttempts().GetForUpdate(ctx, snapshot.Selector)
 		if getErr != nil {
 			return getErr
 		}
+		failedStep = "insert recovery result"
 		if _, getErr = transaction.SecretResults().InsertAvailable(ctx, result); getErr != nil {
 			return getErr
 		}
+		failedStep = "persist consumed recovery attempt"
 		_, getErr = transaction.RecoveryAttempts().ConsumeCAS(ctx, locked, next)
 		return getErr
 	}); err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: %v", failedStep, err)
 	}
 	var consumedDigest []byte
 	if err := fixture.Pool.QueryRow(ctx, `

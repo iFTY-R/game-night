@@ -4,6 +4,13 @@ SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
 FROM user_profiles
 WHERE user_id = sqlc.arg(user_id);
 
+-- name: GetUserProfileForUpdate :one
+SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
+       profile_version, real_name_updated_at, real_name_updated_by
+FROM user_profiles
+WHERE user_id = sqlc.arg(user_id)
+FOR UPDATE;
+
 -- name: CreateUserProfile :one
 INSERT INTO user_profiles (
     user_id,
@@ -88,6 +95,19 @@ INSERT INTO profile_export_items (
 )
 RETURNING export_id, ordinal, user_id, username, profile_version,
           real_name_ciphertext, real_name_nonce, real_name_key_version;
+
+-- name: ListProfileExportSources :many
+SELECT users.user_id,
+       users.username,
+       user_profiles.profile_version,
+       user_profiles.real_name_ciphertext,
+       user_profiles.real_name_nonce,
+       user_profiles.real_name_key_version
+FROM users
+LEFT JOIN user_profiles ON user_profiles.user_id = users.user_id
+WHERE (cardinality(sqlc.arg(user_ids)::uuid[]) = 0 OR users.user_id = ANY(sqlc.arg(user_ids)::uuid[]))
+  AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR users.status = ANY(sqlc.arg(statuses)::text[]))
+ORDER BY users.user_id;
 
 -- name: GetProfileExportContextForUpdate :one
 SELECT export_id, created_by_admin_id, filter_digest, requested_fields, schema_version,

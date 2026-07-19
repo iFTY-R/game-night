@@ -803,6 +803,42 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User,
 	return i, err
 }
 
+const getUserByUsernameKey = `-- name: GetUserByUsernameKey :one
+SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+FROM username_claims AS claim
+JOIN users AS u ON u.user_id = claim.owner_user_id
+WHERE claim.username_key = $1
+  AND claim.status = 'active'
+  AND u.current_username_key = claim.username_key
+`
+
+type GetUserByUsernameKeyParams struct {
+	UsernameKey string `json:"username_key"`
+}
+
+// GetUserByUsernameKey
+//
+//	SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+//	FROM username_claims AS claim
+//	JOIN users AS u ON u.user_id = claim.owner_user_id
+//	WHERE claim.username_key = $1
+//	  AND claim.status = 'active'
+//	  AND u.current_username_key = claim.username_key
+func (q *Queries) GetUserByUsernameKey(ctx context.Context, arg GetUserByUsernameKeyParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsernameKey, arg.UsernameKey)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Status,
+		&i.Username,
+		&i.CurrentUsernameKey,
+		&i.UsernameChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserForUpdate = `-- name: GetUserForUpdate :one
 SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 FROM users
@@ -1422,6 +1458,7 @@ SET status = $1,
 WHERE user_id = $5
   AND status = $6
   AND current_username_key IS NOT DISTINCT FROM $7::text
+  AND updated_at = $8
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 `
 
@@ -1433,6 +1470,7 @@ type SetCurrentUsernameCASParams struct {
 	UserID              pgtype.UUID        `json:"user_id"`
 	ExpectedStatus      string             `json:"expected_status"`
 	ExpectedUsernameKey pgtype.Text        `json:"expected_username_key"`
+	ExpectedUpdatedAt   pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // SetCurrentUsernameCAS
@@ -1446,6 +1484,7 @@ type SetCurrentUsernameCASParams struct {
 //	WHERE user_id = $5
 //	  AND status = $6
 //	  AND current_username_key IS NOT DISTINCT FROM $7::text
+//	  AND updated_at = $8
 //	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 func (q *Queries) SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsernameCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, setCurrentUsernameCAS,
@@ -1456,6 +1495,7 @@ func (q *Queries) SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsern
 		arg.UserID,
 		arg.ExpectedStatus,
 		arg.ExpectedUsernameKey,
+		arg.ExpectedUpdatedAt,
 	)
 	var i User
 	err := row.Scan(
@@ -1576,14 +1616,16 @@ SET status = $1,
     updated_at = $2
 WHERE user_id = $3
   AND status = $4
+  AND updated_at = $5
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 `
 
 type TransitionUserStatusCASParams struct {
-	NextStatus     string             `json:"next_status"`
-	ChangedAt      pgtype.Timestamptz `json:"changed_at"`
-	UserID         pgtype.UUID        `json:"user_id"`
-	ExpectedStatus string             `json:"expected_status"`
+	NextStatus        string             `json:"next_status"`
+	ChangedAt         pgtype.Timestamptz `json:"changed_at"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	ExpectedStatus    string             `json:"expected_status"`
+	ExpectedUpdatedAt pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 // TransitionUserStatusCAS
@@ -1595,6 +1637,7 @@ type TransitionUserStatusCASParams struct {
 //	    updated_at = $2
 //	WHERE user_id = $3
 //	  AND status = $4
+//	  AND updated_at = $5
 //	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 func (q *Queries) TransitionUserStatusCAS(ctx context.Context, arg TransitionUserStatusCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, transitionUserStatusCAS,
@@ -1602,6 +1645,7 @@ func (q *Queries) TransitionUserStatusCAS(ctx context.Context, arg TransitionUse
 		arg.ChangedAt,
 		arg.UserID,
 		arg.ExpectedStatus,
+		arg.ExpectedUpdatedAt,
 	)
 	var i User
 	err := row.Scan(

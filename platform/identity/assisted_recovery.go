@@ -58,6 +58,61 @@ type AssistedRecoveryGrantSnapshot struct {
 // AssistedRecoveryGrant is immutable so identity and admin services share one state machine.
 type AssistedRecoveryGrant struct{ snapshot AssistedRecoveryGrantSnapshot }
 
+// IssuedAssistedRecoveryGrant separates the hash-only aggregate from the one-time administrator-delivered code.
+type IssuedAssistedRecoveryGrant struct {
+	Grant AssistedRecoveryGrant
+	Code  string
+}
+
+// IssueAssisted creates a 15-minute grant with independent selector and 256-bit secret entropy.
+func (service *RecoveryCodeService) IssueAssisted(
+	ctx context.Context,
+	userID, adminID uuid.UUID,
+	at time.Time,
+) (IssuedAssistedRecoveryGrant, error) {
+	if service == nil || service.hasher == nil || ctx == nil || userID == uuid.Nil || adminID == uuid.Nil {
+		return IssuedAssistedRecoveryGrant{}, ErrInvalidAssistedRecoveryGrant
+	}
+	selectorEntropy, err := security.RandomBytes(AssistedRecoverySelectorBytes)
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, err
+	}
+	defer clear(selectorEntropy)
+	selector, err := identifier.NewSelector(selectorEntropy)
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, ErrInvalidAssistedRecoveryGrant
+	}
+	secret, err := security.RandomBytes(AssistedRecoverySecretBytes)
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, err
+	}
+	defer clear(secret)
+	hashInput := assistedRecoverySecretHashInput(selector, secret)
+	secretHash, err := service.hasher.Hash(ctx, hashInput)
+	clear(hashInput)
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, err
+	}
+	grantID, err := uuid.NewV7()
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, ErrInvalidAssistedRecoveryGrant
+	}
+	grant, err := RestoreAssistedRecoveryGrant(AssistedRecoveryGrantSnapshot{
+		ID: grantID, UserID: userID, Selector: selector, SecretHash: secretHash,
+		Purpose: AssistedRecoveryPurpose, Status: AssistedRecoveryGrantActive,
+		MaxAttempts: AssistedRecoveryMaxAttempts, CreatedByAdminID: adminID,
+		CreatedAt: at, ExpiresAt: at.Add(AssistedRecoveryTTL),
+	})
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, err
+	}
+	code, err := security.FormatToken(AssistedRecoveryCodeVersion, selector.Value(), secret)
+	if err != nil {
+		return IssuedAssistedRecoveryGrant{}, ErrInvalidAssistedRecoveryGrant
+	}
+	return IssuedAssistedRecoveryGrant{Grant: grant, Code: code}, nil
+}
+
 // AssistedSelectorFromCode parses only the public lookup component and clears the submitted secret.
 func (service *RecoveryCodeService) AssistedSelectorFromCode(encoded string) (identifier.Selector, error) {
 	parsed, err := parseAssistedRecoveryCode(encoded)

@@ -18,6 +18,9 @@ func TestIdentityEventRoutingValuesAreCanonical(t *testing.T) {
 	for _, eventType := range []EventType{
 		EventTypeIdentityRecoveryCompleted,
 		EventTypeIdentityDeviceRevoked,
+		EventTypeIdentityUserSuspended,
+		EventTypeIdentityUserUnsuspended,
+		EventTypeIdentityUserDeleted,
 	} {
 		if !eventType.Valid() {
 			t.Fatalf("invalid identity event type %q", eventType)
@@ -95,6 +98,27 @@ func TestIdentityDeviceRevokedPayloadIsSecretFree(t *testing.T) {
 		uuid.MustParse(message.DeviceCredentialId), payload, now, now,
 	); err != nil {
 		t.Fatalf("construct device revocation outbox event: %v", err)
+	}
+	assertIdentityEventDescriptorHasNoSecrets(t, message.ProtoReflect().Descriptor())
+}
+
+func TestIdentityUserStatusChangedPayloadIsDeterministicAndSecretFree(t *testing.T) {
+	now := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
+	message := &identityv1.IdentityUserStatusChangedEvent{
+		SchemaVersion: 1, EventId: uuid.NewString(), RequestId: "request-suspend-1", OccurredAt: timestamppb.New(now),
+		UserId: uuid.NewString(), PreviousStatus: identityv1.UserStatus_USER_STATUS_ACTIVE,
+		CurrentStatus: identityv1.UserStatus_USER_STATUS_SUSPENDED, ActorAdminId: uuid.NewString(),
+	}
+	first, err := (proto.MarshalOptions{Deterministic: true}).Marshal(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := (proto.MarshalOptions{Deterministic: true}).Marshal(message)
+	if err != nil || !bytes.Equal(first, second) {
+		t.Fatalf("status event was not deterministic: err=%v", err)
+	}
+	if _, err := NewEvent(uuid.New(), EventTypeIdentityUserSuspended, AggregateTypeIdentityUser, uuid.MustParse(message.UserId), first, now, now); err != nil {
+		t.Fatalf("construct status outbox event: %v", err)
 	}
 	assertIdentityEventDescriptorHasNoSecrets(t, message.ProtoReflect().Descriptor())
 }

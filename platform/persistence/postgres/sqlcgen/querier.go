@@ -1210,6 +1210,15 @@ type Querier interface {
 	//  FROM users
 	//  WHERE user_id = $1
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
+	//GetUserByUsernameKey
+	//
+	//  SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+	//  FROM username_claims AS claim
+	//  JOIN users AS u ON u.user_id = claim.owner_user_id
+	//  WHERE claim.username_key = $1
+	//    AND claim.status = 'active'
+	//    AND u.current_username_key = claim.username_key
+	GetUserByUsernameKey(ctx context.Context, arg GetUserByUsernameKeyParams) (User, error)
 	//GetUserForUpdate
 	//
 	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
@@ -1224,6 +1233,14 @@ type Querier interface {
 	//  FROM user_profiles
 	//  WHERE user_id = $1
 	GetUserProfile(ctx context.Context, arg GetUserProfileParams) (UserProfile, error)
+	//GetUserProfileForUpdate
+	//
+	//  SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
+	//         profile_version, real_name_updated_at, real_name_updated_by
+	//  FROM user_profiles
+	//  WHERE user_id = $1
+	//  FOR UPDATE
+	GetUserProfileForUpdate(ctx context.Context, arg GetUserProfileForUpdateParams) (UserProfile, error)
 	//GetUserRecoveryAttemptBySelector
 	//
 	//  SELECT recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version,
@@ -1362,6 +1379,20 @@ type Querier interface {
 	//  ORDER BY export_id, ordinal
 	//  LIMIT $4
 	ListProfileExportItemsForKeyRotation(ctx context.Context, arg ListProfileExportItemsForKeyRotationParams) ([]ListProfileExportItemsForKeyRotationRow, error)
+	//ListProfileExportSources
+	//
+	//  SELECT users.user_id,
+	//         users.username,
+	//         user_profiles.profile_version,
+	//         user_profiles.real_name_ciphertext,
+	//         user_profiles.real_name_nonce,
+	//         user_profiles.real_name_key_version
+	//  FROM users
+	//  LEFT JOIN user_profiles ON user_profiles.user_id = users.user_id
+	//  WHERE (cardinality($1::uuid[]) = 0 OR users.user_id = ANY($1::uuid[]))
+	//    AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
+	//  ORDER BY users.user_id
+	ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error)
 	//ListUserDeviceCredentials
 	//
 	//  SELECT credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
@@ -1735,6 +1766,7 @@ type Querier interface {
 	//  WHERE user_id = $5
 	//    AND status = $6
 	//    AND current_username_key IS NOT DISTINCT FROM $7::text
+	//    AND updated_at = $8
 	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 	SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsernameCASParams) (User, error)
 	//TouchAdminSessionCAS
@@ -1794,6 +1826,7 @@ type Querier interface {
 	//      updated_at = $2
 	//  WHERE user_id = $3
 	//    AND status = $4
+	//    AND updated_at = $5
 	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 	TransitionUserStatusCAS(ctx context.Context, arg TransitionUserStatusCASParams) (User, error)
 	//UpdateAdminPasswordCAS

@@ -23,6 +23,14 @@ FROM users
 WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
+-- name: GetUserByUsernameKey :one
+SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+FROM username_claims AS claim
+JOIN users AS u ON u.user_id = claim.owner_user_id
+WHERE claim.username_key = sqlc.arg(username_key)
+  AND claim.status = 'active'
+  AND u.current_username_key = claim.username_key;
+
 -- name: GetDeviceIdentityForUpdate :one
 WITH selected_device AS MATERIALIZED (
     SELECT selected.user_id
@@ -150,6 +158,7 @@ SET status = sqlc.arg(next_status),
 WHERE user_id = sqlc.arg(user_id)
   AND status = sqlc.arg(expected_status)
   AND current_username_key IS NOT DISTINCT FROM sqlc.narg(expected_username_key)::text
+  AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
 
 -- name: ReserveUsernameClaimCAS :one
@@ -371,4 +380,5 @@ SET status = sqlc.arg(next_status),
     updated_at = sqlc.arg(changed_at)
 WHERE user_id = sqlc.arg(user_id)
   AND status = sqlc.arg(expected_status)
+  AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;

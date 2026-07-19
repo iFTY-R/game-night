@@ -54,6 +54,33 @@ func TestRecoveryCodeIssuePropagatesBoundedHasherFailure(t *testing.T) {
 	}
 }
 
+func TestAssistedRecoveryIssueUses256BitSecretAndFixedTTL(t *testing.T) {
+	hasher := &recordingRecoveryHasher{hash: testRecoveryPHC}
+	service, err := NewRecoveryCodeService(hasher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	userID, adminID := uuid.New(), uuid.New()
+	issued, err := service.IssueAssisted(context.Background(), userID, adminID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := issued.Grant.Snapshot()
+	if snapshot.UserID != userID || snapshot.CreatedByAdminID != adminID || snapshot.Status != AssistedRecoveryGrantActive ||
+		!snapshot.ExpiresAt.Equal(now.Add(AssistedRecoveryTTL)) || snapshot.SecretHash != testRecoveryPHC {
+		t.Fatalf("unexpected assisted grant: %+v", snapshot)
+	}
+	parsed, err := security.ParseToken(issued.Code, security.TokenPolicy{Version: AssistedRecoveryCodeVersion, MinSecretBytes: AssistedRecoverySecretBytes, MaxSecretBytes: AssistedRecoverySecretBytes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(parsed.Secret)
+	if parsed.Selector != snapshot.Selector.Value() || len(parsed.Secret) != AssistedRecoverySecretBytes || len(hasher.input) <= AssistedRecoverySecretBytes {
+		t.Fatalf("unexpected assisted code shape: selector=%q secret=%d hash_input=%d", parsed.Selector, len(parsed.Secret), len(hasher.input))
+	}
+}
+
 func TestRestoreRecoveryCredentialAcceptsValidStatusMatrix(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	base := validRecoverySnapshot(t, now)

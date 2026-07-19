@@ -5,10 +5,29 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/idempotency"
+	"github.com/iFTY-R/game-night/platform/identity"
+	"github.com/iFTY-R/game-night/platform/outbox"
+	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 )
+
+// IdentityUserRepository exposes governance-only CAS transitions without widening the normal user service port.
+type IdentityUserRepository interface {
+	GetByID(context.Context, uuid.UUID) (identity.User, error)
+	GetByUsernameKey(context.Context, string) (identity.User, error)
+	GetForUpdate(context.Context, uuid.UUID) (identity.User, error)
+	TransitionStatusCAS(context.Context, identity.User, identity.User) (identity.User, error)
+	ForceChangeUsernameCAS(context.Context, identity.User, identity.User) (identity.User, error)
+}
+
+// AssistedRecoveryGrantRepository owns administrator issuance while the identity service owns proof verification.
+type AssistedRecoveryGrantRepository interface {
+	Create(context.Context, identity.AssistedRecoveryGrant) (identity.AssistedRecoveryGrant, error)
+	RevokeActiveForUser(context.Context, uuid.UUID, uuid.UUID, time.Time) ([]uuid.UUID, error)
+}
 
 // AccountRepository owns singleton account row locks and generation-aware security CAS operations.
 type AccountRepository interface {
@@ -53,6 +72,16 @@ type Transaction interface {
 	Enrollments() EnrollmentRepository
 	Sessions() SessionRepository
 	RecoveryCodes() RecoveryCodeRepository
+	IdentityUsers() IdentityUserRepository
+	IdentityUsernameClaims() identity.UsernameClaimRepository
+	IdentityDevices() identity.DeviceRepository
+	IdentityRecoveryCredentials() identity.RecoveryCredentialRepository
+	Profiles() profile.Repository
+	ProfileExports() profile.ExportRepository
+	AssistedRecoveryGrants() AssistedRecoveryGrantRepository
+	Audit() audit.Repository
+	AuditCheckpoints() audit.CheckpointRepository
+	OutboxEvents() outbox.EventRepository
 }
 
 // TransactionWork is scoped to one database transaction and must not retain repository values.

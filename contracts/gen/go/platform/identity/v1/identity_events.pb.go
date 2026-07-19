@@ -370,6 +370,107 @@ func (x *IdentityDeviceRevokedEvent) GetReason() IdentityDeviceRevocationReason 
 	return IdentityDeviceRevocationReason_IDENTITY_DEVICE_REVOCATION_REASON_UNSPECIFIED
 }
 
+// IdentityUserStatusChangedEvent notifies downstream modules to recheck authoritative user state.
+type IdentityUserStatusChangedEvent struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SchemaVersion  uint32                 `protobuf:"varint,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	EventId        string                 `protobuf:"bytes,2,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	RequestId      string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	OccurredAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	UserId         string                 `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PreviousStatus UserStatus             `protobuf:"varint,6,opt,name=previous_status,json=previousStatus,proto3,enum=platform.identity.v1.UserStatus" json:"previous_status,omitempty"`
+	CurrentStatus  UserStatus             `protobuf:"varint,7,opt,name=current_status,json=currentStatus,proto3,enum=platform.identity.v1.UserStatus" json:"current_status,omitempty"`
+	ActorAdminId   string                 `protobuf:"bytes,8,opt,name=actor_admin_id,json=actorAdminId,proto3" json:"actor_admin_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *IdentityUserStatusChangedEvent) Reset() {
+	*x = IdentityUserStatusChangedEvent{}
+	mi := &file_platform_identity_v1_identity_events_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdentityUserStatusChangedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdentityUserStatusChangedEvent) ProtoMessage() {}
+
+func (x *IdentityUserStatusChangedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_identity_v1_identity_events_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdentityUserStatusChangedEvent.ProtoReflect.Descriptor instead.
+func (*IdentityUserStatusChangedEvent) Descriptor() ([]byte, []int) {
+	return file_platform_identity_v1_identity_events_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IdentityUserStatusChangedEvent) GetSchemaVersion() uint32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *IdentityUserStatusChangedEvent) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *IdentityUserStatusChangedEvent) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *IdentityUserStatusChangedEvent) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *IdentityUserStatusChangedEvent) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *IdentityUserStatusChangedEvent) GetPreviousStatus() UserStatus {
+	if x != nil {
+		return x.PreviousStatus
+	}
+	return UserStatus_USER_STATUS_UNSPECIFIED
+}
+
+func (x *IdentityUserStatusChangedEvent) GetCurrentStatus() UserStatus {
+	if x != nil {
+		return x.CurrentStatus
+	}
+	return UserStatus_USER_STATUS_UNSPECIFIED
+}
+
+func (x *IdentityUserStatusChangedEvent) GetActorAdminId() string {
+	if x != nil {
+		return x.ActorAdminId
+	}
+	return ""
+}
+
 var File_platform_identity_v1_identity_events_proto protoreflect.FileDescriptor
 
 const file_platform_identity_v1_identity_events_proto_rawDesc = "" +
@@ -401,7 +502,18 @@ const file_platform_identity_v1_identity_events_proto_rawDesc = "" +
 	"occurredAt\x12\x17\n" +
 	"\auser_id\x18\x06 \x01(\tR\x06userId\x120\n" +
 	"\x14device_credential_id\x18\a \x01(\tR\x12deviceCredentialId\x12L\n" +
-	"\x06reason\x18\b \x01(\x0e24.platform.identity.v1.IdentityDeviceRevocationReasonR\x06reason*\xa1\x01\n" +
+	"\x06reason\x18\b \x01(\x0e24.platform.identity.v1.IdentityDeviceRevocationReasonR\x06reason\"\x91\x03\n" +
+	"\x1eIdentityUserStatusChangedEvent\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x12\x19\n" +
+	"\bevent_id\x18\x02 \x01(\tR\aeventId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12;\n" +
+	"\voccurred_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12\x17\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12I\n" +
+	"\x0fprevious_status\x18\x06 \x01(\x0e2 .platform.identity.v1.UserStatusR\x0epreviousStatus\x12G\n" +
+	"\x0ecurrent_status\x18\a \x01(\x0e2 .platform.identity.v1.UserStatusR\rcurrentStatus\x12$\n" +
+	"\x0eactor_admin_id\x18\b \x01(\tR\factorAdminId*\xa1\x01\n" +
 	"\x16IdentityRecoverySource\x12(\n" +
 	"$IDENTITY_RECOVERY_SOURCE_UNSPECIFIED\x10\x00\x12*\n" +
 	"&IDENTITY_RECOVERY_SOURCE_RECOVERY_CODE\x10\x01\x121\n" +
@@ -428,26 +540,31 @@ func file_platform_identity_v1_identity_events_proto_rawDescGZIP() []byte {
 }
 
 var file_platform_identity_v1_identity_events_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_platform_identity_v1_identity_events_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_platform_identity_v1_identity_events_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_platform_identity_v1_identity_events_proto_goTypes = []any{
 	(IdentityRecoverySource)(0),            // 0: platform.identity.v1.IdentityRecoverySource
 	(IdentityDeviceRevocationReason)(0),    // 1: platform.identity.v1.IdentityDeviceRevocationReason
 	(*IdentityRecoveryCompletedEvent)(nil), // 2: platform.identity.v1.IdentityRecoveryCompletedEvent
 	(*IdentityDeviceRevokedEvent)(nil),     // 3: platform.identity.v1.IdentityDeviceRevokedEvent
-	(*timestamppb.Timestamp)(nil),          // 4: google.protobuf.Timestamp
-	(RecoveryDevicePolicy)(0),              // 5: platform.identity.v1.RecoveryDevicePolicy
+	(*IdentityUserStatusChangedEvent)(nil), // 4: platform.identity.v1.IdentityUserStatusChangedEvent
+	(*timestamppb.Timestamp)(nil),          // 5: google.protobuf.Timestamp
+	(RecoveryDevicePolicy)(0),              // 6: platform.identity.v1.RecoveryDevicePolicy
+	(UserStatus)(0),                        // 7: platform.identity.v1.UserStatus
 }
 var file_platform_identity_v1_identity_events_proto_depIdxs = []int32{
-	4, // 0: platform.identity.v1.IdentityRecoveryCompletedEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	5, // 0: platform.identity.v1.IdentityRecoveryCompletedEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	0, // 1: platform.identity.v1.IdentityRecoveryCompletedEvent.source:type_name -> platform.identity.v1.IdentityRecoverySource
-	5, // 2: platform.identity.v1.IdentityRecoveryCompletedEvent.device_policy:type_name -> platform.identity.v1.RecoveryDevicePolicy
-	4, // 3: platform.identity.v1.IdentityDeviceRevokedEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	6, // 2: platform.identity.v1.IdentityRecoveryCompletedEvent.device_policy:type_name -> platform.identity.v1.RecoveryDevicePolicy
+	5, // 3: platform.identity.v1.IdentityDeviceRevokedEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	1, // 4: platform.identity.v1.IdentityDeviceRevokedEvent.reason:type_name -> platform.identity.v1.IdentityDeviceRevocationReason
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 5: platform.identity.v1.IdentityUserStatusChangedEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	7, // 6: platform.identity.v1.IdentityUserStatusChangedEvent.previous_status:type_name -> platform.identity.v1.UserStatus
+	7, // 7: platform.identity.v1.IdentityUserStatusChangedEvent.current_status:type_name -> platform.identity.v1.UserStatus
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_platform_identity_v1_identity_events_proto_init() }
@@ -462,7 +579,7 @@ func file_platform_identity_v1_identity_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_identity_v1_identity_events_proto_rawDesc), len(file_platform_identity_v1_identity_events_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

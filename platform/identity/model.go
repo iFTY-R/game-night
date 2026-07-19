@@ -166,6 +166,57 @@ func (user User) PlanUsernameChange(username identifier.Username, at time.Time) 
 	}, nil
 }
 
+// PlanForcedUsernameChange bypasses the user cooldown while preserving claim reservation and state invariants.
+// It is intended only for an already authorized administrator transaction.
+func (user User) PlanForcedUsernameChange(username identifier.Username, at time.Time) (UsernameChangePlan, error) {
+	at = canonicalUserTime(at)
+	if user.snapshot.Status != UserStatusActive && user.snapshot.Status != UserStatusSuspended {
+		return UsernameChangePlan{}, ErrUserStatus
+	}
+	if username.Display() == "" || username.Key() == "" || username.Key() == user.snapshot.CurrentUsernameKey {
+		return UsernameChangePlan{}, ErrInvalidUserInput
+	}
+	if at.Before(user.snapshot.UpdatedAt) {
+		return UsernameChangePlan{}, ErrIdentityConcurrentTransition
+	}
+	next := user.snapshot
+	next.Username = username.Display()
+	next.CurrentUsernameKey = username.Key()
+	next.UsernameChangedAt = at
+	next.UpdatedAt = at
+	nextUser, err := RestoreUser(next)
+	if err != nil {
+		return UsernameChangePlan{}, err
+	}
+	return UsernameChangePlan{
+		Next: nextUser, PreviousUsernameKey: user.snapshot.CurrentUsernameKey, ChangedAt: at,
+		ReservePreviousUntil: at.Add(UsernameReservationTTL),
+	}, nil
+}
+
+// TransitionForGovernance applies the reviewed administrator state matrix without restoring revoked credentials.
+func (user User) TransitionForGovernance(nextStatus UserStatus, at time.Time) (User, error) {
+	at = canonicalUserTime(at)
+	current := user.snapshot.Status
+	valid := current == UserStatusActive && nextStatus == UserStatusSuspended ||
+		current == UserStatusSuspended && nextStatus == UserStatusActive ||
+		(current == UserStatusActive || current == UserStatusSuspended) && nextStatus == UserStatusDeleted
+	if !valid {
+		return User{}, ErrUserStatus
+	}
+	if at.Before(user.snapshot.UpdatedAt) {
+		return User{}, ErrIdentityConcurrentTransition
+	}
+	next := user.snapshot
+	next.Status = nextStatus
+	next.UpdatedAt = at
+	if nextStatus == UserStatusDeleted {
+		next.Username = ""
+		next.CurrentUsernameKey = ""
+	}
+	return RestoreUser(next)
+}
+
 // UsernameClaimStatus is the closed state of the global username registry.
 type UsernameClaimStatus string
 

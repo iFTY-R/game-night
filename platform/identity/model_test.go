@@ -143,3 +143,36 @@ func TestOnboardingCompletionRejectsClockRollbackBehindLatestUserUpdate(t *testi
 		t.Fatalf("clock rollback onboarding error = %v", err)
 	}
 }
+
+func TestAdministratorGovernanceStatusMatrixAndForcedRename(t *testing.T) {
+	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	first, _ := identifier.ParseUsername("Alice9")
+	second, _ := identifier.ParseUsername("Bob9")
+	onboarding, _ := NewOnboardingUser(uuid.New(), now)
+	active, _ := onboarding.CompleteOnboarding(first, now.Add(time.Hour))
+
+	plan, err := active.PlanForcedUsernameChange(second, now.Add(2*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Next.Snapshot().Username != second.Display() || plan.PreviousUsernameKey != first.Key() ||
+		!plan.ReservePreviousUntil.Equal(plan.ChangedAt.Add(UsernameReservationTTL)) {
+		t.Fatalf("unexpected forced rename plan: %+v", plan)
+	}
+
+	suspended, err := plan.Next.TransitionForGovernance(UserStatusSuspended, now.Add(3*time.Hour))
+	if err != nil || suspended.Snapshot().Status != UserStatusSuspended {
+		t.Fatalf("suspend transition failed: user=%+v err=%v", suspended.Snapshot(), err)
+	}
+	unsuspended, err := suspended.TransitionForGovernance(UserStatusActive, now.Add(4*time.Hour))
+	if err != nil || unsuspended.Snapshot().Status != UserStatusActive {
+		t.Fatalf("unsuspend transition failed: user=%+v err=%v", unsuspended.Snapshot(), err)
+	}
+	deleted, err := unsuspended.TransitionForGovernance(UserStatusDeleted, now.Add(5*time.Hour))
+	if err != nil || deleted.Snapshot().Username != "" || deleted.Snapshot().CurrentUsernameKey != "" {
+		t.Fatalf("delete transition failed: user=%+v err=%v", deleted.Snapshot(), err)
+	}
+	if _, err := deleted.TransitionForGovernance(UserStatusActive, now.Add(6*time.Hour)); !errors.Is(err, ErrUserStatus) {
+		t.Fatalf("deleted user was restored by governance transition: %v", err)
+	}
+}

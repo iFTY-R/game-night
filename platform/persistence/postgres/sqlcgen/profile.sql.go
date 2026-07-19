@@ -455,6 +455,40 @@ func (q *Queries) GetUserProfile(ctx context.Context, arg GetUserProfileParams) 
 	return i, err
 }
 
+const getUserProfileForUpdate = `-- name: GetUserProfileForUpdate :one
+SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
+       profile_version, real_name_updated_at, real_name_updated_by
+FROM user_profiles
+WHERE user_id = $1
+FOR UPDATE
+`
+
+type GetUserProfileForUpdateParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+// GetUserProfileForUpdate
+//
+//	SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
+//	       profile_version, real_name_updated_at, real_name_updated_by
+//	FROM user_profiles
+//	WHERE user_id = $1
+//	FOR UPDATE
+func (q *Queries) GetUserProfileForUpdate(ctx context.Context, arg GetUserProfileForUpdateParams) (UserProfile, error) {
+	row := q.db.QueryRow(ctx, getUserProfileForUpdate, arg.UserID)
+	var i UserProfile
+	err := row.Scan(
+		&i.UserID,
+		&i.RealNameCiphertext,
+		&i.RealNameNonce,
+		&i.RealNameKeyVersion,
+		&i.ProfileVersion,
+		&i.RealNameUpdatedAt,
+		&i.RealNameUpdatedBy,
+	)
+	return i, err
+}
+
 const listProfileExportItems = `-- name: ListProfileExportItems :many
 SELECT export_id, ordinal, user_id, username, profile_version,
        real_name_ciphertext, real_name_nonce, real_name_key_version
@@ -492,6 +526,74 @@ func (q *Queries) ListProfileExportItems(ctx context.Context, arg ListProfileExp
 		if err := rows.Scan(
 			&i.ExportID,
 			&i.Ordinal,
+			&i.UserID,
+			&i.Username,
+			&i.ProfileVersion,
+			&i.RealNameCiphertext,
+			&i.RealNameNonce,
+			&i.RealNameKeyVersion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProfileExportSources = `-- name: ListProfileExportSources :many
+SELECT users.user_id,
+       users.username,
+       user_profiles.profile_version,
+       user_profiles.real_name_ciphertext,
+       user_profiles.real_name_nonce,
+       user_profiles.real_name_key_version
+FROM users
+LEFT JOIN user_profiles ON user_profiles.user_id = users.user_id
+WHERE (cardinality($1::uuid[]) = 0 OR users.user_id = ANY($1::uuid[]))
+  AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
+ORDER BY users.user_id
+`
+
+type ListProfileExportSourcesParams struct {
+	UserIds  []pgtype.UUID `json:"user_ids"`
+	Statuses []string      `json:"statuses"`
+}
+
+type ListProfileExportSourcesRow struct {
+	UserID             pgtype.UUID `json:"user_id"`
+	Username           pgtype.Text `json:"username"`
+	ProfileVersion     pgtype.Int8 `json:"profile_version"`
+	RealNameCiphertext []byte      `json:"real_name_ciphertext"`
+	RealNameNonce      []byte      `json:"real_name_nonce"`
+	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
+}
+
+// ListProfileExportSources
+//
+//	SELECT users.user_id,
+//	       users.username,
+//	       user_profiles.profile_version,
+//	       user_profiles.real_name_ciphertext,
+//	       user_profiles.real_name_nonce,
+//	       user_profiles.real_name_key_version
+//	FROM users
+//	LEFT JOIN user_profiles ON user_profiles.user_id = users.user_id
+//	WHERE (cardinality($1::uuid[]) = 0 OR users.user_id = ANY($1::uuid[]))
+//	  AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
+//	ORDER BY users.user_id
+func (q *Queries) ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error) {
+	rows, err := q.db.Query(ctx, listProfileExportSources, arg.UserIds, arg.Statuses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProfileExportSourcesRow{}
+	for rows.Next() {
+		var i ListProfileExportSourcesRow
+		if err := rows.Scan(
 			&i.UserID,
 			&i.Username,
 			&i.ProfileVersion,

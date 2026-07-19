@@ -6,7 +6,7 @@ import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2"
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { RecoveryDevicePolicy } from "./identity_pb";
+import type { RecoveryDevicePolicy, UserStatus } from "./identity_pb";
 import { file_platform_identity_v1_identity } from "./identity_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/identity/v1/identity_events.proto.
  */
 export const file_platform_identity_v1_identity_events: GenFile = /*@__PURE__*/
-  fileDesc("CipwbGF0Zm9ybS9pZGVudGl0eS92MS9pZGVudGl0eV9ldmVudHMucHJvdG8SFHBsYXRmb3JtLmlkZW50aXR5LnYxIscDCh5JZGVudGl0eVJlY292ZXJ5Q29tcGxldGVkRXZlbnQSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEAoIZXZlbnRfaWQYAiABKAkSEgoKcmVxdWVzdF9pZBgDIAEoCRIvCgtvY2N1cnJlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdXNlcl9pZBgFIAEoCRIgChhuZXdfZGV2aWNlX2NyZWRlbnRpYWxfaWQYBiABKAkSIgoabmV3X3JlY292ZXJ5X2NyZWRlbnRpYWxfaWQYByABKAkSEQoJcmVzdWx0X2lkGAggASgJEjwKBnNvdXJjZRgJIAEoDjIsLnBsYXRmb3JtLmlkZW50aXR5LnYxLklkZW50aXR5UmVjb3ZlcnlTb3VyY2USQQoNZGV2aWNlX3BvbGljeRgKIAEoDjIqLnBsYXRmb3JtLmlkZW50aXR5LnYxLlJlY292ZXJ5RGV2aWNlUG9saWN5EiUKHXJldm9rZWRfZGV2aWNlX2NyZWRlbnRpYWxfaWRzGAsgAygJEiQKHHJldm9rZWRfYXNzaXN0ZWRfZ3JhbnRfY291bnQYDCABKA0imAIKGklkZW50aXR5RGV2aWNlUmV2b2tlZEV2ZW50EhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhAKCGV2ZW50X2lkGAIgASgJEhYKDmNhdXNlX2V2ZW50X2lkGAMgASgJEhIKCnJlcXVlc3RfaWQYBCABKAkSLwoLb2NjdXJyZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB3VzZXJfaWQYBiABKAkSHAoUZGV2aWNlX2NyZWRlbnRpYWxfaWQYByABKAkSRAoGcmVhc29uGAggASgOMjQucGxhdGZvcm0uaWRlbnRpdHkudjEuSWRlbnRpdHlEZXZpY2VSZXZvY2F0aW9uUmVhc29uKqEBChZJZGVudGl0eVJlY292ZXJ5U291cmNlEigKJElERU5USVRZX1JFQ09WRVJZX1NPVVJDRV9VTlNQRUNJRklFRBAAEioKJklERU5USVRZX1JFQ09WRVJZX1NPVVJDRV9SRUNPVkVSWV9DT0RFEAESMQotSURFTlRJVFlfUkVDT1ZFUllfU09VUkNFX0FETUlOX0FTU0lTVEVEX0dSQU5UEAIqmgMKHklkZW50aXR5RGV2aWNlUmV2b2NhdGlvblJlYXNvbhIxCi1JREVOVElUWV9ERVZJQ0VfUkVWT0NBVElPTl9SRUFTT05fVU5TUEVDSUZJRUQQABI0CjBJREVOVElUWV9ERVZJQ0VfUkVWT0NBVElPTl9SRUFTT05fVVNFUl9SRVFVRVNURUQQARI1CjFJREVOVElUWV9ERVZJQ0VfUkVWT0NBVElPTl9SRUFTT05fQURNSU5fUkVRVUVTVEVEEAISLgoqSURFTlRJVFlfREVWSUNFX1JFVk9DQVRJT05fUkVBU09OX1JFQ09WRVJZEAMSOAo0SURFTlRJVFlfREVWSUNFX1JFVk9DQVRJT05fUkVBU09OX09OQk9BUkRJTkdfRVhQSVJFRBAEEjcKM0lERU5USVRZX0RFVklDRV9SRVZPQ0FUSU9OX1JFQVNPTl9BQ0NPVU5UX1NVU1BFTkRFRBAFEjUKMUlERU5USVRZX0RFVklDRV9SRVZPQ0FUSU9OX1JFQVNPTl9BQ0NPVU5UX0RFTEVURUQQBkJPWk1naXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2NvbnRyYWN0cy9nZW4vZ28vcGxhdGZvcm0vaWRlbnRpdHkvdjE7aWRlbnRpdHl2MWIGcHJvdG8z", [file_google_protobuf_timestamp, file_platform_identity_v1_identity]);
+  fileDesc("CipwbGF0Zm9ybS9pZGVudGl0eS92MS9pZGVudGl0eV9ldmVudHMucHJvdG8SFHBsYXRmb3JtLmlkZW50aXR5LnYxIscDCh5JZGVudGl0eVJlY292ZXJ5Q29tcGxldGVkRXZlbnQSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEAoIZXZlbnRfaWQYAiABKAkSEgoKcmVxdWVzdF9pZBgDIAEoCRIvCgtvY2N1cnJlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdXNlcl9pZBgFIAEoCRIgChhuZXdfZGV2aWNlX2NyZWRlbnRpYWxfaWQYBiABKAkSIgoabmV3X3JlY292ZXJ5X2NyZWRlbnRpYWxfaWQYByABKAkSEQoJcmVzdWx0X2lkGAggASgJEjwKBnNvdXJjZRgJIAEoDjIsLnBsYXRmb3JtLmlkZW50aXR5LnYxLklkZW50aXR5UmVjb3ZlcnlTb3VyY2USQQoNZGV2aWNlX3BvbGljeRgKIAEoDjIqLnBsYXRmb3JtLmlkZW50aXR5LnYxLlJlY292ZXJ5RGV2aWNlUG9saWN5EiUKHXJldm9rZWRfZGV2aWNlX2NyZWRlbnRpYWxfaWRzGAsgAygJEiQKHHJldm9rZWRfYXNzaXN0ZWRfZ3JhbnRfY291bnQYDCABKA0imAIKGklkZW50aXR5RGV2aWNlUmV2b2tlZEV2ZW50EhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhAKCGV2ZW50X2lkGAIgASgJEhYKDmNhdXNlX2V2ZW50X2lkGAMgASgJEhIKCnJlcXVlc3RfaWQYBCABKAkSLwoLb2NjdXJyZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB3VzZXJfaWQYBiABKAkSHAoUZGV2aWNlX2NyZWRlbnRpYWxfaWQYByABKAkSRAoGcmVhc29uGAggASgOMjQucGxhdGZvcm0uaWRlbnRpdHkudjEuSWRlbnRpdHlEZXZpY2VSZXZvY2F0aW9uUmVhc29uIq0CCh5JZGVudGl0eVVzZXJTdGF0dXNDaGFuZ2VkRXZlbnQSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEAoIZXZlbnRfaWQYAiABKAkSEgoKcmVxdWVzdF9pZBgDIAEoCRIvCgtvY2N1cnJlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdXNlcl9pZBgFIAEoCRI5Cg9wcmV2aW91c19zdGF0dXMYBiABKA4yIC5wbGF0Zm9ybS5pZGVudGl0eS52MS5Vc2VyU3RhdHVzEjgKDmN1cnJlbnRfc3RhdHVzGAcgASgOMiAucGxhdGZvcm0uaWRlbnRpdHkudjEuVXNlclN0YXR1cxIWCg5hY3Rvcl9hZG1pbl9pZBgIIAEoCSqhAQoWSWRlbnRpdHlSZWNvdmVyeVNvdXJjZRIoCiRJREVOVElUWV9SRUNPVkVSWV9TT1VSQ0VfVU5TUEVDSUZJRUQQABIqCiZJREVOVElUWV9SRUNPVkVSWV9TT1VSQ0VfUkVDT1ZFUllfQ09ERRABEjEKLUlERU5USVRZX1JFQ09WRVJZX1NPVVJDRV9BRE1JTl9BU1NJU1RFRF9HUkFOVBACKpoDCh5JZGVudGl0eURldmljZVJldm9jYXRpb25SZWFzb24SMQotSURFTlRJVFlfREVWSUNFX1JFVk9DQVRJT05fUkVBU09OX1VOU1BFQ0lGSUVEEAASNAowSURFTlRJVFlfREVWSUNFX1JFVk9DQVRJT05fUkVBU09OX1VTRVJfUkVRVUVTVEVEEAESNQoxSURFTlRJVFlfREVWSUNFX1JFVk9DQVRJT05fUkVBU09OX0FETUlOX1JFUVVFU1RFRBACEi4KKklERU5USVRZX0RFVklDRV9SRVZPQ0FUSU9OX1JFQVNPTl9SRUNPVkVSWRADEjgKNElERU5USVRZX0RFVklDRV9SRVZPQ0FUSU9OX1JFQVNPTl9PTkJPQVJESU5HX0VYUElSRUQQBBI3CjNJREVOVElUWV9ERVZJQ0VfUkVWT0NBVElPTl9SRUFTT05fQUNDT1VOVF9TVVNQRU5ERUQQBRI1CjFJREVOVElUWV9ERVZJQ0VfUkVWT0NBVElPTl9SRUFTT05fQUNDT1VOVF9ERUxFVEVEEAZCT1pNZ2l0aHViLmNvbS9pRlRZLVIvZ2FtZS1uaWdodC9jb250cmFjdHMvZ2VuL2dvL3BsYXRmb3JtL2lkZW50aXR5L3YxO2lkZW50aXR5djFiBnByb3RvMw", [file_google_protobuf_timestamp, file_platform_identity_v1_identity]);
 
 /**
  * IdentityRecoveryCompletedEvent contains only stable IDs and reviewed policy metadata.
@@ -147,6 +147,60 @@ export type IdentityDeviceRevokedEvent = Message<"platform.identity.v1.IdentityD
  */
 export const IdentityDeviceRevokedEventSchema: GenMessage<IdentityDeviceRevokedEvent> = /*@__PURE__*/
   messageDesc(file_platform_identity_v1_identity_events, 1);
+
+/**
+ * IdentityUserStatusChangedEvent notifies downstream modules to recheck authoritative user state.
+ *
+ * @generated from message platform.identity.v1.IdentityUserStatusChangedEvent
+ */
+export type IdentityUserStatusChangedEvent = Message<"platform.identity.v1.IdentityUserStatusChangedEvent"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string event_id = 2;
+   */
+  eventId: string;
+
+  /**
+   * @generated from field: string request_id = 3;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp occurred_at = 4;
+   */
+  occurredAt?: Timestamp;
+
+  /**
+   * @generated from field: string user_id = 5;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: platform.identity.v1.UserStatus previous_status = 6;
+   */
+  previousStatus: UserStatus;
+
+  /**
+   * @generated from field: platform.identity.v1.UserStatus current_status = 7;
+   */
+  currentStatus: UserStatus;
+
+  /**
+   * @generated from field: string actor_admin_id = 8;
+   */
+  actorAdminId: string;
+};
+
+/**
+ * Describes the message platform.identity.v1.IdentityUserStatusChangedEvent.
+ * Use `create(IdentityUserStatusChangedEventSchema)` to create a new message.
+ */
+export const IdentityUserStatusChangedEventSchema: GenMessage<IdentityUserStatusChangedEvent> = /*@__PURE__*/
+  messageDesc(file_platform_identity_v1_identity_events, 2);
 
 /**
  * IdentityRecoverySource records which reviewed authority completed account recovery.

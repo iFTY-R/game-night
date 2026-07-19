@@ -54,6 +54,12 @@ const (
 	EventTypeIdentityRecoveryCompleted EventType = "identity.recovery.completed.v1"
 	// EventTypeIdentityDeviceRevoked tells downstream modules to recheck one device's authoritative state.
 	EventTypeIdentityDeviceRevoked EventType = "identity.device.revoked.v1"
+	// EventTypeIdentityUserSuspended invalidates room/realtime authority derived from an active user.
+	EventTypeIdentityUserSuspended EventType = "identity.user.suspended.v1"
+	// EventTypeIdentityUserUnsuspended announces restored account authority without restoring old credentials.
+	EventTypeIdentityUserUnsuspended EventType = "identity.user.unsuspended.v1"
+	// EventTypeIdentityUserDeleted announces terminal account deletion to downstream modules.
+	EventTypeIdentityUserDeleted EventType = "identity.user.deleted.v1"
 )
 
 // ParseEventType validates a durable event protocol name.

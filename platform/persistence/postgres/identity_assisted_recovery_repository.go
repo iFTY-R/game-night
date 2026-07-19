@@ -13,11 +13,34 @@ import (
 )
 
 type identityAssistedRecoveryQueries interface {
+	CreateAdminAssistedRecoveryGrant(context.Context, sqlcgen.CreateAdminAssistedRecoveryGrantParams) (sqlcgen.AdminAssistedRecoveryGrant, error)
 	GetAdminAssistedRecoveryGrantBySelector(context.Context, sqlcgen.GetAdminAssistedRecoveryGrantBySelectorParams) (sqlcgen.AdminAssistedRecoveryGrant, error)
 	GetAdminAssistedRecoveryGrantForUpdate(context.Context, sqlcgen.GetAdminAssistedRecoveryGrantForUpdateParams) (sqlcgen.AdminAssistedRecoveryGrant, error)
 	RecordAdminAssistedRecoveryFailureCAS(context.Context, sqlcgen.RecordAdminAssistedRecoveryFailureCASParams) (sqlcgen.AdminAssistedRecoveryGrant, error)
 	ConsumeAdminAssistedRecoveryGrantCAS(context.Context, sqlcgen.ConsumeAdminAssistedRecoveryGrantCASParams) (sqlcgen.AdminAssistedRecoveryGrant, error)
 	RevokeActiveAdminAssistedRecoveryGrantsForUser(context.Context, sqlcgen.RevokeActiveAdminAssistedRecoveryGrantsForUserParams) ([]pgtype.UUID, error)
+}
+
+// Create persists only a validated active grant; the one-time plaintext code never reaches this adapter.
+func (repository *identityAssistedRecoveryRepository) Create(
+	ctx context.Context,
+	grant identityDomain.AssistedRecoveryGrant,
+) (identityDomain.AssistedRecoveryGrant, error) {
+	snapshot := grant.Snapshot()
+	if snapshot.Status != identityDomain.AssistedRecoveryGrantActive || snapshot.AttemptCount != 0 {
+		return identityDomain.AssistedRecoveryGrant{}, identityDomain.ErrInvalidAssistedRecoveryGrant
+	}
+	row, err := repository.queries.CreateAdminAssistedRecoveryGrant(
+		ctx, sqlcgen.CreateAdminAssistedRecoveryGrantParams{
+			AssistedGrantID: uuidToPG(snapshot.ID), UserID: uuidToPG(snapshot.UserID), Selector: snapshot.Selector.Value(),
+			SecretHash: snapshot.SecretHash, Purpose: snapshot.Purpose, MaxAttempts: int32(snapshot.MaxAttempts),
+			CreatedByAdminID: uuidToPG(snapshot.CreatedByAdminID), CreatedAt: timeToPG(snapshot.CreatedAt), ExpiresAt: timeToPG(snapshot.ExpiresAt),
+		},
+	)
+	if err != nil {
+		return identityDomain.AssistedRecoveryGrant{}, mapIdentityQueryError(ctx, err, identityDomain.ErrRecoveryConcurrentTransition)
+	}
+	return identityAssistedRecoveryGrantFromRow(row)
 }
 
 type identityAssistedRecoveryRepository struct {

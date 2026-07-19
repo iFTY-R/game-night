@@ -11,8 +11,11 @@ import (
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/idempotency"
+	"github.com/iFTY-R/game-night/platform/identity"
+	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/iFTY-R/game-night/platform/security"
@@ -362,16 +365,32 @@ func adminConnectError(err error) error {
 		return nil
 	}
 	switch {
-	case errors.Is(err, ErrInvalidInput), errors.Is(err, ErrPasswordPolicy):
+	case errors.Is(err, ErrInvalidInput), errors.Is(err, ErrPasswordPolicy),
+		errors.Is(err, profile.ErrInvalidProfileInput), errors.Is(err, profile.ErrProfileExportCursor):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, ErrAuthentication), errors.Is(err, ErrRecoveryInvalid):
 		return connect.NewError(connect.CodeUnauthenticated, ErrAuthentication)
 	case errors.Is(err, ErrPermissionDenied):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, identity.ErrUserNotFound), errors.Is(err, profile.ErrProfileNotFound):
+		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, identity.ErrUsernameUnavailable):
+		return connect.NewError(connect.CodeAlreadyExists, err)
+	case errors.Is(err, identity.ErrIdentityConcurrentTransition), errors.Is(err, identity.ErrDeviceConcurrentTransition),
+		errors.Is(err, profile.ErrProfileConcurrentTransition), errors.Is(err, audit.ErrHeadConflict):
+		return connect.NewError(connect.CodeAborted, err)
 	case errors.Is(err, ratelimit.ErrRejected):
 		return connect.NewError(connect.CodeResourceExhausted, err)
-	default:
+	case errors.Is(err, ratelimit.ErrUnavailable), errors.Is(err, profile.ErrPIIKeyUnavailable),
+		errors.Is(err, audit.ErrSensitiveWriteBlocked), errors.Is(err, audit.ErrRepositoryUnavailable):
+		return connect.NewError(connect.CodeUnavailable, errors.New("administrator service temporarily unavailable"))
+	case errors.Is(err, identity.ErrUserStatus), errors.Is(err, identity.ErrRecoveryConcurrentTransition),
+		errors.Is(err, profile.ErrProfileExportClosed), errors.Is(err, profile.ErrProfileExportExpired),
+		errors.Is(err, secretresult.ErrSecretNoLongerAvailable), errors.Is(err, ErrSessionExpired),
+		errors.Is(err, ErrSessionRevoked), errors.Is(err, ErrUnavailable), errors.Is(err, ErrNotFound):
 		return connect.NewError(connect.CodeFailedPrecondition, err)
+	default:
+		return connect.NewError(connect.CodeInternal, errors.New("administrator service unavailable"))
 	}
 }
 

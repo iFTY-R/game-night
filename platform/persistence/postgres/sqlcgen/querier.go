@@ -71,7 +71,7 @@ type Querier interface {
 	//AcquireKeyRotationJobLease
 	//
 	//  WITH candidate AS (
-	//      SELECT job_id
+	//      SELECT job_id, status
 	//      FROM key_rotation_jobs
 	//      WHERE status IN ('pending', 'running')
 	//        AND (lease_owner IS NULL OR lease_until <= $1)
@@ -90,8 +90,9 @@ type Querier interface {
 	//  RETURNING job.job_id, job.purpose, job.source_key_version, job.target_key_version,
 	//            job.status, job.cursor_scope, job.cursor_id, job.cursor_ordinal,
 	//            job.processed_count, job.conflict_count, job.lease_owner, job.lease_until,
-	//            job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at
-	AcquireKeyRotationJobLease(ctx context.Context, arg AcquireKeyRotationJobLeaseParams) (KeyRotationJob, error)
+	//            job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at,
+	//            candidate.status = 'pending' AS started_now
+	AcquireKeyRotationJobLease(ctx context.Context, arg AcquireKeyRotationJobLeaseParams) (AcquireKeyRotationJobLeaseRow, error)
 	//AcquireOutboxConsumerLeaseCAS
 	//
 	//  UPDATE outbox_consumers
@@ -1353,6 +1354,17 @@ type Querier interface {
 	//    )
 	//  ORDER BY event.event_sequence
 	ListOutboxEventsForConsumer(ctx context.Context, arg ListOutboxEventsForConsumerParams) ([]ListOutboxEventsForConsumerRow, error)
+	//ListPIIKeyVersionsWithReferences
+	//
+	//  SELECT DISTINCT real_name_key_version
+	//  FROM (
+	//      SELECT real_name_key_version FROM user_profiles
+	//      UNION ALL
+	//      SELECT real_name_key_version FROM profile_export_items
+	//  ) AS key_refs
+	//  WHERE real_name_key_version IS NOT NULL
+	//  ORDER BY real_name_key_version
+	ListPIIKeyVersionsWithReferences(ctx context.Context) ([]int32, error)
 	//ListProfileExportItems
 	//
 	//  SELECT export_id, ordinal, user_id, username, profile_version,
@@ -1393,6 +1405,14 @@ type Querier interface {
 	//    AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
 	//  ORDER BY users.user_id
 	ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error)
+	//ListTotpKeyVersionsWithReferences
+	//
+	//  SELECT DISTINCT key_version
+	//  FROM admin_totp_enrollments
+	//  WHERE key_version IS NOT NULL
+	//    AND status IN ('pending', 'active')
+	//  ORDER BY key_version
+	ListTotpKeyVersionsWithReferences(ctx context.Context) ([]int32, error)
 	//ListUserDeviceCredentials
 	//
 	//  SELECT credential_id, user_id, generation, label, created_at, last_seen_at, rotated_at,
@@ -1438,6 +1458,10 @@ type Querier interface {
 	//         (result.payload ->> 'updated_at')::timestamptz AS updated_at
 	//  FROM result
 	ReadAuditHead(ctx context.Context, arg ReadAuditHeadParams) (ReadAuditHeadRow, error)
+	//ReadCheckpointConsumerSequence
+	//
+	//  SELECT read_checkpoint_consumer_sequence()
+	ReadCheckpointConsumerSequence(ctx context.Context) (int64, error)
 	//RecordAdminAssistedRecoveryFailureCAS
 	//
 	//  UPDATE admin_assisted_recovery_grants
@@ -1502,6 +1526,18 @@ type Querier interface {
 	//            challenge_id, origin_hash, purpose, request_digest, attempt_count, max_attempts,
 	//            status, created_at, expires_at, consumed_at, revoked_at, result_id
 	RecordUserRecoveryAttemptFailureCAS(ctx context.Context, arg RecordUserRecoveryAttemptFailureCASParams) (UserRecoveryAttempt, error)
+	//ReleaseKeyRotationJobLeaseCAS
+	//
+	//  UPDATE key_rotation_jobs
+	//  SET lease_owner = NULL,
+	//      lease_until = NULL,
+	//      updated_at = $1
+	//  WHERE job_id = $2
+	//    AND status = 'running'
+	//    AND lease_owner = $3
+	//    AND lease_until > $1
+	//  RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, updated_at
+	ReleaseKeyRotationJobLeaseCAS(ctx context.Context, arg ReleaseKeyRotationJobLeaseCASParams) (ReleaseKeyRotationJobLeaseCASRow, error)
 	//ReleaseOutboxConsumerLeaseCAS
 	//
 	//  UPDATE outbox_consumers
@@ -1755,6 +1791,10 @@ type Querier interface {
 	//    AND real_name_key_version = $6
 	//  RETURNING user_id, real_name_key_version, profile_version
 	RotateUserProfileCiphertextCAS(ctx context.Context, arg RotateUserProfileCiphertextCASParams) (RotateUserProfileCiphertextCASRow, error)
+	//RunExpiryCleanup
+	//
+	//  SELECT run_expiry_cleanup()
+	RunExpiryCleanup(ctx context.Context) ([]byte, error)
 	//SetCurrentUsernameCAS
 	//
 	//  UPDATE users

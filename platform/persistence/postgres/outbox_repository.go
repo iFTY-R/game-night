@@ -32,6 +32,7 @@ type outboxConsumerQueries interface {
 
 type checkpointProgressQueries interface {
 	GetLatestAckedOutboxEventByType(context.Context, sqlcgen.GetLatestAckedOutboxEventByTypeParams) (sqlcgen.OutboxEvent, error)
+	ReadCheckpointConsumerSequence(context.Context) (int64, error)
 }
 
 // OutboxEventRepository appends immutable events and classifies event-ID replay without aborting a transaction.

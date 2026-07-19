@@ -36,7 +36,7 @@ WHERE job_id = sqlc.arg(job_id);
 
 -- name: AcquireKeyRotationJobLease :one
 WITH candidate AS (
-    SELECT job_id
+    SELECT job_id, status
     FROM key_rotation_jobs
     WHERE status IN ('pending', 'running')
       AND (lease_owner IS NULL OR lease_until <= sqlc.arg(acquired_at))
@@ -55,7 +55,8 @@ WHERE job.job_id = candidate.job_id
 RETURNING job.job_id, job.purpose, job.source_key_version, job.target_key_version,
           job.status, job.cursor_scope, job.cursor_id, job.cursor_ordinal,
           job.processed_count, job.conflict_count, job.lease_owner, job.lease_until,
-          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at;
+          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at,
+          candidate.status = 'pending' AS started_now;
 
 -- name: RenewKeyRotationJobLeaseCAS :one
 UPDATE key_rotation_jobs
@@ -176,6 +177,17 @@ WHERE job_id = sqlc.arg(job_id)
   AND lease_owner = sqlc.arg(lease_owner)
 RETURNING job_id, status, processed_count, conflict_count, last_error_code, updated_at;
 
+-- name: ReleaseKeyRotationJobLeaseCAS :one
+UPDATE key_rotation_jobs
+SET lease_owner = NULL,
+    lease_until = NULL,
+    updated_at = sqlc.arg(released_at)
+WHERE job_id = sqlc.arg(job_id)
+  AND status = 'running'
+  AND lease_owner = sqlc.arg(lease_owner)
+  AND lease_until > sqlc.arg(released_at)
+RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, updated_at;
+
 -- name: CountPIIKeyReferences :one
 SELECT (
     (SELECT count(*) FROM user_profiles AS profile WHERE profile.real_name_key_version = sqlc.arg(key_version))
@@ -188,3 +200,20 @@ SELECT count(*)::bigint AS reference_count
 FROM admin_totp_enrollments
 WHERE key_version = sqlc.arg(key_version)
   AND status IN ('pending', 'active');
+
+-- name: ListPIIKeyVersionsWithReferences :many
+SELECT DISTINCT real_name_key_version
+FROM (
+    SELECT real_name_key_version FROM user_profiles
+    UNION ALL
+    SELECT real_name_key_version FROM profile_export_items
+) AS key_refs
+WHERE real_name_key_version IS NOT NULL
+ORDER BY real_name_key_version;
+
+-- name: ListTotpKeyVersionsWithReferences :many
+SELECT DISTINCT key_version
+FROM admin_totp_enrollments
+WHERE key_version IS NOT NULL
+  AND status IN ('pending', 'active')
+ORDER BY key_version;

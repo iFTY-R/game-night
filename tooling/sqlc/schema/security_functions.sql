@@ -39,3 +39,17 @@ LANGUAGE sql
 AS $$
     SELECT 0::bigint, decode(repeat('00', 32), 'hex')
 $$;
+
+CREATE FUNCTION read_checkpoint_consumer_sequence()
+RETURNS bigint
+LANGUAGE sql
+AS $$
+    SELECT 0::bigint
+$$;
+
+CREATE FUNCTION run_expiry_cleanup()
+RETURNS jsonb
+LANGUAGE sql
+AS $$
+    SELECT '{}'::jsonb
+$$;

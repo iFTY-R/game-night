@@ -33,6 +33,14 @@ func NewTOTPService(keyring *security.AESKeyring[security.TOTPKeyPurpose]) (*TOT
 	return &TOTPService{keyring: keyring}, nil
 }
 
+// ActiveKeyVersion returns the version used for new enrollments and rotation targets.
+func (service *TOTPService) ActiveKeyVersion() uint32 {
+	if service == nil || service.keyring == nil {
+		return 0
+	}
+	return service.keyring.ActiveVersion()
+}
+
 // NewEnrollmentSecret creates a seed and encrypted storage payload; plaintext is returned only to the caller.
 func (service *TOTPService) NewEnrollmentSecret(adminID, enrollmentID [16]byte, issuer, account string) (secret, uri string, encrypted security.Encrypted[security.TOTPKeyPurpose], err error) {
 	if service == nil || service.keyring == nil || issuer == "" || account == "" {
@@ -67,6 +75,31 @@ func (service *TOTPService) DecryptSeed(adminID, enrollmentID [16]byte, encrypte
 		return "", ErrIntegrity
 	}
 	return secret, nil
+}
+
+// ReencryptSeed authenticates the enrollment-specific old AAD before sealing with active-version AAD.
+// Plaintext seed bytes remain local to this method and are cleared before returning to the worker.
+func (service *TOTPService) ReencryptSeed(
+	adminID, enrollmentID [16]byte,
+	encrypted security.Encrypted[security.TOTPKeyPurpose],
+) (security.Encrypted[security.TOTPKeyPurpose], error) {
+	if service == nil || service.keyring == nil || encrypted.KeyVersion == 0 {
+		return security.Encrypted[security.TOTPKeyPurpose]{}, ErrInvalidInput
+	}
+	plaintext, err := service.keyring.Decrypt(encrypted, totpAAD(adminID, enrollmentID, encrypted.KeyVersion))
+	if err != nil {
+		return security.Encrypted[security.TOTPKeyPurpose]{}, ErrTOTPInvalid
+	}
+	defer clearBytes(plaintext)
+	if !validTOTPSecret(string(plaintext)) {
+		return security.Encrypted[security.TOTPKeyPurpose]{}, ErrIntegrity
+	}
+	targetVersion := service.keyring.ActiveVersion()
+	rotated, err := service.keyring.Encrypt(plaintext, totpAAD(adminID, enrollmentID, targetVersion))
+	if err != nil || rotated.KeyVersion != targetVersion {
+		return security.Encrypted[security.TOTPKeyPurpose]{}, ErrIntegrity
+	}
+	return rotated, nil
 }
 
 // VerifyCode returns the accepted moving-factor step, allowing PostgreSQL to enforce monotonic CAS.

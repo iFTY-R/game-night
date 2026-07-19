@@ -223,6 +223,12 @@ func (policy *CheckpointHealthPolicy) Evaluate(
 	}, policy.maxEvents, policy.maxAge)
 }
 
+// ProbeSink refreshes the process-owned sink readiness before callers open database health transactions.
+// Evaluate still consumes the same source, so a cached probe cannot bypass the durable progress decision.
+func (policy *CheckpointHealthPolicy) ProbeSink(ctx context.Context) bool {
+	return policy != nil && policy.sink != nil && policy.sink.Ready(ctx)
+}
+
 // EvaluateCheckpointHealth applies the fixed 100-event/5-minute thresholds and production sink requirement.
 func EvaluateCheckpointHealth(input CheckpointHealthInput) (CheckpointHealth, error) {
 	return evaluateCheckpointHealth(input, CheckpointMaxEvents, CheckpointMaxAge)

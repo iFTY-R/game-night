@@ -22,6 +22,8 @@ func (checker checkpointChecker) Check(ctx context.Context) error {
 	if checker.unitOfWork == nil || checker.policy == nil || checker.clock == nil || ctx == nil {
 		return errDependencyUnavailable
 	}
+	// Refresh a potentially remote Object Lock probe before reserving a PostgreSQL transaction/connection.
+	checker.policy.ProbeSink(ctx)
 	return checker.unitOfWork.Run(ctx, func(ctx context.Context, transaction audit.Transaction) error {
 		head, err := transaction.Audit().ReadHead(ctx, audit.ChainAdmin)
 		if err != nil {

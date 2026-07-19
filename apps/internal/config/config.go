@@ -118,6 +118,45 @@ func Load(lookupEnv LookupEnv) (Config, error) {
 	}, nil
 }
 
+// LoadWorker reads only dependencies that the background process is authorized to use.
+func LoadWorker(lookupEnv LookupEnv) (WorkerDependencies, error) {
+	if lookupEnv == nil {
+		return WorkerDependencies{}, errors.New("LookupEnv: invalid configuration")
+	}
+	reader := environmentReader{lookup: lookupEnv}
+	environment, err := loadEnvironment(reader)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	postgres, err := loadPostgreSQL(reader, environment)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	checkpoint, err := loadCheckpoint(reader)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	pii, err := requiredAbsolutePath(reader, piiKeyringFileEnvironment)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	totp, err := requiredAbsolutePath(reader, totpKeyringFileEnvironment)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	auditFile, err := requiredAbsolutePath(reader, auditKeyringFileEnvironment)
+	if err != nil {
+		return WorkerDependencies{}, err
+	}
+	if pii == totp || pii == auditFile || totp == auditFile {
+		return WorkerDependencies{}, fieldError(auditKeyringFileEnvironment, "keyring file is already assigned")
+	}
+	return WorkerDependencies{
+		Environment: environment, PostgreSQL: postgres, Checkpoint: checkpoint,
+		Keyrings: OperationsKeyringFiles{PII: PIIKeyringFile(pii), TOTP: TOTPKeyringFile(totp), Audit: AuditKeyringFile(auditFile)},
+	}, nil
+}
+
 type environmentReader struct {
 	lookup LookupEnv
 }

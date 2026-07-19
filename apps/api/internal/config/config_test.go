@@ -38,6 +38,9 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	if loaded.Argon2 != (Argon2Config{Workers: 4, QueueCapacity: 128}) {
 		t.Fatalf("unexpected Argon2 config: %+v", loaded.Argon2)
 	}
+	if loaded.CheckpointStorage.LocalDirectory == "" {
+		t.Fatal("checkpoint storage configuration was not composed")
+	}
 }
 
 func TestLoadUsesBoundedAPIListenerDefaults(t *testing.T) {
@@ -142,6 +145,8 @@ func validAPIEnvironment(t *testing.T) map[string]string {
 		"GAME_NIGHT_ADMIN_CHALLENGE_KEYRING_FILE": filepath.Join(secretDirectory, "admin-challenge.json"),
 		"GAME_NIGHT_ADMIN_SESSION_KEYRING_FILE":   filepath.Join(secretDirectory, "admin-session.json"),
 		"GAME_NIGHT_AUDIT_KEYRING_FILE":           filepath.Join(secretDirectory, "audit.json"),
+		"GAME_NIGHT_CHECKPOINT_SINK":              "local",
+		"GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY":   filepath.Join(secretDirectory, "checkpoints"),
 	}
 }
 

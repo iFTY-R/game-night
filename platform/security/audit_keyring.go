@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
+	"sort"
 	"time"
 )
 
@@ -44,6 +45,19 @@ func (keyring *AuditKeyring) ActiveVersion() uint32 {
 		return 0
 	}
 	return keyring.activeVersion
+}
+
+// Versions returns every retained public verification version for historical audit validation.
+func (keyring *AuditKeyring) Versions() []uint32 {
+	if keyring == nil {
+		return nil
+	}
+	versions := make([]uint32, 0, len(keyring.keys))
+	for version := range keyring.keys {
+		versions = append(versions, version)
+	}
+	sort.Slice(versions, func(left, right int) bool { return versions[left] < versions[right] })
+	return versions
 }
 
 // LoadAuditKeyring validates read-only key material and requires the active version to include a private key.

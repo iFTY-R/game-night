@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+	"sort"
 	"time"
 )
 
@@ -40,6 +41,19 @@ func LoadAESKeyring[P AESKeyPurpose](path string, now time.Time) (*AESKeyring[P]
 func (keyring *AESKeyring[P]) ActiveVersion() uint32 {
 	version, _ := keyring.keys.active()
 	return version
+}
+
+// Versions returns every retained version so startup can validate historical database references.
+func (keyring *AESKeyring[P]) Versions() []uint32 {
+	if keyring == nil || keyring.keys == nil {
+		return nil
+	}
+	versions := make([]uint32, 0, len(keyring.keys.keys))
+	for version := range keyring.keys.keys {
+		versions = append(versions, version)
+	}
+	sort.Slice(versions, func(left, right int) bool { return versions[left] < versions[right] })
+	return versions
 }
 
 // Encrypt seals non-empty plaintext under the active key and caller-supplied domain AAD.

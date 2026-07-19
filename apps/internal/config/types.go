@@ -66,6 +66,18 @@ type KeyringFiles struct {
 	Audit          AuditKeyringFile
 }
 
+// OperationsKeyringFiles contains only the mounts required by worker cleanup, rotation, and signed audit work.
+type OperationsKeyringFiles struct {
+	PII   PIIKeyringFile
+	TOTP  TOTPKeyringFile
+	Audit AuditKeyringFile
+}
+
+// SecurityPaths preserves the reduced worker key authority when loading cryptographic material.
+func (files OperationsKeyringFiles) SecurityPaths() security.OperationsKeyringPaths {
+	return security.OperationsKeyringPaths{PII: string(files.PII), TOTP: string(files.TOTP), Audit: string(files.Audit)}
+}
+
 // SecurityPaths maps each named configuration type to the only matching cryptographic purpose.
 func (files KeyringFiles) SecurityPaths() security.KeyringPaths {
 	return security.KeyringPaths{
@@ -128,4 +140,12 @@ type Config struct {
 	Checkpoint          CheckpointConfig
 	Keyrings            KeyringFiles
 	BootstrapSecretFile BootstrapSecretFile
+}
+
+// WorkerDependencies omits browser, Redis, bootstrap, and authentication key material from the background process.
+type WorkerDependencies struct {
+	Environment Environment
+	PostgreSQL  PostgreSQLConfig
+	Checkpoint  CheckpointConfig
+	Keyrings    OperationsKeyringFiles
 }

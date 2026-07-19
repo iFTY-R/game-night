@@ -2,18 +2,12 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
-	"os"
-	"runtime"
-	"unicode/utf8"
 
+	"github.com/iFTY-R/game-night/apps/internal/secretfile"
 	"github.com/iFTY-R/game-night/platform/admin"
 )
-
-const maximumSecretFileBytes = 4 << 10
 
 // ErrInvalidSecretFile hides secret paths, contents, and filesystem diagnostics from process output.
 var ErrInvalidSecretFile = errors.New("invalid administrator bootstrap secret file")
@@ -75,40 +69,9 @@ func (coordinator *Coordinator) Check(ctx context.Context) error {
 
 // ReadSecret accepts one read-only regular file and removes only its conventional final line ending.
 func ReadSecret(path string) (string, bool, error) {
-	if path == "" {
-		return "", false, nil
-	}
-	info, err := os.Lstat(path)
-	if err != nil || !secureSecretFileMode(info.Mode()) {
-		return "", false, ErrInvalidSecretFile
-	}
-	file, err := os.Open(path)
+	secret, mounted, err := secretfile.Read(path)
 	if err != nil {
 		return "", false, ErrInvalidSecretFile
 	}
-	defer file.Close()
-	openedInfo, err := file.Stat()
-	if err != nil || !secureSecretFileMode(openedInfo.Mode()) || !os.SameFile(info, openedInfo) {
-		return "", false, ErrInvalidSecretFile
-	}
-	contents, err := io.ReadAll(io.LimitReader(file, maximumSecretFileBytes+1))
-	if err != nil || len(contents) > maximumSecretFileBytes {
-		return "", false, ErrInvalidSecretFile
-	}
-	contents = bytes.TrimSuffix(contents, []byte("\r\n"))
-	contents = bytes.TrimSuffix(contents, []byte("\n"))
-	if len(contents) == 0 || !utf8.Valid(contents) || bytes.ContainsAny(contents, "\x00\r\n") {
-		return "", false, ErrInvalidSecretFile
-	}
-	return string(contents), true, nil
-}
-
-func secureSecretFileMode(mode os.FileMode) bool {
-	if !mode.IsRegular() {
-		return false
-	}
-	if runtime.GOOS == "windows" {
-		return mode.Perm()&0o222 == 0
-	}
-	return mode.Perm() == 0o400
+	return secret, mounted, nil
 }

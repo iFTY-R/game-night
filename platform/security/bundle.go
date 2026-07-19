@@ -31,6 +31,20 @@ type Keyrings struct {
 	Audit          *AuditKeyring
 }
 
+// OperationsKeyringPaths limits worker mounts to encryption domains used by rotation and signed audit operations.
+type OperationsKeyringPaths struct {
+	PII   string
+	TOTP  string
+	Audit string
+}
+
+// OperationsKeyrings excludes authentication/session material from the background worker process.
+type OperationsKeyrings struct {
+	PII   *AESKeyring[PIIKeyPurpose]
+	TOTP  *AESKeyring[TOTPKeyPurpose]
+	Audit *AuditKeyring
+}
+
 // LoadKeyrings loads every purpose before use and rejects key material reused across security domains.
 func LoadKeyrings(paths KeyringPaths, now time.Time) (Keyrings, error) {
 	pii, err := LoadAESKeyring[PIIKeyPurpose](paths.PII, now)
@@ -100,4 +114,30 @@ func LoadKeyrings(paths KeyringPaths, now time.Time) (Keyrings, error) {
 		AdminSession:   adminSession,
 		Audit:          audit,
 	}, nil
+}
+
+// LoadOperationsKeyrings loads only worker-owned domains and still rejects material reused across them.
+func LoadOperationsKeyrings(paths OperationsKeyringPaths, now time.Time) (OperationsKeyrings, error) {
+	pii, err := LoadAESKeyring[PIIKeyPurpose](paths.PII, now)
+	if err != nil {
+		return OperationsKeyrings{}, err
+	}
+	totp, err := LoadAESKeyring[TOTPKeyPurpose](paths.TOTP, now)
+	if err != nil {
+		return OperationsKeyrings{}, err
+	}
+	audit, err := LoadAuditKeyring(paths.Audit, now)
+	if err != nil {
+		return OperationsKeyrings{}, err
+	}
+	seen := make(map[[sha256.Size]byte]struct{})
+	for _, fingerprints := range [][][sha256.Size]byte{pii.keys.fingerprints(), totp.keys.fingerprints(), audit.fingerprints()} {
+		for _, fingerprint := range fingerprints {
+			if _, duplicate := seen[fingerprint]; duplicate {
+				return OperationsKeyrings{}, ErrInvalidKeyring
+			}
+			seen[fingerprint] = struct{}{}
+		}
+	}
+	return OperationsKeyrings{PII: pii, TOTP: totp, Audit: audit}, nil
 }

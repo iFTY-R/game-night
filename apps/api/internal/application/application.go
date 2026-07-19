@@ -93,6 +93,9 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 			_ = application.closeDependencies()
 		}
 	}()
+	if err := postgres.NewKeyringReferenceChecker(pool, keyrings).Check(ctx); err != nil {
+		return nil, errInitializeKeyrings
+	}
 
 	redisOptions, err := goredis.ParseURL(config.Shared.Redis.URL)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 
 const acquireKeyRotationJobLease = `-- name: AcquireKeyRotationJobLease :one
 WITH candidate AS (
-    SELECT job_id
+    SELECT job_id, status
     FROM key_rotation_jobs
     WHERE status IN ('pending', 'running')
       AND (lease_owner IS NULL OR lease_until <= $1)
@@ -32,7 +32,8 @@ WHERE job.job_id = candidate.job_id
 RETURNING job.job_id, job.purpose, job.source_key_version, job.target_key_version,
           job.status, job.cursor_scope, job.cursor_id, job.cursor_ordinal,
           job.processed_count, job.conflict_count, job.lease_owner, job.lease_until,
-          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at
+          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at,
+          candidate.status = 'pending' AS started_now
 `
 
 type AcquireKeyRotationJobLeaseParams struct {
@@ -41,10 +42,31 @@ type AcquireKeyRotationJobLeaseParams struct {
 	LeaseUntil pgtype.Timestamptz `json:"lease_until"`
 }
 
+type AcquireKeyRotationJobLeaseRow struct {
+	JobID            pgtype.UUID        `json:"job_id"`
+	Purpose          string             `json:"purpose"`
+	SourceKeyVersion int32              `json:"source_key_version"`
+	TargetKeyVersion int32              `json:"target_key_version"`
+	Status           string             `json:"status"`
+	CursorScope      string             `json:"cursor_scope"`
+	CursorID         pgtype.UUID        `json:"cursor_id"`
+	CursorOrdinal    pgtype.Int8        `json:"cursor_ordinal"`
+	ProcessedCount   int64              `json:"processed_count"`
+	ConflictCount    int64              `json:"conflict_count"`
+	LeaseOwner       pgtype.Text        `json:"lease_owner"`
+	LeaseUntil       pgtype.Timestamptz `json:"lease_until"`
+	LastErrorCode    pgtype.Text        `json:"last_error_code"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	StartedAt        pgtype.Timestamptz `json:"started_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+	StartedNow       bool               `json:"started_now"`
+}
+
 // AcquireKeyRotationJobLease
 //
 //	WITH candidate AS (
-//	    SELECT job_id
+//	    SELECT job_id, status
 //	    FROM key_rotation_jobs
 //	    WHERE status IN ('pending', 'running')
 //	      AND (lease_owner IS NULL OR lease_until <= $1)
@@ -63,10 +85,11 @@ type AcquireKeyRotationJobLeaseParams struct {
 //	RETURNING job.job_id, job.purpose, job.source_key_version, job.target_key_version,
 //	          job.status, job.cursor_scope, job.cursor_id, job.cursor_ordinal,
 //	          job.processed_count, job.conflict_count, job.lease_owner, job.lease_until,
-//	          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at
-func (q *Queries) AcquireKeyRotationJobLease(ctx context.Context, arg AcquireKeyRotationJobLeaseParams) (KeyRotationJob, error) {
+//	          job.last_error_code, job.created_at, job.started_at, job.updated_at, job.completed_at,
+//	          candidate.status = 'pending' AS started_now
+func (q *Queries) AcquireKeyRotationJobLease(ctx context.Context, arg AcquireKeyRotationJobLeaseParams) (AcquireKeyRotationJobLeaseRow, error) {
 	row := q.db.QueryRow(ctx, acquireKeyRotationJobLease, arg.AcquiredAt, arg.LeaseOwner, arg.LeaseUntil)
-	var i KeyRotationJob
+	var i AcquireKeyRotationJobLeaseRow
 	err := row.Scan(
 		&i.JobID,
 		&i.Purpose,
@@ -85,6 +108,7 @@ func (q *Queries) AcquireKeyRotationJobLease(ctx context.Context, arg AcquireKey
 		&i.StartedAt,
 		&i.UpdatedAt,
 		&i.CompletedAt,
+		&i.StartedNow,
 	)
 	return i, err
 }
@@ -551,6 +575,47 @@ func (q *Queries) ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, ar
 	return items, nil
 }
 
+const listPIIKeyVersionsWithReferences = `-- name: ListPIIKeyVersionsWithReferences :many
+SELECT DISTINCT real_name_key_version
+FROM (
+    SELECT real_name_key_version FROM user_profiles
+    UNION ALL
+    SELECT real_name_key_version FROM profile_export_items
+) AS key_refs
+WHERE real_name_key_version IS NOT NULL
+ORDER BY real_name_key_version
+`
+
+// ListPIIKeyVersionsWithReferences
+//
+//	SELECT DISTINCT real_name_key_version
+//	FROM (
+//	    SELECT real_name_key_version FROM user_profiles
+//	    UNION ALL
+//	    SELECT real_name_key_version FROM profile_export_items
+//	) AS key_refs
+//	WHERE real_name_key_version IS NOT NULL
+//	ORDER BY real_name_key_version
+func (q *Queries) ListPIIKeyVersionsWithReferences(ctx context.Context) ([]int32, error) {
+	rows, err := q.db.Query(ctx, listPIIKeyVersionsWithReferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var real_name_key_version int32
+		if err := rows.Scan(&real_name_key_version); err != nil {
+			return nil, err
+		}
+		items = append(items, real_name_key_version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProfileExportItemsForKeyRotation = `-- name: ListProfileExportItemsForKeyRotation :many
 SELECT export_id, ordinal, user_id, profile_version, real_name_ciphertext,
        real_name_nonce, real_name_key_version
@@ -632,6 +697,41 @@ func (q *Queries) ListProfileExportItemsForKeyRotation(ctx context.Context, arg 
 	return items, nil
 }
 
+const listTotpKeyVersionsWithReferences = `-- name: ListTotpKeyVersionsWithReferences :many
+SELECT DISTINCT key_version
+FROM admin_totp_enrollments
+WHERE key_version IS NOT NULL
+  AND status IN ('pending', 'active')
+ORDER BY key_version
+`
+
+// ListTotpKeyVersionsWithReferences
+//
+//	SELECT DISTINCT key_version
+//	FROM admin_totp_enrollments
+//	WHERE key_version IS NOT NULL
+//	  AND status IN ('pending', 'active')
+//	ORDER BY key_version
+func (q *Queries) ListTotpKeyVersionsWithReferences(ctx context.Context) ([]int32, error) {
+	rows, err := q.db.Query(ctx, listTotpKeyVersionsWithReferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var key_version int32
+		if err := rows.Scan(&key_version); err != nil {
+			return nil, err
+		}
+		items = append(items, key_version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserProfilesForKeyRotation = `-- name: ListUserProfilesForKeyRotation :many
 SELECT user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
        profile_version, real_name_updated_at, real_name_updated_by
@@ -683,6 +783,58 @@ func (q *Queries) ListUserProfilesForKeyRotation(ctx context.Context, arg ListUs
 		return nil, err
 	}
 	return items, nil
+}
+
+const releaseKeyRotationJobLeaseCAS = `-- name: ReleaseKeyRotationJobLeaseCAS :one
+UPDATE key_rotation_jobs
+SET lease_owner = NULL,
+    lease_until = NULL,
+    updated_at = $1
+WHERE job_id = $2
+  AND status = 'running'
+  AND lease_owner = $3
+  AND lease_until > $1
+RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, updated_at
+`
+
+type ReleaseKeyRotationJobLeaseCASParams struct {
+	ReleasedAt pgtype.Timestamptz `json:"released_at"`
+	JobID      pgtype.UUID        `json:"job_id"`
+	LeaseOwner pgtype.Text        `json:"lease_owner"`
+}
+
+type ReleaseKeyRotationJobLeaseCASRow struct {
+	JobID         pgtype.UUID        `json:"job_id"`
+	Status        string             `json:"status"`
+	CursorScope   string             `json:"cursor_scope"`
+	CursorID      pgtype.UUID        `json:"cursor_id"`
+	CursorOrdinal pgtype.Int8        `json:"cursor_ordinal"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+// ReleaseKeyRotationJobLeaseCAS
+//
+//	UPDATE key_rotation_jobs
+//	SET lease_owner = NULL,
+//	    lease_until = NULL,
+//	    updated_at = $1
+//	WHERE job_id = $2
+//	  AND status = 'running'
+//	  AND lease_owner = $3
+//	  AND lease_until > $1
+//	RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, updated_at
+func (q *Queries) ReleaseKeyRotationJobLeaseCAS(ctx context.Context, arg ReleaseKeyRotationJobLeaseCASParams) (ReleaseKeyRotationJobLeaseCASRow, error) {
+	row := q.db.QueryRow(ctx, releaseKeyRotationJobLeaseCAS, arg.ReleasedAt, arg.JobID, arg.LeaseOwner)
+	var i ReleaseKeyRotationJobLeaseCASRow
+	err := row.Scan(
+		&i.JobID,
+		&i.Status,
+		&i.CursorScope,
+		&i.CursorID,
+		&i.CursorOrdinal,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const renewKeyRotationJobLeaseCAS = `-- name: RenewKeyRotationJobLeaseCAS :one

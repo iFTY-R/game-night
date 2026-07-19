@@ -201,3 +201,6 @@ WHERE event.event_sequence <= consumer.last_acked_sequence
   AND event.event_type = ANY(consumer.subscriptions)
 ORDER BY event.event_sequence DESC
 LIMIT 1;
+
+-- name: ReadCheckpointConsumerSequence :one
+SELECT read_checkpoint_consumer_sequence();

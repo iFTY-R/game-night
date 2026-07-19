@@ -49,7 +49,7 @@ func (repository *AuditCheckpointRepository) AppendPendingCheckpoint(ctx context
 		return audit.ErrIntegrity
 	}
 	event, err := outbox.NewEvent(
-		checkpointEventID(snapshot),
+		CheckpointEventID(snapshot),
 		outbox.EventTypeAuditCheckpointPending,
 		outbox.AggregateTypeAuditChain,
 		auditChainAggregateID(snapshot.ChainID),
@@ -77,18 +77,17 @@ func (repository *AuditCheckpointRepository) ReadCheckpointProgress(ctx context.
 	if !chainID.Valid() {
 		return audit.CheckpointProgress{}, audit.ErrInvalidInput
 	}
-	consumer, err := newOutboxConsumerRepository(repository.queries).Get(ctx, outbox.ConsumerIDAuditCheckpoint)
+	ackedSequence, err := repository.queries.ReadCheckpointConsumerSequence(ctx)
 	if err != nil {
 		return audit.CheckpointProgress{}, mapCheckpointDependencyError(ctx, err)
 	}
-	consumerSnapshot := consumer.Snapshot()
-	if len(consumerSnapshot.Subscriptions) != 1 || consumerSnapshot.Subscriptions[0] != outbox.EventTypeAuditCheckpointPending {
+	if ackedSequence < 0 {
 		return audit.CheckpointProgress{}, audit.ErrIntegrity
 	}
 
 	progress := audit.CheckpointProgress{ChainID: chainID}
 	var acknowledged audit.Checkpoint
-	if consumerSnapshot.LastAckedSequence > 0 {
+	if ackedSequence > 0 {
 		checkpoint, checkpointErr := repository.latestAcknowledgedCheckpoint(ctx, chainID)
 		if checkpointErr != nil {
 			return audit.CheckpointProgress{}, checkpointErr
@@ -182,7 +181,8 @@ func (repository *AuditCheckpointRepository) readAnchor(
 	return hash, row.CreatedAt.Time.UTC().Truncate(time.Microsecond), nil
 }
 
-func checkpointEventID(snapshot audit.CheckpointSnapshot) uuid.UUID {
+// CheckpointEventID derives the stable outbox event ID used for one immutable checkpoint payload.
+func CheckpointEventID(snapshot audit.CheckpointSnapshot) uuid.UUID {
 	return uuid.NewSHA1(auditCheckpointEventNamespace, []byte(snapshot.ObjectKey()))
 }
 

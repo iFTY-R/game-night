@@ -588,6 +588,20 @@ func (q *Queries) ListOutboxEventsForConsumer(ctx context.Context, arg ListOutbo
 	return items, nil
 }
 
+const readCheckpointConsumerSequence = `-- name: ReadCheckpointConsumerSequence :one
+SELECT read_checkpoint_consumer_sequence()
+`
+
+// ReadCheckpointConsumerSequence
+//
+//	SELECT read_checkpoint_consumer_sequence()
+func (q *Queries) ReadCheckpointConsumerSequence(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, readCheckpointConsumerSequence)
+	var read_checkpoint_consumer_sequence int64
+	err := row.Scan(&read_checkpoint_consumer_sequence)
+	return read_checkpoint_consumer_sequence, err
+}
+
 const recordOutboxConsumerRetryCAS = `-- name: RecordOutboxConsumerRetryCAS :one
 UPDATE outbox_consumers
 SET retry_count = $1,

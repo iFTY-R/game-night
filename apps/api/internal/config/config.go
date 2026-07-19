@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 )
 
@@ -64,14 +65,19 @@ type Argon2Config struct {
 
 // Config combines the shared dependency/security settings with API-only listener behavior.
 type Config struct {
-	Shared   sharedconfig.Config
-	Listener ListenerConfig
-	Argon2   Argon2Config
+	Shared            sharedconfig.Config
+	CheckpointStorage checkpointstorage.Config
+	Listener          ListenerConfig
+	Argon2            Argon2Config
 }
 
 // Load validates shared configuration first, then parses bounded API listener settings without opening sockets.
 func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	shared, err := sharedconfig.Load(lookupEnv)
+	if err != nil {
+		return Config{}, err
+	}
+	checkpointStorage, err := checkpointstorage.Load(lookupEnv, shared.Environment)
 	if err != nil {
 		return Config{}, err
 	}
@@ -84,7 +90,7 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Shared: shared, Listener: listener, Argon2: argon2Config}, nil
+	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config}, nil
 }
 
 type environmentReader struct {

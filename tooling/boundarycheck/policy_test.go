@@ -12,6 +12,9 @@ func TestValidateEdges(t *testing.T) {
 	}{
 		{name: "app may compose platform", edge: Edge{From: "apps/api", To: "platform/identity"}, wantAllowed: true},
 		{name: "engine may use game sdk", edge: Edge{From: "games/dice/engine/rules", To: "sdk/go/game"}, wantAllowed: true},
+		{name: "dice engine may use shared dice sdk", edge: Edge{From: "games/liars-dice/engine/rules", To: "sdk/go/game/dice"}, wantAllowed: true},
+		{name: "789 engine may use own engine package", edge: Edge{From: "games/dice-789/engine/rules", To: "games/dice-789/engine/turns"}, wantAllowed: true},
+		{name: "meet client may use own generated protocol", edge: Edge{From: "games/meet-by-chance/client", To: "games/meet-by-chance/client/generated"}, wantAllowed: true},
 		{name: "client may use ui kit", edge: Edge{From: "games/dice/client", To: "packages/game-ui-kit"}, wantAllowed: true},
 		{name: "client may use client sdk", edge: Edge{From: "games/dice/client", To: "sdk/ts/game-client"}, wantAllowed: true},
 		{name: "client may use own subpackage", edge: Edge{From: "games/dice/client/table", To: "games/dice/client/actions"}, wantAllowed: true},

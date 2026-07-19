@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
@@ -82,6 +83,48 @@ func (repository *RoomRepository) GetByCode(ctx context.Context, roomCode string
 	return repository.get(ctx, func(queries QueryHandle) (sqlcgen.PartyRoom, error) {
 		return queries.GetPartyRoomByCodeForShare(ctx, sqlcgen.GetPartyRoomByCodeForShareParams{RoomCode: roomCode})
 	})
+}
+
+// ListPublicRooms reads one actor-aware lobby page without loading invitation codes or complete member snapshots.
+func (repository *RoomRepository) ListPublicRooms(
+	ctx context.Context,
+	request roomDomain.PublicRoomListRequest,
+) ([]roomDomain.PublicRoomCard, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !request.Valid() {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
+	includeLobby, includePlaying := false, false
+	for _, status := range request.Filter.Statuses {
+		includeLobby = includeLobby || status == roomDomain.RoomStatusLobby
+		includePlaying = includePlaying || status == roomDomain.RoomStatusPlaying
+	}
+	afterUpdatedAt, afterRoomID := timeToPG(roomLobbyCursorFloor()), uuidToPG(uuid.Nil)
+	if !request.After.UpdatedAt.IsZero() {
+		afterUpdatedAt, afterRoomID = timeToPG(request.After.UpdatedAt), uuidToPG(request.After.RoomID)
+	}
+	var rows []sqlcgen.ListPublicRoomCardsRow
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		var err error
+		rows, err = queries.ListPublicRoomCards(ctx, sqlcgen.ListPublicRoomCardsParams{
+			ActorUserID: uuidToPG(request.ActorUserID), IncludeLobby: includeLobby, IncludePlaying: includePlaying,
+			GameID: request.Filter.GameID, ParticipantJoinableOnly: request.Filter.ParticipantJoinableOnly,
+			HasAfter: !request.After.UpdatedAt.IsZero(), AfterUpdatedAt: afterUpdatedAt, AfterRoomID: afterRoomID,
+			PageLimit: int32(request.Limit),
+		})
+		return err
+	})
+	if err != nil {
+		return nil, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomRepositoryUnavailable)
+	}
+	cards := make([]roomDomain.PublicRoomCard, 0, len(rows))
+	for _, row := range rows {
+		card, mapErr := publicRoomCardFromRow(row)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
 }
 
 // UpdateCAS commits a domain-produced snapshot only when both room and membership versions still match.
@@ -203,6 +246,28 @@ func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDoma
 	return room, nil
 }
 
+func publicRoomCardFromRow(row sqlcgen.ListPublicRoomCardsRow) (roomDomain.PublicRoomCard, error) {
+	if !row.RoomID.Valid || !row.HostUsername.Valid || row.ParticipantCapacity <= 0 ||
+		row.ParticipantCount < 0 || row.ParticipantCount > math.MaxUint32 ||
+		row.SpectatorCount < 0 || row.SpectatorCount > math.MaxUint32 ||
+		row.WaitingCount < 0 || row.WaitingCount > math.MaxUint32 || !row.UpdatedAt.Valid {
+		return roomDomain.PublicRoomCard{}, roomDomain.ErrRoomIntegrity
+	}
+	return roomDomain.RestorePublicRoomCard(roomDomain.PublicRoomCardSnapshot{
+		RoomID: uuid.UUID(row.RoomID.Bytes), HostUsername: row.HostUsername.String,
+		Status: roomDomain.RoomStatus(row.Status), ParticipantCapacity: uint32(row.ParticipantCapacity),
+		ParticipantCount: uint32(row.ParticipantCount), SpectatorCount: uint32(row.SpectatorCount),
+		WaitingCount: uint32(row.WaitingCount), ParticipantAdmission: roomDomain.AdmissionMode(row.ParticipantAdmission),
+		SpectatorAdmission: roomDomain.AdmissionMode(row.SpectatorAdmission), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
+		ViewerRole: optionalMemberRoleFromPG(row.ViewerRole), ViewerRequestedRole: optionalMemberRoleFromPG(row.ViewerRequestedRole),
+		UpdatedAt: row.UpdatedAt.Time,
+	})
+}
+
+func roomLobbyCursorFloor() time.Time {
+	return time.Unix(0, 0).UTC()
+}
+
 func validateRoomTransition(before, after roomDomain.RoomSnapshot) error {
 	if err := validateRoomPersistenceWidths(before); err != nil {
 		return err
@@ -303,3 +368,4 @@ func mapRoomRepositoryError(ctx context.Context, err, noRowsError error) error {
 }
 
 var _ roomDomain.Repository = (*RoomRepository)(nil)
+var _ roomDomain.Store = (*RoomRepository)(nil)

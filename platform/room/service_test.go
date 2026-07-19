@@ -127,9 +127,11 @@ func (generator *sequenceRoomCodeGenerator) Generate() (string, error) {
 }
 
 type memoryRoomRepository struct {
-	mu     sync.Mutex
-	byID   map[uuid.UUID]Room
-	byCode map[string]uuid.UUID
+	mu          sync.Mutex
+	byID        map[uuid.UUID]Room
+	byCode      map[string]uuid.UUID
+	publicRooms []PublicRoomCard
+	lastList    PublicRoomListRequest
 }
 
 func newMemoryRoomRepository() *memoryRoomRepository {
@@ -182,4 +184,13 @@ func (repository *memoryRoomRepository) UpdateCAS(_ context.Context, current, ne
 	return next, nil
 }
 
+func (repository *memoryRoomRepository) ListPublicRooms(_ context.Context, request PublicRoomListRequest) ([]PublicRoomCard, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	repository.lastList = request
+	limit := min(len(repository.publicRooms), int(request.Limit))
+	return append([]PublicRoomCard(nil), repository.publicRooms[:limit]...), nil
+}
+
 var _ Repository = (*memoryRoomRepository)(nil)
+var _ Store = (*memoryRoomRepository)(nil)

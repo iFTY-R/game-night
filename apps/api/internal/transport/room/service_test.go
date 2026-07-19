@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -73,6 +74,51 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	}
 }
 
+func TestRoomConnectListsPublicCardsWithoutWriteHeaders(t *testing.T) {
+	host, guest := uuid.New(), uuid.New()
+	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
+	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PUBLIC, ParticipantCapacity: 4,
+		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_CLOSED,
+	})
+	authorizeRoomWrite(createRequest, "host-device")
+	created, err := client.CreateRoom(t.Context(), createRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	listRequest := connect.NewRequest(&roomv1.ListPublicRoomsRequest{})
+	authorizeRoomRead(listRequest, "guest-device")
+	listed, err := client.ListPublicRooms(t.Context(), listRequest)
+	if err != nil || len(listed.Msg.GetRooms()) != 1 {
+		t.Fatalf("list public rooms: response=%+v err=%v", listed, err)
+	}
+	card := listed.Msg.GetRooms()[0]
+	if card.GetRoomId() != created.Msg.GetRoom().GetRoomId() || card.GetHostUsername() != "TestHost" ||
+		card.GetParticipantCount() != 1 || card.GetPrimaryAction() != roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_JOIN ||
+		listed.Msg.GetPage().GetNextPageToken() != "" {
+		t.Fatalf("public card = %+v", card)
+	}
+}
+
+func TestPublicRoomCursorRoundTripsAndRejectsNonCanonicalInput(t *testing.T) {
+	want := roomDomain.PublicRoomPageCursor{
+		UpdatedAt: time.Date(2026, time.July, 19, 22, 0, 0, 123456000, time.UTC), RoomID: uuid.New(),
+	}
+	token, err := encodePublicRoomCursor(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := decodePublicRoomCursor(token)
+	if err != nil || got.RoomID != want.RoomID || !got.UpdatedAt.Equal(want.UpdatedAt) {
+		t.Fatalf("cursor = %+v, want %+v, err = %v", got, want, err)
+	}
+	if _, err := decodePublicRoomCursor(token + "A"); !errors.Is(err, roomDomain.ErrInvalidRoomInput) {
+		t.Fatalf("non-canonical cursor error = %v", err)
+	}
+}
+
 func TestEveryRoomRPCIsImplemented(t *testing.T) {
 	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": uuid.New()})
 	calls := []func() error{
@@ -82,6 +128,10 @@ func TestEveryRoomRPCIsImplemented(t *testing.T) {
 		},
 		func() error {
 			_, err := client.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.ListPublicRooms(t.Context(), connect.NewRequest(&roomv1.ListPublicRoomsRequest{}))
 			return err
 		},
 		func() error {
@@ -148,6 +198,11 @@ func authorizeRoomWrite[T any](request *connect.Request[T], deviceToken string) 
 	csrfToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{7}, csrf.TokenBytes))
 	request.Header().Set("Origin", roomTransportOrigin)
 	request.Header().Set(csrf.HeaderName, csrfToken)
+	request.Header().Set("Cookie", cookies.UserDeviceCookieName+"="+deviceToken+"; "+cookies.UserCSRFCookieName+"="+csrfToken)
+}
+
+func authorizeRoomRead[T any](request *connect.Request[T], deviceToken string) {
+	csrfToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{7}, csrf.TokenBytes))
 	request.Header().Set("Cookie", cookies.UserDeviceCookieName+"="+deviceToken+"; "+cookies.UserCSRFCookieName+"="+csrfToken)
 }
 
@@ -226,4 +281,90 @@ func (repository *transportRoomRepository) UpdateCAS(_ context.Context, current,
 	return next, nil
 }
 
+func (repository *transportRoomRepository) ListPublicRooms(_ context.Context, request roomDomain.PublicRoomListRequest) ([]roomDomain.PublicRoomCard, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	if !request.Valid() {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
+	cards := make([]roomDomain.PublicRoomCard, 0, len(repository.byID))
+	for _, candidate := range repository.byID {
+		snapshot := candidate.Snapshot()
+		if snapshot.Visibility != roomDomain.VisibilityPublic || snapshot.Status == roomDomain.RoomStatusClosed ||
+			!transportRoomMatchesFilter(snapshot, request.Filter) || !transportRoomAfterCursor(snapshot, request.After) {
+			continue
+		}
+		participantCount, spectatorCount, waitingCount := uint32(0), uint32(0), uint32(0)
+		viewerRole, viewerRequestedRole := roomDomain.MemberRole(""), roomDomain.MemberRole("")
+		for _, member := range snapshot.Members {
+			switch member.Role {
+			case roomDomain.MemberRoleParticipant:
+				participantCount++
+			case roomDomain.MemberRoleSpectator:
+				spectatorCount++
+			case roomDomain.MemberRoleWaiting:
+				waitingCount++
+			}
+			if member.UserID == request.ActorUserID {
+				viewerRole, viewerRequestedRole = member.Role, member.RequestedRole
+			}
+		}
+		card, err := roomDomain.RestorePublicRoomCard(roomDomain.PublicRoomCardSnapshot{
+			RoomID: snapshot.ID, HostUsername: "TestHost", Status: snapshot.Status,
+			ParticipantCapacity: snapshot.ParticipantCapacity, ParticipantCount: participantCount,
+			SpectatorCount: spectatorCount, WaitingCount: waitingCount,
+			ParticipantAdmission: snapshot.ParticipantAdmission, SpectatorAdmission: snapshot.SpectatorAdmission,
+			ActiveGameID: snapshot.ActiveGameID, ViewerRole: viewerRole, ViewerRequestedRole: viewerRequestedRole,
+			UpdatedAt: snapshot.UpdatedAt,
+		})
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	sort.Slice(cards, func(left, right int) bool {
+		leftSnapshot, rightSnapshot := cards[left].Snapshot(), cards[right].Snapshot()
+		if !leftSnapshot.UpdatedAt.Equal(rightSnapshot.UpdatedAt) {
+			return leftSnapshot.UpdatedAt.After(rightSnapshot.UpdatedAt)
+		}
+		return leftSnapshot.RoomID.String() > rightSnapshot.RoomID.String()
+	})
+	return append([]roomDomain.PublicRoomCard(nil), cards[:min(len(cards), int(request.Limit))]...), nil
+}
+
+func transportRoomMatchesFilter(snapshot roomDomain.RoomSnapshot, filter roomDomain.PublicRoomFilter) bool {
+	if len(filter.Statuses) > 0 {
+		matched := false
+		for _, status := range filter.Statuses {
+			matched = matched || snapshot.Status == status
+		}
+		if !matched {
+			return false
+		}
+	}
+	if filter.GameID != "" && snapshot.ActiveGameID != filter.GameID {
+		return false
+	}
+	if !filter.ParticipantJoinableOnly {
+		return true
+	}
+	participants := uint32(0)
+	for _, member := range snapshot.Members {
+		if member.Role == roomDomain.MemberRoleParticipant {
+			participants++
+		}
+	}
+	return snapshot.Status == roomDomain.RoomStatusLobby && snapshot.ParticipantAdmission != roomDomain.AdmissionClosed &&
+		participants < snapshot.ParticipantCapacity
+}
+
+func transportRoomAfterCursor(snapshot roomDomain.RoomSnapshot, after roomDomain.PublicRoomPageCursor) bool {
+	if after.UpdatedAt.IsZero() {
+		return true
+	}
+	return snapshot.UpdatedAt.Before(after.UpdatedAt) ||
+		(snapshot.UpdatedAt.Equal(after.UpdatedAt) && snapshot.ID.String() < after.RoomID.String())
+}
+
 var _ roomDomain.Repository = (*transportRoomRepository)(nil)
+var _ roomDomain.Store = (*transportRoomRepository)(nil)

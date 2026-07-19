@@ -1484,6 +1484,58 @@ type Querier interface {
 	//    AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
 	//  ORDER BY users.user_id
 	ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error)
+	//ListPublicRoomCards
+	//
+	//  SELECT room.room_id,
+	//      host.username AS host_username,
+	//      room.status,
+	//      room.participant_capacity,
+	//      counts.participant_count,
+	//      counts.spectator_count,
+	//      counts.waiting_count,
+	//      room.participant_admission,
+	//      room.spectator_admission,
+	//      room.active_game_id,
+	//      viewer.role AS viewer_role,
+	//      viewer.requested_role AS viewer_requested_role,
+	//      room.updated_at
+	//  FROM party_rooms AS room
+	//  JOIN users AS host
+	//    ON host.user_id = room.host_user_id
+	//   AND host.status = 'active'
+	//  JOIN LATERAL (
+	//      SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
+	//          count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
+	//          count(*) FILTER (WHERE member.role = 'waiting') AS waiting_count
+	//      FROM room_members AS member
+	//      WHERE member.room_id = room.room_id
+	//  ) AS counts ON true
+	//  LEFT JOIN room_members AS viewer
+	//    ON viewer.room_id = room.room_id
+	//   AND viewer.user_id = $1
+	//  WHERE room.visibility = 'public'
+	//    AND room.status <> 'closed'
+	//    AND (
+	//        (NOT $2::boolean AND NOT $3::boolean)
+	//        OR ($2::boolean AND room.status = 'lobby')
+	//        OR ($3::boolean AND room.status = 'playing')
+	//    )
+	//    AND ($4::text = '' OR room.active_game_id = $4::text)
+	//    AND (
+	//        NOT $5::boolean
+	//        OR (
+	//            room.status = 'lobby'
+	//            AND room.participant_admission IN ('open', 'approval')
+	//            AND counts.participant_count < room.participant_capacity
+	//        )
+	//    )
+	//    AND (
+	//        NOT $6::boolean
+	//        OR (room.updated_at, room.room_id) < ($7::timestamptz, $8::uuid)
+	//    )
+	//  ORDER BY room.updated_at DESC, room.room_id DESC
+	//  LIMIT $9
+	ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCardsParams) ([]ListPublicRoomCardsRow, error)
 	//ListRoomMembers
 	//
 	//  SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at

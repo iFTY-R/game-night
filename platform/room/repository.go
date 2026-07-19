@@ -14,6 +14,12 @@ type Repository interface {
 	UpdateCAS(context.Context, Room, Room) (Room, error)
 }
 
+// Store keeps authoritative aggregate writes and public lobby projections as explicit ports on one adapter.
+type Store interface {
+	Repository
+	PublicRoomRepository
+}
+
 // ValidateRoomCode exposes the canonical code grammar to transport and persistence adapters.
 func ValidateRoomCode(value string) error {
 	return validateRoomCode(value)

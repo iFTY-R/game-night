@@ -3,6 +3,7 @@ syntax = "proto3";
 package platform.room.v1;
 
 import "google/protobuf/timestamp.proto";
+import "platform/common/v1/common.proto";
 
 option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1;roomv1";
 
@@ -10,6 +11,7 @@ option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room
 service RoomService {
   rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
   rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc ListPublicRooms(ListPublicRoomsRequest) returns (ListPublicRoomsResponse);
   rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
   rpc ApproveMember(ApproveMemberRequest) returns (ApproveMemberResponse);
   rpc SetAdmission(SetAdmissionRequest) returns (SetAdmissionResponse);
@@ -50,6 +52,19 @@ enum JoinIntent {
   JOIN_INTENT_UNSPECIFIED = 0;
   JOIN_INTENT_PARTICIPANT = 1;
   JOIN_INTENT_SPECTATOR = 2;
+}
+
+// PublicRoomPrimaryAction is computed against current state and the authenticated viewer.
+enum PublicRoomPrimaryAction {
+  PUBLIC_ROOM_PRIMARY_ACTION_UNSPECIFIED = 0;
+  PUBLIC_ROOM_PRIMARY_ACTION_ENTER_ROOM = 1;
+  PUBLIC_ROOM_PRIMARY_ACTION_JOIN = 2;
+  PUBLIC_ROOM_PRIMARY_ACTION_REQUEST_JOIN = 3;
+  PUBLIC_ROOM_PRIMARY_ACTION_SPECTATE = 4;
+  PUBLIC_ROOM_PRIMARY_ACTION_REQUEST_SPECTATE = 5;
+  PUBLIC_ROOM_PRIMARY_ACTION_WAIT_FOR_HOST = 6;
+  PUBLIC_ROOM_PRIMARY_ACTION_IN_PROGRESS = 7;
+  PUBLIC_ROOM_PRIMARY_ACTION_FULL = 8;
 }
 
 message RoomVersion {
@@ -101,6 +116,41 @@ message GetRoomRequest {
 
 message GetRoomResponse {
   Room room = 1;
+}
+
+// PublicRoomFilter supports the stable discovery facets currently backed by authoritative room state.
+message PublicRoomFilter {
+  repeated RoomStatus statuses = 1;
+  string game_id = 2;
+  bool participant_joinable_only = 3;
+}
+
+// PublicRoomCard excludes invitation codes, real names, and other players' membership details.
+message PublicRoomCard {
+  string room_id = 1;
+  string host_username = 2;
+  RoomStatus status = 3;
+  uint32 participant_capacity = 4;
+  uint32 participant_count = 5;
+  uint32 spectator_count = 6;
+  uint32 waiting_count = 7;
+  AdmissionMode participant_admission = 8;
+  AdmissionMode spectator_admission = 9;
+  string active_game_id = 10;
+  MemberRole viewer_role = 11;
+  MemberRole viewer_requested_role = 12;
+  PublicRoomPrimaryAction primary_action = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+message ListPublicRoomsRequest {
+  PublicRoomFilter filter = 1;
+  platform.common.v1.PageRequest page = 2;
+}
+
+message ListPublicRoomsResponse {
+  repeated PublicRoomCard rooms = 1;
+  platform.common.v1.PageInfo page = 2;
 }
 
 message JoinRoomRequest {

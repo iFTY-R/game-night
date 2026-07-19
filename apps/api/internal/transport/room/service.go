@@ -3,19 +3,30 @@ package room
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"net/http"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
+	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	// publicRoomCursorVersion permits future cursor format changes without ambiguous decoding.
+	publicRoomCursorVersion byte = 1
+	// publicRoomCursorBytes stores one version byte, Unix nanoseconds, and a UUID.
+	publicRoomCursorBytes = 1 + 8 + 16
 )
 
 // Service keeps Cookie, Origin, CSRF, and wire mapping outside the room domain.
@@ -72,6 +83,35 @@ func (service *Service) GetRoom(ctx context.Context, request *connect.Request[ro
 		return nil, err
 	}
 	return connect.NewResponse(&roomv1.GetRoomResponse{Room: roomWire(loaded)}), nil
+}
+
+// ListPublicRooms authenticates a safe lobby read and returns only redacted actor-aware cards.
+func (service *Service) ListPublicRooms(ctx context.Context, request *connect.Request[roomv1.ListPublicRoomsRequest]) (*connect.Response[roomv1.ListPublicRoomsResponse], error) {
+	actor, err := service.authenticate(ctx, requestHTTP(request))
+	if err != nil {
+		return nil, err
+	}
+	after, pageSize, err := publicRoomPageRequest(request.Msg.GetPage())
+	if err != nil {
+		return nil, err
+	}
+	page, err := service.domain.ListPublicRooms(ctx, roomDomain.ListPublicRoomsCommand{
+		ActorUserID: actor, Filter: publicRoomFilterDomain(request.Msg.GetFilter()), After: after, PageSize: pageSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	rooms := make([]*roomv1.PublicRoomCard, 0, len(page.Rooms))
+	for _, card := range page.Rooms {
+		rooms = append(rooms, publicRoomCardWire(card))
+	}
+	nextToken, err := encodePublicRoomCursor(page.NextCursor)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.ListPublicRoomsResponse{
+		Rooms: rooms, Page: &commonv1.PageInfo{NextPageToken: nextToken},
+	}), nil
 }
 
 // JoinRoom admits or queues the current principal through a public ID or private invitation code.
@@ -268,6 +308,51 @@ func versionDomain(value *roomv1.RoomVersion) roomDomain.Version {
 	return roomDomain.Version{Room: value.GetRoomVersion(), Membership: value.GetMembershipVersion()}
 }
 
+func publicRoomPageRequest(page *commonv1.PageRequest) (roomDomain.PublicRoomPageCursor, uint32, error) {
+	if page == nil {
+		return roomDomain.PublicRoomPageCursor{}, 0, nil
+	}
+	if page.GetPageSize() < 0 || page.GetPageSize() > int32(roomDomain.MaximumPublicRoomPageSize) {
+		return roomDomain.PublicRoomPageCursor{}, 0, roomDomain.ErrInvalidRoomInput
+	}
+	cursor, err := decodePublicRoomCursor(page.GetPageToken())
+	return cursor, uint32(page.GetPageSize()), err
+}
+
+func encodePublicRoomCursor(cursor roomDomain.PublicRoomPageCursor) (string, error) {
+	if cursor.UpdatedAt.IsZero() && cursor.RoomID == uuid.Nil {
+		return "", nil
+	}
+	if cursor.UpdatedAt.IsZero() || cursor.RoomID == uuid.Nil || cursor.UpdatedAt.UnixNano() <= 0 {
+		return "", roomDomain.ErrInvalidRoomInput
+	}
+	raw := make([]byte, publicRoomCursorBytes)
+	raw[0] = publicRoomCursorVersion
+	binary.BigEndian.PutUint64(raw[1:9], uint64(cursor.UpdatedAt.UnixNano()))
+	copy(raw[9:], cursor.RoomID[:])
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func decodePublicRoomCursor(value string) (roomDomain.PublicRoomPageCursor, error) {
+	if value == "" {
+		return roomDomain.PublicRoomPageCursor{}, nil
+	}
+	raw, err := base64.RawURLEncoding.Strict().DecodeString(value)
+	if err != nil || len(raw) != publicRoomCursorBytes || raw[0] != publicRoomCursorVersion ||
+		base64.RawURLEncoding.EncodeToString(raw) != value {
+		return roomDomain.PublicRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	roomID, err := uuid.FromBytes(raw[9:])
+	if err != nil || roomID == uuid.Nil {
+		return roomDomain.PublicRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	updatedAt := time.Unix(0, int64(binary.BigEndian.Uint64(raw[1:9]))).UTC()
+	if updatedAt.UnixNano() <= 0 {
+		return roomDomain.PublicRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	return roomDomain.PublicRoomPageCursor{UpdatedAt: updatedAt, RoomID: roomID}, nil
+}
+
 func parseUUID(value string) (uuid.UUID, error) {
 	parsed, err := uuid.Parse(strings.TrimSpace(value))
 	if err != nil || parsed == uuid.Nil {
@@ -306,6 +391,19 @@ func roomWire(room roomDomain.Room) *roomv1.Room {
 		ActiveSessionId: activeSessionID, ActiveGameId: snapshot.ActiveGameID,
 		Version:   &roomv1.RoomVersion{RoomVersion: snapshot.RoomVersion, MembershipVersion: snapshot.MembershipVersion},
 		CreatedAt: timestamppb.New(snapshot.CreatedAt), UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
+	}
+}
+
+func publicRoomCardWire(card roomDomain.PublicRoomCard) *roomv1.PublicRoomCard {
+	snapshot := card.Snapshot()
+	return &roomv1.PublicRoomCard{
+		RoomId: snapshot.RoomID.String(), HostUsername: snapshot.HostUsername, Status: statusWire(snapshot.Status),
+		ParticipantCapacity: snapshot.ParticipantCapacity, ParticipantCount: snapshot.ParticipantCount,
+		SpectatorCount: snapshot.SpectatorCount, WaitingCount: snapshot.WaitingCount,
+		ParticipantAdmission: admissionWire(snapshot.ParticipantAdmission), SpectatorAdmission: admissionWire(snapshot.SpectatorAdmission),
+		ActiveGameId: snapshot.ActiveGameID, ViewerRole: memberRoleWire(snapshot.ViewerRole),
+		ViewerRequestedRole: memberRoleWire(snapshot.ViewerRequestedRole), PrimaryAction: publicRoomPrimaryActionWire(card.PrimaryAction()),
+		UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
 	}
 }
 
@@ -370,6 +468,55 @@ func statusWire(value roomDomain.RoomStatus) roomv1.RoomStatus {
 		return roomv1.RoomStatus_ROOM_STATUS_CLOSED
 	default:
 		return roomv1.RoomStatus_ROOM_STATUS_UNSPECIFIED
+	}
+}
+
+func statusDomain(value roomv1.RoomStatus) roomDomain.RoomStatus {
+	switch value {
+	case roomv1.RoomStatus_ROOM_STATUS_LOBBY:
+		return roomDomain.RoomStatusLobby
+	case roomv1.RoomStatus_ROOM_STATUS_PLAYING:
+		return roomDomain.RoomStatusPlaying
+	case roomv1.RoomStatus_ROOM_STATUS_CLOSED:
+		return roomDomain.RoomStatusClosed
+	default:
+		return ""
+	}
+}
+
+func publicRoomFilterDomain(value *roomv1.PublicRoomFilter) roomDomain.PublicRoomFilter {
+	if value == nil {
+		return roomDomain.PublicRoomFilter{}
+	}
+	statuses := make([]roomDomain.RoomStatus, 0, len(value.GetStatuses()))
+	for _, status := range value.GetStatuses() {
+		statuses = append(statuses, statusDomain(status))
+	}
+	return roomDomain.PublicRoomFilter{
+		Statuses: statuses, GameID: value.GetGameId(), ParticipantJoinableOnly: value.GetParticipantJoinableOnly(),
+	}
+}
+
+func publicRoomPrimaryActionWire(value roomDomain.PublicRoomPrimaryAction) roomv1.PublicRoomPrimaryAction {
+	switch value {
+	case roomDomain.PublicRoomPrimaryActionEnterRoom:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_ENTER_ROOM
+	case roomDomain.PublicRoomPrimaryActionJoin:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_JOIN
+	case roomDomain.PublicRoomPrimaryActionRequestJoin:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_REQUEST_JOIN
+	case roomDomain.PublicRoomPrimaryActionSpectate:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_SPECTATE
+	case roomDomain.PublicRoomPrimaryActionRequestSpectate:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_REQUEST_SPECTATE
+	case roomDomain.PublicRoomPrimaryActionWaitForHost:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_WAIT_FOR_HOST
+	case roomDomain.PublicRoomPrimaryActionInProgress:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_IN_PROGRESS
+	case roomDomain.PublicRoomPrimaryActionFull:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_FULL
+	default:
+		return roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_UNSPECIFIED
 	}
 }
 

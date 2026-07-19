@@ -144,7 +144,7 @@ func exerciseRoomLifecycle(
 ) {
 	t.Helper()
 	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
-		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 4,
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PUBLIC, ParticipantCapacity: 4,
 		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
 		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_APPROVAL,
 	})
@@ -156,6 +156,20 @@ func exerciseRoomLifecycle(
 	if created.Msg.GetRoom().GetRoomId() == "" || created.Msg.GetRoom().GetRoomCode() == "" {
 		t.Fatalf("create integrated room: room=%+v", created.Msg.GetRoom())
 	}
+	listed, err := client.ListPublicRooms(ctx, connect.NewRequest(&roomv1.ListPublicRoomsRequest{
+		Filter: &roomv1.PublicRoomFilter{Statuses: []roomv1.RoomStatus{roomv1.RoomStatus_ROOM_STATUS_LOBBY}},
+		Page:   &commonv1.PageRequest{PageSize: 1},
+	}))
+	if err != nil || len(listed.Msg.GetRooms()) != 1 {
+		t.Fatalf("list integrated public rooms: response=%+v err=%v", listed, err)
+	}
+	card := listed.Msg.GetRooms()[0]
+	if card.GetRoomId() != created.Msg.GetRoom().GetRoomId() || card.GetHostUsername() != "ConnectUser9" ||
+		card.GetPrimaryAction() != roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_ENTER_ROOM ||
+		card.GetParticipantCount() != 1 || listed.Msg.GetPage().GetNextPageToken() != "" {
+		t.Fatalf("list integrated public rooms: card=%+v", card)
+	}
+	assertNoStore(t, listed.Header())
 	loaded, err := client.GetRoom(ctx, connect.NewRequest(&roomv1.GetRoomRequest{RoomId: created.Msg.GetRoom().GetRoomId()}))
 	if err != nil {
 		t.Fatalf("get integrated room: %v", err)

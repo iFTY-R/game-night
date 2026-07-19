@@ -87,6 +87,189 @@ func TestRoomRepositoryPersistsMembershipAndRejectsStaleVersions(t *testing.T) {
 	}
 }
 
+func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
+	defer cancel()
+	applyTransactionTestMigrations(t, ctx, fixture)
+
+	now := databaseIntegrationTime(t, ctx, fixture).Truncate(time.Second)
+	actorID, participantID := uuid.New(), uuid.New()
+	hostIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	createRoomTestUser(t, ctx, fixture, actorID, "LobbyViewer", now)
+	createRoomTestUser(t, ctx, fixture, participantID, "LobbyPlayer", now)
+	for index, hostID := range hostIDs {
+		createRoomTestUser(t, ctx, fixture, hostID, "LobbyHost"+string(rune('A'+index)), now)
+	}
+
+	repository := NewRoomRepository(fixture.Pool)
+	stableIDs := []uuid.UUID{
+		uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+	}
+	openRoom, err := roomDomain.New(stableIDs[0], hostIDs[0], "LOBBY01", roomDomain.VisibilityPublic, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalRoom, err := roomDomain.NewWithAdmission(
+		stableIDs[1], hostIDs[1], "LOBBY02", roomDomain.VisibilityPublic, 3,
+		roomDomain.AdmissionApproval, roomDomain.AdmissionOpen, now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fullRoom, err := roomDomain.NewWithAdmission(
+		stableIDs[2], hostIDs[2], "LOBBY03", roomDomain.VisibilityPublic, 1,
+		roomDomain.AdmissionOpen, roomDomain.AdmissionClosed, now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []roomDomain.Room{openRoom, approvalRoom, fullRoom} {
+		if _, err := repository.Create(ctx, candidate); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	viewerRoom, err := roomDomain.New(uuid.New(), hostIDs[3], "LOBBY04", roomDomain.VisibilityPublic, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedViewerRoom, err := repository.Create(ctx, viewerRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withViewer, _, err := storedViewerRoom.Join(actorID, roomDomain.JoinIntentSpectator, storedViewerRoom.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewerRoom, err = repository.UpdateCAS(ctx, storedViewerRoom, withViewer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	playingRoom, err := roomDomain.New(uuid.New(), hostIDs[4], "LOBBY05", roomDomain.VisibilityPublic, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedPlayingRoom, err := repository.Create(ctx, playingRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withParticipant, _, err := storedPlayingRoom.Join(
+		participantID, roomDomain.JoinIntentParticipant, storedPlayingRoom.Version(), now.Add(time.Second),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withParticipant, err = repository.UpdateCAS(ctx, storedPlayingRoom, withParticipant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playingRoom, _, err = withParticipant.StartSession(
+		hostIDs[4], uuid.New(), "dice", 2, withParticipant.Version(), now.Add(2*time.Second),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playingRoom, err = repository.UpdateCAS(ctx, withParticipant, playingRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	privateRoom, err := roomDomain.New(uuid.New(), hostIDs[5], "LOBBY06", roomDomain.VisibilityPrivate, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(ctx, privateRoom); err != nil {
+		t.Fatal(err)
+	}
+	closedRoom, err := roomDomain.New(uuid.New(), hostIDs[6], "LOBBY07", roomDomain.VisibilityPublic, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedClosedRoom, err := repository.Create(ctx, closedRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedRoom, err = storedClosedRoom.Close(hostIDs[6], storedClosedRoom.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.UpdateCAS(ctx, storedClosedRoom, closedRoom); err != nil {
+		t.Fatal(err)
+	}
+	suspendedRoom, err := roomDomain.New(uuid.New(), hostIDs[7], "LOBBY08", roomDomain.VisibilityPublic, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(ctx, suspendedRoom); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.Pool.Exec(ctx, "UPDATE users SET status = 'suspended', updated_at = $2 WHERE user_id = $1", hostIDs[7], now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	firstRequest, err := roomDomain.NewPublicRoomListRequest(actorID, roomDomain.PublicRoomFilter{}, roomDomain.PublicRoomPageCursor{}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstRows, err := repository.ListPublicRooms(ctx, firstRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(firstRows) != 3 || firstRows[0].Snapshot().RoomID != playingRoom.Snapshot().ID ||
+		firstRows[0].Snapshot().ParticipantCount != 2 || firstRows[0].Snapshot().ActiveGameID != "dice" ||
+		firstRows[0].PrimaryAction() != roomDomain.PublicRoomPrimaryActionSpectate ||
+		firstRows[1].Snapshot().RoomID != viewerRoom.Snapshot().ID || firstRows[1].Snapshot().ViewerRole != roomDomain.MemberRoleSpectator ||
+		firstRows[1].PrimaryAction() != roomDomain.PublicRoomPrimaryActionEnterRoom {
+		t.Fatalf("first public rows = %+v", publicRoomSnapshots(firstRows))
+	}
+
+	after := firstRows[1].Snapshot()
+	secondRequest, err := roomDomain.NewPublicRoomListRequest(
+		actorID, roomDomain.PublicRoomFilter{}, roomDomain.PublicRoomPageCursor{UpdatedAt: after.UpdatedAt, RoomID: after.RoomID}, 10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRows, err := repository.ListPublicRooms(ctx, secondRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotStableIDs := make([]uuid.UUID, 0, len(secondRows))
+	for _, card := range secondRows {
+		gotStableIDs = append(gotStableIDs, card.Snapshot().RoomID)
+	}
+	wantStableIDs := []uuid.UUID{stableIDs[2], stableIDs[1], stableIDs[0]}
+	if !reflect.DeepEqual(gotStableIDs, wantStableIDs) {
+		t.Fatalf("stable IDs = %v, want %v", gotStableIDs, wantStableIDs)
+	}
+
+	gameRequest, err := roomDomain.NewPublicRoomListRequest(
+		actorID, roomDomain.PublicRoomFilter{GameID: "dice"}, roomDomain.PublicRoomPageCursor{}, 10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gameRows, err := repository.ListPublicRooms(ctx, gameRequest)
+	if err != nil || len(gameRows) != 1 || gameRows[0].Snapshot().RoomID != playingRoom.Snapshot().ID {
+		t.Fatalf("game rows = %+v, err = %v", publicRoomSnapshots(gameRows), err)
+	}
+
+	joinableRequest, err := roomDomain.NewPublicRoomListRequest(
+		actorID, roomDomain.PublicRoomFilter{ParticipantJoinableOnly: true}, roomDomain.PublicRoomPageCursor{}, 10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joinableRows, err := repository.ListPublicRooms(ctx, joinableRequest)
+	if err != nil || len(joinableRows) != 3 {
+		t.Fatalf("joinable rows = %+v, err = %v", publicRoomSnapshots(joinableRows), err)
+	}
+}
+
 func TestRoomRepositoryEnforcesCodeAndHostMembershipIntegrity(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
@@ -162,4 +345,12 @@ func createRoomTestUser(
 	if err := transaction.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func publicRoomSnapshots(cards []roomDomain.PublicRoomCard) []roomDomain.PublicRoomCardSnapshot {
+	snapshots := make([]roomDomain.PublicRoomCardSnapshot, 0, len(cards))
+	for _, card := range cards {
+		snapshots = append(snapshots, card.Snapshot())
+	}
+	return snapshots
 }

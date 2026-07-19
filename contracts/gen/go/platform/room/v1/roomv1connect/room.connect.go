@@ -37,6 +37,9 @@ const (
 	RoomServiceCreateRoomProcedure = "/platform.room.v1.RoomService/CreateRoom"
 	// RoomServiceGetRoomProcedure is the fully-qualified name of the RoomService's GetRoom RPC.
 	RoomServiceGetRoomProcedure = "/platform.room.v1.RoomService/GetRoom"
+	// RoomServiceListPublicRoomsProcedure is the fully-qualified name of the RoomService's
+	// ListPublicRooms RPC.
+	RoomServiceListPublicRoomsProcedure = "/platform.room.v1.RoomService/ListPublicRooms"
 	// RoomServiceJoinRoomProcedure is the fully-qualified name of the RoomService's JoinRoom RPC.
 	RoomServiceJoinRoomProcedure = "/platform.room.v1.RoomService/JoinRoom"
 	// RoomServiceApproveMemberProcedure is the fully-qualified name of the RoomService's ApproveMember
@@ -60,6 +63,7 @@ const (
 type RoomServiceClient interface {
 	CreateRoom(context.Context, *connect.Request[v1.CreateRoomRequest]) (*connect.Response[v1.CreateRoomResponse], error)
 	GetRoom(context.Context, *connect.Request[v1.GetRoomRequest]) (*connect.Response[v1.GetRoomResponse], error)
+	ListPublicRooms(context.Context, *connect.Request[v1.ListPublicRoomsRequest]) (*connect.Response[v1.ListPublicRoomsResponse], error)
 	JoinRoom(context.Context, *connect.Request[v1.JoinRoomRequest]) (*connect.Response[v1.JoinRoomResponse], error)
 	ApproveMember(context.Context, *connect.Request[v1.ApproveMemberRequest]) (*connect.Response[v1.ApproveMemberResponse], error)
 	SetAdmission(context.Context, *connect.Request[v1.SetAdmissionRequest]) (*connect.Response[v1.SetAdmissionResponse], error)
@@ -90,6 +94,12 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+RoomServiceGetRoomProcedure,
 			connect.WithSchema(roomServiceMethods.ByName("GetRoom")),
+			connect.WithClientOptions(opts...),
+		),
+		listPublicRooms: connect.NewClient[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse](
+			httpClient,
+			baseURL+RoomServiceListPublicRoomsProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("ListPublicRooms")),
 			connect.WithClientOptions(opts...),
 		),
 		joinRoom: connect.NewClient[v1.JoinRoomRequest, v1.JoinRoomResponse](
@@ -139,15 +149,16 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // roomServiceClient implements RoomServiceClient.
 type roomServiceClient struct {
-	createRoom    *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
-	getRoom       *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
-	joinRoom      *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
-	approveMember *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
-	setAdmission  *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
-	startGame     *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
-	finishGame    *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
-	removeMember  *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
-	closeRoom     *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
+	createRoom      *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
+	getRoom         *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
+	listPublicRooms *connect.Client[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse]
+	joinRoom        *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
+	approveMember   *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
+	setAdmission    *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
+	startGame       *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
+	finishGame      *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
+	removeMember    *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
+	closeRoom       *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
 }
 
 // CreateRoom calls platform.room.v1.RoomService.CreateRoom.
@@ -158,6 +169,11 @@ func (c *roomServiceClient) CreateRoom(ctx context.Context, req *connect.Request
 // GetRoom calls platform.room.v1.RoomService.GetRoom.
 func (c *roomServiceClient) GetRoom(ctx context.Context, req *connect.Request[v1.GetRoomRequest]) (*connect.Response[v1.GetRoomResponse], error) {
 	return c.getRoom.CallUnary(ctx, req)
+}
+
+// ListPublicRooms calls platform.room.v1.RoomService.ListPublicRooms.
+func (c *roomServiceClient) ListPublicRooms(ctx context.Context, req *connect.Request[v1.ListPublicRoomsRequest]) (*connect.Response[v1.ListPublicRoomsResponse], error) {
+	return c.listPublicRooms.CallUnary(ctx, req)
 }
 
 // JoinRoom calls platform.room.v1.RoomService.JoinRoom.
@@ -199,6 +215,7 @@ func (c *roomServiceClient) CloseRoom(ctx context.Context, req *connect.Request[
 type RoomServiceHandler interface {
 	CreateRoom(context.Context, *connect.Request[v1.CreateRoomRequest]) (*connect.Response[v1.CreateRoomResponse], error)
 	GetRoom(context.Context, *connect.Request[v1.GetRoomRequest]) (*connect.Response[v1.GetRoomResponse], error)
+	ListPublicRooms(context.Context, *connect.Request[v1.ListPublicRoomsRequest]) (*connect.Response[v1.ListPublicRoomsResponse], error)
 	JoinRoom(context.Context, *connect.Request[v1.JoinRoomRequest]) (*connect.Response[v1.JoinRoomResponse], error)
 	ApproveMember(context.Context, *connect.Request[v1.ApproveMemberRequest]) (*connect.Response[v1.ApproveMemberResponse], error)
 	SetAdmission(context.Context, *connect.Request[v1.SetAdmissionRequest]) (*connect.Response[v1.SetAdmissionResponse], error)
@@ -225,6 +242,12 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		RoomServiceGetRoomProcedure,
 		svc.GetRoom,
 		connect.WithSchema(roomServiceMethods.ByName("GetRoom")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceListPublicRoomsHandler := connect.NewUnaryHandler(
+		RoomServiceListPublicRoomsProcedure,
+		svc.ListPublicRooms,
+		connect.WithSchema(roomServiceMethods.ByName("ListPublicRooms")),
 		connect.WithHandlerOptions(opts...),
 	)
 	roomServiceJoinRoomHandler := connect.NewUnaryHandler(
@@ -275,6 +298,8 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceCreateRoomHandler.ServeHTTP(w, r)
 		case RoomServiceGetRoomProcedure:
 			roomServiceGetRoomHandler.ServeHTTP(w, r)
+		case RoomServiceListPublicRoomsProcedure:
+			roomServiceListPublicRoomsHandler.ServeHTTP(w, r)
 		case RoomServiceJoinRoomProcedure:
 			roomServiceJoinRoomHandler.ServeHTTP(w, r)
 		case RoomServiceApproveMemberProcedure:
@@ -304,6 +329,10 @@ func (UnimplementedRoomServiceHandler) CreateRoom(context.Context, *connect.Requ
 
 func (UnimplementedRoomServiceHandler) GetRoom(context.Context, *connect.Request[v1.GetRoomRequest]) (*connect.Response[v1.GetRoomResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.GetRoom is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) ListPublicRooms(context.Context, *connect.Request[v1.ListPublicRoomsRequest]) (*connect.Response[v1.ListPublicRoomsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.ListPublicRooms is not implemented"))
 }
 
 func (UnimplementedRoomServiceHandler) JoinRoom(context.Context, *connect.Request[v1.JoinRoomRequest]) (*connect.Response[v1.JoinRoomResponse], error) {

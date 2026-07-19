@@ -35,6 +35,14 @@ type GetRoomCommand struct {
 	Selector    RoomSelector
 }
 
+// ListPublicRoomsCommand discovers active public rooms through bounded, actor-aware keyset pagination.
+type ListPublicRoomsCommand struct {
+	ActorUserID uuid.UUID
+	Filter      PublicRoomFilter
+	After       PublicRoomPageCursor
+	PageSize    uint32
+}
+
 // JoinRoomCommand admits or queues an authenticated actor under one current aggregate version.
 type JoinRoomCommand struct {
 	ActorUserID uuid.UUID
@@ -95,17 +103,18 @@ type CloseRoomCommand struct {
 // Service owns room authorization and repository orchestration outside transport and PostgreSQL adapters.
 type Service struct {
 	repository Repository
+	lobby      PublicRoomRepository
 	codes      CodeGenerator
 	games      GameCatalog
 	clock      clock.Clock
 }
 
 // NewService requires all dependencies so room creation and mutation fail closed when wiring is incomplete.
-func NewService(repository Repository, codes CodeGenerator, games GameCatalog, source clock.Clock) (*Service, error) {
-	if repository == nil || codes == nil || games == nil || source == nil {
+func NewService(store Store, codes CodeGenerator, games GameCatalog, source clock.Clock) (*Service, error) {
+	if store == nil || codes == nil || games == nil || source == nil {
 		return nil, ErrInvalidRoomInput
 	}
-	return &Service{repository: repository, codes: codes, games: games, clock: source}, nil
+	return &Service{repository: store, lobby: store, codes: codes, games: games, clock: source}, nil
 }
 
 // CreateRoom generates server-owned identifiers and retries only invitation-code uniqueness races.
@@ -153,6 +162,31 @@ func (service *Service) GetRoom(ctx context.Context, command GetRoomCommand) (Ro
 		return Room{}, ErrRoomNotFound
 	}
 	return room, nil
+}
+
+// ListPublicRooms returns only validated public projections and emits a cursor when a lookahead row exists.
+func (service *Service) ListPublicRooms(ctx context.Context, command ListPublicRoomsCommand) (PublicRoomPage, error) {
+	if service == nil || service.lobby == nil || ctx == nil {
+		return PublicRoomPage{}, ErrInvalidRoomInput
+	}
+	request, err := NewPublicRoomListRequest(command.ActorUserID, command.Filter, command.After, command.PageSize)
+	if err != nil {
+		return PublicRoomPage{}, err
+	}
+	rooms, err := service.lobby.ListPublicRooms(ctx, request)
+	if err != nil {
+		return PublicRoomPage{}, err
+	}
+	if len(rooms) > int(request.Limit) {
+		return PublicRoomPage{}, ErrRoomIntegrity
+	}
+	page := PublicRoomPage{Rooms: rooms}
+	if len(rooms) > int(request.PageSize) {
+		page.Rooms = append([]PublicRoomCard(nil), rooms[:request.PageSize]...)
+		last := page.Rooms[len(page.Rooms)-1].Snapshot()
+		page.NextCursor = PublicRoomPageCursor{UpdatedAt: last.UpdatedAt, RoomID: last.RoomID}
+	}
+	return page, nil
 }
 
 // JoinRoom accepts a public room ID or invitation code and relies on repository CAS for concurrent capacity decisions.

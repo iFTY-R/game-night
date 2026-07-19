@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package game.dice789.v1;
+
+option go_package = "github.com/iFTY-R/game-night/games/dice-789/gen/go/game/dice789/v1;dice789v1";
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_AWAITING_ROLL = 1;
+  PHASE_RESULT_PENDING = 2;
+  PHASE_AWAITING_ADD = 3;
+  PHASE_AWAITING_TARGET = 4;
+  PHASE_AWAITING_CONTINUE = 5;
+  PHASE_TURN_SETTLED = 6;
+  PHASE_FINISHED = 7;
+}
+
+enum ContinueMode {
+  CONTINUE_MODE_UNSPECIFIED = 0;
+  CONTINUE_MODE_OPTIONAL = 1;
+  CONTINUE_MODE_FORCED_REROLL = 2;
+  CONTINUE_MODE_FORCED_PASS = 3;
+}
+
+message Config {
+  uint32 initial_pool_ticks = 1;
+  uint32 layer_capacity_ticks = 2;
+  uint32 add_step_ticks = 3;
+  uint32 max_layers = 4;
+  bool stacked_pool = 5;
+  bool ordinary_pairs_reverse = 6;
+  bool double_one_enabled = 7;
+  bool double_four_enabled = 8;
+  bool double_six_enabled = 9;
+  ContinueMode continue_mode = 10;
+  bool last_digit_match = 11;
+  uint32 action_timeout_seconds = 12;
+  uint32 drop_report_window_seconds = 13;
+}
+
+message PoolLayer {
+  uint32 ticks = 1;
+}
+
+message PlayerState {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 penalty_ticks = 4;
+}
+
+message State {
+  uint32 schema_version = 1;
+  Phase phase = 2;
+  uint32 turn = 3;
+  repeated PlayerState players = 4;
+  string current_user_id = 5;
+  string source_user_id = 6;
+  string target_user_id = 7;
+  uint32 direction = 8;
+  repeated PoolLayer pool = 9;
+  uint32 total_pool_ticks = 10;
+  uint32 die_one = 11;
+  uint32 die_two = 12;
+  uint32 sum = 13;
+  int64 action_deadline_unix_millis = 14;
+  Config config = 15;
+}
+
+message Roll {}
+message ConfirmLanded {}
+message AddToPool { uint32 ticks = 1; }
+message ChooseTarget { string user_id = 1; }
+message Reroll {}
+message Pass {}
+message ReportDropped { string reason = 1; }
+message Finish {}
+
+message Command {
+  oneof command {
+    Roll roll = 1;
+    ConfirmLanded confirm_landed = 2;
+    AddToPool add_to_pool = 3;
+    ChooseTarget choose_target = 4;
+    Reroll reroll = 5;
+    Pass pass = 6;
+    ReportDropped report_dropped = 7;
+    Finish finish = 8;
+  }
+}
+
+message TurnStarted { uint32 turn = 1; string user_id = 2; }
+message DiceRolled { uint32 die_one = 1; uint32 die_two = 2; uint32 sum = 3; }
+message PoolChanged { uint32 before_ticks = 1; uint32 after_ticks = 2; uint32 actor_ticks = 3; }
+message DirectionChanged { uint32 direction = 1; }
+message PenaltyRecorded { string user_id = 1; uint32 ticks = 2; string reason = 3; }
+message TargetSelected { string source_user_id = 1; string target_user_id = 2; }
+message TurnDropped { string user_id = 1; string reason = 2; }
+message ParticipantRevoked { string user_id = 1; }
+message SessionFinished { string reason = 1; }
+
+message Event {
+  oneof event {
+    TurnStarted turn_started = 1;
+    DiceRolled dice_rolled = 2;
+    PoolChanged pool_changed = 3;
+    DirectionChanged direction_changed = 4;
+    PenaltyRecorded penalty_recorded = 5;
+    TargetSelected target_selected = 6;
+    TurnDropped turn_dropped = 7;
+    ParticipantRevoked participant_revoked = 8;
+    SessionFinished session_finished = 9;
+  }
+}
+
+message View {
+  Phase phase = 1;
+  uint32 turn = 2;
+  repeated PlayerState players = 3;
+  string current_user_id = 4;
+  string target_user_id = 5;
+  uint32 direction = 6;
+  repeated PoolLayer pool = 7;
+  uint32 total_pool_ticks = 8;
+  uint32 die_one = 9;
+  uint32 die_two = 10;
+  uint32 sum = 11;
+  int64 action_deadline_unix_millis = 12;
+  repeated string allowed_actions = 13;
+  string finish_reason = 14;
+}

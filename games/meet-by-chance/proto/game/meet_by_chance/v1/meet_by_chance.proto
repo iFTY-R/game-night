@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package game.meet_by_chance.v1;
+
+option go_package = "github.com/iFTY-R/game-night/games/meet-by-chance/gen/go/game/meet_by_chance/v1;meetbychancev1";
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_ROLLING = 1;
+  PHASE_REVEALING = 2;
+  PHASE_RESOLVING_MATCH = 3;
+  PHASE_TARGET_DECISION = 4;
+  PHASE_TARGET_ROLLING = 5;
+  PHASE_ROUND_SETTLED = 6;
+  PHASE_FINISHED = 7;
+}
+
+enum HandClass {
+  HAND_CLASS_UNSPECIFIED = 0;
+  HAND_CLASS_SINGLE = 1;
+  HAND_CLASS_PAIR = 2;
+  HAND_CLASS_STRAIGHT = 3;
+  HAND_CLASS_LEOPARD = 4;
+  HAND_CLASS_SPECIAL_235 = 5;
+}
+
+message Config {
+  bool straight_123 = 1;
+  bool straight_234 = 2;
+  bool straight_345 = 3;
+  bool straight_456 = 4;
+  bool special_235_enabled = 5;
+  bool ones_wild = 6;
+  uint32 target_penalty_ticks = 7;
+  uint32 reroll_penalty_ticks = 8;
+  uint32 match_penalty_ticks = 9;
+  uint32 weak_extra_penalty_ticks = 10;
+  uint32 target_reroll_limit = 11;
+  uint32 match_resolution_limit = 12;
+  uint32 action_timeout_seconds = 13;
+}
+
+message PlayerState {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 penalty_ticks = 4;
+  repeated uint32 dice = 5;
+  HandClass hand_class = 6;
+  repeated int32 full_key = 7;
+  repeated int32 tie_key = 8;
+}
+
+message State {
+  uint32 schema_version = 1;
+  Phase phase = 2;
+  uint32 round = 3;
+  repeated PlayerState players = 4;
+  string target_user_id = 5;
+  uint32 target_reroll_count = 6;
+  uint32 target_streak = 7;
+  uint32 match_resolution_count = 8;
+  int64 action_deadline_unix_millis = 9;
+  Config config = 10;
+}
+
+message Reroll {}
+message Stand {}
+message Finish {}
+
+message Command {
+  oneof command {
+    Reroll reroll = 1;
+    Stand stand = 2;
+    Finish finish = 3;
+  }
+}
+
+message RoundStarted { uint32 round = 1; }
+message DiceRevealed { repeated PlayerState players = 1; }
+message HandClassified { string user_id = 1; HandClass hand_class = 2; repeated int32 full_key = 3; repeated int32 tie_key = 4; }
+message MatchResolved { repeated string user_ids = 1; string kind = 2; uint32 penalty_ticks = 3; }
+message TargetSelected { string user_id = 1; uint32 penalty_ticks = 2; }
+message TargetRerolled { string user_id = 1; uint32 count = 2; }
+message PenaltyRecorded { string user_id = 1; uint32 ticks = 2; string reason = 3; }
+message ParticipantRevoked { string user_id = 1; }
+message SessionFinished { string reason = 1; }
+
+message Event {
+  oneof event {
+    RoundStarted round_started = 1;
+    DiceRevealed dice_revealed = 2;
+    HandClassified hand_classified = 3;
+    MatchResolved match_resolved = 4;
+    TargetSelected target_selected = 5;
+    TargetRerolled target_rerolled = 6;
+    PenaltyRecorded penalty_recorded = 7;
+    ParticipantRevoked participant_revoked = 8;
+    SessionFinished session_finished = 9;
+  }
+}
+
+message View {
+  Phase phase = 1;
+  uint32 round = 2;
+  repeated PlayerState players = 3;
+  string target_user_id = 4;
+  uint32 target_reroll_count = 5;
+  uint32 target_reroll_limit = 6;
+  uint32 match_resolution_count = 7;
+  uint32 match_resolution_limit = 8;
+  int64 action_deadline_unix_millis = 9;
+  repeated string allowed_actions = 10;
+  string finish_reason = 11;
+}

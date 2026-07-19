@@ -18,6 +18,8 @@
     "test:backend:integration": "go test -p 1 -race ./platform/... ./apps/... ./internal/integrationtest/... ./infra/nginx/test/..."
   },
   "devDependencies": {
+    "@bufbuild/protobuf": "2.6.2",
+    "@bufbuild/protoc-gen-es": "2.6.2",
     "turbo": "2.10.5"
   }
 }

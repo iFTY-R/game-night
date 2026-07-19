@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package game.liars_dice.v1;
+
+option go_package = "github.com/iFTY-R/game-night/games/liars-dice/gen/go/game/liars_dice/v1;liarsdicev1";
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_ROLLING = 1;
+  PHASE_BIDDING = 2;
+  PHASE_REVEALING = 3;
+  PHASE_ROUND_SETTLED = 4;
+  PHASE_FINISHED = 5;
+}
+
+enum BidMode {
+  BID_MODE_UNSPECIFIED = 0;
+  BID_MODE_FLYING = 1;
+  BID_MODE_STRICT = 2;
+}
+
+message Config {
+  uint32 dice_per_player = 1;
+  bool ones_wild = 2;
+  bool strict_enabled = 3;
+  bool flying_enabled = 4;
+  uint32 first_bid_minimum = 5;
+  uint32 penalty_ticks = 6;
+  uint32 action_timeout_seconds = 7;
+}
+
+message Bid {
+  uint32 quantity = 1;
+  uint32 face = 2;
+  BidMode mode = 3;
+}
+
+message PlayerState {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 penalty_ticks = 4;
+}
+
+message PrivateDice {
+  string user_id = 1;
+  repeated uint32 faces = 2;
+}
+
+message State {
+  uint32 schema_version = 1;
+  Phase phase = 2;
+  uint32 round = 3;
+  repeated PlayerState players = 4;
+  string first_actor_user_id = 5;
+  string current_actor_user_id = 6;
+  string last_bidder_user_id = 7;
+  Bid current_bid = 8;
+  bool has_current_bid = 9;
+  int64 action_deadline_unix_millis = 10;
+  repeated PrivateDice private_dice = 11;
+  Config config = 12;
+}
+
+message PlaceBid {
+  Bid bid = 1;
+}
+
+message OpenDice {}
+message Finish {}
+
+message Command {
+  oneof command {
+    PlaceBid place_bid = 1;
+    OpenDice open_dice = 2;
+    Finish finish = 3;
+  }
+}
+
+message BidPlaced {
+  string user_id = 1;
+  Bid bid = 2;
+}
+
+message DiceRevealed {
+  repeated PrivateDice dice = 1;
+}
+
+message RoundSettled {
+  string loser_user_id = 1;
+  uint32 penalty_ticks = 2;
+  uint32 next_round = 3;
+}
+
+message ParticipantRevoked {
+  string user_id = 1;
+}
+
+message SessionFinished {
+  string reason = 1;
+}
+
+message Event {
+  oneof event {
+    BidPlaced bid_placed = 1;
+    DiceRevealed dice_revealed = 2;
+    RoundSettled round_settled = 3;
+    ParticipantRevoked participant_revoked = 4;
+    SessionFinished session_finished = 5;
+  }
+}
+
+message PublicPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 penalty_ticks = 4;
+  bool has_private_dice = 5;
+}
+
+message View {
+  Phase phase = 1;
+  uint32 round = 2;
+  repeated PublicPlayer players = 3;
+  repeated uint32 own_dice = 4;
+  Bid current_bid = 5;
+  bool has_current_bid = 6;
+  string current_actor_user_id = 7;
+  int64 action_deadline_unix_millis = 8;
+  repeated string allowed_actions = 9;
+  repeated PrivateDice revealed_dice = 10;
+  string finish_reason = 11;
+}

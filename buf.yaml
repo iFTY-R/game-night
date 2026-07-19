@@ -1,6 +1,9 @@
 version: v2
 modules:
   - path: contracts
+  - path: games/liars-dice/proto
+  - path: games/dice-789/proto
+  - path: games/meet-by-chance/proto
 lint:
   use:
     - STANDARD

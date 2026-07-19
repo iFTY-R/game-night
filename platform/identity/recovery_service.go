@@ -141,8 +141,9 @@ func NewServiceWithRecovery(
 	usernames identifier.UsernameValidator,
 	serviceClock clock.Clock,
 	auditService *audit.Service,
+	checkpointHealth *audit.CheckpointHealthPolicy,
 ) (*Service, error) {
-	if recoveryAttempts == nil || auditService == nil {
+	if recoveryAttempts == nil || auditService == nil || checkpointHealth == nil {
 		return nil, ErrInvalidIdentityRequest
 	}
 	service, err := NewService(
@@ -153,6 +154,7 @@ func NewServiceWithRecovery(
 	}
 	service.recoveryAttempts = recoveryAttempts
 	service.audit = auditService
+	service.checkpointHealth = checkpointHealth
 	return service, nil
 }
 
@@ -921,11 +923,7 @@ func (service *Service) appendAuditEvent(
 	if err != nil {
 		return err
 	}
-	health, err := audit.EvaluateCheckpointHealth(audit.CheckpointHealthInput{
-		HeadSequence: next.Sequence(), AcknowledgedSequence: progress.AcknowledgedSequence,
-		UncheckpointedSince: progress.UncheckpointedSince, Now: input.OccurredAt,
-		Production: false, SinkReady: true,
-	})
+	health, err := service.checkpointHealth.Evaluate(ctx, next.Sequence(), progress, input.OccurredAt)
 	if err != nil || !health.CheckpointDue() {
 		return err
 	}
@@ -945,11 +943,7 @@ func (service *Service) requireHealthyAudit(ctx context.Context, transaction Ide
 	if err != nil {
 		return err
 	}
-	health, err := audit.EvaluateCheckpointHealth(audit.CheckpointHealthInput{
-		HeadSequence: head.Sequence(), AcknowledgedSequence: progress.AcknowledgedSequence,
-		UncheckpointedSince: progress.UncheckpointedSince, Now: service.clock.Now(),
-		Production: false, SinkReady: true,
-	})
+	health, err := service.checkpointHealth.Evaluate(ctx, head.Sequence(), progress, service.clock.Now())
 	if err != nil {
 		return err
 	}

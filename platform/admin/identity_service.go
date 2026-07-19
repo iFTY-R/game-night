@@ -38,38 +38,41 @@ const (
 
 // IdentityServiceDependencies keeps PII, authentication, audit, and persistence authority explicit.
 type IdentityServiceDependencies struct {
-	Clock         clock.Clock
-	UnitOfWork    UnitOfWork
-	Sessions      *SessionService
-	Authorizer    AdminAuthorizer
-	Limiter       ratelimit.RateLimiter
-	PII           *profile.PIIProtector
-	RecoveryCodes *identity.RecoveryCodeService
-	Results       *secretresult.Service
-	Audit         *audit.Service
+	Clock            clock.Clock
+	UnitOfWork       UnitOfWork
+	Sessions         *SessionService
+	Authorizer       AdminAuthorizer
+	Limiter          ratelimit.RateLimiter
+	PII              *profile.PIIProtector
+	RecoveryCodes    *identity.RecoveryCodeService
+	Results          *secretresult.Service
+	Audit            *audit.Service
+	CheckpointHealth *audit.CheckpointHealthPolicy
 }
 
 // IdentityService coordinates administrator profile and user-governance operations.
 type IdentityService struct {
-	clock         clock.Clock
-	unitOfWork    UnitOfWork
-	sessions      *SessionService
-	authorizer    AdminAuthorizer
-	limiter       ratelimit.RateLimiter
-	pii           *profile.PIIProtector
-	recoveryCodes *identity.RecoveryCodeService
-	results       *secretresult.Service
-	audit         *audit.Service
+	clock            clock.Clock
+	unitOfWork       UnitOfWork
+	sessions         *SessionService
+	authorizer       AdminAuthorizer
+	limiter          ratelimit.RateLimiter
+	pii              *profile.PIIProtector
+	recoveryCodes    *identity.RecoveryCodeService
+	results          *secretresult.Service
+	audit            *audit.Service
+	checkpointHealth *audit.CheckpointHealthPolicy
 }
 
 func NewIdentityService(deps IdentityServiceDependencies) (*IdentityService, error) {
 	if deps.Clock == nil || deps.UnitOfWork == nil || deps.Sessions == nil || deps.Limiter == nil ||
-		deps.PII == nil || deps.RecoveryCodes == nil || deps.Results == nil || deps.Audit == nil {
+		deps.PII == nil || deps.RecoveryCodes == nil || deps.Results == nil || deps.Audit == nil || deps.CheckpointHealth == nil {
 		return nil, ErrInvalidInput
 	}
 	return &IdentityService{
 		clock: deps.Clock, unitOfWork: deps.UnitOfWork, sessions: deps.Sessions, authorizer: deps.Authorizer,
 		limiter: deps.Limiter, pii: deps.PII, recoveryCodes: deps.RecoveryCodes, results: deps.Results, audit: deps.Audit,
+		checkpointHealth: deps.CheckpointHealth,
 	}, nil
 }
 
@@ -994,10 +997,7 @@ func (service *IdentityService) requireHealthyAudit(ctx context.Context, transac
 	if err != nil {
 		return err
 	}
-	health, err := audit.EvaluateCheckpointHealth(audit.CheckpointHealthInput{
-		HeadSequence: head.Sequence(), AcknowledgedSequence: progress.AcknowledgedSequence,
-		UncheckpointedSince: progress.UncheckpointedSince, Now: service.clock.Now(), Production: false, SinkReady: true,
-	})
+	health, err := service.checkpointHealth.Evaluate(ctx, head.Sequence(), progress, service.clock.Now())
 	if err != nil {
 		return err
 	}
@@ -1044,7 +1044,7 @@ func (service *IdentityService) appendAuditActor(ctx context.Context, transactio
 	if err != nil {
 		return err
 	}
-	health, err := audit.EvaluateCheckpointHealth(audit.CheckpointHealthInput{HeadSequence: next.Sequence(), AcknowledgedSequence: progress.AcknowledgedSequence, UncheckpointedSince: progress.UncheckpointedSince, Now: service.clock.Now(), Production: false, SinkReady: true})
+	health, err := service.checkpointHealth.Evaluate(ctx, next.Sequence(), progress, service.clock.Now())
 	if err != nil || !health.CheckpointDue() {
 		return err
 	}

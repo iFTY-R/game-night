@@ -20,6 +20,8 @@ const (
 	idleTimeoutEnvironment       = "GAME_NIGHT_API_IDLE_TIMEOUT"
 	shutdownTimeoutEnvironment   = "GAME_NIGHT_API_SHUTDOWN_TIMEOUT"
 	maxHeaderBytesEnvironment    = "GAME_NIGHT_API_MAX_HEADER_BYTES"
+	argon2WorkersEnvironment     = "GAME_NIGHT_API_ARGON2_WORKERS"
+	argon2QueueEnvironment       = "GAME_NIGHT_API_ARGON2_QUEUE_CAPACITY"
 	// Listener defaults support mobile requests without allowing stalled clients to hold resources indefinitely.
 	defaultListenAddress     = ":8080"
 	defaultReadHeaderTimeout = 5 * time.Second
@@ -36,6 +38,11 @@ const (
 	defaultMaxHeaderBytes = 1 << 20
 	minimumMaxHeaderBytes = 4 << 10
 	maximumMaxHeaderBytes = 4 << 20
+	// Two workers keep the default aggregate Argon2 memory at 128 MiB; the hard cap matches security package limits.
+	defaultArgon2Workers = 2
+	maximumArgon2Workers = 8
+	defaultArgon2Queue   = 64
+	maximumArgon2Queue   = 4096
 )
 
 // ListenerConfig bounds HTTP resource use and graceful shutdown time for the API process.
@@ -49,10 +56,17 @@ type ListenerConfig struct {
 	MaxHeaderBytes    int
 }
 
+// Argon2Config bounds expensive password and recovery-code work independently of HTTP concurrency.
+type Argon2Config struct {
+	Workers       int
+	QueueCapacity int
+}
+
 // Config combines the shared dependency/security settings with API-only listener behavior.
 type Config struct {
 	Shared   sharedconfig.Config
 	Listener ListenerConfig
+	Argon2   Argon2Config
 }
 
 // Load validates shared configuration first, then parses bounded API listener settings without opening sockets.
@@ -66,7 +80,11 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Shared: shared, Listener: listener}, nil
+	argon2Config, err := loadArgon2(reader)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{Shared: shared, Listener: listener, Argon2: argon2Config}, nil
 }
 
 type environmentReader struct {
@@ -123,6 +141,18 @@ func loadListener(reader environmentReader) (ListenerConfig, error) {
 		ShutdownTimeout:   shutdownTimeout,
 		MaxHeaderBytes:    maxHeaderBytes,
 	}, nil
+}
+
+func loadArgon2(reader environmentReader) (Argon2Config, error) {
+	workers, err := parseInteger(reader, argon2WorkersEnvironment, defaultArgon2Workers, 1, maximumArgon2Workers)
+	if err != nil {
+		return Argon2Config{}, err
+	}
+	queueCapacity, err := parseInteger(reader, argon2QueueEnvironment, defaultArgon2Queue, 0, maximumArgon2Queue)
+	if err != nil {
+		return Argon2Config{}, err
+	}
+	return Argon2Config{Workers: workers, QueueCapacity: queueCapacity}, nil
 }
 
 func validListenAddress(value string) bool {

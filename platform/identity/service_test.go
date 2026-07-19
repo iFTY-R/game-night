@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/idempotency"
@@ -409,12 +410,21 @@ func newIdentityServiceFixture(t testing.TB) *identityServiceFixture {
 	}
 	service, err := NewServiceWithRecovery(
 		challengeService, deviceService, recoveryService, attemptService, resultService,
-		unitOfWork, limiter, validator, serviceClock, newIdentityAuditService(t),
+		unitOfWork, limiter, validator, serviceClock, newIdentityAuditService(t), testCheckpointHealthPolicy(t),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return &identityServiceFixture{service: service, clock: serviceClock, limiter: limiter, storage: storage, hasher: hasher}
+}
+
+func testCheckpointHealthPolicy(t testing.TB) *audit.CheckpointHealthPolicy {
+	t.Helper()
+	policy, err := audit.NewCheckpointHealthPolicy(false, audit.SinkReadinessFunc(func(context.Context) bool { return true }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return policy
 }
 
 func (fixture *identityServiceFixture) bootstrap(t testing.TB, ctx context.Context) BootstrapIdentityResult {

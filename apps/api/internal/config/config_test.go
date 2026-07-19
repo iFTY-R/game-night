@@ -18,6 +18,8 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	environment[idleTimeoutEnvironment] = "45s"
 	environment[shutdownTimeoutEnvironment] = "20s"
 	environment[maxHeaderBytesEnvironment] = "524288"
+	environment[argon2WorkersEnvironment] = "4"
+	environment[argon2QueueEnvironment] = "128"
 
 	loaded, err := Load(mapLookup(environment))
 	if err != nil {
@@ -32,6 +34,9 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	}
 	if loaded.Listener.IdleTimeout != 45*time.Second || loaded.Listener.ShutdownTimeout != 20*time.Second || loaded.Listener.MaxHeaderBytes != 524288 {
 		t.Fatalf("unexpected API resource limits: %+v", loaded.Listener)
+	}
+	if loaded.Argon2 != (Argon2Config{Workers: 4, QueueCapacity: 128}) {
+		t.Fatalf("unexpected Argon2 config: %+v", loaded.Argon2)
 	}
 }
 
@@ -53,6 +58,9 @@ func TestLoadUsesBoundedAPIListenerDefaults(t *testing.T) {
 	if loaded.Listener != want {
 		t.Fatalf("unexpected listener defaults: got %+v want %+v", loaded.Listener, want)
 	}
+	if loaded.Argon2 != (Argon2Config{Workers: 2, QueueCapacity: 64}) {
+		t.Fatalf("unexpected Argon2 defaults: %+v", loaded.Argon2)
+	}
 }
 
 func TestLoadRejectsInvalidAPIOptionsWithoutLeakingValues(t *testing.T) {
@@ -68,6 +76,8 @@ func TestLoadRejectsInvalidAPIOptionsWithoutLeakingValues(t *testing.T) {
 		{name: "idle timeout", environment: idleTimeoutEnvironment, value: "secret-idle"},
 		{name: "shutdown timeout", environment: shutdownTimeoutEnvironment, value: "secret-shutdown"},
 		{name: "max header bytes", environment: maxHeaderBytesEnvironment, value: "secret-header-size"},
+		{name: "Argon2 workers", environment: argon2WorkersEnvironment, value: "secret-workers"},
+		{name: "Argon2 queue", environment: argon2QueueEnvironment, value: "secret-queue"},
 	}
 
 	for _, test := range tests {
@@ -96,6 +106,8 @@ func TestLoadRejectsExcessiveAPIResourceLimits(t *testing.T) {
 		{environment: idleTimeoutEnvironment, value: "5m1s"},
 		{environment: shutdownTimeoutEnvironment, value: "1m1s"},
 		{environment: maxHeaderBytesEnvironment, value: "4194305"},
+		{environment: argon2WorkersEnvironment, value: "9"},
+		{environment: argon2QueueEnvironment, value: "4097"},
 	}
 
 	for _, test := range tests {

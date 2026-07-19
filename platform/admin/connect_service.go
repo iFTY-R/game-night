@@ -43,14 +43,37 @@ func adminTransport(ctx context.Context) AdminTransportContext {
 	return transport
 }
 
+// AdminCookieEffects is implemented by the API transport so this adapter never owns Cookie names or policies.
+type AdminCookieEffects interface {
+	SetAdminChallenge(HeaderWriter, IssuedChallenge) error
+	SetAdminSession(HeaderWriter, IssuedSession) error
+	ClearAdminSession(HeaderWriter) error
+}
+
+// HeaderWriter is the only response mutation capability the domain adapter needs for Set-Cookie delivery.
+type HeaderWriter interface {
+	Add(string, string)
+}
+
 // ConnectAdminService is the transport adapter for AdminAuthService. It contains no persistence logic.
-type ConnectAdminService struct{ service *Service }
+type ConnectAdminService struct {
+	service       *Service
+	cookieEffects AdminCookieEffects
+}
 
 func NewConnectAdminService(service *Service) (*ConnectAdminService, error) {
 	if service == nil {
 		return nil, ErrInvalidInput
 	}
 	return &ConnectAdminService{service: service}, nil
+}
+
+// NewConnectAdminServiceWithCookieEffects requires the API-owned Cookie delivery boundary for runtime handlers.
+func NewConnectAdminServiceWithCookieEffects(service *Service, effects AdminCookieEffects) (*ConnectAdminService, error) {
+	if service == nil || effects == nil {
+		return nil, ErrInvalidInput
+	}
+	return &ConnectAdminService{service: service, cookieEffects: effects}, nil
 }
 
 var _ adminv1connect.AdminAuthServiceHandler = (*ConnectAdminService)(nil)
@@ -69,7 +92,13 @@ func (adapter *ConnectAdminService) BeginAdminLogin(ctx context.Context, request
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.BeginAdminLoginResponse{Challenge: &commonv1.AnonymousChallenge{ChallengeProof: issued.Credentials.BodyProof, ExpiresAt: timestamppb.New(issued.Challenge.Snapshot().ExpiresAt)}}), nil
+	response := connect.NewResponse(&adminv1.BeginAdminLoginResponse{Challenge: &commonv1.AnonymousChallenge{ChallengeProof: issued.Credentials.BodyProof, ExpiresAt: timestamppb.New(issued.Challenge.Snapshot().ExpiresAt)}})
+	if adapter.cookieEffects != nil {
+		if err := adapter.cookieEffects.SetAdminChallenge(response.Header(), issued); err != nil {
+			return nil, adminConnectError(err)
+		}
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) LoginPassword(ctx context.Context, request *connect.Request[adminv1.LoginPasswordRequest]) (*connect.Response[adminv1.LoginPasswordResponse], error) {
@@ -82,7 +111,11 @@ func (adapter *ConnectAdminService) LoginPassword(ctx context.Context, request *
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.LoginPasswordResponse{NextStep: nextStepWire(result.NextStep), ExpiresAt: timestamppb.New(result.ExpiresAt)}), nil
+	response := connect.NewResponse(&adminv1.LoginPasswordResponse{NextStep: nextStepWire(result.NextStep), ExpiresAt: timestamppb.New(result.ExpiresAt)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) VerifyTotp(ctx context.Context, request *connect.Request[adminv1.VerifyTotpRequest]) (*connect.Response[adminv1.VerifyTotpResponse], error) {
@@ -95,7 +128,11 @@ func (adapter *ConnectAdminService) VerifyTotp(ctx context.Context, request *con
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.VerifyTotpResponse{Session: sessionSummary(result.Session)}), nil
+	response := connect.NewResponse(&adminv1.VerifyTotpResponse{Session: sessionSummary(result.Session)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) ChangeInitialPassword(ctx context.Context, request *connect.Request[adminv1.ChangeInitialPasswordRequest]) (*connect.Response[adminv1.ChangeInitialPasswordResponse], error) {
@@ -108,7 +145,11 @@ func (adapter *ConnectAdminService) ChangeInitialPassword(ctx context.Context, r
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.ChangeInitialPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP, ExpiresAt: timestamppb.New(result.Session.Session.Snapshot().AbsoluteExpiresAt)}), nil
+	response := connect.NewResponse(&adminv1.ChangeInitialPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP, ExpiresAt: timestamppb.New(result.Session.Session.Snapshot().AbsoluteExpiresAt)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) BeginTotpEnrollment(ctx context.Context, request *connect.Request[adminv1.BeginTotpEnrollmentRequest]) (*connect.Response[adminv1.BeginTotpEnrollmentResponse], error) {
@@ -142,7 +183,11 @@ func (adapter *ConnectAdminService) CompleteTotpEnrollment(ctx context.Context, 
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.CompleteTotpEnrollmentResponse{Result: operationResultWire(result.Operation), RecoveryCodes: result.RecoveryCodes, Session: sessionSummary(result.Session)}), nil
+	response := connect.NewResponse(&adminv1.CompleteTotpEnrollmentResponse{Result: operationResultWire(result.Operation), RecoveryCodes: result.RecoveryCodes, Session: sessionSummary(result.Session)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) ConfirmAdminSecretReceipt(ctx context.Context, request *connect.Request[adminv1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[adminv1.ConfirmAdminSecretReceiptResponse], error) {
@@ -176,7 +221,11 @@ func (adapter *ConnectAdminService) RecoverAdmin(ctx context.Context, request *c
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.RecoverAdminResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)}), nil
+	response := connect.NewResponse(&adminv1.RecoverAdminResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) ChangeAdminPassword(ctx context.Context, request *connect.Request[adminv1.ChangeAdminPasswordRequest]) (*connect.Response[adminv1.ChangeAdminPasswordResponse], error) {
@@ -189,7 +238,11 @@ func (adapter *ConnectAdminService) ChangeAdminPassword(ctx context.Context, req
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.ChangeAdminPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)}), nil
+	response := connect.NewResponse(&adminv1.ChangeAdminPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)})
+	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) BeginTotpRebind(ctx context.Context, request *connect.Request[adminv1.BeginTotpRebindRequest]) (*connect.Response[adminv1.BeginTotpRebindResponse], error) {
@@ -205,7 +258,11 @@ func (adapter *ConnectAdminService) CompleteTotpRebind(ctx context.Context, requ
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminv1.CompleteTotpRebindResponse{Result: result.Msg.GetResult(), RecoveryCodes: result.Msg.GetRecoveryCodes(), Session: result.Msg.GetSession()}), nil
+	response := connect.NewResponse(&adminv1.CompleteTotpRebindResponse{Result: result.Msg.GetResult(), RecoveryCodes: result.Msg.GetRecoveryCodes(), Session: result.Msg.GetSession()})
+	for _, value := range result.Header().Values("Set-Cookie") {
+		response.Header().Add("Set-Cookie", value)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) RegenerateAdminRecoveryCodes(ctx context.Context, request *connect.Request[adminv1.RegenerateAdminRecoveryCodesRequest]) (*connect.Response[adminv1.RegenerateAdminRecoveryCodesResponse], error) {
@@ -234,7 +291,11 @@ func (adapter *ConnectAdminService) LogoutAdmin(ctx context.Context, _ *connect.
 	if err := adapter.service.LogoutAdmin(ctx, session, transport.CookieToken, transport.CSRFToken); err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.LogoutAdminResponse{LoggedOut: true}), nil
+	response := connect.NewResponse(&adminv1.LogoutAdminResponse{LoggedOut: true})
+	if err := adapter.clearSessionCookie(response.Header()); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
 }
 
 func (adapter *ConnectAdminService) LogoutAllAdminSessions(ctx context.Context, _ *connect.Request[adminv1.LogoutAllAdminSessionsRequest]) (*connect.Response[adminv1.LogoutAllAdminSessionsResponse], error) {
@@ -247,7 +308,25 @@ func (adapter *ConnectAdminService) LogoutAllAdminSessions(ctx context.Context, 
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	return connect.NewResponse(&adminv1.LogoutAllAdminSessionsResponse{RevokedSessions: int32(count)}), nil
+	response := connect.NewResponse(&adminv1.LogoutAllAdminSessionsResponse{RevokedSessions: int32(count)})
+	if err := adapter.clearSessionCookie(response.Header()); err != nil {
+		return nil, adminConnectError(err)
+	}
+	return response, nil
+}
+
+func (adapter *ConnectAdminService) setSessionCookie(header HeaderWriter, session IssuedSession) error {
+	if adapter.cookieEffects == nil {
+		return nil
+	}
+	return adapter.cookieEffects.SetAdminSession(header, session)
+}
+
+func (adapter *ConnectAdminService) clearSessionCookie(header HeaderWriter) error {
+	if adapter.cookieEffects == nil {
+		return nil
+	}
+	return adapter.cookieEffects.ClearAdminSession(header)
 }
 
 func (adapter *ConnectAdminService) sessionFromTransport(ctx context.Context, transport AdminTransportContext) (Session, error) {

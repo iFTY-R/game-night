@@ -122,6 +122,7 @@ type Service struct {
 	recoveryAttempts *RecoveryAttemptService
 	results          *secretresult.Service
 	audit            *audit.Service
+	checkpointHealth *audit.CheckpointHealthPolicy
 	unitOfWork       IdentityUnitOfWork
 	limiter          ratelimit.RateLimiter
 	usernames        identifier.UsernameValidator

@@ -1,0 +1,146 @@
+// Package errors maps domain failures to stable, non-sensitive Connect errors.
+package errors
+
+import (
+	"context"
+	stderrors "errors"
+	"time"
+
+	"connectrpc.com/connect"
+	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
+	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
+	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
+	"github.com/iFTY-R/game-night/platform/admin"
+	"github.com/iFTY-R/game-night/platform/audit"
+	"github.com/iFTY-R/game-night/platform/identifier"
+	"github.com/iFTY-R/game-night/platform/identity"
+	"github.com/iFTY-R/game-night/platform/profile"
+	"github.com/iFTY-R/game-night/platform/ratelimit"
+	"github.com/iFTY-R/game-night/platform/secretresult"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+// Interceptor replaces every unary domain error before Connect serializes it to an untrusted client.
+func Interceptor() connect.Interceptor {
+	return connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, request connect.AnyRequest) (connect.AnyResponse, error) {
+			response, err := next(ctx, request)
+			return response, Map(err)
+		}
+	})
+}
+
+// Map returns one stable Connect code and BusinessErrorDetail without retaining the original error message.
+func Map(err error) error {
+	if err == nil {
+		return nil
+	}
+	descriptor := classify(err)
+	return newConnectError(descriptor, retryAt(err, time.Now()))
+}
+
+// AccountSuspended reports a terminal credential inspection without exposing unverified user state.
+func AccountSuspended() error {
+	return newConnectError(descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ACCOUNT_SUSPENDED, "identity.account.suspended"}, time.Time{})
+}
+
+// AccountDeleted reports a verified deleted account while preventing the credential from establishing a principal.
+func AccountDeleted() error {
+	return newConnectError(descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ACCOUNT_DELETED, "identity.account.deleted"}, time.Time{})
+}
+
+type descriptor struct {
+	connectCode  connect.Code
+	businessCode commonv1.BusinessErrorCode
+	messageKey   string
+}
+
+func classify(err error) descriptor {
+	switch {
+	case stderrors.Is(err, context.Canceled):
+		return descriptor{connectCode: connect.CodeCanceled, messageKey: "request.canceled"}
+	case stderrors.Is(err, context.DeadlineExceeded):
+		return descriptor{connectCode: connect.CodeDeadlineExceeded, messageKey: "request.deadline_exceeded"}
+	case stderrors.Is(err, origin.ErrNotAllowed):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ORIGIN_NOT_ALLOWED, "request.origin.not_allowed"}
+	case stderrors.Is(err, csrf.ErrInvalid):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_CSRF_INVALID, "request.csrf.invalid"}
+	case stderrors.Is(err, identifier.ErrUsernameLength), stderrors.Is(err, identifier.ErrUsernameCharacters),
+		stderrors.Is(err, identifier.ErrUsernameUnderscores):
+		return descriptor{connect.CodeInvalidArgument, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_INVALID, "identity.username.invalid"}
+	case stderrors.Is(err, identity.ErrUsernameUnavailable), stderrors.Is(err, identifier.ErrUsernameUnavailable):
+		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, "identity.username.taken"}
+	case stderrors.Is(err, identity.ErrUsernameChangeCooldown):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_CHANGE_COOLDOWN, "identity.username.change_cooldown"}
+	case stderrors.Is(err, identity.ErrOnboardingExpired), stderrors.Is(err, identity.ErrUserStatus):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDENTITY_ONBOARDING_REQUIRED, "identity.onboarding.required"}
+	case stderrors.Is(err, identity.ErrDeviceAuthentication):
+		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_CREDENTIAL_INVALID, "identity.device.invalid"}
+	case stderrors.Is(err, identity.ErrDeviceUnavailable):
+		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_REVOKED, "identity.device.revoked"}
+	case stderrors.Is(err, identity.ErrRecoveryInvalid), stderrors.Is(err, secretresult.ErrReplayUnauthorized):
+		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RECOVERY_INVALID, "identity.recovery.invalid"}
+	case stderrors.Is(err, secretresult.ErrIdempotencyConflict), stderrors.Is(err, admin.ErrIdempotencyConflict):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT, "operation.idempotency_conflict"}
+	case stderrors.Is(err, secretresult.ErrSecretNoLongerAvailable):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SECRET_RESULT_NO_LONGER_AVAILABLE, "operation.secret_no_longer_available"}
+	case stderrors.Is(err, ratelimit.ErrRejected):
+		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RATE_LIMITED, "request.rate_limited"}
+	case stderrors.Is(err, admin.ErrTOTPInvalid):
+		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_MFA_INVALID, "admin.mfa.invalid"}
+	case stderrors.Is(err, admin.ErrAuthentication), stderrors.Is(err, admin.ErrRecoveryInvalid),
+		stderrors.Is(err, admin.ErrSessionExpired), stderrors.Is(err, admin.ErrSessionRevoked):
+		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, "admin.auth.invalid"}
+	case stderrors.Is(err, admin.ErrPermissionDenied):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, "admin.permission.denied"}
+	case stderrors.Is(err, profile.ErrPIIKeyUnavailable):
+		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE, "profile.key.unavailable"}
+	case stderrors.Is(err, audit.ErrSensitiveWriteBlocked), stderrors.Is(err, audit.ErrRepositoryUnavailable):
+		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED, "audit.write.unavailable"}
+	case stderrors.Is(err, identity.ErrUserNotFound), stderrors.Is(err, profile.ErrProfileNotFound), stderrors.Is(err, admin.ErrNotFound):
+		return descriptor{connectCode: connect.CodeNotFound, messageKey: "resource.not_found"}
+	case stderrors.Is(err, identity.ErrIdentityConcurrentTransition), stderrors.Is(err, identity.ErrRecoveryConcurrentTransition),
+		stderrors.Is(err, identity.ErrDeviceConcurrentTransition), stderrors.Is(err, profile.ErrProfileConcurrentTransition),
+		stderrors.Is(err, admin.ErrConcurrentTransition), stderrors.Is(err, audit.ErrHeadConflict),
+		stderrors.Is(err, secretresult.ErrConcurrentTransition):
+		return descriptor{connectCode: connect.CodeAborted, messageKey: "operation.concurrent_transition"}
+	case stderrors.Is(err, identity.ErrInvalidIdentityRequest), stderrors.Is(err, identity.ErrInvalidUserInput),
+		stderrors.Is(err, identity.ErrInvalidDeviceInput), stderrors.Is(err, identity.ErrInvalidRecoveryCredential),
+		stderrors.Is(err, identity.ErrInvalidRecoveryAttempt), stderrors.Is(err, identity.ErrInvalidAssistedRecoveryGrant),
+		stderrors.Is(err, profile.ErrInvalidProfileInput), stderrors.Is(err, profile.ErrProfileExportCursor),
+		stderrors.Is(err, admin.ErrInvalidInput), stderrors.Is(err, admin.ErrPasswordPolicy),
+		stderrors.Is(err, secretresult.ErrInvalidInput):
+		return descriptor{connectCode: connect.CodeInvalidArgument, messageKey: "request.invalid"}
+	case stderrors.Is(err, profile.ErrProfileExportClosed), stderrors.Is(err, profile.ErrProfileExportExpired),
+		stderrors.Is(err, admin.ErrUnavailable):
+		return descriptor{connectCode: connect.CodeFailedPrecondition, messageKey: "operation.failed_precondition"}
+	case stderrors.Is(err, ratelimit.ErrUnavailable), stderrors.Is(err, identity.ErrIdentityRepositoryUnavailable),
+		stderrors.Is(err, profile.ErrProfileRepositoryUnavailable), stderrors.Is(err, admin.ErrRepositoryUnavailable),
+		stderrors.Is(err, secretresult.ErrRepositoryUnavailable):
+		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}
+	default:
+		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.internal_error"}
+	}
+}
+
+func retryAt(err error, now time.Time) time.Time {
+	var failure *ratelimit.Failure
+	if !stderrors.As(err, &failure) || failure.Kind() != ratelimit.FailureRejected || failure.RetryAfter() <= 0 {
+		return time.Time{}
+	}
+	return now.Add(failure.RetryAfter()).Round(0).UTC()
+}
+
+func newConnectError(value descriptor, retry time.Time) error {
+	connectError := connect.NewError(value.connectCode, stderrors.New(value.messageKey))
+	detailMessage := &commonv1.BusinessErrorDetail{Code: value.businessCode, MessageKey: value.messageKey}
+	if !retry.IsZero() {
+		detailMessage.RetryAt = timestamppb.New(retry)
+	}
+	detail, err := connect.NewErrorDetail(detailMessage)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, stderrors.New("service.internal_error"))
+	}
+	connectError.AddDetail(detail)
+	return connectError
+}

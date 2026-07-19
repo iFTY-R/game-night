@@ -2,6 +2,7 @@ package audit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"time"
 
@@ -154,10 +155,80 @@ type CheckpointHealth struct {
 	state                HealthState
 	uncheckpointedEvents uint64
 	uncheckpointedAge    time.Duration
+	maxEvents            uint64
+	maxAge               time.Duration
+}
+
+// SinkReadiness reports whether the configured durable checkpoint sink can accept new anchors.
+type SinkReadiness interface {
+	Ready(context.Context) bool
+}
+
+// SinkReadinessFunc adapts a process-owned sink probe to the domain health policy.
+type SinkReadinessFunc func(context.Context) bool
+
+// Ready invokes the sink probe and treats an absent function as unavailable.
+func (check SinkReadinessFunc) Ready(ctx context.Context) bool {
+	return check != nil && check(ctx)
+}
+
+// CheckpointHealthPolicy combines deployment mode with a live sink probe so domains and readiness use one decision.
+type CheckpointHealthPolicy struct {
+	production bool
+	sink       SinkReadiness
+	maxEvents  uint64
+	maxAge     time.Duration
+}
+
+// NewCheckpointHealthPolicy requires an explicit sink probe even outside production to prevent hidden healthy defaults.
+func NewCheckpointHealthPolicy(production bool, sink SinkReadiness) (*CheckpointHealthPolicy, error) {
+	return NewCheckpointHealthPolicyWithThresholds(production, sink, CheckpointMaxEvents, CheckpointMaxAge)
+}
+
+// NewCheckpointHealthPolicyWithThresholds permits deployments to tighten, but never relax, the fixed ceilings.
+func NewCheckpointHealthPolicyWithThresholds(
+	production bool,
+	sink SinkReadiness,
+	maxEvents uint64,
+	maxAge time.Duration,
+) (*CheckpointHealthPolicy, error) {
+	if sink == nil {
+		return nil, ErrInvalidInput
+	}
+	if maxEvents == 0 || maxEvents > CheckpointMaxEvents || maxAge <= 0 || maxAge > CheckpointMaxAge {
+		return nil, ErrInvalidInput
+	}
+	return &CheckpointHealthPolicy{
+		production: production, sink: sink, maxEvents: maxEvents, maxAge: maxAge,
+	}, nil
+}
+
+// Evaluate derives health from durable database progress and the current sink state.
+func (policy *CheckpointHealthPolicy) Evaluate(
+	ctx context.Context,
+	headSequence uint64,
+	progress CheckpointProgress,
+	now time.Time,
+) (CheckpointHealth, error) {
+	if policy == nil || policy.sink == nil || ctx == nil || !progress.ChainID.Valid() {
+		return CheckpointHealth{}, ErrInvalidInput
+	}
+	return evaluateCheckpointHealth(CheckpointHealthInput{
+		HeadSequence:         headSequence,
+		AcknowledgedSequence: progress.AcknowledgedSequence,
+		UncheckpointedSince:  progress.UncheckpointedSince,
+		Now:                  now,
+		Production:           policy.production,
+		SinkReady:            policy.sink.Ready(ctx),
+	}, policy.maxEvents, policy.maxAge)
 }
 
 // EvaluateCheckpointHealth applies the fixed 100-event/5-minute thresholds and production sink requirement.
 func EvaluateCheckpointHealth(input CheckpointHealthInput) (CheckpointHealth, error) {
+	return evaluateCheckpointHealth(input, CheckpointMaxEvents, CheckpointMaxAge)
+}
+
+func evaluateCheckpointHealth(input CheckpointHealthInput, maxEvents uint64, maxAge time.Duration) (CheckpointHealth, error) {
 	if input.Now.IsZero() || input.AcknowledgedSequence > input.HeadSequence {
 		return CheckpointHealth{}, ErrInvalidInput
 	}
@@ -173,10 +244,13 @@ func EvaluateCheckpointHealth(input CheckpointHealthInput) (CheckpointHealth, er
 		return CheckpointHealth{}, ErrInvalidInput
 	}
 	state := HealthHealthy
-	if input.Production && !input.SinkReady || uncheckpointed >= CheckpointMaxEvents || age >= CheckpointMaxAge {
+	if input.Production && !input.SinkReady || uncheckpointed >= maxEvents || age >= maxAge {
 		state = HealthDegraded
 	}
-	return CheckpointHealth{state: state, uncheckpointedEvents: uncheckpointed, uncheckpointedAge: age}, nil
+	return CheckpointHealth{
+		state: state, uncheckpointedEvents: uncheckpointed, uncheckpointedAge: age,
+		maxEvents: maxEvents, maxAge: maxAge,
+	}, nil
 }
 
 // State returns the closed readiness state.
@@ -190,7 +264,7 @@ func (health CheckpointHealth) AllowsSensitiveWrites() bool { return health.stat
 
 // CheckpointDue reports whether the append transaction must enqueue a new checkpoint.
 func (health CheckpointHealth) CheckpointDue() bool {
-	return health.uncheckpointedEvents >= CheckpointMaxEvents || health.uncheckpointedAge >= CheckpointMaxAge
+	return health.uncheckpointedEvents >= health.maxEvents || health.uncheckpointedAge >= health.maxAge
 }
 
 // UncheckpointedEvents returns the durable event lag used for metrics.

@@ -30,6 +30,15 @@ func LoadHMACKeyring[P HMACKeyPurpose](path string, now time.Time) (*HMACKeyring
 	return &HMACKeyring[P]{keys: keys}, nil
 }
 
+// ActiveVersion returns the immutable version used for newly created digests and credential proofs.
+func (keyring *HMACKeyring[P]) ActiveVersion() uint32 {
+	if keyring == nil || keyring.keys == nil {
+		return 0
+	}
+	version, _ := keyring.keys.active()
+	return version
+}
+
 // Sum returns a versioned HMAC digest without retaining the input value.
 func (keyring *HMACKeyring[P]) Sum(value []byte) (MAC[P], error) {
 	if len(value) == 0 {

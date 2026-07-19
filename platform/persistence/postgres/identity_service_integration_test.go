@@ -635,11 +635,21 @@ func newIntegrationIdentityRuntime(t testing.TB, fixture *integrationtest.Postgr
 	service, err := identityDomain.NewServiceWithRecovery(
 		challengeService, deviceService, recoveryService, recoveryAttemptService, resultService,
 		NewIdentityUnitOfWorkWithAudit(fixture.Pool, auditService), ratelimittest.New(), validator, serviceClock, auditService,
+		integrationCheckpointHealthPolicy(t),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return integrationIdentityRuntime{service: service, clock: serviceClock, devices: deviceService}
+}
+
+func integrationCheckpointHealthPolicy(t testing.TB) *audit.CheckpointHealthPolicy {
+	t.Helper()
+	policy, err := audit.NewCheckpointHealthPolicy(false, audit.SinkReadinessFunc(func(context.Context) bool { return true }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return policy
 }
 
 // integrationOnboardIdentity creates one active user and retains its initial device plus recovery authority.

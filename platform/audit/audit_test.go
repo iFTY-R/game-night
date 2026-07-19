@@ -2,6 +2,7 @@ package audit
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
@@ -241,6 +242,54 @@ func TestCheckpointHealthFailsClosedAtFixedThresholds(t *testing.T) {
 				t.Fatalf("unexpected health decision: state=%v ready=%t allowed=%t", health.State(), health.Ready(), health.AllowsSensitiveWrites())
 			}
 		})
+	}
+}
+
+func TestCheckpointHealthPolicyUsesLiveSinkReadiness(t *testing.T) {
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	sinkReady := false
+	policy, err := NewCheckpointHealthPolicy(true, SinkReadinessFunc(func(context.Context) bool {
+		return sinkReady
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	progress := CheckpointProgress{ChainID: ChainAdmin}
+	health, err := policy.Evaluate(t.Context(), 0, progress, now)
+	if err != nil || health.Ready() {
+		t.Fatalf("production policy ignored unavailable sink: health=%+v err=%v", health, err)
+	}
+	sinkReady = true
+	health, err = policy.Evaluate(t.Context(), 0, progress, now)
+	if err != nil || !health.Ready() {
+		t.Fatalf("production policy ignored recovered sink: health=%+v err=%v", health, err)
+	}
+	if _, err = NewCheckpointHealthPolicy(false, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("nil sink policy error = %v", err)
+	}
+}
+
+func TestCheckpointHealthPolicyHonorsTighterConfiguredThresholds(t *testing.T) {
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	policy, err := NewCheckpointHealthPolicyWithThresholds(
+		false,
+		SinkReadinessFunc(func(context.Context) bool { return true }),
+		10,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	health, err := policy.Evaluate(t.Context(), 10, CheckpointProgress{
+		ChainID: ChainAdmin, UncheckpointedSince: now.Add(-time.Second),
+	}, now)
+	if err != nil || health.Ready() || !health.CheckpointDue() {
+		t.Fatalf("tightened event threshold ignored: health=%+v err=%v", health, err)
+	}
+	if _, err := NewCheckpointHealthPolicyWithThresholds(
+		false, SinkReadinessFunc(func(context.Context) bool { return true }), CheckpointMaxEvents+1, CheckpointMaxAge,
+	); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("relaxed checkpoint threshold error = %v", err)
 	}
 }
 

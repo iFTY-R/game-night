@@ -96,6 +96,9 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 
 // GetSetupState reads the singleton without exposing password or generation metadata.
 func (service *Service) GetSetupState(ctx context.Context) (SetupState, error) {
+	if service == nil || ctx == nil || service.unitOfWork == nil {
+		return "", ErrRepositoryUnavailable
+	}
 	var state SetupState
 	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
 		account, err := transaction.Accounts().GetForUpdate(ctx)
@@ -117,15 +120,27 @@ func (service *Service) GetSetupState(ctx context.Context) (SetupState, error) {
 	return state, mapAdminUoWError(err)
 }
 
-// BootstrapPassword performs the one-winner bootstrap CAS used by all application instances.
+// BootstrapPassword performs the one-winner bootstrap CAS. A losing instance verifies that its mounted
+// secret matches the committed bootstrap password; later active states reject a still-mounted secret.
 func (service *Service) BootstrapPassword(ctx context.Context, bootstrapSecret string) error {
-	if strings.TrimSpace(bootstrapSecret) == "" {
+	if service == nil || ctx == nil || service.unitOfWork == nil || service.passwords == nil || service.clock == nil ||
+		strings.TrimSpace(bootstrapSecret) == "" {
 		return ErrBootstrapSecretMismatch
 	}
 	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
 		account, err := transaction.Accounts().GetForUpdate(ctx)
 		if err != nil {
 			return err
+		}
+		snapshot := account.Snapshot()
+		if snapshot.Status == AccountStatusSetupRequired {
+			matched, _, verifyErr := VerifyPassword(ctx, service.passwords, PasswordRecord{
+				Hash: snapshot.PasswordHash, Algorithm: snapshot.PasswordAlgorithm, Parameters: snapshot.PasswordParameters,
+			}, bootstrapSecret)
+			if verifyErr != nil || !matched {
+				return ErrBootstrapSecretMismatch
+			}
+			return nil
 		}
 		if !account.IsBootstrapPending() {
 			return ErrBootstrapSecretMismatch
@@ -138,6 +153,18 @@ func (service *Service) BootstrapPassword(ctx context.Context, bootstrapSecret s
 		return err
 	})
 	return mapAdminUoWError(err)
+}
+
+// BootstrapReadyWithoutSecret confirms that startup no longer depends on the one-time secret mount.
+func (service *Service) BootstrapReadyWithoutSecret(ctx context.Context) error {
+	state, err := service.GetSetupState(ctx)
+	if err != nil {
+		return err
+	}
+	if state == SetupStateBootstrapPending {
+		return ErrBootstrapSecretMismatch
+	}
+	return nil
 }
 
 // BeginAdminLogin issues a generation-bound challenge and persists only its HMAC digest.

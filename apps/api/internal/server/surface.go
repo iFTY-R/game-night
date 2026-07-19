@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 )
 
 var errInvalidSurface = errors.New("invalid API surface configuration")
@@ -21,6 +22,7 @@ const (
 // handler interface prevents an administrator adapter from being mounted here.
 type UserSurfaceConfig struct {
 	Identity     identityv1connect.IdentityServiceHandler
+	Room         roomv1connect.RoomServiceHandler
 	Interceptors []connect.Interceptor
 	Readiness    *Readiness
 }
@@ -39,13 +41,15 @@ type UserSurface struct{ handler http.Handler }
 
 // NewUserSurface builds an immutable user mux with its own interceptor chain.
 func NewUserSurface(config UserSurfaceConfig) (*UserSurface, error) {
-	if config.Identity == nil || config.Readiness == nil || invalidInterceptors(config.Interceptors) {
+	if config.Identity == nil || config.Room == nil || config.Readiness == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
 	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(config.Identity, options...)
+	roomPath, roomHandler := roomv1connect.NewRoomServiceHandler(config.Room, options...)
 	mux := http.NewServeMux()
 	mux.Handle(identityPath, identityHandler)
+	mux.Handle(roomPath, roomHandler)
 	mountReadiness(mux, config.Readiness)
 	return &UserSurface{handler: mux}, nil
 }
@@ -101,6 +105,7 @@ func NewHandler(config HandlerConfig) (http.Handler, error) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/"+identityv1connect.IdentityServiceName+"/", config.User)
+	mux.Handle("/"+roomv1connect.RoomServiceName+"/", config.User)
 	mux.Handle("/"+adminv1connect.AdminAuthServiceName+"/", config.Admin)
 	mux.Handle("/"+adminv1connect.AdminIdentityServiceName+"/", config.Admin)
 	// Both immutable surfaces own the same readiness instance; routing through one avoids duplicate public paths.

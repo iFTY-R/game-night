@@ -49,6 +49,14 @@ const (
 	BusinessErrorCode_BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE               BusinessErrorCode = 20
 	BusinessErrorCode_BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED                BusinessErrorCode = 21
 	BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE   BusinessErrorCode = 22
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_NOT_FOUND                    BusinessErrorCode = 23
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT             BusinessErrorCode = 24
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED             BusinessErrorCode = 25
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_FULL                         BusinessErrorCode = 26
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED                BusinessErrorCode = 27
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID               BusinessErrorCode = 28
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND             BusinessErrorCode = 29
+	BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE             BusinessErrorCode = 30
 )
 
 // Enum value maps for BusinessErrorCode.
@@ -77,6 +85,14 @@ var (
 		20: "BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE",
 		21: "BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED",
 		22: "BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE",
+		23: "BUSINESS_ERROR_CODE_ROOM_NOT_FOUND",
+		24: "BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT",
+		25: "BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED",
+		26: "BUSINESS_ERROR_CODE_ROOM_FULL",
+		27: "BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED",
+		28: "BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID",
+		29: "BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND",
+		30: "BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE",
 	}
 	BusinessErrorCode_value = map[string]int32{
 		"BUSINESS_ERROR_CODE_UNSPECIFIED":                       0,
@@ -102,6 +118,14 @@ var (
 		"BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE":               20,
 		"BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED":                21,
 		"BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE":   22,
+		"BUSINESS_ERROR_CODE_ROOM_NOT_FOUND":                    23,
+		"BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT":             24,
+		"BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED":             25,
+		"BUSINESS_ERROR_CODE_ROOM_FULL":                         26,
+		"BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED":                27,
+		"BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID":               28,
+		"BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND":             29,
+		"BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE":             30,
 	}
 )
 
@@ -211,7 +235,8 @@ const file_platform_common_v1_error_proto_rawDesc = "" +
 	"\vmessage_key\x18\x02 \x01(\tR\n" +
 	"messageKey\x125\n" +
 	"\bretry_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aretryAt\x12M\n" +
-	"\x10field_violations\x18\x04 \x03(\v2\".platform.common.v1.FieldViolationR\x0ffieldViolations*\x95\b\n" +
+	"\x10field_violations\x18\x04 \x03(\v2\".platform.common.v1.FieldViolationR\x0ffieldViolations*\xf5\n" +
+	"\n" +
 	"\x11BusinessErrorCode\x12#\n" +
 	"\x1fBUSINESS_ERROR_CODE_UNSPECIFIED\x10\x00\x124\n" +
 	"0BUSINESS_ERROR_CODE_IDENTITY_ONBOARDING_REQUIRED\x10\x01\x12(\n" +
@@ -236,7 +261,15 @@ const file_platform_common_v1_error_proto_rawDesc = "" +
 	" BUSINESS_ERROR_CODE_AUTH_INVALID\x10\x13\x12+\n" +
 	"'BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE\x10\x14\x12*\n" +
 	"&BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED\x10\x15\x127\n" +
-	"3BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE\x10\x16BKZIgithub.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1b\x06proto3"
+	"3BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE\x10\x16\x12&\n" +
+	"\"BUSINESS_ERROR_CODE_ROOM_NOT_FOUND\x10\x17\x12-\n" +
+	")BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT\x10\x18\x12-\n" +
+	")BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED\x10\x19\x12!\n" +
+	"\x1dBUSINESS_ERROR_CODE_ROOM_FULL\x10\x1a\x12*\n" +
+	"&BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED\x10\x1b\x12+\n" +
+	"'BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID\x10\x1c\x12-\n" +
+	")BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND\x10\x1d\x12-\n" +
+	")BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE\x10\x1eBKZIgithub.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1b\x06proto3"
 
 var (
 	file_platform_common_v1_error_proto_rawDescOnce sync.Once

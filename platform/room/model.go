@@ -125,8 +125,22 @@ type RemovalResult struct {
 	Version            Version
 }
 
-// New creates a private lobby with the host as the first stable participant seat.
+// New creates a lobby with open participant and spectator admission.
 func New(id, hostUserID uuid.UUID, roomCode string, visibility Visibility, participantCapacity uint32, createdAt time.Time) (Room, error) {
+	return NewWithAdmission(
+		id, hostUserID, roomCode, visibility, participantCapacity, AdmissionOpen, AdmissionOpen, createdAt,
+	)
+}
+
+// NewWithAdmission creates a lobby with explicit host-selected pregame admission policy.
+func NewWithAdmission(
+	id, hostUserID uuid.UUID,
+	roomCode string,
+	visibility Visibility,
+	participantCapacity uint32,
+	participantAdmission, spectatorAdmission AdmissionMode,
+	createdAt time.Time,
+) (Room, error) {
 	createdAt = canonicalRoomTime(createdAt)
 	if id == uuid.Nil || hostUserID == uuid.Nil || createdAt.IsZero() {
 		return Room{}, ErrInvalidRoomInput
@@ -134,13 +148,13 @@ func New(id, hostUserID uuid.UUID, roomCode string, visibility Visibility, parti
 	if err := validateRoomCode(roomCode); err != nil {
 		return Room{}, err
 	}
-	if !visibility.Valid() || participantCapacity == 0 {
+	if !visibility.Valid() || participantCapacity == 0 || !participantAdmission.Valid() || !spectatorAdmission.Valid() {
 		return Room{}, ErrInvalidRoomInput
 	}
 	return Restore(RoomSnapshot{
 		ID: id, RoomCode: roomCode, Visibility: visibility, Status: RoomStatusLobby,
 		HostUserID: hostUserID, ParticipantCapacity: participantCapacity,
-		ParticipantAdmission: AdmissionOpen, SpectatorAdmission: AdmissionOpen,
+		ParticipantAdmission: participantAdmission, SpectatorAdmission: spectatorAdmission,
 		Members: []MemberSnapshot{{
 			UserID: hostUserID, Role: MemberRoleParticipant, SeatIndex: 0,
 			JoinedAt: createdAt, LastSeenAt: createdAt,
@@ -165,6 +179,10 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 			return Room{}, ErrInvalidRoomInput
 		}
 	} else if snapshot.ActiveSessionID != uuid.Nil || snapshot.ActiveGameID != "" {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if snapshot.Status == RoomStatusClosed &&
+		(snapshot.ParticipantAdmission != AdmissionClosed || snapshot.SpectatorAdmission != AdmissionClosed) {
 		return Room{}, ErrInvalidRoomInput
 	}
 	if len(snapshot.Members) == 0 || len(snapshot.Members) > int(snapshot.ParticipantCapacity)+1_000_000 {

@@ -16,6 +16,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
+	"github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -86,6 +87,25 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SECRET_RESULT_NO_LONGER_AVAILABLE, "operation.secret_no_longer_available"}
 	case stderrors.Is(err, ratelimit.ErrRejected):
 		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RATE_LIMITED, "request.rate_limited"}
+	case stderrors.Is(err, room.ErrRoomNotFound):
+		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_NOT_FOUND, "room.not_found"}
+	case stderrors.Is(err, room.ErrRoomCodeUnavailable):
+		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE, "room.code.unavailable"}
+	case stderrors.Is(err, room.ErrRoomVersionConflict):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.version.conflict"}
+	case stderrors.Is(err, room.ErrAdmissionClosed):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED, "room.admission.closed"}
+	case stderrors.Is(err, room.ErrRoomFull):
+		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_FULL, "room.full"}
+	case stderrors.Is(err, room.ErrHostRequired):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED, "room.host.required"}
+	case stderrors.Is(err, room.ErrMemberNotFound), stderrors.Is(err, room.ErrWaitingNotFound):
+		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND, "room.member.not_found"}
+	case stderrors.Is(err, room.ErrRoomStatus), stderrors.Is(err, room.ErrRoomClosed),
+		stderrors.Is(err, room.ErrSessionActive), stderrors.Is(err, room.ErrSessionNotFound),
+		stderrors.Is(err, room.ErrInsufficientParticipants), stderrors.Is(err, room.ErrCannotRemoveHost),
+		stderrors.Is(err, room.ErrGameUnavailable):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID, "room.status.invalid"}
 	case stderrors.Is(err, admin.ErrTOTPInvalid):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_MFA_INVALID, "admin.mfa.invalid"}
 	case stderrors.Is(err, admin.ErrAuthentication), stderrors.Is(err, admin.ErrRecoveryInvalid),
@@ -109,14 +129,14 @@ func classify(err error) descriptor {
 		stderrors.Is(err, identity.ErrInvalidRecoveryAttempt), stderrors.Is(err, identity.ErrInvalidAssistedRecoveryGrant),
 		stderrors.Is(err, profile.ErrInvalidProfileInput), stderrors.Is(err, profile.ErrProfileExportCursor),
 		stderrors.Is(err, admin.ErrInvalidInput), stderrors.Is(err, admin.ErrPasswordPolicy),
-		stderrors.Is(err, secretresult.ErrInvalidInput):
+		stderrors.Is(err, secretresult.ErrInvalidInput), stderrors.Is(err, room.ErrInvalidRoomInput):
 		return descriptor{connectCode: connect.CodeInvalidArgument, messageKey: "request.invalid"}
 	case stderrors.Is(err, profile.ErrProfileExportClosed), stderrors.Is(err, profile.ErrProfileExportExpired),
 		stderrors.Is(err, admin.ErrUnavailable):
 		return descriptor{connectCode: connect.CodeFailedPrecondition, messageKey: "operation.failed_precondition"}
 	case stderrors.Is(err, ratelimit.ErrUnavailable), stderrors.Is(err, identity.ErrIdentityRepositoryUnavailable),
 		stderrors.Is(err, profile.ErrProfileRepositoryUnavailable), stderrors.Is(err, admin.ErrRepositoryUnavailable),
-		stderrors.Is(err, secretresult.ErrRepositoryUnavailable):
+		stderrors.Is(err, secretresult.ErrRepositoryUnavailable), stderrors.Is(err, room.ErrRoomRepositoryUnavailable):
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}
 	default:
 		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.internal_error"}

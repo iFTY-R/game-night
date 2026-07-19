@@ -39,4 +39,6 @@ var (
 	ErrRoomRepositoryUnavailable = errors.New("room repository unavailable")
 	// ErrRoomIntegrity reports persisted room/member state that violates aggregate invariants.
 	ErrRoomIntegrity = errors.New("room persistence integrity failure")
+	// ErrGameUnavailable prevents room state from starting without an authoritative registered game manifest.
+	ErrGameUnavailable = errors.New("game is unavailable")
 )

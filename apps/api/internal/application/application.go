@@ -22,6 +22,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/proxy"
 	ratetransport "github.com/iFTY-R/game-night/apps/api/internal/transport/ratelimit"
+	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	"github.com/iFTY-R/game-night/platform/admin"
@@ -32,6 +33,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/persistence/postgres"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	"github.com/iFTY-R/game-night/platform/profile"
+	roomdomain "github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/iFTY-R/game-night/platform/security"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -140,6 +142,12 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	roomService, err := roomdomain.NewService(
+		postgres.NewRoomRepository(pool), roomdomain.NewSecureCodeGenerator(), roomdomain.NewDisabledGameCatalog(), source,
+	)
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	application.argon2 = argon2Service
 	auditService, checkpointPolicy, err := securityServices(keyrings, config.Shared, options.CheckpointSink)
 	if err != nil {
@@ -169,7 +177,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 		return nil, errInitializeTransport
 	}
 	handler, err := transportHandler(
-		config.Shared, source, userService, adminService, adminIdentityService,
+		config.Shared, source, userService, roomService, adminService, adminIdentityService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -381,6 +389,7 @@ func transportHandler(
 	config sharedconfig.Config,
 	source clock.Clock,
 	userService *identitydomain.Service,
+	roomService *roomdomain.Service,
 	adminService *admin.Service,
 	adminIdentityService *admin.IdentityService,
 	metricRegistry *metrics.Registry,
@@ -412,7 +421,16 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	identityHandler, err := identitytransport.NewService(userService, userCookies, userOrigins, csrf.NewUserValidator(), userProxy, source)
+	userCSRF := csrf.NewUserValidator()
+	identityHandler, err := identitytransport.NewService(userService, userCookies, userOrigins, userCSRF, userProxy, source)
+	if err != nil {
+		return nil, err
+	}
+	roomAuthenticator, err := roomtransport.NewIdentityAuthenticator(userService)
+	if err != nil {
+		return nil, err
+	}
+	roomHandler, err := roomtransport.NewService(roomService, roomAuthenticator, userOrigins, userCSRF)
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +450,8 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	userSensitive, err := sensitive.New(sensitive.IdentityOperations...)
+	userOperations := append(append([]string(nil), sensitive.IdentityOperations...), sensitive.RoomOperations...)
+	userSensitive, err := sensitive.New(userOperations...)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +460,7 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	userMetrics, err := metrics.NewUnaryInterceptor(logger, metricRegistry, sensitive.IdentityOperations...)
+	userMetrics, err := metrics.NewUnaryInterceptor(logger, metricRegistry, userOperations...)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +469,7 @@ func transportHandler(
 		return nil, err
 	}
 	userSurface, err := server.NewUserSurface(server.UserSurfaceConfig{
-		Identity: identityHandler, Readiness: readiness,
+		Identity: identityHandler, Room: roomHandler, Readiness: readiness,
 		Interceptors: []connect.Interceptor{userSensitive.Interceptor(), userMetrics, transporterrors.Interceptor()},
 	})
 	if err != nil {

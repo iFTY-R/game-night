@@ -11,6 +11,7 @@ func TestTemplateUsesExactServiceAllowlistAndNoDefaultProxy(t *testing.T) {
 	template := readRepositoryFile(t, "..", "templates", "game-night.conf.template")
 	for _, path := range []string{
 		"location ^~ /platform.identity.v1.IdentityService/",
+		"location ^~ /platform.room.v1.RoomService/",
 		"location ^~ /platform.admin.v1.AdminAuthService/",
 		"location ^~ /platform.admin.v1.AdminIdentityService/",
 	} {
@@ -34,7 +35,8 @@ func TestTemplateUsesExactServiceAllowlistAndNoDefaultProxy(t *testing.T) {
 	userServer := template[userStart:adminStart]
 	adminServer := template[adminStart:]
 	if strings.Contains(userServer, "/platform.admin.v1.") || strings.Contains(userServer, "game_night_admin_api") ||
-		strings.Contains(adminServer, "/platform.identity.v1.") || strings.Contains(adminServer, "game_night_identity_api") {
+		strings.Contains(adminServer, "/platform.identity.v1.") || strings.Contains(adminServer, "/platform.room.v1.") ||
+		strings.Contains(adminServer, "game_night_identity_api") {
 		t.Fatal("a service path or upstream crossed the user/admin virtual-host boundary")
 	}
 }
@@ -54,8 +56,8 @@ func TestTemplateOverwritesForwardingHeadersAndDisablesCaching(t *testing.T) {
 		"add_header Pragma \"no-cache\" always;",
 		"proxy_cache off;",
 	} {
-		if strings.Count(template, directive) != 3 {
-			t.Fatalf("security directive %q must cover all three allowed service locations", directive)
+		if strings.Count(template, directive) != 4 {
+			t.Fatalf("security directive %q must cover all four allowed service locations", directive)
 		}
 	}
 	if strings.Contains(template, "$proxy_add_x_forwarded_for") {

@@ -7,7 +7,6 @@
 package roomv1
 
 import (
-	_ "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -676,6 +675,7 @@ func (x *CreateRoomResponse) GetRoom() *Room {
 type GetRoomRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	RoomCode      string                 `protobuf:"bytes,2,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -713,6 +713,13 @@ func (*GetRoomRequest) Descriptor() ([]byte, []int) {
 func (x *GetRoomRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
+	}
+	return ""
+}
+
+func (x *GetRoomRequest) GetRoomCode() string {
+	if x != nil {
+		return x.RoomCode
 	}
 	return ""
 }
@@ -766,6 +773,7 @@ type JoinRoomRequest struct {
 	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	Intent          JoinIntent             `protobuf:"varint,2,opt,name=intent,proto3,enum=platform.room.v1.JoinIntent" json:"intent,omitempty"`
 	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	RoomCode        string                 `protobuf:"bytes,4,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -819,6 +827,13 @@ func (x *JoinRoomRequest) GetExpectedVersion() *RoomVersion {
 		return x.ExpectedVersion
 	}
 	return nil
+}
+
+func (x *JoinRoomRequest) GetRoomCode() string {
+	if x != nil {
+		return x.RoomCode
+	}
+	return ""
 }
 
 type JoinRoomResponse struct {
@@ -1106,14 +1121,12 @@ func (x *SetAdmissionResponse) GetRoom() *Room {
 }
 
 type StartGameRequest struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	RoomId              string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	SessionId           string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	GameId              string                 `protobuf:"bytes,3,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
-	MinimumParticipants uint32                 `protobuf:"varint,4,opt,name=minimum_participants,json=minimumParticipants,proto3" json:"minimum_participants,omitempty"`
-	ExpectedVersion     *RoomVersion           `protobuf:"bytes,5,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	GameId          string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StartGameRequest) Reset() {
@@ -1153,25 +1166,11 @@ func (x *StartGameRequest) GetRoomId() string {
 	return ""
 }
 
-func (x *StartGameRequest) GetSessionId() string {
-	if x != nil {
-		return x.SessionId
-	}
-	return ""
-}
-
 func (x *StartGameRequest) GetGameId() string {
 	if x != nil {
 		return x.GameId
 	}
 	return ""
-}
-
-func (x *StartGameRequest) GetMinimumParticipants() uint32 {
-	if x != nil {
-		return x.MinimumParticipants
-	}
-	return 0
 }
 
 func (x *StartGameRequest) GetExpectedVersion() *RoomVersion {
@@ -1633,7 +1632,7 @@ var File_platform_room_v1_room_proto protoreflect.FileDescriptor
 
 const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\n" +
-	"\x1bplatform/room/v1/room.proto\x12\x10platform.room.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/common.proto\"_\n" +
+	"\x1bplatform/room/v1/room.proto\x12\x10platform.room.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"_\n" +
 	"\vRoomVersion\x12!\n" +
 	"\froom_version\x18\x01 \x01(\x04R\vroomVersion\x12-\n" +
 	"\x12membership_version\x18\x02 \x01(\x04R\x11membershipVersion\"\xb2\x02\n" +
@@ -1676,15 +1675,17 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x15participant_admission\x18\x03 \x01(\x0e2\x1f.platform.room.v1.AdmissionModeR\x14participantAdmission\x12P\n" +
 	"\x13spectator_admission\x18\x04 \x01(\x0e2\x1f.platform.room.v1.AdmissionModeR\x12spectatorAdmission\"@\n" +
 	"\x12CreateRoomResponse\x12*\n" +
-	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\")\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"F\n" +
 	"\x0eGetRoomRequest\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"=\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
+	"\troom_code\x18\x02 \x01(\tR\broomCode\"=\n" +
 	"\x0fGetRoomResponse\x12*\n" +
-	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xaa\x01\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xc7\x01\n" +
 	"\x0fJoinRoomRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x124\n" +
 	"\x06intent\x18\x02 \x01(\x0e2\x1c.platform.room.v1.JoinIntentR\x06intent\x12H\n" +
-	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"\x8e\x01\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12\x1b\n" +
+	"\troom_code\x18\x04 \x01(\tR\broomCode\"\x8e\x01\n" +
 	"\x10JoinRoomResponse\x12*\n" +
 	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\x124\n" +
 	"\x06member\x18\x02 \x01(\v2\x1c.platform.room.v1.RoomMemberR\x06member\x12\x18\n" +
@@ -1702,14 +1703,11 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x13spectator_admission\x18\x03 \x01(\x0e2\x1f.platform.room.v1.AdmissionModeR\x12spectatorAdmission\x12H\n" +
 	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"B\n" +
 	"\x14SetAdmissionResponse\x12*\n" +
-	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xe0\x01\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\x94\x01\n" +
 	"\x10StartGameRequest\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x17\n" +
-	"\agame_id\x18\x03 \x01(\tR\x06gameId\x121\n" +
-	"\x14minimum_participants\x18\x04 \x01(\rR\x13minimumParticipants\x12H\n" +
-	"\x10expected_version\x18\x05 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"K\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
+	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12H\n" +
+	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersionJ\x04\b\x03\x10\x04\"K\n" +
 	"\x11FrozenParticipant\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +

@@ -139,4 +139,10 @@ func TestRestoreRejectsPlayingRoomWithoutClosedParticipantAdmission(t *testing.T
 	if _, err := Restore(snapshot); !errors.Is(err, ErrInvalidRoomInput) {
 		t.Fatalf("invalid playing snapshot error=%v", err)
 	}
+	snapshot.Status = RoomStatusClosed
+	snapshot.ActiveSessionID = uuid.Nil
+	snapshot.ActiveGameID = ""
+	if _, err := Restore(snapshot); !errors.Is(err, ErrInvalidRoomInput) {
+		t.Fatalf("open closed-room snapshot error=%v", err)
+	}
 }

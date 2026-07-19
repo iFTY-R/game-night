@@ -96,6 +96,9 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	assertAllowedResponse(t, identityResponse, "identity")
 	identityRequest := identity.lastRequest(t)
 	assertForwardingHeadersReplaced(t, identityRequest, userHost)
+	roomResponse := requestNginx(t, client, endpoint, userHost,
+		"/platform.room.v1.RoomService/GetRoom", false)
+	assertAllowedResponse(t, roomResponse, "identity")
 
 	adminAuthResponse := requestNginx(t, client, endpoint, adminHost,
 		"/platform.admin.v1.AdminAuthService/GetStatus", false)
@@ -110,6 +113,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	}{
 		{host: userHost, path: "/platform.admin.v1.AdminAuthService/GetStatus"},
 		{host: adminHost, path: "/platform.identity.v1.IdentityService/Bootstrap"},
+		{host: adminHost, path: "/platform.room.v1.RoomService/GetRoom"},
 		{host: userHost, path: "/platform.identity.v1.UnknownService/Call"},
 		{host: "unexpected.game-night.test", path: "/platform.identity.v1.IdentityService/Bootstrap"},
 	} {

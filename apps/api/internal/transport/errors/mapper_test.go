@@ -10,6 +10,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/identifier"
 	"github.com/iFTY-R/game-night/platform/identity"
+	"github.com/iFTY-R/game-night/platform/room"
 )
 
 func TestMapReturnsStableBusinessDetails(t *testing.T) {
@@ -24,6 +25,8 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 		{name: "username taken", err: identity.ErrUsernameUnavailable, wantConnect: connect.CodeAlreadyExists, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, wantKey: "identity.username.taken"},
 		{name: "device invalid", err: identity.ErrDeviceAuthentication, wantConnect: connect.CodeUnauthenticated, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_CREDENTIAL_INVALID, wantKey: "identity.device.invalid"},
 		{name: "admin auth", err: admin.ErrAuthentication, wantConnect: connect.CodeUnauthenticated, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, wantKey: "admin.auth.invalid"},
+		{name: "room version", err: room.ErrRoomVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, wantKey: "room.version.conflict"},
+		{name: "room admission", err: room.ErrAdmissionClosed, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED, wantKey: "room.admission.closed"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

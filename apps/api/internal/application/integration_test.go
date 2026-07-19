@@ -42,6 +42,8 @@ import (
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
+	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
@@ -68,6 +70,7 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 
 	identityClient := identityv1connect.NewIdentityServiceClient(runtime.client, runtime.baseURL)
 	identity := onboardAndRecoverIdentity(t, ctx, runtime, identityClient)
+	exerciseRoomLifecycle(t, ctx, runtime, roomv1connect.NewRoomServiceClient(runtime.client, runtime.baseURL))
 
 	authClient := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
 	adminIdentityClient := adminv1connect.NewAdminIdentityServiceClient(runtime.client, runtime.baseURL)
@@ -129,6 +132,59 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 		strings.Contains(runtime.logs.String(), applicationActivePassword) ||
 		strings.Contains(runtime.logs.String(), applicationTestRealName) {
 		t.Fatal("application logs contain a configured password or real name")
+	}
+}
+
+// exerciseRoomLifecycle proves recovered device authority reaches room PostgreSQL mutations through TLS Connect.
+func exerciseRoomLifecycle(
+	t testing.TB,
+	ctx context.Context,
+	runtime *applicationIntegrationRuntime,
+	client roomv1connect.RoomServiceClient,
+) {
+	t.Helper()
+	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 4,
+		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_APPROVAL,
+	})
+	runtime.authorizeUserWrite(t, createRequest)
+	created, err := client.CreateRoom(ctx, createRequest)
+	if err != nil {
+		t.Fatalf("create integrated room: %v", err)
+	}
+	if created.Msg.GetRoom().GetRoomId() == "" || created.Msg.GetRoom().GetRoomCode() == "" {
+		t.Fatalf("create integrated room: room=%+v", created.Msg.GetRoom())
+	}
+	loaded, err := client.GetRoom(ctx, connect.NewRequest(&roomv1.GetRoomRequest{RoomId: created.Msg.GetRoom().GetRoomId()}))
+	if err != nil {
+		t.Fatalf("get integrated room: %v", err)
+	}
+	if loaded.Msg.GetRoom().GetRoomCode() != created.Msg.GetRoom().GetRoomCode() {
+		t.Fatalf("get integrated room: room=%+v", loaded.Msg.GetRoom())
+	}
+	setRequest := connect.NewRequest(&roomv1.SetAdmissionRequest{
+		RoomId: created.Msg.GetRoom().GetRoomId(), ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_CLOSED,
+		SpectatorAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN, ExpectedVersion: created.Msg.GetRoom().GetVersion(),
+	})
+	runtime.authorizeUserWrite(t, setRequest)
+	updated, err := client.SetAdmission(ctx, setRequest)
+	if err != nil {
+		t.Fatalf("set integrated room admission: %v", err)
+	}
+	if updated.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
+		t.Fatalf("set integrated room admission: room=%+v", updated.Msg.GetRoom())
+	}
+	closeRequest := connect.NewRequest(&roomv1.CloseRoomRequest{
+		RoomId: updated.Msg.GetRoom().GetRoomId(), ExpectedVersion: updated.Msg.GetRoom().GetVersion(),
+	})
+	runtime.authorizeUserWrite(t, closeRequest)
+	closed, err := client.CloseRoom(ctx, closeRequest)
+	if err != nil {
+		t.Fatalf("close integrated room: %v", err)
+	}
+	if closed.Msg.GetRoom().GetStatus() != roomv1.RoomStatus_ROOM_STATUS_CLOSED {
+		t.Fatalf("close integrated room: room=%+v", closed.Msg.GetRoom())
 	}
 }
 

@@ -101,6 +101,12 @@ type GetCurrentIdentityResult struct {
 	AccountInstruction    AccountInstruction
 }
 
+// AuthenticatePrincipalCommand binds a current device bearer to its persisted CSRF authority for other user domains.
+type AuthenticatePrincipalCommand struct {
+	DeviceToken string
+	CSRFToken   string
+}
+
 // ChangeUsernameCommand requires current device, CSRF, and all three username limiter dimensions.
 type ChangeUsernameCommand struct {
 	DeviceToken string
@@ -446,6 +452,34 @@ func (service *Service) GetCurrentIdentity(ctx context.Context, command GetCurre
 		return nil
 	})
 	return response, err
+}
+
+// AuthenticatePrincipal returns an active user only after current-generation device and CSRF verification.
+// Other domains use this boundary instead of reading identity repositories or accepting transport-owned user IDs.
+func (service *Service) AuthenticatePrincipal(ctx context.Context, command AuthenticatePrincipalCommand) (User, error) {
+	if service == nil || ctx == nil || command.DeviceToken == "" || command.CSRFToken == "" {
+		return User{}, ErrInvalidIdentityRequest
+	}
+	credentialID, err := CredentialIDFromToken(command.DeviceToken)
+	if err != nil {
+		return User{}, err
+	}
+	var principal User
+	err = service.unitOfWork.Run(ctx, func(ctx context.Context, transaction ChallengeTransaction) error {
+		user, device, getErr := transaction.Devices().GetIdentityForUpdate(ctx, credentialID)
+		if getErr != nil {
+			return getErr
+		}
+		if _, authErr := service.authenticateSensitiveDevice(device, command.DeviceToken, command.CSRFToken); authErr != nil {
+			return authErr
+		}
+		if user.Snapshot().Status != UserStatusActive {
+			return ErrUserStatus
+		}
+		principal = user
+		return nil
+	})
+	return principal, err
 }
 
 // ChangeUsername claims the new key and reserves the old key in one database transaction.

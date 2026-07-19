@@ -13,6 +13,8 @@ import (
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
+	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 )
 
 func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *testing.T) {
@@ -20,7 +22,7 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	var userCalls atomic.Int32
 	var adminCalls atomic.Int32
 	userSurface, err := NewUserSurface(UserSurfaceConfig{
-		Identity: &testIdentityHandler{}, Readiness: readiness,
+		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Readiness: readiness,
 		Interceptors: []connect.Interceptor{countingInterceptor(&userCalls)},
 	})
 	if err != nil {
@@ -43,6 +45,10 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	if _, err = userClient.GetCurrentIdentity(t.Context(), connect.NewRequest(&identityv1.GetCurrentIdentityRequest{})); err != nil {
 		t.Fatalf("call user surface: %v", err)
 	}
+	roomClient := roomv1connect.NewRoomServiceClient(userServer.Client(), userServer.URL)
+	if _, err = roomClient.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{})); err != nil {
+		t.Fatalf("call room surface: %v", err)
+	}
 	adminAuthClient := adminv1connect.NewAdminAuthServiceClient(adminServer.Client(), adminServer.URL)
 	if _, err = adminAuthClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatalf("call admin auth surface: %v", err)
@@ -55,7 +61,8 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	assertHTTPStatus(t, userServer, adminv1connect.AdminAuthServiceGetSetupStateProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, userServer, adminv1connect.AdminIdentityServiceGetUserProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
-	if userCalls.Load() != 1 || adminCalls.Load() != 2 {
+	assertHTTPStatus(t, adminServer, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
+	if userCalls.Load() != 2 || adminCalls.Load() != 2 {
 		t.Fatalf("interceptor calls crossed surfaces: user=%d admin=%d", userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -65,7 +72,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	var userCalls atomic.Int32
 	var adminCalls atomic.Int32
 	userSurface, err := NewUserSurface(UserSurfaceConfig{
-		Identity: &testIdentityHandler{}, Readiness: readiness,
+		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Readiness: readiness,
 		Interceptors: []connect.Interceptor{countingInterceptor(&userCalls)},
 	})
 	if err != nil {
@@ -92,6 +99,10 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	if _, err = userClient.GetCurrentIdentity(t.Context(), connect.NewRequest(&identityv1.GetCurrentIdentityRequest{})); err != nil {
 		t.Fatal(err)
 	}
+	roomClient := roomv1connect.NewRoomServiceClient(testServer.Client(), testServer.URL)
+	if _, err = roomClient.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{})); err != nil {
+		t.Fatal(err)
+	}
 	adminClient := adminv1connect.NewAdminAuthServiceClient(testServer.Client(), testServer.URL)
 	if _, err = adminClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatal(err)
@@ -101,7 +112,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 1 || adminCalls.Load() != 1 {
+	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 2 || adminCalls.Load() != 1 {
 		t.Fatalf("combined routing: metrics=%d user=%d admin=%d", response.StatusCode, userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -142,6 +153,14 @@ func (*testIdentityHandler) GetCurrentIdentity(context.Context, *connect.Request
 
 type testAdminAuthHandler struct {
 	adminv1connect.UnimplementedAdminAuthServiceHandler
+}
+
+type testRoomHandler struct {
+	roomv1connect.UnimplementedRoomServiceHandler
+}
+
+func (*testRoomHandler) GetRoom(context.Context, *connect.Request[roomv1.GetRoomRequest]) (*connect.Response[roomv1.GetRoomResponse], error) {
+	return connect.NewResponse(&roomv1.GetRoomResponse{}), nil
 }
 
 func (*testAdminAuthHandler) GetSetupState(context.Context, *connect.Request[adminv1.GetSetupStateRequest]) (*connect.Response[adminv1.GetSetupStateResponse], error) {

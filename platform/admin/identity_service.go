@@ -379,7 +379,13 @@ func (service *IdentityService) GetProfileExportPage(ctx context.Context, comman
 			return err
 		}
 		contextSnapshot := exportContext.Snapshot()
-		if contextSnapshot.CreatedByAdminID != command.Authorization.Session.Snapshot().AdminID || !exportContext.IsReadableAt(service.clock.Now()) {
+		if contextSnapshot.CreatedByAdminID != command.Authorization.Session.Snapshot().AdminID {
+			return profile.ErrProfileExportClosed
+		}
+		if contextSnapshot.Status == profile.ExportStatusActive && !exportContext.IsReadableAt(service.clock.Now()) {
+			return profile.ErrProfileExportExpired
+		}
+		if contextSnapshot.Status != profile.ExportStatusActive {
 			return profile.ErrProfileExportClosed
 		}
 		if afterOrdinal > contextSnapshot.ItemCount {
@@ -421,6 +427,36 @@ func (service *IdentityService) GetProfileExportPage(ctx context.Context, comman
 		}
 	}
 	return ProfileExportPage{Records: records, NextCursor: nextCursor, Complete: complete}, nil
+}
+
+// ExpireProfileExport is called by the cleanup worker after the context reaches its half-open expiry boundary.
+func (service *IdentityService) ExpireProfileExport(ctx context.Context, exportID uuid.UUID, requestID string) (bool, error) {
+	if exportID == uuid.Nil || strings.TrimSpace(requestID) == "" {
+		return false, ErrInvalidInput
+	}
+	expired := false
+	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
+		current, err := transaction.ProfileExports().GetContextForUpdate(ctx, exportID)
+		if err != nil {
+			return err
+		}
+		if current.Status() != profile.ExportStatusActive {
+			return nil
+		}
+		if _, err = current.Expire(service.clock.Now()); err != nil {
+			return err
+		}
+		if _, err = transaction.ProfileExports().ExpireCAS(ctx, exportID, service.clock.Now()); err != nil {
+			return err
+		}
+		expired = true
+		actor, actorErr := audit.NewActor(audit.ActorSystem, "profile-export-expirer")
+		if actorErr != nil {
+			return actorErr
+		}
+		return service.appendAuditActor(ctx, transaction, actor, requestID, audit.TargetProfileExport, exportID.String(), audit.ActionProfileExportExpired, "expired", digestFields(exportID.String()))
+	})
+	return expired, mapAdminIdentityError(err)
 }
 
 // CompleteProfileExport closes a readable context and records the terminal audit state atomically.
@@ -972,11 +1008,15 @@ func (service *IdentityService) requireHealthyAudit(ctx context.Context, transac
 }
 
 func (service *IdentityService) appendAdminAudit(ctx context.Context, transaction Transaction, authorization IdentityAuthorization, targetType audit.TargetType, targetID string, action audit.Action, reasonCode string, detailDigest []byte) error {
-	head, err := transaction.Audit().ReadHead(ctx, audit.ChainAdmin)
+	actor, err := audit.NewActor(audit.ActorAdmin, authorization.Session.Snapshot().AdminID.String())
 	if err != nil {
 		return err
 	}
-	actor, err := audit.NewActor(audit.ActorAdmin, authorization.Session.Snapshot().AdminID.String())
+	return service.appendAuditActor(ctx, transaction, actor, authorization.RequestID, targetType, targetID, action, reasonCode, detailDigest)
+}
+
+func (service *IdentityService) appendAuditActor(ctx context.Context, transaction Transaction, actor audit.Actor, requestID string, targetType audit.TargetType, targetID string, action audit.Action, reasonCode string, detailDigest []byte) error {
+	head, err := transaction.Audit().ReadHead(ctx, audit.ChainAdmin)
 	if err != nil {
 		return err
 	}
@@ -984,7 +1024,7 @@ func (service *IdentityService) appendAdminAudit(ctx context.Context, transactio
 	if err != nil {
 		return err
 	}
-	requestID := strings.TrimSpace(authorization.RequestID)
+	requestID = strings.TrimSpace(requestID)
 	if requestID == "" {
 		return ErrInvalidInput
 	}

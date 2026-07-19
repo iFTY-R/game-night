@@ -176,7 +176,10 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 	seenSeats := make(map[uint32]struct{}, len(members))
 	participantCount := 0
 	hostFound := false
-	for _, member := range members {
+	for index := range members {
+		members[index].JoinedAt = canonicalRoomTime(members[index].JoinedAt)
+		members[index].LastSeenAt = canonicalRoomTime(members[index].LastSeenAt)
+		member := members[index]
 		if member.UserID == uuid.Nil || !member.Role.Valid() || member.JoinedAt.IsZero() || member.LastSeenAt.Before(member.JoinedAt) ||
 			member.JoinedAt.Before(snapshot.CreatedAt) || member.LastSeenAt.After(snapshot.UpdatedAt) {
 			return Room{}, ErrInvalidRoomInput

@@ -31,4 +31,12 @@ var (
 	ErrWaitingNotFound = errors.New("waiting room member not found")
 	// ErrRoomVersionOverflow rejects a practically impossible but unsafe uint64 wraparound.
 	ErrRoomVersionOverflow = errors.New("room version overflow")
+	// ErrRoomNotFound is the persistence absence result for an inaccessible room identifier or code.
+	ErrRoomNotFound = errors.New("room not found")
+	// ErrRoomCodeUnavailable collapses duplicate and concurrently claimed invitation codes.
+	ErrRoomCodeUnavailable = errors.New("room code is unavailable")
+	// ErrRoomRepositoryUnavailable hides database and generated-query diagnostics from domain callers.
+	ErrRoomRepositoryUnavailable = errors.New("room repository unavailable")
+	// ErrRoomIntegrity reports persisted room/member state that violates aggregate invariants.
+	ErrRoomIntegrity = errors.New("room persistence integrity failure")
 )

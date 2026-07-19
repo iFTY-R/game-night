@@ -227,6 +227,23 @@ type OutboxEvent struct {
 	AvailableAt   pgtype.Timestamptz `json:"available_at"`
 }
 
+type PartyRoom struct {
+	RoomID               pgtype.UUID        `json:"room_id"`
+	RoomCode             string             `json:"room_code"`
+	Visibility           string             `json:"visibility"`
+	Status               string             `json:"status"`
+	HostUserID           pgtype.UUID        `json:"host_user_id"`
+	ParticipantCapacity  int32              `json:"participant_capacity"`
+	ParticipantAdmission string             `json:"participant_admission"`
+	SpectatorAdmission   string             `json:"spectator_admission"`
+	ActiveSessionID      pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID         pgtype.Text        `json:"active_game_id"`
+	RoomVersion          int64              `json:"room_version"`
+	MembershipVersion    int64              `json:"membership_version"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ProfileExportContext struct {
 	ExportID         pgtype.UUID        `json:"export_id"`
 	CreatedByAdminID pgtype.UUID        `json:"created_by_admin_id"`
@@ -252,6 +269,16 @@ type ProfileExportItem struct {
 	RealNameCiphertext []byte      `json:"real_name_ciphertext"`
 	RealNameNonce      []byte      `json:"real_name_nonce"`
 	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
+}
+
+type RoomMember struct {
+	RoomID        pgtype.UUID        `json:"room_id"`
+	UserID        pgtype.UUID        `json:"user_id"`
+	Role          string             `json:"role"`
+	RequestedRole pgtype.Text        `json:"requested_role"`
+	SeatIndex     pgtype.Int4        `json:"seat_index"`
+	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
+	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
 }
 
 type SecretOperationResult struct {

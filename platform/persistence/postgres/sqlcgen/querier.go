@@ -691,6 +691,43 @@ type Querier interface {
 	//  RETURNING event_sequence, event_id, event_type, aggregate_type, aggregate_id,
 	//            payload, created_at, available_at
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (OutboxEvent, error)
+	//CreatePartyRoom
+	//
+	//  INSERT INTO party_rooms (
+	//      room_id,
+	//      room_code,
+	//      visibility,
+	//      status,
+	//      host_user_id,
+	//      participant_capacity,
+	//      participant_admission,
+	//      spectator_admission,
+	//      active_session_id,
+	//      active_game_id,
+	//      room_version,
+	//      membership_version,
+	//      created_at,
+	//      updated_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12,
+	//      $13,
+	//      $14
+	//  )
+	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
+	//      participant_admission, spectator_admission, active_session_id, active_game_id,
+	//      room_version, membership_version, created_at, updated_at
+	CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error)
 	//CreatePendingAdminTotpEnrollment
 	//
 	//  INSERT INTO admin_totp_enrollments (
@@ -772,6 +809,26 @@ type Querier interface {
 	//  RETURNING export_id, ordinal, user_id, username, profile_version,
 	//            real_name_ciphertext, real_name_nonce, real_name_key_version
 	CreateProfileExportItem(ctx context.Context, arg CreateProfileExportItemParams) (ProfileExportItem, error)
+	//CreateRoomMember
+	//
+	//  INSERT INTO room_members (
+	//      room_id,
+	//      user_id,
+	//      role,
+	//      requested_role,
+	//      seat_index,
+	//      joined_at,
+	//      last_seen_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7
+	//  )
+	CreateRoomMember(ctx context.Context, arg CreateRoomMemberParams) error
 	//CreateSecretOperationResult
 	//
 	//  INSERT INTO secret_operation_results (
@@ -914,6 +971,10 @@ type Querier interface {
 	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
 	//            created_at, consumed_at, revoked_at, revoke_reason
 	CreateUserRecoveryCredential(ctx context.Context, arg CreateUserRecoveryCredentialParams) (UserRecoveryCredential, error)
+	//DeleteRoomMembers
+	//
+	//  DELETE FROM room_members WHERE room_id = $1
+	DeleteRoomMembers(ctx context.Context, arg DeleteRoomMembersParams) error
 	//DisableActiveAdminTotpEnrollmentCAS
 	//
 	//  UPDATE admin_totp_enrollments
@@ -1149,6 +1210,24 @@ type Querier interface {
 	//  FROM outbox_events
 	//  WHERE event_id = $1
 	GetOutboxEventByID(ctx context.Context, arg GetOutboxEventByIDParams) (OutboxEvent, error)
+	//GetPartyRoomByCodeForShare
+	//
+	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
+	//      participant_admission, spectator_admission, active_session_id, active_game_id,
+	//      room_version, membership_version, created_at, updated_at
+	//  FROM party_rooms
+	//  WHERE room_code = $1
+	//  FOR SHARE
+	GetPartyRoomByCodeForShare(ctx context.Context, arg GetPartyRoomByCodeForShareParams) (PartyRoom, error)
+	//GetPartyRoomForShare
+	//
+	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
+	//      participant_admission, spectator_admission, active_session_id, active_game_id,
+	//      room_version, membership_version, created_at, updated_at
+	//  FROM party_rooms
+	//  WHERE room_id = $1
+	//  FOR SHARE
+	GetPartyRoomForShare(ctx context.Context, arg GetPartyRoomForShareParams) (PartyRoom, error)
 	//GetPendingAdminTotpEnrollmentForUpdate
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
@@ -1405,6 +1484,13 @@ type Querier interface {
 	//    AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
 	//  ORDER BY users.user_id
 	ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error)
+	//ListRoomMembers
+	//
+	//  SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
+	//  FROM room_members
+	//  WHERE room_id = $1
+	//  ORDER BY joined_at, user_id
+	ListRoomMembers(ctx context.Context, arg ListRoomMembersParams) ([]RoomMember, error)
 	//ListTotpKeyVersionsWithReferences
 	//
 	//  SELECT DISTINCT key_version
@@ -1885,6 +1971,28 @@ type Querier interface {
 	//    AND admin_version = $8
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	UpdateAdminPasswordCAS(ctx context.Context, arg UpdateAdminPasswordCASParams) (UpdateAdminPasswordCASRow, error)
+	//UpdatePartyRoomCAS
+	//
+	//  UPDATE party_rooms
+	//  SET visibility = $1,
+	//      status = $2,
+	//      host_user_id = $3,
+	//      participant_capacity = $4,
+	//      participant_admission = $5,
+	//      spectator_admission = $6,
+	//      active_session_id = $7,
+	//      active_game_id = $8,
+	//      room_version = $9,
+	//      membership_version = $10,
+	//      updated_at = $11
+	//  WHERE room_id = $12
+	//    AND room_code = $13
+	//    AND room_version = $14
+	//    AND membership_version = $15
+	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
+	//      participant_admission, spectator_admission, active_session_id, active_game_id,
+	//      room_version, membership_version, created_at, updated_at
+	UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error)
 	//UpdateUserProfileCAS
 	//
 	//  UPDATE user_profiles

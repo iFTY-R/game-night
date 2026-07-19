@@ -183,6 +183,79 @@ type DeviceCredential struct {
 	RevokeReason             pgtype.Text        `json:"revoke_reason"`
 }
 
+type GameActionReceipt struct {
+	SessionID             pgtype.UUID        `json:"session_id"`
+	ActorUserID           pgtype.UUID        `json:"actor_user_id"`
+	ActionID              string             `json:"action_id"`
+	RequestDigest         []byte             `json:"request_digest"`
+	ResultCode            string             `json:"result_code"`
+	ResultDigest          []byte             `json:"result_digest"`
+	CommittedStateVersion int64              `json:"committed_state_version"`
+	CommittedAt           pgtype.Timestamptz `json:"committed_at"`
+}
+
+type GameSession struct {
+	SessionID          pgtype.UUID        `json:"session_id"`
+	RoomID             pgtype.UUID        `json:"room_id"`
+	GameID             string             `json:"game_id"`
+	EngineVersion      string             `json:"engine_version"`
+	ProtocolVersion    string             `json:"protocol_version"`
+	ClientVersion      string             `json:"client_version"`
+	StateVersion       int64              `json:"state_version"`
+	OwnershipEpoch     int64              `json:"ownership_epoch"`
+	SnapshotVersion    int32              `json:"snapshot_version"`
+	StateMessageType   string             `json:"state_message_type"`
+	StateSchemaVersion int32              `json:"state_schema_version"`
+	StatePayload       []byte             `json:"state_payload"`
+	NextDeadlineAt     pgtype.Timestamptz `json:"next_deadline_at"`
+	Status             string             `json:"status"`
+	StartedAt          pgtype.Timestamptz `json:"started_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	EndedAt            pgtype.Timestamptz `json:"ended_at"`
+}
+
+type GameSessionEvent struct {
+	BatchID       pgtype.UUID `json:"batch_id"`
+	EventOrdinal  int32       `json:"event_ordinal"`
+	MessageType   string      `json:"message_type"`
+	SchemaVersion int32       `json:"schema_version"`
+	Payload       []byte      `json:"payload"`
+}
+
+type GameSessionEventBatch struct {
+	BatchID            pgtype.UUID        `json:"batch_id"`
+	SessionID          pgtype.UUID        `json:"session_id"`
+	StateVersion       int64              `json:"state_version"`
+	OwnershipEpoch     int64              `json:"ownership_epoch"`
+	Cause              string             `json:"cause"`
+	ActorUserID        pgtype.UUID        `json:"actor_user_id"`
+	ActionID           pgtype.Text        `json:"action_id"`
+	ExecutedAt         pgtype.Timestamptz `json:"executed_at"`
+	RandomSeed         []byte             `json:"random_seed"`
+	AllocatedIds       []string           `json:"allocated_ids"`
+	InputMessageType   string             `json:"input_message_type"`
+	InputSchemaVersion int32              `json:"input_schema_version"`
+	InputPayload       []byte             `json:"input_payload"`
+	EventCount         int32              `json:"event_count"`
+	CommittedAt        pgtype.Timestamptz `json:"committed_at"`
+}
+
+type GameSessionParticipant struct {
+	SessionID pgtype.UUID `json:"session_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	SeatIndex int32       `json:"seat_index"`
+}
+
+type GameSessionTimer struct {
+	SessionID            pgtype.UUID        `json:"session_id"`
+	TimerID              string             `json:"timer_id"`
+	ExpectedStateVersion int64              `json:"expected_state_version"`
+	DueAt                pgtype.Timestamptz `json:"due_at"`
+	MessageType          string             `json:"message_type"`
+	SchemaVersion        int32              `json:"schema_version"`
+	Payload              []byte             `json:"payload"`
+}
+
 type KeyRotationJob struct {
 	JobID            pgtype.UUID        `json:"job_id"`
 	Purpose          string             `json:"purpose"`

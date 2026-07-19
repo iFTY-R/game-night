@@ -68,6 +68,19 @@ type Querier interface {
 	//  RETURNING consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
 	//            retry_count, next_attempt_at, last_error_code, created_at, updated_at
 	AckOutboxConsumerOffsetCAS(ctx context.Context, arg AckOutboxConsumerOffsetCASParams) (OutboxConsumer, error)
+	//AcquireGameSessionOwnershipCAS
+	//
+	//  UPDATE game_sessions
+	//  SET ownership_epoch = ownership_epoch + 1,
+	//      updated_at = $1
+	//  WHERE session_id = $2
+	//    AND state_version = $3
+	//    AND ownership_epoch = $4
+	//    AND status IN ('active', 'suspended')
+	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+	//      state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+	AcquireGameSessionOwnershipCAS(ctx context.Context, arg AcquireGameSessionOwnershipCASParams) (GameSession, error)
 	//AcquireKeyRotationJobLease
 	//
 	//  WITH candidate AS (
@@ -615,6 +628,135 @@ type Querier interface {
 	//            created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
 	//            revoked_at, revoke_reason
 	CreateDeviceCredential(ctx context.Context, arg CreateDeviceCredentialParams) (DeviceCredential, error)
+	//CreateGameActionReceipt
+	//
+	//  INSERT INTO game_action_receipts (
+	//      session_id,
+	//      actor_user_id,
+	//      action_id,
+	//      request_digest,
+	//      result_code,
+	//      result_digest,
+	//      committed_state_version,
+	//      committed_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8
+	//  )
+	//  ON CONFLICT (session_id, actor_user_id, action_id) DO NOTHING
+	//  RETURNING session_id, actor_user_id, action_id, request_digest, result_code,
+	//      result_digest, committed_state_version, committed_at
+	CreateGameActionReceipt(ctx context.Context, arg CreateGameActionReceiptParams) (GameActionReceipt, error)
+	//CreateGameSession
+	//
+	//  INSERT INTO game_sessions (
+	//      session_id,
+	//      room_id,
+	//      game_id,
+	//      engine_version,
+	//      protocol_version,
+	//      client_version,
+	//      state_version,
+	//      ownership_epoch,
+	//      snapshot_version,
+	//      state_message_type,
+	//      state_schema_version,
+	//      state_payload,
+	//      next_deadline_at,
+	//      status,
+	//      started_at,
+	//      updated_at,
+	//      ended_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12,
+	//      $13,
+	//      $14,
+	//      $15,
+	//      $16,
+	//      $17
+	//  )
+	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+	//      state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+	CreateGameSession(ctx context.Context, arg CreateGameSessionParams) (GameSession, error)
+	//CreateGameSessionEvent
+	//
+	//  INSERT INTO game_session_events (batch_id, event_ordinal, message_type, schema_version, payload)
+	//  VALUES (
+	//      $1, $2, $3,
+	//      $4, $5
+	//  )
+	CreateGameSessionEvent(ctx context.Context, arg CreateGameSessionEventParams) error
+	//CreateGameSessionEventBatch
+	//
+	//  INSERT INTO game_session_event_batches (
+	//      batch_id,
+	//      session_id,
+	//      state_version,
+	//      ownership_epoch,
+	//      cause,
+	//      actor_user_id,
+	//      action_id,
+	//      executed_at,
+	//      random_seed,
+	//      allocated_ids,
+	//      input_message_type,
+	//      input_schema_version,
+	//      input_payload,
+	//      event_count,
+	//      committed_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12,
+	//      $13,
+	//      $14,
+	//      $15
+	//  )
+	//  RETURNING batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
+	//      action_id, executed_at, random_seed, allocated_ids, input_message_type,
+	//      input_schema_version, input_payload, event_count, committed_at
+	CreateGameSessionEventBatch(ctx context.Context, arg CreateGameSessionEventBatchParams) (GameSessionEventBatch, error)
+	//CreateGameSessionParticipant
+	//
+	//  INSERT INTO game_session_participants (session_id, user_id, seat_index)
+	//  VALUES ($1, $2, $3)
+	CreateGameSessionParticipant(ctx context.Context, arg CreateGameSessionParticipantParams) error
+	//CreateGameSessionTimer
+	//
+	//  INSERT INTO game_session_timers (
+	//      session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+	//  ) VALUES (
+	//      $1, $2, $3, $4,
+	//      $5, $6, $7
+	//  )
+	CreateGameSessionTimer(ctx context.Context, arg CreateGameSessionTimerParams) error
 	//CreateKeyRotationJob
 	//
 	//  INSERT INTO key_rotation_jobs (
@@ -971,6 +1113,10 @@ type Querier interface {
 	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
 	//            created_at, consumed_at, revoked_at, revoke_reason
 	CreateUserRecoveryCredential(ctx context.Context, arg CreateUserRecoveryCredentialParams) (UserRecoveryCredential, error)
+	//DeleteGameSessionTimers
+	//
+	//  DELETE FROM game_session_timers WHERE session_id = $1
+	DeleteGameSessionTimers(ctx context.Context, arg DeleteGameSessionTimersParams) error
 	//DeleteRoomMembers
 	//
 	//  DELETE FROM room_members WHERE room_id = $1
@@ -1175,6 +1321,33 @@ type Querier interface {
 	//  FROM locked_user AS u
 	//  JOIN locked_device AS d ON d.user_id = u.user_id
 	GetDeviceIdentityForUpdate(ctx context.Context, arg GetDeviceIdentityForUpdateParams) (GetDeviceIdentityForUpdateRow, error)
+	//GetGameActionReceipt
+	//
+	//  SELECT session_id, actor_user_id, action_id, request_digest, result_code,
+	//      result_digest, committed_state_version, committed_at
+	//  FROM game_action_receipts
+	//  WHERE session_id = $1
+	//    AND actor_user_id = $2
+	//    AND action_id = $3
+	GetGameActionReceipt(ctx context.Context, arg GetGameActionReceiptParams) (GameActionReceipt, error)
+	//GetGameSessionForShare
+	//
+	//  SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
+	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+	//      state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+	//  FROM game_sessions
+	//  WHERE session_id = $1
+	//  FOR SHARE
+	GetGameSessionForShare(ctx context.Context, arg GetGameSessionForShareParams) (GameSession, error)
+	//GetGameSessionForUpdate
+	//
+	//  SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
+	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+	//      state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+	//  FROM game_sessions
+	//  WHERE session_id = $1
+	//  FOR UPDATE
+	GetGameSessionForUpdate(ctx context.Context, arg GetGameSessionForUpdateParams) (GameSession, error)
 	//GetKeyRotationJob
 	//
 	//  SELECT job_id, purpose, source_key_version, target_key_version, status, cursor_scope,
@@ -1401,6 +1574,27 @@ type Querier interface {
 	//  ORDER BY sequence
 	//  LIMIT $3
 	ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]AuditEventsRedacted, error)
+	//ListGameSessionEvents
+	//
+	//  SELECT batch_id, event_ordinal, message_type, schema_version, payload
+	//  FROM game_session_events
+	//  WHERE batch_id = $1
+	//  ORDER BY event_ordinal
+	ListGameSessionEvents(ctx context.Context, arg ListGameSessionEventsParams) ([]GameSessionEvent, error)
+	//ListGameSessionParticipants
+	//
+	//  SELECT session_id, user_id, seat_index
+	//  FROM game_session_participants
+	//  WHERE session_id = $1
+	//  ORDER BY seat_index, user_id
+	ListGameSessionParticipants(ctx context.Context, arg ListGameSessionParticipantsParams) ([]GameSessionParticipant, error)
+	//ListGameSessionTimers
+	//
+	//  SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+	//  FROM game_session_timers
+	//  WHERE session_id = $1
+	//  ORDER BY timer_id
+	ListGameSessionTimers(ctx context.Context, arg ListGameSessionTimersParams) ([]GameSessionTimer, error)
 	//ListOutboxEventsForConsumer
 	//
 	//  WITH consumer_state AS MATERIALIZED (
@@ -2023,6 +2217,26 @@ type Querier interface {
 	//    AND admin_version = $8
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	UpdateAdminPasswordCAS(ctx context.Context, arg UpdateAdminPasswordCASParams) (UpdateAdminPasswordCASRow, error)
+	//UpdateGameSessionStateCAS
+	//
+	//  UPDATE game_sessions
+	//  SET state_version = $1,
+	//      snapshot_version = $2,
+	//      state_message_type = $3,
+	//      state_schema_version = $4,
+	//      state_payload = $5,
+	//      next_deadline_at = $6,
+	//      status = $7,
+	//      updated_at = $8,
+	//      ended_at = $9
+	//  WHERE session_id = $10
+	//    AND state_version = $11
+	//    AND ownership_epoch = $12
+	//    AND status = 'active'
+	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+	//      state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+	UpdateGameSessionStateCAS(ctx context.Context, arg UpdateGameSessionStateCASParams) (GameSession, error)
 	//UpdatePartyRoomCAS
 	//
 	//  UPDATE party_rooms

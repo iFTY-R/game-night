@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -94,7 +95,7 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	execution := deterministicContextFixture()
 	message := Message{MessageType: "roll", SchemaVersion: 1}
 	command := CommandRequest{
-		Context: execution, ActorUserID: "user-1", ActionID: "action-1", ExpectedStateVersion: 3, Command: message,
+		Context: execution, ActorUserID: "user-1", ActionID: actionIDFixture(1), ExpectedStateVersion: 3, Command: message,
 	}
 	if !command.Valid() {
 		t.Fatal("valid command rejected")
@@ -111,6 +112,18 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	}
 }
 
+func TestActionIDRequiresCanonicalRawBase64URLWithAtLeast128Bits(t *testing.T) {
+	actionID := actionIDFixture(7)
+	if !actionID.Valid() {
+		t.Fatal("valid action ID rejected")
+	}
+	for _, value := range []string{"action-1", string(actionID) + "=", base64.RawURLEncoding.EncodeToString(make([]byte, 15))} {
+		if _, err := ParseActionID(value); !errors.Is(err, ErrInvalidContract) {
+			t.Fatalf("invalid action ID %q error = %v", value, err)
+		}
+	}
+}
+
 func deterministicContextFixture() DeterministicContext {
 	execution := DeterministicContext{
 		Now:          time.Date(2026, time.July, 19, 23, 0, 0, 0, time.UTC),
@@ -118,4 +131,12 @@ func deterministicContextFixture() DeterministicContext {
 	}
 	execution.RandomSeed[0] = 1
 	return execution
+}
+
+func actionIDFixture(marker byte) ActionID {
+	value := make([]byte, MinimumActionIDBytes)
+	for index := range value {
+		value[index] = marker
+	}
+	return ActionID(base64.RawURLEncoding.EncodeToString(value))
 }

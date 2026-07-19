@@ -134,7 +134,7 @@ func (request CreateRequest) Validate(limits ParticipantLimits) error {
 type CommandRequest struct {
 	Context              DeterministicContext
 	ActorUserID          Identifier
-	ActionID             Identifier
+	ActionID             ActionID
 	ExpectedStateVersion uint64
 	Command              Message
 }
@@ -142,8 +142,7 @@ type CommandRequest struct {
 // Valid rejects commands that cannot participate in deterministic action-receipt and version checks.
 func (request CommandRequest) Valid() bool {
 	_, actorErr := ParseIdentifier(string(request.ActorUserID))
-	_, actionErr := ParseIdentifier(string(request.ActionID))
-	return request.Context.Valid() && actorErr == nil && actionErr == nil && request.ExpectedStateVersion > 0 && request.Command.Valid()
+	return request.Context.Valid() && actorErr == nil && request.ActionID.Valid() && request.ExpectedStateVersion > 0 && request.Command.Valid()
 }
 
 // TimerRequest replays a persisted timer firing against an exact expected state version.
@@ -188,6 +187,7 @@ func (timer TimerIntent) Valid(executedAt time.Time) bool {
 type Transition struct {
 	Snapshot Snapshot
 	Events   []Event
+	// Timers is the complete next-state timer set; omitting a previous timer cancels it atomically.
 	Timers   []TimerIntent
 	Finished bool
 }

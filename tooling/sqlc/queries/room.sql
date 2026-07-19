@@ -42,6 +42,14 @@ FROM party_rooms
 WHERE room_id = sqlc.arg(room_id)
 FOR SHARE;
 
+-- name: GetPartyRoomForUpdate :one
+SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
+    participant_admission, spectator_admission, active_session_id, active_game_id,
+    room_version, membership_version, created_at, updated_at
+FROM party_rooms
+WHERE room_id = sqlc.arg(room_id)
+FOR UPDATE;
+
 -- name: GetPartyRoomByCodeForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,

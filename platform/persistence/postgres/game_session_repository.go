@@ -40,42 +40,49 @@ func (repository *GameSessionRepository) Create(ctx context.Context, commit game
 	}
 	var stored gameruntime.Session
 	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
-		snapshot := commit.Session.Snapshot()
-		row, err := queries.CreateGameSession(ctx, createGameSessionParams(snapshot))
-		if err != nil {
-			return err
-		}
-		for _, participant := range snapshot.Participants {
-			if err := queries.CreateGameSessionParticipant(ctx, sqlcgen.CreateGameSessionParticipantParams{
-				SessionID: uuidToPG(snapshot.ID), UserID: uuidToPG(participant.UserID), SeatIndex: int32(participant.SeatIndex),
-			}); err != nil {
-				return err
-			}
-		}
-		if err := replaceGameSessionTimers(ctx, queries, snapshot.ID, snapshot.Timers); err != nil {
-			return err
-		}
-		if err := insertGameSessionBatch(ctx, queries, commit.Batch); err != nil {
-			return err
-		}
-		if err := insertGameSessionOutbox(ctx, queries, commit.OutboxEvents); err != nil {
-			return err
-		}
-		participants, err := queries.ListGameSessionParticipants(ctx, sqlcgen.ListGameSessionParticipantsParams{SessionID: uuidToPG(snapshot.ID)})
-		if err != nil {
-			return err
-		}
-		timers, err := queries.ListGameSessionTimers(ctx, sqlcgen.ListGameSessionTimersParams{SessionID: uuidToPG(snapshot.ID)})
-		if err != nil {
-			return err
-		}
-		stored, err = sessionFromRows(row, participants, timers)
+		var err error
+		stored, err = createGameSessionAggregate(ctx, queries, commit)
 		return err
 	})
 	if err != nil {
 		return gameruntime.Session{}, mapGameSessionRepositoryError(ctx, err, gameruntime.ErrSessionAlreadyExists)
 	}
 	return stored, nil
+}
+
+// createGameSessionAggregate writes the session and all immutable creation children through one query handle.
+// The surrounding transaction must also own any parent aggregate pointer that references this session.
+func createGameSessionAggregate(ctx context.Context, queries QueryHandle, commit gameruntime.CreationCommit) (gameruntime.Session, error) {
+	snapshot := commit.Session.Snapshot()
+	row, err := queries.CreateGameSession(ctx, createGameSessionParams(snapshot))
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
+	for _, participant := range snapshot.Participants {
+		if err := queries.CreateGameSessionParticipant(ctx, sqlcgen.CreateGameSessionParticipantParams{
+			SessionID: uuidToPG(snapshot.ID), UserID: uuidToPG(participant.UserID), SeatIndex: int32(participant.SeatIndex),
+		}); err != nil {
+			return gameruntime.Session{}, err
+		}
+	}
+	if err := replaceGameSessionTimers(ctx, queries, snapshot.ID, snapshot.Timers); err != nil {
+		return gameruntime.Session{}, err
+	}
+	if err := insertGameSessionBatch(ctx, queries, commit.Batch); err != nil {
+		return gameruntime.Session{}, err
+	}
+	if err := insertGameSessionOutbox(ctx, queries, commit.OutboxEvents); err != nil {
+		return gameruntime.Session{}, err
+	}
+	participants, err := queries.ListGameSessionParticipants(ctx, sqlcgen.ListGameSessionParticipantsParams{SessionID: uuidToPG(snapshot.ID)})
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
+	timers, err := queries.ListGameSessionTimers(ctx, sqlcgen.ListGameSessionTimersParams{SessionID: uuidToPG(snapshot.ID)})
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
+	return sessionFromRows(row, participants, timers)
 }
 
 // Get loads one session and its immutable children in a consistent PostgreSQL transaction snapshot.

@@ -302,6 +302,49 @@ func (q *Queries) GetPartyRoomForShare(ctx context.Context, arg GetPartyRoomForS
 	return i, err
 }
 
+const getPartyRoomForUpdate = `-- name: GetPartyRoomForUpdate :one
+SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
+    participant_admission, spectator_admission, active_session_id, active_game_id,
+    room_version, membership_version, created_at, updated_at
+FROM party_rooms
+WHERE room_id = $1
+FOR UPDATE
+`
+
+type GetPartyRoomForUpdateParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+// GetPartyRoomForUpdate
+//
+//	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
+//	    participant_admission, spectator_admission, active_session_id, active_game_id,
+//	    room_version, membership_version, created_at, updated_at
+//	FROM party_rooms
+//	WHERE room_id = $1
+//	FOR UPDATE
+func (q *Queries) GetPartyRoomForUpdate(ctx context.Context, arg GetPartyRoomForUpdateParams) (PartyRoom, error) {
+	row := q.db.QueryRow(ctx, getPartyRoomForUpdate, arg.RoomID)
+	var i PartyRoom
+	err := row.Scan(
+		&i.RoomID,
+		&i.RoomCode,
+		&i.Visibility,
+		&i.Status,
+		&i.HostUserID,
+		&i.ParticipantCapacity,
+		&i.ParticipantAdmission,
+		&i.SpectatorAdmission,
+		&i.ActiveSessionID,
+		&i.ActiveGameID,
+		&i.RoomVersion,
+		&i.MembershipVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listPublicRoomCards = `-- name: ListPublicRoomCards :many
 SELECT room.room_id,
     host.username AS host_username,

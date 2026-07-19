@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 )
 
@@ -167,13 +169,23 @@ func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	playingRoom, _, err = withParticipant.StartSession(
+	playingRoom, start, err := withParticipant.StartSession(
 		hostIDs[4], uuid.New(), "dice", 2, 9, withParticipant.Version(), now.Add(2*time.Second),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	playingRoom, err = repository.UpdateCAS(ctx, withParticipant, playingRoom)
+	playingSession, playingBatch, err := gameruntime.NewSession(gameSessionCreateRequest(
+		start.SessionID, withParticipant.Snapshot().ID, hostIDs[4], participantID, start.StartedAt,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	playingEvent := newGameSessionOutboxEvent(t, gameruntime.GameSessionCreatedEventType, start.SessionID, uuid.New(), start.StartedAt, []byte("lobby-created"))
+	playingRoom, _, err = NewRoomGameSessionRepository(fixture.Pool).Start(
+		ctx, withParticipant, playingRoom,
+		gameruntime.CreationCommit{Session: playingSession, Batch: playingBatch, OutboxEvents: []outbox.Event{playingEvent}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -138,23 +138,8 @@ func (repository *RoomRepository) UpdateCAS(ctx context.Context, current, next r
 	}
 	var stored roomDomain.Room
 	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
-		row, err := queries.UpdatePartyRoomCAS(ctx, updatePartyRoomParams(before, after))
-		if err != nil {
-			return err
-		}
-		if err := queries.DeleteRoomMembers(ctx, sqlcgen.DeleteRoomMembersParams{RoomID: uuidToPG(after.ID)}); err != nil {
-			return err
-		}
-		for _, member := range after.Members {
-			if err := queries.CreateRoomMember(ctx, createRoomMemberParams(after.ID, member)); err != nil {
-				return err
-			}
-		}
-		members, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(after.ID)})
-		if err != nil {
-			return err
-		}
-		stored, err = roomFromRows(row, members)
+		var err error
+		stored, err = updateRoomAggregateCAS(ctx, queries, before, after)
 		return err
 	})
 	if err != nil {
@@ -204,6 +189,28 @@ func updatePartyRoomParams(before, after roomDomain.RoomSnapshot) sqlcgen.Update
 		RoomID: uuidToPG(before.ID), RoomCode: before.RoomCode, ExpectedRoomVersion: int64(before.RoomVersion),
 		ExpectedMembershipVersion: int64(before.MembershipVersion),
 	}
+}
+
+// updateRoomAggregateCAS writes the room row and complete member snapshot through one query handle.
+// The caller owns the surrounding transaction, so a later aggregate failure rolls back the whole room update.
+func updateRoomAggregateCAS(ctx context.Context, queries QueryHandle, beforeSnapshot, afterSnapshot roomDomain.RoomSnapshot) (roomDomain.Room, error) {
+	row, err := queries.UpdatePartyRoomCAS(ctx, updatePartyRoomParams(beforeSnapshot, afterSnapshot))
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	if err := queries.DeleteRoomMembers(ctx, sqlcgen.DeleteRoomMembersParams{RoomID: uuidToPG(afterSnapshot.ID)}); err != nil {
+		return roomDomain.Room{}, err
+	}
+	for _, member := range afterSnapshot.Members {
+		if err := queries.CreateRoomMember(ctx, createRoomMemberParams(afterSnapshot.ID, member)); err != nil {
+			return roomDomain.Room{}, err
+		}
+	}
+	members, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(afterSnapshot.ID)})
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	return roomFromRows(row, members)
 }
 
 func createRoomMemberParams(roomID uuid.UUID, member roomDomain.MemberSnapshot) sqlcgen.CreateRoomMemberParams {

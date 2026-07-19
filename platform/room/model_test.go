@@ -20,7 +20,7 @@ func TestRoomLifecycleKeepsPostGameAdmissionClosed(t *testing.T) {
 	if err != nil || joined.Member.SeatIndex != 1 {
 		t.Fatalf("join first: member=%+v err=%v", joined.Member, err)
 	}
-	room, started, err := room.StartSession(host, uuid.New(), "dice", 2, room.Version(), now.Add(2*time.Second))
+	room, started, err := room.StartSession(host, uuid.New(), "dice", 2, 9, room.Version(), now.Add(2*time.Second))
 	if err != nil || len(started.Participants) != 2 || room.Snapshot().ParticipantAdmission != AdmissionClosed {
 		t.Fatalf("start session: started=%+v room=%+v err=%v", started, room.Snapshot(), err)
 	}
@@ -109,7 +109,7 @@ func TestRemovingActiveParticipantReportsRuntimeRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	room, started, err := room.StartSession(host, uuid.New(), "poker", 2, room.Version(), now.Add(2*time.Second))
+	room, started, err := room.StartSession(host, uuid.New(), "poker", 2, 9, room.Version(), now.Add(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +122,26 @@ func TestRemovingActiveParticipantReportsRuntimeRevocation(t *testing.T) {
 	}
 	if _, _, err := room.RemoveMember(host, host, room.Version(), now.Add(4*time.Second)); !errors.Is(err, ErrCannotRemoveHost) {
 		t.Fatalf("remove host error=%v", err)
+	}
+}
+
+func TestStartSessionRejectsMoreParticipantsThanGameManifestSupports(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 13, 30, 0, 0, time.UTC)
+	host := uuid.New()
+	room, err := New(uuid.New(), host, "LIMIT9", VisibilityPrivate, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for offset := 1; offset <= 2; offset++ {
+		room, _, err = room.Join(uuid.New(), JoinIntentParticipant, room.Version(), now.Add(time.Duration(offset)*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err := room.StartSession(
+		host, uuid.New(), "two-seat-game", 2, 2, room.Version(), now.Add(3*time.Second),
+	); !errors.Is(err, ErrParticipantLimitExceeded) {
+		t.Fatalf("participant limit error = %v", err)
 	}
 }
 

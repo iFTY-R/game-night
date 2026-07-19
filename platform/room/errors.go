@@ -27,6 +27,8 @@ var (
 	ErrSessionNotFound = errors.New("room session not found")
 	// ErrInsufficientParticipants prevents an empty or undersized frozen participant snapshot.
 	ErrInsufficientParticipants = errors.New("room has insufficient participants")
+	// ErrParticipantLimitExceeded prevents a room from starting a game that cannot represent every frozen seat.
+	ErrParticipantLimitExceeded = errors.New("room exceeds game participant limit")
 	// ErrWaitingNotFound reports an approval command for a user without a waiting membership.
 	ErrWaitingNotFound = errors.New("waiting room member not found")
 	// ErrRoomVersionOverflow rejects a practically impossible but unsafe uint64 wraparound.

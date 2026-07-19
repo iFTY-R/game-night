@@ -392,9 +392,16 @@ func (room Room) ApproveWaiting(hostUserID, userID uuid.UUID, expected Version, 
 }
 
 // StartSession freezes participant seats and closes participant admission until the session ends.
-func (room Room) StartSession(hostUserID, sessionID uuid.UUID, gameID string, minimumParticipants uint32, expected Version, at time.Time) (Room, SessionStart, error) {
+func (room Room) StartSession(
+	hostUserID, sessionID uuid.UUID,
+	gameID string,
+	minimumParticipants, maximumParticipants uint32,
+	expected Version,
+	at time.Time,
+) (Room, SessionStart, error) {
 	at = canonicalRoomTime(at)
-	if hostUserID == uuid.Nil || sessionID == uuid.Nil || strings.TrimSpace(gameID) == "" || minimumParticipants == 0 || at.IsZero() {
+	if hostUserID == uuid.Nil || sessionID == uuid.Nil || strings.TrimSpace(gameID) == "" || minimumParticipants == 0 ||
+		maximumParticipants < minimumParticipants || at.IsZero() {
 		return Room{}, SessionStart{}, ErrInvalidRoomInput
 	}
 	if err := room.checkHost(hostUserID); err != nil {
@@ -420,6 +427,9 @@ func (room Room) StartSession(hostUserID, sessionID uuid.UUID, gameID string, mi
 	}
 	if len(participants) < int(minimumParticipants) {
 		return Room{}, SessionStart{}, ErrInsufficientParticipants
+	}
+	if len(participants) > int(maximumParticipants) {
+		return Room{}, SessionStart{}, ErrParticipantLimitExceeded
 	}
 	next := room.snapshot
 	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusPlaying, sessionID, strings.TrimSpace(gameID), AdmissionClosed

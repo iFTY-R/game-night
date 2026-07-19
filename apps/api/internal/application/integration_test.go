@@ -177,6 +177,13 @@ func exerciseRoomLifecycle(
 	if loaded.Msg.GetRoom().GetRoomCode() != created.Msg.GetRoom().GetRoomCode() {
 		t.Fatalf("get integrated room: room=%+v", loaded.Msg.GetRoom())
 	}
+	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
+		RoomId: created.Msg.GetRoom().GetRoomId(), GameId: "dice", ExpectedVersion: created.Msg.GetRoom().GetVersion(),
+	})
+	runtime.authorizeUserWrite(t, startRequest)
+	if _, err := client.StartGame(ctx, startRequest); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("start room without GameSession runtime: %v", err)
+	}
 	setRequest := connect.NewRequest(&roomv1.SetAdmissionRequest{
 		RoomId: created.Msg.GetRoom().GetRoomId(), ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_CLOSED,
 		SpectatorAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN, ExpectedVersion: created.Msg.GetRoom().GetVersion(),

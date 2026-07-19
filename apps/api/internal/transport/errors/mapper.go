@@ -103,7 +103,8 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND, "room.member.not_found"}
 	case stderrors.Is(err, room.ErrRoomStatus), stderrors.Is(err, room.ErrRoomClosed),
 		stderrors.Is(err, room.ErrSessionActive), stderrors.Is(err, room.ErrSessionNotFound),
-		stderrors.Is(err, room.ErrInsufficientParticipants), stderrors.Is(err, room.ErrCannotRemoveHost),
+		stderrors.Is(err, room.ErrInsufficientParticipants), stderrors.Is(err, room.ErrParticipantLimitExceeded),
+		stderrors.Is(err, room.ErrCannotRemoveHost),
 		stderrors.Is(err, room.ErrGameUnavailable):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID, "room.status.invalid"}
 	case stderrors.Is(err, admin.ErrTOTPInvalid):

@@ -69,7 +69,6 @@ type SetAdmissionCommand struct {
 }
 
 // StartGameCommand freezes current participants for the requested game session.
-// MinimumParticipants is supplied by the game catalog boundary until the Game SDK owns this call path.
 type StartGameCommand struct {
 	ActorUserID uuid.UUID
 	RoomID      uuid.UUID
@@ -283,15 +282,16 @@ func (service *Service) StartGame(ctx context.Context, command StartGameCommand)
 	if err != nil {
 		return Room{}, SessionStart{}, err
 	}
-	minimumParticipants, err := service.games.MinimumParticipants(ctx, strings.TrimSpace(command.GameID))
+	participantLimits, err := service.games.ParticipantLimits(ctx, strings.TrimSpace(command.GameID))
 	if err != nil {
 		return Room{}, SessionStart{}, err
 	}
-	if minimumParticipants == 0 {
+	if !participantLimits.Valid() {
 		return Room{}, SessionStart{}, ErrGameUnavailable
 	}
 	next, start, err := room.StartSession(
-		command.ActorUserID, sessionID, strings.TrimSpace(command.GameID), minimumParticipants, command.Expected, service.clock.Now(),
+		command.ActorUserID, sessionID, strings.TrimSpace(command.GameID), participantLimits.Minimum, participantLimits.Maximum,
+		command.Expected, service.clock.Now(),
 	)
 	if err != nil {
 		return Room{}, SessionStart{}, err

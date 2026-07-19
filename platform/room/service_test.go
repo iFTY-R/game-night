@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/clock"
+	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
 func TestServiceCreatesRoomWithExplicitAdmissionAndRetriesCodeConflict(t *testing.T) {
@@ -113,7 +114,9 @@ type sequenceRoomCodeGenerator struct {
 
 type testGameCatalog struct{}
 
-func (testGameCatalog) MinimumParticipants(context.Context, string) (uint32, error) { return 2, nil }
+func (testGameCatalog) ParticipantLimits(context.Context, string) (gameSDK.ParticipantLimits, error) {
+	return gameSDK.ParticipantLimits{Minimum: 2, Maximum: 9}, nil
+}
 
 func (generator *sequenceRoomCodeGenerator) Generate() (string, error) {
 	generator.mu.Lock()

@@ -23,6 +23,7 @@ import (
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	"github.com/iFTY-R/game-night/platform/clock"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
+	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
 const roomTransportOrigin = "https://play.example.test"
@@ -225,8 +226,8 @@ func (*transportCodeGenerator) Generate() (string, error) { return "TEST01", nil
 
 type transportGameCatalog struct{}
 
-func (transportGameCatalog) MinimumParticipants(context.Context, string) (uint32, error) {
-	return 2, nil
+func (transportGameCatalog) ParticipantLimits(context.Context, string) (gameSDK.ParticipantLimits, error) {
+	return gameSDK.ParticipantLimits{Minimum: 2, Maximum: 9}, nil
 }
 
 type transportRoomRepository struct {

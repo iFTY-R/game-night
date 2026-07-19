@@ -168,7 +168,7 @@ func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 		t.Fatal(err)
 	}
 	playingRoom, _, err = withParticipant.StartSession(
-		hostIDs[4], uuid.New(), "dice", 2, withParticipant.Version(), now.Add(2*time.Second),
+		hostIDs[4], uuid.New(), "dice", 2, 9, withParticipant.Version(), now.Add(2*time.Second),
 	)
 	if err != nil {
 		t.Fatal(err)

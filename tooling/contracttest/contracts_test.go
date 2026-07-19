@@ -8,6 +8,7 @@ import (
 	auditv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
+	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -61,6 +62,17 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"RevokeUserDevice",
 		"ListAuditEvents",
 	})
+	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
+		"CreateRoom",
+		"GetRoom",
+		"JoinRoom",
+		"ApproveMember",
+		"SetAdmission",
+		"StartGame",
+		"FinishGame",
+		"RemoveMember",
+		"CloseRoom",
+	})
 }
 
 func TestBusinessErrorCodesMatchApprovedContract(t *testing.T) {
@@ -112,6 +124,7 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		adminv1.File_platform_admin_v1_admin_auth_proto,
 		adminv1.File_platform_admin_v1_admin_identity_proto,
 		auditv1.File_platform_audit_v1_audit_proto,
+		roomv1.File_platform_room_v1_room_proto,
 	}
 	for _, file := range files {
 		assertEnumsHaveUnspecifiedZero(t, file.Enums(), file.Path())

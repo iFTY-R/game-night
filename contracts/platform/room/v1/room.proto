@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package platform.room.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/common/v1/common.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1;roomv1";
+
+// RoomService owns continuous PartyRoom membership and host-controlled admission.
+service RoomService {
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
+  rpc ApproveMember(ApproveMemberRequest) returns (ApproveMemberResponse);
+  rpc SetAdmission(SetAdmissionRequest) returns (SetAdmissionResponse);
+  rpc StartGame(StartGameRequest) returns (StartGameResponse);
+  rpc FinishGame(FinishGameRequest) returns (FinishGameResponse);
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+  rpc CloseRoom(CloseRoomRequest) returns (CloseRoomResponse);
+}
+
+enum RoomVisibility {
+  ROOM_VISIBILITY_UNSPECIFIED = 0;
+  ROOM_VISIBILITY_PRIVATE = 1;
+  ROOM_VISIBILITY_PUBLIC = 2;
+}
+
+enum RoomStatus {
+  ROOM_STATUS_UNSPECIFIED = 0;
+  ROOM_STATUS_LOBBY = 1;
+  ROOM_STATUS_PLAYING = 2;
+  ROOM_STATUS_CLOSED = 3;
+}
+
+enum AdmissionMode {
+  ADMISSION_MODE_UNSPECIFIED = 0;
+  ADMISSION_MODE_OPEN = 1;
+  ADMISSION_MODE_APPROVAL = 2;
+  ADMISSION_MODE_CLOSED = 3;
+}
+
+enum MemberRole {
+  MEMBER_ROLE_UNSPECIFIED = 0;
+  MEMBER_ROLE_PARTICIPANT = 1;
+  MEMBER_ROLE_SPECTATOR = 2;
+  MEMBER_ROLE_WAITING = 3;
+}
+
+enum JoinIntent {
+  JOIN_INTENT_UNSPECIFIED = 0;
+  JOIN_INTENT_PARTICIPANT = 1;
+  JOIN_INTENT_SPECTATOR = 2;
+}
+
+message RoomVersion {
+  uint64 room_version = 1;
+  uint64 membership_version = 2;
+}
+
+message RoomMember {
+  string user_id = 1;
+  MemberRole role = 2;
+  MemberRole requested_role = 3;
+  uint32 seat_index = 4;
+  google.protobuf.Timestamp joined_at = 5;
+  google.protobuf.Timestamp last_seen_at = 6;
+}
+
+message Room {
+  string room_id = 1;
+  string room_code = 2;
+  RoomVisibility visibility = 3;
+  RoomStatus status = 4;
+  string host_user_id = 5;
+  uint32 participant_capacity = 6;
+  AdmissionMode participant_admission = 7;
+  AdmissionMode spectator_admission = 8;
+  repeated RoomMember members = 9;
+  string active_session_id = 10;
+  string active_game_id = 11;
+  RoomVersion version = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+message CreateRoomRequest {
+  RoomVisibility visibility = 1;
+  uint32 participant_capacity = 2;
+  AdmissionMode participant_admission = 3;
+  AdmissionMode spectator_admission = 4;
+}
+
+message CreateRoomResponse {
+  Room room = 1;
+}
+
+message GetRoomRequest {
+  string room_id = 1;
+}
+
+message GetRoomResponse {
+  Room room = 1;
+}
+
+message JoinRoomRequest {
+  string room_id = 1;
+  JoinIntent intent = 2;
+  RoomVersion expected_version = 3;
+}
+
+message JoinRoomResponse {
+  Room room = 1;
+  RoomMember member = 2;
+  bool created = 3;
+}
+
+message ApproveMemberRequest {
+  string room_id = 1;
+  string user_id = 2;
+  RoomVersion expected_version = 3;
+}
+
+message ApproveMemberResponse {
+  Room room = 1;
+  RoomMember member = 2;
+}
+
+message SetAdmissionRequest {
+  string room_id = 1;
+  AdmissionMode participant_admission = 2;
+  AdmissionMode spectator_admission = 3;
+  RoomVersion expected_version = 4;
+}
+
+message SetAdmissionResponse {
+  Room room = 1;
+}
+
+message StartGameRequest {
+  string room_id = 1;
+  string session_id = 2;
+  string game_id = 3;
+  uint32 minimum_participants = 4;
+  RoomVersion expected_version = 5;
+}
+
+message FrozenParticipant {
+  string user_id = 1;
+  uint32 seat_index = 2;
+}
+
+message StartGameResponse {
+  Room room = 1;
+  string session_id = 2;
+  string game_id = 3;
+  repeated FrozenParticipant participants = 4;
+}
+
+message FinishGameRequest {
+  string room_id = 1;
+  string session_id = 2;
+  RoomVersion expected_version = 3;
+}
+
+message FinishGameResponse {
+  Room room = 1;
+}
+
+message RemoveMemberRequest {
+  string room_id = 1;
+  string user_id = 2;
+  RoomVersion expected_version = 3;
+}
+
+message RemoveMemberResponse {
+  Room room = 1;
+  RoomMember removed = 2;
+  bool participant_revoked = 3;
+  string active_session_id = 4;
+}
+
+message CloseRoomRequest {
+  string room_id = 1;
+  RoomVersion expected_version = 2;
+}
+
+message CloseRoomResponse {
+  Room room = 1;
+}

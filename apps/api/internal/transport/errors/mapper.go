@@ -21,6 +21,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/ratelimit"
 	"github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
+	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -154,7 +155,8 @@ func classify(err error) descriptor {
 		stderrors.Is(err, admin.ErrInvalidInput), stderrors.Is(err, admin.ErrPasswordPolicy),
 		stderrors.Is(err, secretresult.ErrInvalidInput), stderrors.Is(err, room.ErrInvalidRoomInput),
 		stderrors.Is(err, gameruntime.ErrInvalidSessionInput), stderrors.Is(err, gameruntime.ErrInvalidActionCommit),
-		stderrors.Is(err, gameruntime.ErrInvalidSystemCommit), stderrors.Is(err, redisstore.ErrInvalidCoordinationInput):
+		stderrors.Is(err, gameruntime.ErrInvalidSystemCommit), stderrors.Is(err, gameSDK.ErrInvalidContract),
+		stderrors.Is(err, redisstore.ErrInvalidCoordinationInput):
 		return descriptor{connectCode: connect.CodeInvalidArgument, messageKey: "request.invalid"}
 	case stderrors.Is(err, profile.ErrProfileExportClosed), stderrors.Is(err, profile.ErrProfileExportExpired),
 		stderrors.Is(err, admin.ErrUnavailable):

@@ -414,6 +414,9 @@ type State struct {
 	ActionDeadlineUnixMillis int64                  `protobuf:"varint,10,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
 	PrivateDice              []*PrivateDice         `protobuf:"bytes,11,rep,name=private_dice,json=privateDice,proto3" json:"private_dice,omitempty"`
 	Config                   *Config                `protobuf:"bytes,12,opt,name=config,proto3" json:"config,omitempty"`
+	LastRevealedDice         []*PrivateDice         `protobuf:"bytes,13,rep,name=last_revealed_dice,json=lastRevealedDice,proto3" json:"last_revealed_dice,omitempty"`
+	LastSettlement           *RoundSettled          `protobuf:"bytes,14,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	FinishReason             string                 `protobuf:"bytes,15,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -530,6 +533,27 @@ func (x *State) GetConfig() *Config {
 		return x.Config
 	}
 	return nil
+}
+
+func (x *State) GetLastRevealedDice() []*PrivateDice {
+	if x != nil {
+		return x.LastRevealedDice
+	}
+	return nil
+}
+
+func (x *State) GetLastSettlement() *RoundSettled {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
+func (x *State) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
 }
 
 type PlaceBid struct {
@@ -798,6 +822,58 @@ func (x *BidPlaced) GetBid() *Bid {
 	return nil
 }
 
+type RoundStarted struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Round            uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	FirstActorUserId string                 `protobuf:"bytes,2,opt,name=first_actor_user_id,json=firstActorUserId,proto3" json:"first_actor_user_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *RoundStarted) Reset() {
+	*x = RoundStarted{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoundStarted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoundStarted) ProtoMessage() {}
+
+func (x *RoundStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoundStarted.ProtoReflect.Descriptor instead.
+func (*RoundStarted) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RoundStarted) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *RoundStarted) GetFirstActorUserId() string {
+	if x != nil {
+		return x.FirstActorUserId
+	}
+	return ""
+}
+
 type DiceRevealed struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Dice          []*PrivateDice         `protobuf:"bytes,1,rep,name=dice,proto3" json:"dice,omitempty"`
@@ -807,7 +883,7 @@ type DiceRevealed struct {
 
 func (x *DiceRevealed) Reset() {
 	*x = DiceRevealed{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[10]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -819,7 +895,7 @@ func (x *DiceRevealed) String() string {
 func (*DiceRevealed) ProtoMessage() {}
 
 func (x *DiceRevealed) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[10]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -832,7 +908,7 @@ func (x *DiceRevealed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiceRevealed.ProtoReflect.Descriptor instead.
 func (*DiceRevealed) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{10}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DiceRevealed) GetDice() []*PrivateDice {
@@ -843,17 +919,21 @@ func (x *DiceRevealed) GetDice() []*PrivateDice {
 }
 
 type RoundSettled struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LoserUserId   string                 `protobuf:"bytes,1,opt,name=loser_user_id,json=loserUserId,proto3" json:"loser_user_id,omitempty"`
-	PenaltyTicks  uint32                 `protobuf:"varint,2,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
-	NextRound     uint32                 `protobuf:"varint,3,opt,name=next_round,json=nextRound,proto3" json:"next_round,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	LoserUserId    string                 `protobuf:"bytes,1,opt,name=loser_user_id,json=loserUserId,proto3" json:"loser_user_id,omitempty"`
+	PenaltyTicks   uint32                 `protobuf:"varint,2,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	NextRound      uint32                 `protobuf:"varint,3,opt,name=next_round,json=nextRound,proto3" json:"next_round,omitempty"`
+	ActualQuantity uint32                 `protobuf:"varint,4,opt,name=actual_quantity,json=actualQuantity,proto3" json:"actual_quantity,omitempty"`
+	Reason         string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	OpenerUserId   string                 `protobuf:"bytes,6,opt,name=opener_user_id,json=openerUserId,proto3" json:"opener_user_id,omitempty"`
+	Bid            *Bid                   `protobuf:"bytes,7,opt,name=bid,proto3" json:"bid,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RoundSettled) Reset() {
 	*x = RoundSettled{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[11]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -865,7 +945,7 @@ func (x *RoundSettled) String() string {
 func (*RoundSettled) ProtoMessage() {}
 
 func (x *RoundSettled) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[11]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -878,7 +958,7 @@ func (x *RoundSettled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundSettled.ProtoReflect.Descriptor instead.
 func (*RoundSettled) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{11}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RoundSettled) GetLoserUserId() string {
@@ -902,6 +982,34 @@ func (x *RoundSettled) GetNextRound() uint32 {
 	return 0
 }
 
+func (x *RoundSettled) GetActualQuantity() uint32 {
+	if x != nil {
+		return x.ActualQuantity
+	}
+	return 0
+}
+
+func (x *RoundSettled) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RoundSettled) GetOpenerUserId() string {
+	if x != nil {
+		return x.OpenerUserId
+	}
+	return ""
+}
+
+func (x *RoundSettled) GetBid() *Bid {
+	if x != nil {
+		return x.Bid
+	}
+	return nil
+}
+
 type ParticipantRevoked struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -911,7 +1019,7 @@ type ParticipantRevoked struct {
 
 func (x *ParticipantRevoked) Reset() {
 	*x = ParticipantRevoked{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[12]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +1031,7 @@ func (x *ParticipantRevoked) String() string {
 func (*ParticipantRevoked) ProtoMessage() {}
 
 func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[12]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1044,7 @@ func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantRevoked.ProtoReflect.Descriptor instead.
 func (*ParticipantRevoked) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{12}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ParticipantRevoked) GetUserId() string {
@@ -955,7 +1063,7 @@ type SessionFinished struct {
 
 func (x *SessionFinished) Reset() {
 	*x = SessionFinished{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[13]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1075,7 @@ func (x *SessionFinished) String() string {
 func (*SessionFinished) ProtoMessage() {}
 
 func (x *SessionFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[13]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1088,7 @@ func (x *SessionFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFinished.ProtoReflect.Descriptor instead.
 func (*SessionFinished) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{13}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SessionFinished) GetReason() string {
@@ -999,6 +1107,7 @@ type Event struct {
 	//	*Event_RoundSettled
 	//	*Event_ParticipantRevoked
 	//	*Event_SessionFinished
+	//	*Event_RoundStarted
 	Event         isEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1006,7 +1115,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[14]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1127,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[14]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1140,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{14}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Event) GetEvent() isEvent_Event {
@@ -1086,6 +1195,15 @@ func (x *Event) GetSessionFinished() *SessionFinished {
 	return nil
 }
 
+func (x *Event) GetRoundStarted() *RoundStarted {
+	if x != nil {
+		if x, ok := x.Event.(*Event_RoundStarted); ok {
+			return x.RoundStarted
+		}
+	}
+	return nil
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -1110,6 +1228,10 @@ type Event_SessionFinished struct {
 	SessionFinished *SessionFinished `protobuf:"bytes,5,opt,name=session_finished,json=sessionFinished,proto3,oneof"`
 }
 
+type Event_RoundStarted struct {
+	RoundStarted *RoundStarted `protobuf:"bytes,6,opt,name=round_started,json=roundStarted,proto3,oneof"`
+}
+
 func (*Event_BidPlaced) isEvent_Event() {}
 
 func (*Event_DiceRevealed) isEvent_Event() {}
@@ -1119,6 +1241,69 @@ func (*Event_RoundSettled) isEvent_Event() {}
 func (*Event_ParticipantRevoked) isEvent_Event() {}
 
 func (*Event_SessionFinished) isEvent_Event() {}
+
+func (*Event_RoundStarted) isEvent_Event() {}
+
+// ActionTimer binds one persisted timeout to the exact round, actor, and deadline it may settle.
+type ActionTimer struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Round              uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	UserId             string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DeadlineUnixMillis int64                  `protobuf:"varint,3,opt,name=deadline_unix_millis,json=deadlineUnixMillis,proto3" json:"deadline_unix_millis,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ActionTimer) Reset() {
+	*x = ActionTimer{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionTimer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionTimer) ProtoMessage() {}
+
+func (x *ActionTimer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionTimer.ProtoReflect.Descriptor instead.
+func (*ActionTimer) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ActionTimer) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ActionTimer) GetDeadlineUnixMillis() int64 {
+	if x != nil {
+		return x.DeadlineUnixMillis
+	}
+	return 0
+}
 
 type PublicPlayer struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -1133,7 +1318,7 @@ type PublicPlayer struct {
 
 func (x *PublicPlayer) Reset() {
 	*x = PublicPlayer{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[15]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1145,7 +1330,7 @@ func (x *PublicPlayer) String() string {
 func (*PublicPlayer) ProtoMessage() {}
 
 func (x *PublicPlayer) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[15]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1158,7 +1343,7 @@ func (x *PublicPlayer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicPlayer.ProtoReflect.Descriptor instead.
 func (*PublicPlayer) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{15}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PublicPlayer) GetUserId() string {
@@ -1209,13 +1394,14 @@ type View struct {
 	AllowedActions           []string               `protobuf:"bytes,9,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
 	RevealedDice             []*PrivateDice         `protobuf:"bytes,10,rep,name=revealed_dice,json=revealedDice,proto3" json:"revealed_dice,omitempty"`
 	FinishReason             string                 `protobuf:"bytes,11,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	LastSettlement           *RoundSettled          `protobuf:"bytes,12,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
 
 func (x *View) Reset() {
 	*x = View{}
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[16]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1227,7 +1413,7 @@ func (x *View) String() string {
 func (*View) ProtoMessage() {}
 
 func (x *View) ProtoReflect() protoreflect.Message {
-	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[16]
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1240,7 +1426,7 @@ func (x *View) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use View.ProtoReflect.Descriptor instead.
 func (*View) Descriptor() ([]byte, []int) {
-	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{16}
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *View) GetPhase() Phase {
@@ -1320,6 +1506,295 @@ func (x *View) GetFinishReason() string {
 	return ""
 }
 
+func (x *View) GetLastSettlement() *RoundSettled {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
+// ViewDelta is generated from the latest authoritative snapshot for one viewer only.
+type ViewDelta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	View          *View                  `protobuf:"bytes,1,opt,name=view,proto3" json:"view,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ViewDelta) Reset() {
+	*x = ViewDelta{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ViewDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ViewDelta) ProtoMessage() {}
+
+func (x *ViewDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ViewDelta.ProtoReflect.Descriptor instead.
+func (*ViewDelta) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ViewDelta) GetView() *View {
+	if x != nil {
+		return x.View
+	}
+	return nil
+}
+
+type ReplayBid struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Bid           *Bid                   `protobuf:"bytes,2,opt,name=bid,proto3" json:"bid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayBid) Reset() {
+	*x = ReplayBid{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayBid) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayBid) ProtoMessage() {}
+
+func (x *ReplayBid) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayBid.ProtoReflect.Descriptor instead.
+func (*ReplayBid) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ReplayBid) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ReplayBid) GetBid() *Bid {
+	if x != nil {
+		return x.Bid
+	}
+	return nil
+}
+
+// ReplayRound contains only a settled round; dice is empty when rules never revealed that round.
+type ReplayRound struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Round            uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	FirstActorUserId string                 `protobuf:"bytes,2,opt,name=first_actor_user_id,json=firstActorUserId,proto3" json:"first_actor_user_id,omitempty"`
+	Bids             []*ReplayBid           `protobuf:"bytes,3,rep,name=bids,proto3" json:"bids,omitempty"`
+	Dice             []*PrivateDice         `protobuf:"bytes,4,rep,name=dice,proto3" json:"dice,omitempty"`
+	DiceRevealed     bool                   `protobuf:"varint,5,opt,name=dice_revealed,json=diceRevealed,proto3" json:"dice_revealed,omitempty"`
+	LoserUserId      string                 `protobuf:"bytes,6,opt,name=loser_user_id,json=loserUserId,proto3" json:"loser_user_id,omitempty"`
+	PenaltyTicks     uint32                 `protobuf:"varint,7,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	ActualQuantity   uint32                 `protobuf:"varint,8,opt,name=actual_quantity,json=actualQuantity,proto3" json:"actual_quantity,omitempty"`
+	Reason           string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	OpenerUserId     string                 `protobuf:"bytes,10,opt,name=opener_user_id,json=openerUserId,proto3" json:"opener_user_id,omitempty"`
+	Bid              *Bid                   `protobuf:"bytes,11,opt,name=bid,proto3" json:"bid,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ReplayRound) Reset() {
+	*x = ReplayRound{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayRound) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayRound) ProtoMessage() {}
+
+func (x *ReplayRound) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayRound.ProtoReflect.Descriptor instead.
+func (*ReplayRound) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ReplayRound) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *ReplayRound) GetFirstActorUserId() string {
+	if x != nil {
+		return x.FirstActorUserId
+	}
+	return ""
+}
+
+func (x *ReplayRound) GetBids() []*ReplayBid {
+	if x != nil {
+		return x.Bids
+	}
+	return nil
+}
+
+func (x *ReplayRound) GetDice() []*PrivateDice {
+	if x != nil {
+		return x.Dice
+	}
+	return nil
+}
+
+func (x *ReplayRound) GetDiceRevealed() bool {
+	if x != nil {
+		return x.DiceRevealed
+	}
+	return false
+}
+
+func (x *ReplayRound) GetLoserUserId() string {
+	if x != nil {
+		return x.LoserUserId
+	}
+	return ""
+}
+
+func (x *ReplayRound) GetPenaltyTicks() uint32 {
+	if x != nil {
+		return x.PenaltyTicks
+	}
+	return 0
+}
+
+func (x *ReplayRound) GetActualQuantity() uint32 {
+	if x != nil {
+		return x.ActualQuantity
+	}
+	return 0
+}
+
+func (x *ReplayRound) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ReplayRound) GetOpenerUserId() string {
+	if x != nil {
+		return x.OpenerUserId
+	}
+	return ""
+}
+
+func (x *ReplayRound) GetBid() *Bid {
+	if x != nil {
+		return x.Bid
+	}
+	return nil
+}
+
+type Replay struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Rounds         []*ReplayRound         `protobuf:"bytes,1,rep,name=rounds,proto3" json:"rounds,omitempty"`
+	RevokedUserIds []string               `protobuf:"bytes,2,rep,name=revoked_user_ids,json=revokedUserIds,proto3" json:"revoked_user_ids,omitempty"`
+	FinishReason   string                 `protobuf:"bytes,3,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Replay) Reset() {
+	*x = Replay{}
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Replay) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Replay) ProtoMessage() {}
+
+func (x *Replay) ProtoReflect() protoreflect.Message {
+	mi := &file_game_liars_dice_v1_liars_dice_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Replay.ProtoReflect.Descriptor instead.
+func (*Replay) Descriptor() ([]byte, []int) {
+	return file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *Replay) GetRounds() []*ReplayRound {
+	if x != nil {
+		return x.Rounds
+	}
+	return nil
+}
+
+func (x *Replay) GetRevokedUserIds() []string {
+	if x != nil {
+		return x.RevokedUserIds
+	}
+	return nil
+}
+
+func (x *Replay) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
 var File_game_liars_dice_v1_liars_dice_proto protoreflect.FileDescriptor
 
 const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
@@ -1345,7 +1820,7 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\"<\n" +
 	"\vPrivateDice\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
-	"\x05faces\x18\x02 \x03(\rR\x05faces\"\xda\x04\n" +
+	"\x05faces\x18\x02 \x03(\rR\x05faces\"\x99\x06\n" +
 	"\x05State\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x12/\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x19.game.liars_dice.v1.PhaseR\x05phase\x12\x14\n" +
@@ -1360,7 +1835,10 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"\x1baction_deadline_unix_millis\x18\n" +
 	" \x01(\x03R\x18actionDeadlineUnixMillis\x12B\n" +
 	"\fprivate_dice\x18\v \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\vprivateDice\x122\n" +
-	"\x06config\x18\f \x01(\v2\x1a.game.liars_dice.v1.ConfigR\x06config\"5\n" +
+	"\x06config\x18\f \x01(\v2\x1a.game.liars_dice.v1.ConfigR\x06config\x12M\n" +
+	"\x12last_revealed_dice\x18\r \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\x10lastRevealedDice\x12I\n" +
+	"\x0flast_settlement\x18\x0e \x01(\v2 .game.liars_dice.v1.RoundSettledR\x0elastSettlement\x12#\n" +
+	"\rfinish_reason\x18\x0f \x01(\tR\ffinishReason\"5\n" +
 	"\bPlaceBid\x12)\n" +
 	"\x03bid\x18\x01 \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"\n" +
 	"\n" +
@@ -1373,33 +1851,45 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"\acommand\"O\n" +
 	"\tBidPlaced\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12)\n" +
-	"\x03bid\x18\x02 \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"C\n" +
+	"\x03bid\x18\x02 \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"S\n" +
+	"\fRoundStarted\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12-\n" +
+	"\x13first_actor_user_id\x18\x02 \x01(\tR\x10firstActorUserId\"C\n" +
 	"\fDiceRevealed\x123\n" +
-	"\x04dice\x18\x01 \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\x04dice\"v\n" +
+	"\x04dice\x18\x01 \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\x04dice\"\x88\x02\n" +
 	"\fRoundSettled\x12\"\n" +
 	"\rloser_user_id\x18\x01 \x01(\tR\vloserUserId\x12#\n" +
 	"\rpenalty_ticks\x18\x02 \x01(\rR\fpenaltyTicks\x12\x1d\n" +
 	"\n" +
-	"next_round\x18\x03 \x01(\rR\tnextRound\"-\n" +
+	"next_round\x18\x03 \x01(\rR\tnextRound\x12'\n" +
+	"\x0factual_quantity\x18\x04 \x01(\rR\x0eactualQuantity\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12$\n" +
+	"\x0eopener_user_id\x18\x06 \x01(\tR\fopenerUserId\x12)\n" +
+	"\x03bid\x18\a \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"-\n" +
 	"\x12ParticipantRevoked\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\")\n" +
 	"\x0fSessionFinished\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\x8f\x03\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\"\xd8\x03\n" +
 	"\x05Event\x12>\n" +
 	"\n" +
 	"bid_placed\x18\x01 \x01(\v2\x1d.game.liars_dice.v1.BidPlacedH\x00R\tbidPlaced\x12G\n" +
 	"\rdice_revealed\x18\x02 \x01(\v2 .game.liars_dice.v1.DiceRevealedH\x00R\fdiceRevealed\x12G\n" +
 	"\rround_settled\x18\x03 \x01(\v2 .game.liars_dice.v1.RoundSettledH\x00R\froundSettled\x12Y\n" +
 	"\x13participant_revoked\x18\x04 \x01(\v2&.game.liars_dice.v1.ParticipantRevokedH\x00R\x12participantRevoked\x12P\n" +
-	"\x10session_finished\x18\x05 \x01(\v2#.game.liars_dice.v1.SessionFinishedH\x00R\x0fsessionFinishedB\a\n" +
-	"\x05event\"\xad\x01\n" +
+	"\x10session_finished\x18\x05 \x01(\v2#.game.liars_dice.v1.SessionFinishedH\x00R\x0fsessionFinished\x12G\n" +
+	"\rround_started\x18\x06 \x01(\v2 .game.liars_dice.v1.RoundStartedH\x00R\froundStartedB\a\n" +
+	"\x05event\"n\n" +
+	"\vActionTimer\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
+	"\x14deadline_unix_millis\x18\x03 \x01(\x03R\x12deadlineUnixMillis\"\xad\x01\n" +
 	"\fPublicPlayer\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
 	"seat_index\x18\x02 \x01(\rR\tseatIndex\x12\x16\n" +
 	"\x06active\x18\x03 \x01(\bR\x06active\x12#\n" +
 	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\x12(\n" +
-	"\x10has_private_dice\x18\x05 \x01(\bR\x0ehasPrivateDice\"\x8c\x04\n" +
+	"\x10has_private_dice\x18\x05 \x01(\bR\x0ehasPrivateDice\"\xd7\x04\n" +
 	"\x04View\x12/\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x19.game.liars_dice.v1.PhaseR\x05phase\x12\x14\n" +
 	"\x05round\x18\x02 \x01(\rR\x05round\x12:\n" +
@@ -1413,7 +1903,30 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"\x0fallowed_actions\x18\t \x03(\tR\x0eallowedActions\x12D\n" +
 	"\rrevealed_dice\x18\n" +
 	" \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\frevealedDice\x12#\n" +
-	"\rfinish_reason\x18\v \x01(\tR\ffinishReason*\x86\x01\n" +
+	"\rfinish_reason\x18\v \x01(\tR\ffinishReason\x12I\n" +
+	"\x0flast_settlement\x18\f \x01(\v2 .game.liars_dice.v1.RoundSettledR\x0elastSettlement\"9\n" +
+	"\tViewDelta\x12,\n" +
+	"\x04view\x18\x01 \x01(\v2\x18.game.liars_dice.v1.ViewR\x04view\"O\n" +
+	"\tReplayBid\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12)\n" +
+	"\x03bid\x18\x02 \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"\xba\x03\n" +
+	"\vReplayRound\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12-\n" +
+	"\x13first_actor_user_id\x18\x02 \x01(\tR\x10firstActorUserId\x121\n" +
+	"\x04bids\x18\x03 \x03(\v2\x1d.game.liars_dice.v1.ReplayBidR\x04bids\x123\n" +
+	"\x04dice\x18\x04 \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\x04dice\x12#\n" +
+	"\rdice_revealed\x18\x05 \x01(\bR\fdiceRevealed\x12\"\n" +
+	"\rloser_user_id\x18\x06 \x01(\tR\vloserUserId\x12#\n" +
+	"\rpenalty_ticks\x18\a \x01(\rR\fpenaltyTicks\x12'\n" +
+	"\x0factual_quantity\x18\b \x01(\rR\x0eactualQuantity\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x12$\n" +
+	"\x0eopener_user_id\x18\n" +
+	" \x01(\tR\fopenerUserId\x12)\n" +
+	"\x03bid\x18\v \x01(\v2\x17.game.liars_dice.v1.BidR\x03bid\"\x90\x01\n" +
+	"\x06Replay\x127\n" +
+	"\x06rounds\x18\x01 \x03(\v2\x1f.game.liars_dice.v1.ReplayRoundR\x06rounds\x12(\n" +
+	"\x10revoked_user_ids\x18\x02 \x03(\tR\x0erevokedUserIds\x12#\n" +
+	"\rfinish_reason\x18\x03 \x01(\tR\ffinishReason*\x86\x01\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rPHASE_ROLLING\x10\x01\x12\x11\n" +
@@ -1439,7 +1952,7 @@ func file_game_liars_dice_v1_liars_dice_proto_rawDescGZIP() []byte {
 }
 
 var file_game_liars_dice_v1_liars_dice_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_game_liars_dice_v1_liars_dice_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_game_liars_dice_v1_liars_dice_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_game_liars_dice_v1_liars_dice_proto_goTypes = []any{
 	(Phase)(0),                 // 0: game.liars_dice.v1.Phase
 	(BidMode)(0),               // 1: game.liars_dice.v1.BidMode
@@ -1453,13 +1966,19 @@ var file_game_liars_dice_v1_liars_dice_proto_goTypes = []any{
 	(*Finish)(nil),             // 9: game.liars_dice.v1.Finish
 	(*Command)(nil),            // 10: game.liars_dice.v1.Command
 	(*BidPlaced)(nil),          // 11: game.liars_dice.v1.BidPlaced
-	(*DiceRevealed)(nil),       // 12: game.liars_dice.v1.DiceRevealed
-	(*RoundSettled)(nil),       // 13: game.liars_dice.v1.RoundSettled
-	(*ParticipantRevoked)(nil), // 14: game.liars_dice.v1.ParticipantRevoked
-	(*SessionFinished)(nil),    // 15: game.liars_dice.v1.SessionFinished
-	(*Event)(nil),              // 16: game.liars_dice.v1.Event
-	(*PublicPlayer)(nil),       // 17: game.liars_dice.v1.PublicPlayer
-	(*View)(nil),               // 18: game.liars_dice.v1.View
+	(*RoundStarted)(nil),       // 12: game.liars_dice.v1.RoundStarted
+	(*DiceRevealed)(nil),       // 13: game.liars_dice.v1.DiceRevealed
+	(*RoundSettled)(nil),       // 14: game.liars_dice.v1.RoundSettled
+	(*ParticipantRevoked)(nil), // 15: game.liars_dice.v1.ParticipantRevoked
+	(*SessionFinished)(nil),    // 16: game.liars_dice.v1.SessionFinished
+	(*Event)(nil),              // 17: game.liars_dice.v1.Event
+	(*ActionTimer)(nil),        // 18: game.liars_dice.v1.ActionTimer
+	(*PublicPlayer)(nil),       // 19: game.liars_dice.v1.PublicPlayer
+	(*View)(nil),               // 20: game.liars_dice.v1.View
+	(*ViewDelta)(nil),          // 21: game.liars_dice.v1.ViewDelta
+	(*ReplayBid)(nil),          // 22: game.liars_dice.v1.ReplayBid
+	(*ReplayRound)(nil),        // 23: game.liars_dice.v1.ReplayRound
+	(*Replay)(nil),             // 24: game.liars_dice.v1.Replay
 }
 var file_game_liars_dice_v1_liars_dice_proto_depIdxs = []int32{
 	1,  // 0: game.liars_dice.v1.Bid.mode:type_name -> game.liars_dice.v1.BidMode
@@ -1468,26 +1987,37 @@ var file_game_liars_dice_v1_liars_dice_proto_depIdxs = []int32{
 	3,  // 3: game.liars_dice.v1.State.current_bid:type_name -> game.liars_dice.v1.Bid
 	5,  // 4: game.liars_dice.v1.State.private_dice:type_name -> game.liars_dice.v1.PrivateDice
 	2,  // 5: game.liars_dice.v1.State.config:type_name -> game.liars_dice.v1.Config
-	3,  // 6: game.liars_dice.v1.PlaceBid.bid:type_name -> game.liars_dice.v1.Bid
-	7,  // 7: game.liars_dice.v1.Command.place_bid:type_name -> game.liars_dice.v1.PlaceBid
-	8,  // 8: game.liars_dice.v1.Command.open_dice:type_name -> game.liars_dice.v1.OpenDice
-	9,  // 9: game.liars_dice.v1.Command.finish:type_name -> game.liars_dice.v1.Finish
-	3,  // 10: game.liars_dice.v1.BidPlaced.bid:type_name -> game.liars_dice.v1.Bid
-	5,  // 11: game.liars_dice.v1.DiceRevealed.dice:type_name -> game.liars_dice.v1.PrivateDice
-	11, // 12: game.liars_dice.v1.Event.bid_placed:type_name -> game.liars_dice.v1.BidPlaced
-	12, // 13: game.liars_dice.v1.Event.dice_revealed:type_name -> game.liars_dice.v1.DiceRevealed
-	13, // 14: game.liars_dice.v1.Event.round_settled:type_name -> game.liars_dice.v1.RoundSettled
-	14, // 15: game.liars_dice.v1.Event.participant_revoked:type_name -> game.liars_dice.v1.ParticipantRevoked
-	15, // 16: game.liars_dice.v1.Event.session_finished:type_name -> game.liars_dice.v1.SessionFinished
-	0,  // 17: game.liars_dice.v1.View.phase:type_name -> game.liars_dice.v1.Phase
-	17, // 18: game.liars_dice.v1.View.players:type_name -> game.liars_dice.v1.PublicPlayer
-	3,  // 19: game.liars_dice.v1.View.current_bid:type_name -> game.liars_dice.v1.Bid
-	5,  // 20: game.liars_dice.v1.View.revealed_dice:type_name -> game.liars_dice.v1.PrivateDice
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	5,  // 6: game.liars_dice.v1.State.last_revealed_dice:type_name -> game.liars_dice.v1.PrivateDice
+	14, // 7: game.liars_dice.v1.State.last_settlement:type_name -> game.liars_dice.v1.RoundSettled
+	3,  // 8: game.liars_dice.v1.PlaceBid.bid:type_name -> game.liars_dice.v1.Bid
+	7,  // 9: game.liars_dice.v1.Command.place_bid:type_name -> game.liars_dice.v1.PlaceBid
+	8,  // 10: game.liars_dice.v1.Command.open_dice:type_name -> game.liars_dice.v1.OpenDice
+	9,  // 11: game.liars_dice.v1.Command.finish:type_name -> game.liars_dice.v1.Finish
+	3,  // 12: game.liars_dice.v1.BidPlaced.bid:type_name -> game.liars_dice.v1.Bid
+	5,  // 13: game.liars_dice.v1.DiceRevealed.dice:type_name -> game.liars_dice.v1.PrivateDice
+	3,  // 14: game.liars_dice.v1.RoundSettled.bid:type_name -> game.liars_dice.v1.Bid
+	11, // 15: game.liars_dice.v1.Event.bid_placed:type_name -> game.liars_dice.v1.BidPlaced
+	13, // 16: game.liars_dice.v1.Event.dice_revealed:type_name -> game.liars_dice.v1.DiceRevealed
+	14, // 17: game.liars_dice.v1.Event.round_settled:type_name -> game.liars_dice.v1.RoundSettled
+	15, // 18: game.liars_dice.v1.Event.participant_revoked:type_name -> game.liars_dice.v1.ParticipantRevoked
+	16, // 19: game.liars_dice.v1.Event.session_finished:type_name -> game.liars_dice.v1.SessionFinished
+	12, // 20: game.liars_dice.v1.Event.round_started:type_name -> game.liars_dice.v1.RoundStarted
+	0,  // 21: game.liars_dice.v1.View.phase:type_name -> game.liars_dice.v1.Phase
+	19, // 22: game.liars_dice.v1.View.players:type_name -> game.liars_dice.v1.PublicPlayer
+	3,  // 23: game.liars_dice.v1.View.current_bid:type_name -> game.liars_dice.v1.Bid
+	5,  // 24: game.liars_dice.v1.View.revealed_dice:type_name -> game.liars_dice.v1.PrivateDice
+	14, // 25: game.liars_dice.v1.View.last_settlement:type_name -> game.liars_dice.v1.RoundSettled
+	20, // 26: game.liars_dice.v1.ViewDelta.view:type_name -> game.liars_dice.v1.View
+	3,  // 27: game.liars_dice.v1.ReplayBid.bid:type_name -> game.liars_dice.v1.Bid
+	22, // 28: game.liars_dice.v1.ReplayRound.bids:type_name -> game.liars_dice.v1.ReplayBid
+	5,  // 29: game.liars_dice.v1.ReplayRound.dice:type_name -> game.liars_dice.v1.PrivateDice
+	3,  // 30: game.liars_dice.v1.ReplayRound.bid:type_name -> game.liars_dice.v1.Bid
+	23, // 31: game.liars_dice.v1.Replay.rounds:type_name -> game.liars_dice.v1.ReplayRound
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_game_liars_dice_v1_liars_dice_proto_init() }
@@ -1500,12 +2030,13 @@ func file_game_liars_dice_v1_liars_dice_proto_init() {
 		(*Command_OpenDice)(nil),
 		(*Command_Finish)(nil),
 	}
-	file_game_liars_dice_v1_liars_dice_proto_msgTypes[14].OneofWrappers = []any{
+	file_game_liars_dice_v1_liars_dice_proto_msgTypes[15].OneofWrappers = []any{
 		(*Event_BidPlaced)(nil),
 		(*Event_DiceRevealed)(nil),
 		(*Event_RoundSettled)(nil),
 		(*Event_ParticipantRevoked)(nil),
 		(*Event_SessionFinished)(nil),
+		(*Event_RoundStarted)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1513,7 +2044,7 @@ func file_game_liars_dice_v1_liars_dice_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_game_liars_dice_v1_liars_dice_proto_rawDesc), len(file_game_liars_dice_v1_liars_dice_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   17,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

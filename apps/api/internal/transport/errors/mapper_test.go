@@ -12,6 +12,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/identifier"
 	"github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/room"
+	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
 func TestMapReturnsStableBusinessDetails(t *testing.T) {
@@ -31,6 +32,7 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 		{name: "game state version", err: gameruntime.ErrStateVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_STATE_VERSION_CONFLICT, wantKey: "game.state.version_conflict"},
 		{name: "game participant", err: gameruntime.ErrParticipantNotActive, wantConnect: connect.CodePermissionDenied, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PARTICIPANT_NOT_ACTIVE, wantKey: "game.participant.not_active"},
 		{name: "game replay", err: gameruntime.ErrReplayUnavailable, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, wantKey: "game.replay.unavailable"},
+		{name: "game rule", err: gameSDK.ErrInvalidContract, wantConnect: connect.CodeInvalidArgument, wantKey: "request.invalid"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

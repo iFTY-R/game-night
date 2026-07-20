@@ -11,6 +11,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	roomdomain "github.com/iFTY-R/game-night/platform/room"
+	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
 type errorDescriptor struct {
@@ -75,7 +76,8 @@ func classifyError(err error) errorDescriptor {
 		return errorDescriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.version.conflict"}
 	case errors.Is(err, roomdomain.ErrHostRequired):
 		return errorDescriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED, "room.host.required"}
-	case errors.Is(err, gameruntime.ErrInvalidSessionInput), errors.Is(err, redisstore.ErrInvalidCoordinationInput):
+	case errors.Is(err, gameruntime.ErrInvalidSessionInput), errors.Is(err, game.ErrInvalidContract),
+		errors.Is(err, redisstore.ErrInvalidCoordinationInput):
 		return errorDescriptor{connect.CodeInvalidArgument, 0, "request.invalid"}
 	case errors.Is(err, gameruntime.ErrGameSessionRepositoryUnavailable), errors.Is(err, redisstore.ErrCoordinationUnavailable):
 		return errorDescriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}

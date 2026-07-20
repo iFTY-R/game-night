@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file game/liars_dice/v1/liars_dice.proto.
  */
 export const file_game_liars_dice_v1_liars_dice: GenFile = /*@__PURE__*/
-  fileDesc("CiNnYW1lL2xpYXJzX2RpY2UvdjEvbGlhcnNfZGljZS5wcm90bxISZ2FtZS5saWFyc19kaWNlLnYxIrYBCgZDb25maWcSFwoPZGljZV9wZXJfcGxheWVyGAEgASgNEhEKCW9uZXNfd2lsZBgCIAEoCBIWCg5zdHJpY3RfZW5hYmxlZBgDIAEoCBIWCg5mbHlpbmdfZW5hYmxlZBgEIAEoCBIZChFmaXJzdF9iaWRfbWluaW11bRgFIAEoDRIVCg1wZW5hbHR5X3RpY2tzGAYgASgNEh4KFmFjdGlvbl90aW1lb3V0X3NlY29uZHMYByABKA0iUAoDQmlkEhAKCHF1YW50aXR5GAEgASgNEgwKBGZhY2UYAiABKA0SKQoEbW9kZRgDIAEoDjIbLmdhbWUubGlhcnNfZGljZS52MS5CaWRNb2RlIlkKC1BsYXllclN0YXRlEg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDRIOCgZhY3RpdmUYAyABKAgSFQoNcGVuYWx0eV90aWNrcxgEIAEoDSItCgtQcml2YXRlRGljZRIPCgd1c2VyX2lkGAEgASgJEg0KBWZhY2VzGAIgAygNIrIDCgVTdGF0ZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIoCgVwaGFzZRgCIAEoDjIZLmdhbWUubGlhcnNfZGljZS52MS5QaGFzZRINCgVyb3VuZBgDIAEoDRIwCgdwbGF5ZXJzGAQgAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlBsYXllclN0YXRlEhsKE2ZpcnN0X2FjdG9yX3VzZXJfaWQYBSABKAkSHQoVY3VycmVudF9hY3Rvcl91c2VyX2lkGAYgASgJEhsKE2xhc3RfYmlkZGVyX3VzZXJfaWQYByABKAkSLAoLY3VycmVudF9iaWQYCCABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkEhcKD2hhc19jdXJyZW50X2JpZBgJIAEoCBIjChthY3Rpb25fZGVhZGxpbmVfdW5peF9taWxsaXMYCiABKAMSNQoMcHJpdmF0ZV9kaWNlGAsgAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlByaXZhdGVEaWNlEioKBmNvbmZpZxgMIAEoCzIaLmdhbWUubGlhcnNfZGljZS52MS5Db25maWciMAoIUGxhY2VCaWQSJAoDYmlkGAEgASgLMhcuZ2FtZS5saWFyc19kaWNlLnYxLkJpZCIKCghPcGVuRGljZSIICgZGaW5pc2giqAEKB0NvbW1hbmQSMQoJcGxhY2VfYmlkGAEgASgLMhwuZ2FtZS5saWFyc19kaWNlLnYxLlBsYWNlQmlkSAASMQoJb3Blbl9kaWNlGAIgASgLMhwuZ2FtZS5saWFyc19kaWNlLnYxLk9wZW5EaWNlSAASLAoGZmluaXNoGAMgASgLMhouZ2FtZS5saWFyc19kaWNlLnYxLkZpbmlzaEgAQgkKB2NvbW1hbmQiQgoJQmlkUGxhY2VkEg8KB3VzZXJfaWQYASABKAkSJAoDYmlkGAIgASgLMhcuZ2FtZS5saWFyc19kaWNlLnYxLkJpZCI9CgxEaWNlUmV2ZWFsZWQSLQoEZGljZRgBIAMoCzIfLmdhbWUubGlhcnNfZGljZS52MS5Qcml2YXRlRGljZSJQCgxSb3VuZFNldHRsZWQSFQoNbG9zZXJfdXNlcl9pZBgBIAEoCRIVCg1wZW5hbHR5X3RpY2tzGAIgASgNEhIKCm5leHRfcm91bmQYAyABKA0iJQoSUGFydGljaXBhbnRSZXZva2VkEg8KB3VzZXJfaWQYASABKAkiIQoPU2Vzc2lvbkZpbmlzaGVkEg4KBnJlYXNvbhgBIAEoCSLDAgoFRXZlbnQSMwoKYmlkX3BsYWNlZBgBIAEoCzIdLmdhbWUubGlhcnNfZGljZS52MS5CaWRQbGFjZWRIABI5Cg1kaWNlX3JldmVhbGVkGAIgASgLMiAuZ2FtZS5saWFyc19kaWNlLnYxLkRpY2VSZXZlYWxlZEgAEjkKDXJvdW5kX3NldHRsZWQYAyABKAsyIC5nYW1lLmxpYXJzX2RpY2UudjEuUm91bmRTZXR0bGVkSAASRQoTcGFydGljaXBhbnRfcmV2b2tlZBgEIAEoCzImLmdhbWUubGlhcnNfZGljZS52MS5QYXJ0aWNpcGFudFJldm9rZWRIABI/ChBzZXNzaW9uX2ZpbmlzaGVkGAUgASgLMiMuZ2FtZS5saWFyc19kaWNlLnYxLlNlc3Npb25GaW5pc2hlZEgAQgcKBWV2ZW50InQKDFB1YmxpY1BsYXllchIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0SDgoGYWN0aXZlGAMgASgIEhUKDXBlbmFsdHlfdGlja3MYBCABKA0SGAoQaGFzX3ByaXZhdGVfZGljZRgFIAEoCCL3AgoEVmlldxIoCgVwaGFzZRgBIAEoDjIZLmdhbWUubGlhcnNfZGljZS52MS5QaGFzZRINCgVyb3VuZBgCIAEoDRIxCgdwbGF5ZXJzGAMgAygLMiAuZ2FtZS5saWFyc19kaWNlLnYxLlB1YmxpY1BsYXllchIQCghvd25fZGljZRgEIAMoDRIsCgtjdXJyZW50X2JpZBgFIAEoCzIXLmdhbWUubGlhcnNfZGljZS52MS5CaWQSFwoPaGFzX2N1cnJlbnRfYmlkGAYgASgIEh0KFWN1cnJlbnRfYWN0b3JfdXNlcl9pZBgHIAEoCRIjChthY3Rpb25fZGVhZGxpbmVfdW5peF9taWxsaXMYCCABKAMSFwoPYWxsb3dlZF9hY3Rpb25zGAkgAygJEjYKDXJldmVhbGVkX2RpY2UYCiADKAsyHy5nYW1lLmxpYXJzX2RpY2UudjEuUHJpdmF0ZURpY2USFQoNZmluaXNoX3JlYXNvbhgLIAEoCSqGAQoFUGhhc2USFQoRUEhBU0VfVU5TUEVDSUZJRUQQABIRCg1QSEFTRV9ST0xMSU5HEAESEQoNUEhBU0VfQklERElORxACEhMKD1BIQVNFX1JFVkVBTElORxADEhcKE1BIQVNFX1JPVU5EX1NFVFRMRUQQBBISCg5QSEFTRV9GSU5JU0hFRBAFKk0KB0JpZE1vZGUSGAoUQklEX01PREVfVU5TUEVDSUZJRUQQABITCg9CSURfTU9ERV9GTFlJTkcQARITCg9CSURfTU9ERV9TVFJJQ1QQAkJVWlNnaXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2dhbWVzL2xpYXJzLWRpY2UvZ2VuL2dvL2dhbWUvbGlhcnNfZGljZS92MTtsaWFyc2RpY2V2MWIGcHJvdG8z");
+  fileDesc("CiNnYW1lL2xpYXJzX2RpY2UvdjEvbGlhcnNfZGljZS5wcm90bxISZ2FtZS5saWFyc19kaWNlLnYxIrYBCgZDb25maWcSFwoPZGljZV9wZXJfcGxheWVyGAEgASgNEhEKCW9uZXNfd2lsZBgCIAEoCBIWCg5zdHJpY3RfZW5hYmxlZBgDIAEoCBIWCg5mbHlpbmdfZW5hYmxlZBgEIAEoCBIZChFmaXJzdF9iaWRfbWluaW11bRgFIAEoDRIVCg1wZW5hbHR5X3RpY2tzGAYgASgNEh4KFmFjdGlvbl90aW1lb3V0X3NlY29uZHMYByABKA0iUAoDQmlkEhAKCHF1YW50aXR5GAEgASgNEgwKBGZhY2UYAiABKA0SKQoEbW9kZRgDIAEoDjIbLmdhbWUubGlhcnNfZGljZS52MS5CaWRNb2RlIlkKC1BsYXllclN0YXRlEg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDRIOCgZhY3RpdmUYAyABKAgSFQoNcGVuYWx0eV90aWNrcxgEIAEoDSItCgtQcml2YXRlRGljZRIPCgd1c2VyX2lkGAEgASgJEg0KBWZhY2VzGAIgAygNIsEECgVTdGF0ZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIoCgVwaGFzZRgCIAEoDjIZLmdhbWUubGlhcnNfZGljZS52MS5QaGFzZRINCgVyb3VuZBgDIAEoDRIwCgdwbGF5ZXJzGAQgAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlBsYXllclN0YXRlEhsKE2ZpcnN0X2FjdG9yX3VzZXJfaWQYBSABKAkSHQoVY3VycmVudF9hY3Rvcl91c2VyX2lkGAYgASgJEhsKE2xhc3RfYmlkZGVyX3VzZXJfaWQYByABKAkSLAoLY3VycmVudF9iaWQYCCABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkEhcKD2hhc19jdXJyZW50X2JpZBgJIAEoCBIjChthY3Rpb25fZGVhZGxpbmVfdW5peF9taWxsaXMYCiABKAMSNQoMcHJpdmF0ZV9kaWNlGAsgAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlByaXZhdGVEaWNlEioKBmNvbmZpZxgMIAEoCzIaLmdhbWUubGlhcnNfZGljZS52MS5Db25maWcSOwoSbGFzdF9yZXZlYWxlZF9kaWNlGA0gAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlByaXZhdGVEaWNlEjkKD2xhc3Rfc2V0dGxlbWVudBgOIAEoCzIgLmdhbWUubGlhcnNfZGljZS52MS5Sb3VuZFNldHRsZWQSFQoNZmluaXNoX3JlYXNvbhgPIAEoCSIwCghQbGFjZUJpZBIkCgNiaWQYASABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkIgoKCE9wZW5EaWNlIggKBkZpbmlzaCKoAQoHQ29tbWFuZBIxCglwbGFjZV9iaWQYASABKAsyHC5nYW1lLmxpYXJzX2RpY2UudjEuUGxhY2VCaWRIABIxCglvcGVuX2RpY2UYAiABKAsyHC5nYW1lLmxpYXJzX2RpY2UudjEuT3BlbkRpY2VIABIsCgZmaW5pc2gYAyABKAsyGi5nYW1lLmxpYXJzX2RpY2UudjEuRmluaXNoSABCCQoHY29tbWFuZCJCCglCaWRQbGFjZWQSDwoHdXNlcl9pZBgBIAEoCRIkCgNiaWQYAiABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkIjoKDFJvdW5kU3RhcnRlZBINCgVyb3VuZBgBIAEoDRIbChNmaXJzdF9hY3Rvcl91c2VyX2lkGAIgASgJIj0KDERpY2VSZXZlYWxlZBItCgRkaWNlGAEgAygLMh8uZ2FtZS5saWFyc19kaWNlLnYxLlByaXZhdGVEaWNlIrcBCgxSb3VuZFNldHRsZWQSFQoNbG9zZXJfdXNlcl9pZBgBIAEoCRIVCg1wZW5hbHR5X3RpY2tzGAIgASgNEhIKCm5leHRfcm91bmQYAyABKA0SFwoPYWN0dWFsX3F1YW50aXR5GAQgASgNEg4KBnJlYXNvbhgFIAEoCRIWCg5vcGVuZXJfdXNlcl9pZBgGIAEoCRIkCgNiaWQYByABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkIiUKElBhcnRpY2lwYW50UmV2b2tlZBIPCgd1c2VyX2lkGAEgASgJIiEKD1Nlc3Npb25GaW5pc2hlZBIOCgZyZWFzb24YASABKAki/gIKBUV2ZW50EjMKCmJpZF9wbGFjZWQYASABKAsyHS5nYW1lLmxpYXJzX2RpY2UudjEuQmlkUGxhY2VkSAASOQoNZGljZV9yZXZlYWxlZBgCIAEoCzIgLmdhbWUubGlhcnNfZGljZS52MS5EaWNlUmV2ZWFsZWRIABI5Cg1yb3VuZF9zZXR0bGVkGAMgASgLMiAuZ2FtZS5saWFyc19kaWNlLnYxLlJvdW5kU2V0dGxlZEgAEkUKE3BhcnRpY2lwYW50X3Jldm9rZWQYBCABKAsyJi5nYW1lLmxpYXJzX2RpY2UudjEuUGFydGljaXBhbnRSZXZva2VkSAASPwoQc2Vzc2lvbl9maW5pc2hlZBgFIAEoCzIjLmdhbWUubGlhcnNfZGljZS52MS5TZXNzaW9uRmluaXNoZWRIABI5Cg1yb3VuZF9zdGFydGVkGAYgASgLMiAuZ2FtZS5saWFyc19kaWNlLnYxLlJvdW5kU3RhcnRlZEgAQgcKBWV2ZW50IksKC0FjdGlvblRpbWVyEg0KBXJvdW5kGAEgASgNEg8KB3VzZXJfaWQYAiABKAkSHAoUZGVhZGxpbmVfdW5peF9taWxsaXMYAyABKAMidAoMUHVibGljUGxheWVyEg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDRIOCgZhY3RpdmUYAyABKAgSFQoNcGVuYWx0eV90aWNrcxgEIAEoDRIYChBoYXNfcHJpdmF0ZV9kaWNlGAUgASgIIrIDCgRWaWV3EigKBXBoYXNlGAEgASgOMhkuZ2FtZS5saWFyc19kaWNlLnYxLlBoYXNlEg0KBXJvdW5kGAIgASgNEjEKB3BsYXllcnMYAyADKAsyIC5nYW1lLmxpYXJzX2RpY2UudjEuUHVibGljUGxheWVyEhAKCG93bl9kaWNlGAQgAygNEiwKC2N1cnJlbnRfYmlkGAUgASgLMhcuZ2FtZS5saWFyc19kaWNlLnYxLkJpZBIXCg9oYXNfY3VycmVudF9iaWQYBiABKAgSHQoVY3VycmVudF9hY3Rvcl91c2VyX2lkGAcgASgJEiMKG2FjdGlvbl9kZWFkbGluZV91bml4X21pbGxpcxgIIAEoAxIXCg9hbGxvd2VkX2FjdGlvbnMYCSADKAkSNgoNcmV2ZWFsZWRfZGljZRgKIAMoCzIfLmdhbWUubGlhcnNfZGljZS52MS5Qcml2YXRlRGljZRIVCg1maW5pc2hfcmVhc29uGAsgASgJEjkKD2xhc3Rfc2V0dGxlbWVudBgMIAEoCzIgLmdhbWUubGlhcnNfZGljZS52MS5Sb3VuZFNldHRsZWQiMwoJVmlld0RlbHRhEiYKBHZpZXcYASABKAsyGC5nYW1lLmxpYXJzX2RpY2UudjEuVmlldyJCCglSZXBsYXlCaWQSDwoHdXNlcl9pZBgBIAEoCRIkCgNiaWQYAiABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkIsECCgtSZXBsYXlSb3VuZBINCgVyb3VuZBgBIAEoDRIbChNmaXJzdF9hY3Rvcl91c2VyX2lkGAIgASgJEisKBGJpZHMYAyADKAsyHS5nYW1lLmxpYXJzX2RpY2UudjEuUmVwbGF5QmlkEi0KBGRpY2UYBCADKAsyHy5nYW1lLmxpYXJzX2RpY2UudjEuUHJpdmF0ZURpY2USFQoNZGljZV9yZXZlYWxlZBgFIAEoCBIVCg1sb3Nlcl91c2VyX2lkGAYgASgJEhUKDXBlbmFsdHlfdGlja3MYByABKA0SFwoPYWN0dWFsX3F1YW50aXR5GAggASgNEg4KBnJlYXNvbhgJIAEoCRIWCg5vcGVuZXJfdXNlcl9pZBgKIAEoCRIkCgNiaWQYCyABKAsyFy5nYW1lLmxpYXJzX2RpY2UudjEuQmlkImoKBlJlcGxheRIvCgZyb3VuZHMYASADKAsyHy5nYW1lLmxpYXJzX2RpY2UudjEuUmVwbGF5Um91bmQSGAoQcmV2b2tlZF91c2VyX2lkcxgCIAMoCRIVCg1maW5pc2hfcmVhc29uGAMgASgJKoYBCgVQaGFzZRIVChFQSEFTRV9VTlNQRUNJRklFRBAAEhEKDVBIQVNFX1JPTExJTkcQARIRCg1QSEFTRV9CSURESU5HEAISEwoPUEhBU0VfUkVWRUFMSU5HEAMSFwoTUEhBU0VfUk9VTkRfU0VUVExFRBAEEhIKDlBIQVNFX0ZJTklTSEVEEAUqTQoHQmlkTW9kZRIYChRCSURfTU9ERV9VTlNQRUNJRklFRBAAEhMKD0JJRF9NT0RFX0ZMWUlORxABEhMKD0JJRF9NT0RFX1NUUklDVBACQlVaU2dpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvZ2FtZXMvbGlhcnMtZGljZS9nZW4vZ28vZ2FtZS9saWFyc19kaWNlL3YxO2xpYXJzZGljZXYxYgZwcm90bzM");
 
 /**
  * @generated from message game.liars_dice.v1.Config
@@ -203,6 +203,21 @@ export type State = Message<"game.liars_dice.v1.State"> & {
    * @generated from field: game.liars_dice.v1.Config config = 12;
    */
   config?: Config;
+
+  /**
+   * @generated from field: repeated game.liars_dice.v1.PrivateDice last_revealed_dice = 13;
+   */
+  lastRevealedDice: PrivateDice[];
+
+  /**
+   * @generated from field: game.liars_dice.v1.RoundSettled last_settlement = 14;
+   */
+  lastSettlement?: RoundSettled;
+
+  /**
+   * @generated from field: string finish_reason = 15;
+   */
+  finishReason: string;
 };
 
 /**
@@ -313,6 +328,28 @@ export const BidPlacedSchema: GenMessage<BidPlaced> = /*@__PURE__*/
   messageDesc(file_game_liars_dice_v1_liars_dice, 9);
 
 /**
+ * @generated from message game.liars_dice.v1.RoundStarted
+ */
+export type RoundStarted = Message<"game.liars_dice.v1.RoundStarted"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string first_actor_user_id = 2;
+   */
+  firstActorUserId: string;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.RoundStarted.
+ * Use `create(RoundStartedSchema)` to create a new message.
+ */
+export const RoundStartedSchema: GenMessage<RoundStarted> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 10);
+
+/**
  * @generated from message game.liars_dice.v1.DiceRevealed
  */
 export type DiceRevealed = Message<"game.liars_dice.v1.DiceRevealed"> & {
@@ -327,7 +364,7 @@ export type DiceRevealed = Message<"game.liars_dice.v1.DiceRevealed"> & {
  * Use `create(DiceRevealedSchema)` to create a new message.
  */
 export const DiceRevealedSchema: GenMessage<DiceRevealed> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 10);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 11);
 
 /**
  * @generated from message game.liars_dice.v1.RoundSettled
@@ -347,6 +384,26 @@ export type RoundSettled = Message<"game.liars_dice.v1.RoundSettled"> & {
    * @generated from field: uint32 next_round = 3;
    */
   nextRound: number;
+
+  /**
+   * @generated from field: uint32 actual_quantity = 4;
+   */
+  actualQuantity: number;
+
+  /**
+   * @generated from field: string reason = 5;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: string opener_user_id = 6;
+   */
+  openerUserId: string;
+
+  /**
+   * @generated from field: game.liars_dice.v1.Bid bid = 7;
+   */
+  bid?: Bid;
 };
 
 /**
@@ -354,7 +411,7 @@ export type RoundSettled = Message<"game.liars_dice.v1.RoundSettled"> & {
  * Use `create(RoundSettledSchema)` to create a new message.
  */
 export const RoundSettledSchema: GenMessage<RoundSettled> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 11);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 12);
 
 /**
  * @generated from message game.liars_dice.v1.ParticipantRevoked
@@ -371,7 +428,7 @@ export type ParticipantRevoked = Message<"game.liars_dice.v1.ParticipantRevoked"
  * Use `create(ParticipantRevokedSchema)` to create a new message.
  */
 export const ParticipantRevokedSchema: GenMessage<ParticipantRevoked> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 12);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 13);
 
 /**
  * @generated from message game.liars_dice.v1.SessionFinished
@@ -388,7 +445,7 @@ export type SessionFinished = Message<"game.liars_dice.v1.SessionFinished"> & {
  * Use `create(SessionFinishedSchema)` to create a new message.
  */
 export const SessionFinishedSchema: GenMessage<SessionFinished> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 13);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 14);
 
 /**
  * @generated from message game.liars_dice.v1.Event
@@ -427,6 +484,12 @@ export type Event = Message<"game.liars_dice.v1.Event"> & {
      */
     value: SessionFinished;
     case: "sessionFinished";
+  } | {
+    /**
+     * @generated from field: game.liars_dice.v1.RoundStarted round_started = 6;
+     */
+    value: RoundStarted;
+    case: "roundStarted";
   } | { case: undefined; value?: undefined };
 };
 
@@ -435,7 +498,36 @@ export type Event = Message<"game.liars_dice.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 14);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 15);
+
+/**
+ * ActionTimer binds one persisted timeout to the exact round, actor, and deadline it may settle.
+ *
+ * @generated from message game.liars_dice.v1.ActionTimer
+ */
+export type ActionTimer = Message<"game.liars_dice.v1.ActionTimer"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string user_id = 2;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: int64 deadline_unix_millis = 3;
+   */
+  deadlineUnixMillis: bigint;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.ActionTimer.
+ * Use `create(ActionTimerSchema)` to create a new message.
+ */
+export const ActionTimerSchema: GenMessage<ActionTimer> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 16);
 
 /**
  * @generated from message game.liars_dice.v1.PublicPlayer
@@ -472,7 +564,7 @@ export type PublicPlayer = Message<"game.liars_dice.v1.PublicPlayer"> & {
  * Use `create(PublicPlayerSchema)` to create a new message.
  */
 export const PublicPlayerSchema: GenMessage<PublicPlayer> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 15);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 17);
 
 /**
  * @generated from message game.liars_dice.v1.View
@@ -532,6 +624,11 @@ export type View = Message<"game.liars_dice.v1.View"> & {
    * @generated from field: string finish_reason = 11;
    */
   finishReason: string;
+
+  /**
+   * @generated from field: game.liars_dice.v1.RoundSettled last_settlement = 12;
+   */
+  lastSettlement?: RoundSettled;
 };
 
 /**
@@ -539,7 +636,144 @@ export type View = Message<"game.liars_dice.v1.View"> & {
  * Use `create(ViewSchema)` to create a new message.
  */
 export const ViewSchema: GenMessage<View> = /*@__PURE__*/
-  messageDesc(file_game_liars_dice_v1_liars_dice, 16);
+  messageDesc(file_game_liars_dice_v1_liars_dice, 18);
+
+/**
+ * ViewDelta is generated from the latest authoritative snapshot for one viewer only.
+ *
+ * @generated from message game.liars_dice.v1.ViewDelta
+ */
+export type ViewDelta = Message<"game.liars_dice.v1.ViewDelta"> & {
+  /**
+   * @generated from field: game.liars_dice.v1.View view = 1;
+   */
+  view?: View;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.ViewDelta.
+ * Use `create(ViewDeltaSchema)` to create a new message.
+ */
+export const ViewDeltaSchema: GenMessage<ViewDelta> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 19);
+
+/**
+ * @generated from message game.liars_dice.v1.ReplayBid
+ */
+export type ReplayBid = Message<"game.liars_dice.v1.ReplayBid"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: game.liars_dice.v1.Bid bid = 2;
+   */
+  bid?: Bid;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.ReplayBid.
+ * Use `create(ReplayBidSchema)` to create a new message.
+ */
+export const ReplayBidSchema: GenMessage<ReplayBid> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 20);
+
+/**
+ * ReplayRound contains only a settled round; dice is empty when rules never revealed that round.
+ *
+ * @generated from message game.liars_dice.v1.ReplayRound
+ */
+export type ReplayRound = Message<"game.liars_dice.v1.ReplayRound"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string first_actor_user_id = 2;
+   */
+  firstActorUserId: string;
+
+  /**
+   * @generated from field: repeated game.liars_dice.v1.ReplayBid bids = 3;
+   */
+  bids: ReplayBid[];
+
+  /**
+   * @generated from field: repeated game.liars_dice.v1.PrivateDice dice = 4;
+   */
+  dice: PrivateDice[];
+
+  /**
+   * @generated from field: bool dice_revealed = 5;
+   */
+  diceRevealed: boolean;
+
+  /**
+   * @generated from field: string loser_user_id = 6;
+   */
+  loserUserId: string;
+
+  /**
+   * @generated from field: uint32 penalty_ticks = 7;
+   */
+  penaltyTicks: number;
+
+  /**
+   * @generated from field: uint32 actual_quantity = 8;
+   */
+  actualQuantity: number;
+
+  /**
+   * @generated from field: string reason = 9;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: string opener_user_id = 10;
+   */
+  openerUserId: string;
+
+  /**
+   * @generated from field: game.liars_dice.v1.Bid bid = 11;
+   */
+  bid?: Bid;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.ReplayRound.
+ * Use `create(ReplayRoundSchema)` to create a new message.
+ */
+export const ReplayRoundSchema: GenMessage<ReplayRound> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 21);
+
+/**
+ * @generated from message game.liars_dice.v1.Replay
+ */
+export type Replay = Message<"game.liars_dice.v1.Replay"> & {
+  /**
+   * @generated from field: repeated game.liars_dice.v1.ReplayRound rounds = 1;
+   */
+  rounds: ReplayRound[];
+
+  /**
+   * @generated from field: repeated string revoked_user_ids = 2;
+   */
+  revokedUserIds: string[];
+
+  /**
+   * @generated from field: string finish_reason = 3;
+   */
+  finishReason: string;
+};
+
+/**
+ * Describes the message game.liars_dice.v1.Replay.
+ * Use `create(ReplaySchema)` to create a new message.
+ */
+export const ReplaySchema: GenMessage<Replay> = /*@__PURE__*/
+  messageDesc(file_game_liars_dice_v1_liars_dice, 22);
 
 /**
  * @generated from enum game.liars_dice.v1.Phase

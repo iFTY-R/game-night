@@ -60,6 +60,9 @@ message State {
   int64 action_deadline_unix_millis = 10;
   repeated PrivateDice private_dice = 11;
   Config config = 12;
+  repeated PrivateDice last_revealed_dice = 13;
+  RoundSettled last_settlement = 14;
+  string finish_reason = 15;
 }
 
 message PlaceBid {
@@ -82,6 +85,11 @@ message BidPlaced {
   Bid bid = 2;
 }
 
+message RoundStarted {
+  uint32 round = 1;
+  string first_actor_user_id = 2;
+}
+
 message DiceRevealed {
   repeated PrivateDice dice = 1;
 }
@@ -90,6 +98,10 @@ message RoundSettled {
   string loser_user_id = 1;
   uint32 penalty_ticks = 2;
   uint32 next_round = 3;
+  uint32 actual_quantity = 4;
+  string reason = 5;
+  string opener_user_id = 6;
+  Bid bid = 7;
 }
 
 message ParticipantRevoked {
@@ -107,7 +119,15 @@ message Event {
     RoundSettled round_settled = 3;
     ParticipantRevoked participant_revoked = 4;
     SessionFinished session_finished = 5;
+    RoundStarted round_started = 6;
   }
+}
+
+// ActionTimer binds one persisted timeout to the exact round, actor, and deadline it may settle.
+message ActionTimer {
+  uint32 round = 1;
+  string user_id = 2;
+  int64 deadline_unix_millis = 3;
 }
 
 message PublicPlayer {
@@ -130,4 +150,36 @@ message View {
   repeated string allowed_actions = 9;
   repeated PrivateDice revealed_dice = 10;
   string finish_reason = 11;
+  RoundSettled last_settlement = 12;
+}
+
+// ViewDelta is generated from the latest authoritative snapshot for one viewer only.
+message ViewDelta {
+  View view = 1;
+}
+
+message ReplayBid {
+  string user_id = 1;
+  Bid bid = 2;
+}
+
+// ReplayRound contains only a settled round; dice is empty when rules never revealed that round.
+message ReplayRound {
+  uint32 round = 1;
+  string first_actor_user_id = 2;
+  repeated ReplayBid bids = 3;
+  repeated PrivateDice dice = 4;
+  bool dice_revealed = 5;
+  string loser_user_id = 6;
+  uint32 penalty_ticks = 7;
+  uint32 actual_quantity = 8;
+  string reason = 9;
+  string opener_user_id = 10;
+  Bid bid = 11;
+}
+
+message Replay {
+  repeated ReplayRound rounds = 1;
+  repeated string revoked_user_ids = 2;
+  string finish_reason = 3;
 }

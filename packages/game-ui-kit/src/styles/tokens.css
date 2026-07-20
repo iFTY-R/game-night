@@ -1,0 +1,27 @@
+:root {
+  --platform-surface: #121a1d;
+  --platform-surface-raised: #1b292d;
+  --platform-ink: #f5f1e8;
+  --platform-muted: #a8b5b4;
+  --platform-accent: #e6b566;
+  --platform-danger: #e77c65;
+  --platform-focus: #86d6ca;
+  --platform-touch-min: 48px;
+  --game-table: #173b38;
+}
+
+[data-contrast="high"] {
+  --platform-ink: #ffffff;
+  --platform-muted: #e8efee;
+  --platform-accent: #ffd878;
+  --platform-focus: #9ffff0;
+}
+
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+}

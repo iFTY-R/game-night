@@ -15,7 +15,9 @@
     "generate:contracts": "node tooling/scripts/generate-contracts.mjs",
     "generate:sql": "go tool sqlc generate -f tooling/sqlc/sqlc.yaml",
     "test": "go test ./... && turbo run test",
-    "test:backend:integration": "go test -p 1 -race ./platform/... ./apps/... ./internal/integrationtest/... ./infra/nginx/test/..."
+    "test:backend:integration": "go test -p 1 -race ./platform/... ./apps/... ./internal/integrationtest/... ./infra/nginx/test/...",
+    "test:web:e2e": "pnpm --filter @game-night/web test:e2e",
+    "dev:web": "pnpm --filter @game-night/web dev"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "2.6.2",

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Game Night</title>
+  <desc id="desc">A pair of dice beside a warm table light</desc>
+  <rect width="128" height="128" rx="24" fill="#173b38"/>
+  <path d="M18 88c22-20 45-28 92-23" fill="none" stroke="#e6b566" stroke-width="8" stroke-linecap="round"/>
+  <rect x="24" y="27" width="43" height="43" rx="9" transform="rotate(-10 24 27)" fill="#f5f1e8"/>
+  <circle cx="40" cy="42" r="5" fill="#173b38"/>
+  <circle cx="51" cy="55" r="5" fill="#173b38"/>
+  <rect x="63" y="38" width="40" height="40" rx="9" transform="rotate(12 63 38)" fill="#e77c65"/>
+  <circle cx="78" cy="50" r="4.5" fill="#1b292d"/>
+  <circle cx="91" cy="65" r="4.5" fill="#1b292d"/>
+</svg>

@@ -48,6 +48,11 @@ FROM game_sessions
 WHERE session_id = sqlc.arg(session_id)
 FOR SHARE;
 
+-- name: GetGameSessionRoomID :one
+SELECT room_id
+FROM game_sessions
+WHERE session_id = sqlc.arg(session_id);
+
 -- name: GetGameSessionForUpdate :one
 SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
@@ -87,6 +92,20 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
 
+-- name: UpdateGameSessionLifecycleCAS :one
+UPDATE game_sessions
+SET next_deadline_at = sqlc.narg(next_deadline_at),
+    status = sqlc.arg(status),
+    updated_at = sqlc.arg(updated_at),
+    ended_at = sqlc.narg(ended_at)
+WHERE session_id = sqlc.arg(session_id)
+  AND state_version = sqlc.arg(expected_state_version)
+  AND ownership_epoch = sqlc.arg(expected_ownership_epoch)
+  AND status IN ('active', 'suspended')
+RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+    state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
+
 -- name: CreateGameSessionParticipant :exec
 INSERT INTO game_session_participants (session_id, user_id, seat_index)
 VALUES (sqlc.arg(session_id), sqlc.arg(user_id), sqlc.arg(seat_index));
@@ -114,6 +133,23 @@ FROM game_session_timers
 WHERE session_id = sqlc.arg(session_id)
 ORDER BY timer_id;
 
+-- name: GetGameSessionTimerForUpdate :one
+SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+FROM game_session_timers
+WHERE session_id = sqlc.arg(session_id)
+  AND timer_id = sqlc.arg(timer_id)
+FOR UPDATE;
+
+-- name: ListDueGameSessionTimerCandidates :many
+SELECT timer.session_id, timer.timer_id, timer.expected_state_version, timer.due_at,
+    timer.message_type, timer.schema_version, timer.payload
+FROM game_session_timers AS timer
+JOIN game_sessions AS session USING (session_id)
+WHERE session.status = 'active'
+  AND timer.due_at <= sqlc.arg(due_at)
+ORDER BY timer.due_at, timer.session_id, timer.timer_id
+LIMIT sqlc.arg(batch_limit);
+
 -- name: CreateGameSessionEventBatch :one
 INSERT INTO game_session_event_batches (
     batch_id,
@@ -123,6 +159,12 @@ INSERT INTO game_session_event_batches (
     cause,
     actor_user_id,
     action_id,
+    timer_id,
+    system_operation_id,
+    system_source_kind,
+    system_source_event_id,
+    system_requested_by_user_id,
+    system_request_digest,
     executed_at,
     random_seed,
     allocated_ids,
@@ -139,6 +181,12 @@ INSERT INTO game_session_event_batches (
     sqlc.arg(cause),
     sqlc.narg(actor_user_id),
     sqlc.narg(action_id),
+    sqlc.narg(timer_id),
+    sqlc.narg(system_operation_id),
+    sqlc.narg(system_source_kind),
+    sqlc.narg(system_source_event_id),
+    sqlc.narg(system_requested_by_user_id),
+    sqlc.narg(system_request_digest),
     sqlc.arg(executed_at),
     sqlc.arg(random_seed),
     sqlc.arg(allocated_ids),
@@ -149,7 +197,9 @@ INSERT INTO game_session_event_batches (
     sqlc.arg(committed_at)
 )
 RETURNING batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
-    action_id, executed_at, random_seed, allocated_ids, input_message_type,
+    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+    system_requested_by_user_id, system_request_digest,
+    executed_at, random_seed, allocated_ids, input_message_type,
     input_schema_version, input_payload, event_count, committed_at;
 
 -- name: CreateGameSessionEvent :exec
@@ -164,6 +214,39 @@ SELECT batch_id, event_ordinal, message_type, schema_version, payload
 FROM game_session_events
 WHERE batch_id = sqlc.arg(batch_id)
 ORDER BY event_ordinal;
+
+-- name: ListGameSessionEventBatchesAfter :many
+SELECT batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
+    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+    system_requested_by_user_id, system_request_digest,
+    executed_at, random_seed, allocated_ids, input_message_type,
+    input_schema_version, input_payload, event_count, committed_at
+FROM game_session_event_batches
+WHERE session_id = sqlc.arg(session_id)
+  AND state_version > sqlc.arg(after_state_version)
+ORDER BY state_version
+LIMIT sqlc.arg(batch_limit);
+
+-- name: CreateGameTimerReceipt :one
+INSERT INTO game_timer_receipts (
+    session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at
+) VALUES (
+    sqlc.arg(session_id), sqlc.arg(timer_id), sqlc.arg(expected_state_version),
+    sqlc.arg(result_code), sqlc.arg(result_digest), sqlc.arg(committed_state_version),
+    sqlc.arg(batch_id), sqlc.arg(committed_at)
+)
+ON CONFLICT (session_id, timer_id, expected_state_version) DO NOTHING
+RETURNING session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at;
+
+-- name: GetGameTimerReceipt :one
+SELECT session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at
+FROM game_timer_receipts
+WHERE session_id = sqlc.arg(session_id)
+  AND timer_id = sqlc.arg(timer_id)
+  AND expected_state_version = sqlc.arg(expected_state_version);
 
 -- name: CreateGameActionReceipt :one
 INSERT INTO game_action_receipts (
@@ -196,3 +279,49 @@ FROM game_action_receipts
 WHERE session_id = sqlc.arg(session_id)
   AND actor_user_id = sqlc.arg(actor_user_id)
   AND action_id = sqlc.arg(action_id);
+
+-- name: InsertGameSystemOperationPending :one
+INSERT INTO game_system_operations (
+    session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, created_at
+) VALUES (
+    sqlc.arg(session_id), sqlc.arg(operation_id), sqlc.arg(source_kind), sqlc.narg(source_event_id),
+    sqlc.narg(requested_by_user_id), sqlc.arg(logical_digest), 'pending', sqlc.arg(created_at)
+)
+ON CONFLICT DO NOTHING
+RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at;
+
+-- name: GetGameSystemOperationForUpdate :one
+SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+FROM game_system_operations
+WHERE session_id = sqlc.arg(session_id)
+  AND operation_id = sqlc.arg(operation_id)
+FOR UPDATE;
+
+-- name: GetGameSystemOperationBySourceForUpdate :one
+SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+FROM game_system_operations
+WHERE session_id = sqlc.arg(session_id)
+  AND source_event_id = sqlc.arg(source_event_id)
+FOR UPDATE;
+
+-- name: CompleteGameSystemOperationCAS :one
+UPDATE game_system_operations
+SET status = 'completed',
+    result_code = sqlc.arg(result_code),
+    result_digest = sqlc.arg(result_digest),
+    committed_state_version = sqlc.arg(committed_state_version),
+    batch_id = sqlc.narg(batch_id),
+    completed_at = sqlc.arg(completed_at)
+WHERE session_id = sqlc.arg(session_id)
+  AND operation_id = sqlc.arg(operation_id)
+  AND status = 'pending'
+RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at;

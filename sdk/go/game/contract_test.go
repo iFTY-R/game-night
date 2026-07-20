@@ -47,6 +47,9 @@ func TestCreateRequestValidatesFrozenParticipantIdentityAndSeats(t *testing.T) {
 	execution := deterministicContextFixture()
 	request := CreateRequest{
 		Context: execution,
+		StartContext: SessionStartContext{
+			HostUserID: "user-2", StartingSeat: 0,
+		},
 		Participants: []Participant{
 			{UserID: "user-1", SeatIndex: 0},
 			{UserID: "user-2", SeatIndex: 1},
@@ -60,6 +63,30 @@ func TestCreateRequestValidatesFrozenParticipantIdentityAndSeats(t *testing.T) {
 	request.Participants[1].SeatIndex = 0
 	if err := request.Validate(limits); !errors.Is(err, ErrInvalidContract) {
 		t.Fatalf("duplicate seat error = %v", err)
+	}
+}
+
+func TestCreateRequestRequiresTrustedHostAndStartingSeatInFrozenParticipants(t *testing.T) {
+	request := CreateRequest{
+		Context:      deterministicContextFixture(),
+		StartContext: SessionStartContext{HostUserID: "user-2", StartingSeat: 4},
+		Participants: []Participant{{UserID: "user-1", SeatIndex: 4}, {UserID: "user-2", SeatIndex: 9}},
+		Config:       Message{MessageType: "game_config", SchemaVersion: 1},
+	}
+	limits := ParticipantLimits{Minimum: 2, Maximum: 9}
+	if err := request.Validate(limits); err != nil {
+		t.Fatal(err)
+	}
+
+	invalidHost := request
+	invalidHost.StartContext.HostUserID = "user-3"
+	if err := invalidHost.Validate(limits); !errors.Is(err, ErrInvalidContract) {
+		t.Fatalf("unknown host error = %v", err)
+	}
+	invalidSeat := request
+	invalidSeat.StartContext.StartingSeat = 3
+	if err := invalidSeat.Validate(limits); !errors.Is(err, ErrInvalidContract) {
+		t.Fatalf("unknown starting seat error = %v", err)
 	}
 }
 
@@ -104,11 +131,37 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	if !timer.Valid() {
 		t.Fatal("valid timer rejected")
 	}
+	system := SystemRequest{
+		Context: execution, SystemOperationID: actionIDFixture(4), SourceEventID: "event-4",
+		ExpectedStateVersion: 3, System: message,
+	}
+	if !system.Valid() {
+		t.Fatal("valid system request rejected")
+	}
+	system.SourceEventID = "Event-4"
+	if system.Valid() {
+		t.Fatal("non-canonical system source accepted")
+	}
 	if !(Viewer{Kind: ViewerPlayer, UserID: "user-1", SeatIndex: 8}).Valid() {
 		t.Fatal("valid player viewer rejected")
 	}
 	if (Viewer{Kind: ViewerSpectator, UserID: "user-1", SeatIndex: 1}).Valid() {
 		t.Fatal("spectator with participant seat accepted")
+	}
+}
+
+func TestEventProjectionContainsOnlyBoundedViewerSafeMessages(t *testing.T) {
+	versioned := VersionedEvent{StateVersion: 4, Event: Event{Message: Message{MessageType: "dice_revealed", SchemaVersion: 1}}}
+	if !versioned.Valid() {
+		t.Fatal("valid versioned event rejected")
+	}
+	projection := EventProjection{Messages: []Message{{MessageType: "viewer_delta", SchemaVersion: 1}}}
+	if !projection.Valid() {
+		t.Fatal("valid event projection rejected")
+	}
+	projection.Messages[0].SchemaVersion = 0
+	if projection.Valid() {
+		t.Fatal("invalid viewer-safe message accepted")
 	}
 }
 

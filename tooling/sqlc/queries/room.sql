@@ -79,6 +79,24 @@ RETURNING room_id, room_code, visibility, status, host_user_id, participant_capa
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at;
 
+-- name: FinishPartyRoomCAS :one
+UPDATE party_rooms
+SET status = 'lobby',
+    participant_admission = 'closed',
+    active_session_id = NULL,
+    active_game_id = NULL,
+    room_version = sqlc.arg(room_version),
+    updated_at = sqlc.arg(updated_at)
+WHERE room_id = sqlc.arg(room_id)
+  AND status = 'playing'
+  AND active_session_id = sqlc.arg(active_session_id)
+  AND active_game_id = sqlc.arg(active_game_id)
+  AND room_version = sqlc.arg(expected_room_version)
+  AND membership_version = sqlc.arg(expected_membership_version)
+RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
+    participant_admission, spectator_admission, active_session_id, active_game_id,
+    room_version, membership_version, created_at, updated_at;
+
 -- name: DeleteRoomMembers :exec
 DELETE FROM room_members WHERE room_id = sqlc.arg(room_id);
 
@@ -106,6 +124,12 @@ SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_
 FROM room_members
 WHERE room_id = sqlc.arg(room_id)
 ORDER BY joined_at, user_id;
+
+-- name: GetRoomMemberRole :one
+SELECT role
+FROM room_members
+WHERE room_id = sqlc.arg(room_id)
+  AND user_id = sqlc.arg(user_id);
 
 -- name: ListPublicRoomCards :many
 SELECT room.room_id,

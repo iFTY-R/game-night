@@ -3,13 +3,16 @@ package postgres
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"github.com/google/uuid"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -86,6 +89,405 @@ func (repository *RoomGameSessionRepository) Start(
 		return roomDomain.Room{}, gameruntime.Session{}, mapRoomGameSessionStartError(ctx, err)
 	}
 	return storedRoom, storedSession, nil
+}
+
+// FinishAction atomically commits a naturally terminal player transition and returns the room to its post-game lobby.
+func (repository *RoomGameSessionRepository) FinishAction(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.ActionCommit,
+) (roomDomain.Room, gameruntime.ActionCommitResult, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !commit.Valid() {
+		return roomDomain.Room{}, gameruntime.ActionCommitResult{}, gameruntime.ErrInvalidActionCommit
+	}
+	if err := validateRoomGameSessionTermination(before, after, commit.Before(), commit.After(), gameruntime.StatusFinished); err != nil {
+		return roomDomain.Room{}, gameruntime.ActionCommitResult{}, err
+	}
+	var storedRoom roomDomain.Room
+	var result gameruntime.ActionCommitResult
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		locked, err := lockRoomForUpdate(ctx, queries, before.Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		actorUserID := commit.Receipt().Snapshot().Key.ActorUserID
+		role, err := queries.GetRoomMemberRole(ctx, sqlcgen.GetRoomMemberRoleParams{
+			RoomID: uuidToPG(before.Snapshot().ID), UserID: uuidToPG(actorUserID),
+		})
+		if errors.Is(err, pgx.ErrNoRows) || err == nil && role != string(roomDomain.MemberRoleParticipant) {
+			return gameruntime.ErrParticipantNotActive
+		}
+		if err != nil {
+			return err
+		}
+		if !sameRoomSnapshot(locked.Snapshot(), before.Snapshot()) {
+			result, err = replayFinishedActionAfterRoomChange(ctx, queries, commit)
+			storedRoom = locked
+			return err
+		}
+		result, err = commitActionAfterRoomLock(ctx, queries, commit)
+		if err != nil {
+			return err
+		}
+		if result.Replayed || result.Session.Snapshot().Status != gameruntime.StatusFinished {
+			return gameruntime.ErrInvalidActionCommit
+		}
+		storedRoom, err = finishPartyRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
+		return err
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.ActionCommitResult{}, mapRoomGameSessionStartError(ctx, err)
+	}
+	return storedRoom, result, nil
+}
+
+// FinishTimer atomically commits a terminal due-timer transition and clears the matching room pointer.
+func (repository *RoomGameSessionRepository) FinishTimer(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.TimerCommit,
+) (roomDomain.Room, gameruntime.TimerCommitResult, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !commit.Valid() {
+		return roomDomain.Room{}, gameruntime.TimerCommitResult{}, gameruntime.ErrInvalidTimerCommit
+	}
+	if err := validateRoomGameSessionTermination(before, after, commit.Before(), commit.After(), gameruntime.StatusFinished); err != nil {
+		return roomDomain.Room{}, gameruntime.TimerCommitResult{}, err
+	}
+	var storedRoom roomDomain.Room
+	var result gameruntime.TimerCommitResult
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		locked, err := lockRoomForUpdate(ctx, queries, before.Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		current, err := getGameSessionForUpdate(ctx, queries, commit.Before().Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		if !sameRoomSnapshot(locked.Snapshot(), before.Snapshot()) {
+			result, err = replayFinishedTimerAfterRoomChange(ctx, queries, current, commit)
+			storedRoom = locked
+			return err
+		}
+		result, err = commitTimerAfterSessionLock(ctx, queries, current, commit)
+		if err != nil {
+			return err
+		}
+		if result.Replayed || result.Session.Snapshot().Status != gameruntime.StatusFinished {
+			return gameruntime.ErrInvalidTimerCommit
+		}
+		storedRoom, err = finishPartyRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
+		return err
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.TimerCommitResult{}, mapRoomGameSessionStartError(ctx, err)
+	}
+	return storedRoom, result, nil
+}
+
+// FinishSystem applies a current-host system transition and clears the room pointer in the same transaction.
+func (repository *RoomGameSessionRepository) FinishSystem(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	actorUserID uuid.UUID,
+	commit gameruntime.SystemCommit,
+) (roomDomain.Room, gameruntime.SystemCommitResult, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !commit.Valid() {
+		return roomDomain.Room{}, gameruntime.SystemCommitResult{}, gameruntime.ErrInvalidSystemCommit
+	}
+	source := commit.Receipt().Snapshot().Key.Source
+	if source.Kind == gameruntime.SystemSourceHostAPI &&
+		(actorUserID == uuid.Nil || source.RequestedByUserID != actorUserID) {
+		return roomDomain.Room{}, gameruntime.SystemCommitResult{}, roomDomain.ErrHostRequired
+	}
+	if source.Kind != gameruntime.SystemSourceHostAPI &&
+		(actorUserID != uuid.Nil || source.RequestedByUserID != uuid.Nil) {
+		return roomDomain.Room{}, gameruntime.SystemCommitResult{}, roomDomain.ErrHostRequired
+	}
+	if err := validateRoomGameSessionTermination(before, after, commit.Before(), commit.After(), gameruntime.StatusFinished); err != nil {
+		return roomDomain.Room{}, gameruntime.SystemCommitResult{}, err
+	}
+	var storedRoom roomDomain.Room
+	var result gameruntime.SystemCommitResult
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		locked, err := lockRoomForUpdate(ctx, queries, before.Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		if source.Kind == gameruntime.SystemSourceHostAPI && locked.Snapshot().HostUserID != actorUserID {
+			return roomDomain.ErrHostRequired
+		}
+		current, err := getGameSessionForUpdate(ctx, queries, commit.Before().Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		if !sameRoomSnapshot(locked.Snapshot(), before.Snapshot()) {
+			result, err = replayFinishedSystemAfterRoomChange(ctx, queries, current, commit)
+			storedRoom = locked
+			return err
+		}
+		result, err = commitSystemAfterSessionLock(ctx, queries, current, commit)
+		if err != nil {
+			return err
+		}
+		if result.Retry {
+			storedRoom = locked
+			return nil
+		}
+		if result.Replayed || result.Session.Snapshot().Status != gameruntime.StatusFinished {
+			return gameruntime.ErrInvalidSystemCommit
+		}
+		storedRoom, err = finishPartyRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
+		return err
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.SystemCommitResult{}, mapRoomGameSessionStartError(ctx, err)
+	}
+	return storedRoom, result, nil
+}
+
+// Cancel atomically applies a runtime-native cancellation and clears the room pointer without a normal game result.
+func (repository *RoomGameSessionRepository) Cancel(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.LifecycleCommit,
+) (roomDomain.Room, gameruntime.Session, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !commit.Valid() {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidLifecycleCommit
+	}
+	if err := validateRoomGameSessionTermination(before, after, commit.Before(), commit.After(), gameruntime.StatusCancelled); err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	var storedRoom roomDomain.Room
+	var storedSession gameruntime.Session
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		locked, err := lockRoomForUpdate(ctx, queries, before.Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		current, err := getGameSessionForUpdate(ctx, queries, commit.Before().Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		if !sameRoomSnapshot(locked.Snapshot(), before.Snapshot()) {
+			if !samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusCancelled) {
+				return roomDomain.ErrRoomVersionConflict
+			}
+			storedRoom, storedSession = locked, current
+			return nil
+		}
+		storedSession, err = persistLifecycleAfterSessionLock(ctx, queries, current, commit)
+		if err != nil {
+			return err
+		}
+		storedRoom, err = finishPartyRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
+		return err
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, mapRoomGameSessionStartError(ctx, err)
+	}
+	return storedRoom, storedSession, nil
+}
+
+func lockExactRoom(ctx context.Context, queries QueryHandle, before roomDomain.Room) (roomDomain.Room, error) {
+	snapshot := before.Snapshot()
+	locked, err := lockRoomForUpdate(ctx, queries, snapshot.ID)
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	if !sameRoomSnapshot(locked.Snapshot(), snapshot) {
+		return roomDomain.Room{}, roomDomain.ErrRoomVersionConflict
+	}
+	return locked, nil
+}
+
+// lockRoomForUpdate loads the current aggregate after taking the canonical room-first transaction lock.
+func lockRoomForUpdate(ctx context.Context, queries QueryHandle, roomID uuid.UUID) (roomDomain.Room, error) {
+	row, err := queries.GetPartyRoomForUpdate(ctx, sqlcgen.GetPartyRoomForUpdateParams{RoomID: uuidToPG(roomID)})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return roomDomain.Room{}, roomDomain.ErrRoomNotFound
+		}
+		return roomDomain.Room{}, err
+	}
+	members, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(roomID)})
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	return roomFromRows(row, members)
+}
+
+// replayFinishedActionAfterRoomChange returns only an already-durable terminal receipt after the room pointer moved on.
+func replayFinishedActionAfterRoomChange(
+	ctx context.Context,
+	queries QueryHandle,
+	commit gameruntime.ActionCommit,
+) (gameruntime.ActionCommitResult, error) {
+	current, err := getGameSessionForUpdate(ctx, queries, commit.Before().Snapshot().ID)
+	if err != nil {
+		return gameruntime.ActionCommitResult{}, err
+	}
+	key := commit.Receipt().Snapshot().Key
+	row, err := queries.GetGameActionReceipt(ctx, sqlcgen.GetGameActionReceiptParams{
+		SessionID: uuidToPG(key.SessionID), ActorUserID: uuidToPG(key.ActorUserID), ActionID: key.ActionID.Value(),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return gameruntime.ActionCommitResult{}, roomDomain.ErrRoomVersionConflict
+	}
+	if err != nil {
+		return gameruntime.ActionCommitResult{}, err
+	}
+	receipt, err := actionReceiptFromRow(row)
+	if err != nil {
+		return gameruntime.ActionCommitResult{}, err
+	}
+	if _, err := receipt.Replay(commit.Receipt().Snapshot().RequestDigest); err != nil {
+		return gameruntime.ActionCommitResult{}, err
+	}
+	if !samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusFinished) ||
+		receipt.Snapshot().StateVersion != current.Snapshot().State.StateVersion {
+		return gameruntime.ActionCommitResult{}, gameruntime.ErrGameSessionIntegrity
+	}
+	return gameruntime.ActionCommitResult{Session: current, Receipt: receipt, Replayed: true}, nil
+}
+
+// replayFinishedTimerAfterRoomChange prevents a duplicate terminal wakeup from advancing either aggregate twice.
+func replayFinishedTimerAfterRoomChange(
+	ctx context.Context,
+	queries QueryHandle,
+	current gameruntime.Session,
+	commit gameruntime.TimerCommit,
+) (gameruntime.TimerCommitResult, error) {
+	key := commit.Receipt().Snapshot().Key
+	row, err := queries.GetGameTimerReceipt(ctx, sqlcgen.GetGameTimerReceiptParams{
+		SessionID: uuidToPG(key.SessionID), TimerID: string(key.TimerID), ExpectedStateVersion: int64(key.ExpectedStateVersion),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return gameruntime.TimerCommitResult{}, roomDomain.ErrRoomVersionConflict
+	}
+	if err != nil {
+		return gameruntime.TimerCommitResult{}, err
+	}
+	receipt, err := timerReceiptFromRow(row)
+	if err != nil {
+		return gameruntime.TimerCommitResult{}, err
+	}
+	if !samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusFinished) ||
+		receipt.Snapshot().StateVersion != current.Snapshot().State.StateVersion {
+		return gameruntime.TimerCommitResult{}, gameruntime.ErrGameSessionIntegrity
+	}
+	return gameruntime.TimerCommitResult{Session: current, Receipt: receipt, Replayed: true}, nil
+}
+
+// replayFinishedSystemAfterRoomChange requires the original completed operation/source/digest binding.
+func replayFinishedSystemAfterRoomChange(
+	ctx context.Context,
+	queries QueryHandle,
+	current gameruntime.Session,
+	commit gameruntime.SystemCommit,
+) (gameruntime.SystemCommitResult, error) {
+	receiptSnapshot := commit.Receipt().Snapshot()
+	row, err := queries.GetGameSystemOperationForUpdate(ctx, sqlcgen.GetGameSystemOperationForUpdateParams{
+		SessionID: uuidToPG(receiptSnapshot.Key.SessionID), OperationID: receiptSnapshot.Key.OperationID.Value(),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return gameruntime.SystemCommitResult{}, roomDomain.ErrRoomVersionConflict
+	}
+	if err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	receipt, err := completedSystemReceiptFromRow(row, receiptSnapshot.Key, receiptSnapshot.RequestDigest)
+	if errors.Is(err, gameruntime.ErrSystemOperationPending) {
+		return gameruntime.SystemCommitResult{}, roomDomain.ErrRoomVersionConflict
+	}
+	if err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	if !samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusFinished) ||
+		receipt.Snapshot().StateVersion != current.Snapshot().State.StateVersion {
+		return gameruntime.SystemCommitResult{}, gameruntime.ErrGameSessionIntegrity
+	}
+	return gameruntime.SystemCommitResult{Session: current, Receipt: receipt, Replayed: true}, nil
+}
+
+// samePersistedTerminalSession verifies the stable identity and terminal version needed by cross-aggregate replay.
+func samePersistedTerminalSession(current, proposed gameruntime.SessionSnapshot, status gameruntime.Status) bool {
+	return current.ID == proposed.ID && current.RoomID == proposed.RoomID && current.VersionKey == proposed.VersionKey &&
+		current.OwnershipEpoch == proposed.OwnershipEpoch && current.State.StateVersion == proposed.State.StateVersion &&
+		current.Status == status && current.EndedAt.Equal(current.UpdatedAt)
+}
+
+func finishPartyRoomAggregateCAS(
+	ctx context.Context,
+	queries QueryHandle,
+	before roomDomain.RoomSnapshot,
+	after roomDomain.RoomSnapshot,
+) (roomDomain.Room, error) {
+	row, err := queries.FinishPartyRoomCAS(ctx, sqlcgen.FinishPartyRoomCASParams{
+		RoomVersion: int64(after.RoomVersion), UpdatedAt: timeToPG(after.UpdatedAt), RoomID: uuidToPG(before.ID),
+		ActiveSessionID: uuidToPG(before.ActiveSessionID), ActiveGameID: pgtype.Text{String: before.ActiveGameID, Valid: true},
+		ExpectedRoomVersion: int64(before.RoomVersion), ExpectedMembershipVersion: int64(before.MembershipVersion),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return roomDomain.Room{}, roomDomain.ErrRoomVersionConflict
+		}
+		return roomDomain.Room{}, err
+	}
+	members, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(before.ID)})
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	stored, err := roomFromRows(row, members)
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	if !sameRoomSnapshot(stored.Snapshot(), after) {
+		return roomDomain.Room{}, roomDomain.ErrRoomIntegrity
+	}
+	return stored, nil
+}
+
+func validateRoomGameSessionTermination(
+	before roomDomain.Room,
+	after roomDomain.Room,
+	beforeSession gameruntime.Session,
+	afterSession gameruntime.Session,
+	wantStatus gameruntime.Status,
+) error {
+	if err := validateRoomTransition(before.Snapshot(), after.Snapshot()); err != nil {
+		return err
+	}
+	roomBefore, roomAfter := before.Snapshot(), after.Snapshot()
+	sessionBefore, sessionAfter := beforeSession.Snapshot(), afterSession.Snapshot()
+	expectedRoom := roomBefore
+	expectedRoom.Status = roomDomain.RoomStatusLobby
+	expectedRoom.ParticipantAdmission = roomDomain.AdmissionClosed
+	expectedRoom.ActiveSessionID = uuid.Nil
+	expectedRoom.ActiveGameID = ""
+	expectedRoom.RoomVersion++
+	expectedRoom.UpdatedAt = roomAfter.UpdatedAt
+	if roomBefore.Status != roomDomain.RoomStatusPlaying || roomBefore.ActiveSessionID == uuid.Nil ||
+		!sameRoomSnapshot(expectedRoom, roomAfter) || !sameTerminatingSessionIdentity(sessionBefore, sessionAfter) ||
+		sessionBefore.ID != roomBefore.ActiveSessionID || sessionBefore.RoomID != roomBefore.ID ||
+		string(sessionBefore.VersionKey.GameID) != roomBefore.ActiveGameID || sessionAfter.Status != wantStatus ||
+		!sessionAfter.UpdatedAt.Equal(roomAfter.UpdatedAt) {
+		return gameruntime.ErrInvalidSessionInput
+	}
+	if wantStatus == gameruntime.StatusCancelled && !reflect.DeepEqual(sessionBefore.State, sessionAfter.State) {
+		return gameruntime.ErrInvalidLifecycleCommit
+	}
+	return nil
+}
+
+func sameTerminatingSessionIdentity(left, right gameruntime.SessionSnapshot) bool {
+	return left.ID == right.ID && left.RoomID == right.RoomID && left.VersionKey == right.VersionKey &&
+		left.OwnershipEpoch == right.OwnershipEpoch && left.StartedAt.Equal(right.StartedAt) &&
+		reflect.DeepEqual(left.Participants, right.Participants)
 }
 
 // validateRoomGameSessionStart accepts only the exact lobby-to-playing transition and its matching frozen runtime state.
@@ -167,14 +569,25 @@ func mapRoomGameSessionStartError(ctx context.Context, err error) error {
 	}
 	for _, domainErr := range []error{
 		roomDomain.ErrInvalidRoomInput,
+		roomDomain.ErrHostRequired,
 		roomDomain.ErrRoomVersionConflict,
 		roomDomain.ErrRoomNotFound,
 		roomDomain.ErrRoomIntegrity,
 		roomDomain.ErrRoomRepositoryUnavailable,
 		gameruntime.ErrInvalidSessionInput,
 		gameruntime.ErrSessionAlreadyExists,
+		gameruntime.ErrStateVersionConflict,
+		gameruntime.ErrOwnershipLost,
+		gameruntime.ErrSessionSuspended,
+		gameruntime.ErrSessionTerminal,
+		gameruntime.ErrParticipantNotActive,
+		gameruntime.ErrInvalidActionCommit,
+		gameruntime.ErrInvalidTimerCommit,
+		gameruntime.ErrInvalidSystemCommit,
+		gameruntime.ErrInvalidLifecycleCommit,
 		gameruntime.ErrGameSessionIntegrity,
 		gameruntime.ErrGameSessionRepositoryUnavailable,
+		idempotency.ErrConflict,
 	} {
 		if errors.Is(err, domainErr) {
 			return domainErr
@@ -185,7 +598,7 @@ func mapRoomGameSessionStartError(ctx context.Context, err error) error {
 		switch pgError.Code {
 		case "23505":
 			return gameruntime.ErrSessionAlreadyExists
-		case "23503", "23514", "22P02":
+		case "23502", "23503", "23514", "22P02":
 			return gameruntime.ErrGameSessionIntegrity
 		case "40001", "40P01":
 			return roomDomain.ErrRoomVersionConflict

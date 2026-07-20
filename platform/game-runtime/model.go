@@ -1,6 +1,7 @@
 package gameruntime
 
 import (
+	"bytes"
 	"math"
 	"sort"
 	"time"
@@ -86,6 +87,30 @@ type ActionTransitionRequest struct {
 	Execution      game.DeterministicContext
 	Input          game.Message
 	Transition     game.Transition
+}
+
+// TimerTransitionRequest binds one persisted timer firing to its exact scheduled state version and payload.
+type TimerTransitionRequest struct {
+	BatchID              uuid.UUID
+	OwnershipEpoch       uint64
+	TimerID              game.Identifier
+	ExpectedStateVersion uint64
+	Execution            game.DeterministicContext
+	Input                game.Message
+	Transition           game.Transition
+}
+
+// SystemTransitionRequest binds one external system fact to its durable idempotency identity.
+type SystemTransitionRequest struct {
+	BatchID              uuid.UUID
+	OwnershipEpoch       uint64
+	ExpectedStateVersion uint64
+	SystemOperationID    idempotency.OperationID
+	Source               SystemSource
+	RequestDigest        idempotency.Digest
+	Execution            game.DeterministicContext
+	Input                game.Message
+	Transition           game.Transition
 }
 
 // NewSession creates an initially unowned session and its state-version-one event batch.
@@ -241,6 +266,199 @@ func (session Session) ApplyAction(request ActionTransitionRequest) (Session, Ev
 	return next, batch, nil
 }
 
+// ApplyTimer accepts a due persisted timer exactly once for the state version that scheduled it.
+func (session Session) ApplyTimer(request TimerTransitionRequest) (Session, EventBatch, error) {
+	if session.snapshot.Status.Terminal() {
+		return Session{}, EventBatch{}, ErrSessionTerminal
+	}
+	if session.snapshot.Status != StatusActive {
+		return Session{}, EventBatch{}, ErrSessionSuspended
+	}
+	if request.OwnershipEpoch == 0 || request.OwnershipEpoch != session.snapshot.OwnershipEpoch {
+		return Session{}, EventBatch{}, ErrOwnershipLost
+	}
+	currentVersion := session.snapshot.State.StateVersion
+	if request.ExpectedStateVersion != currentVersion || currentVersion == math.MaxUint64 ||
+		request.Transition.Snapshot.StateVersion != currentVersion+1 {
+		return Session{}, EventBatch{}, ErrStateVersionConflict
+	}
+	if _, timerErr := game.ParseIdentifier(string(request.TimerID)); request.BatchID == uuid.Nil || timerErr != nil ||
+		!request.Execution.Valid() || request.Execution.Now.Before(session.snapshot.UpdatedAt) || !request.Input.Valid() {
+		return Session{}, EventBatch{}, ErrInvalidSessionInput
+	}
+	timer, found := session.timer(request.TimerID)
+	if !found {
+		return Session{}, EventBatch{}, ErrTimerNotFound
+	}
+	if timer.ExpectedStateVersion != request.ExpectedStateVersion || request.Execution.Now.Before(timer.DueAt) ||
+		!sameGameMessage(timer.Message, request.Input) {
+		return Session{}, EventBatch{}, ErrInvalidSessionInput
+	}
+	return session.applyTransition(
+		request.BatchID,
+		request.OwnershipEpoch,
+		EventCauseTimer,
+		request.Execution,
+		request.Input,
+		request.Transition,
+		EventBatchSnapshot{TimerID: request.TimerID},
+	)
+}
+
+// ApplySystem accepts one exact-version platform command without impersonating a participant action.
+func (session Session) ApplySystem(request SystemTransitionRequest) (Session, EventBatch, error) {
+	if session.snapshot.Status.Terminal() {
+		return Session{}, EventBatch{}, ErrSessionTerminal
+	}
+	if session.snapshot.Status != StatusActive {
+		return Session{}, EventBatch{}, ErrSessionSuspended
+	}
+	if request.OwnershipEpoch == 0 || request.OwnershipEpoch != session.snapshot.OwnershipEpoch {
+		return Session{}, EventBatch{}, ErrOwnershipLost
+	}
+	currentVersion := session.snapshot.State.StateVersion
+	if request.ExpectedStateVersion != currentVersion || currentVersion == math.MaxUint64 ||
+		request.Transition.Snapshot.StateVersion != currentVersion+1 {
+		return Session{}, EventBatch{}, ErrStateVersionConflict
+	}
+	if request.BatchID == uuid.Nil || !request.SystemOperationID.Valid() || !request.Source.Valid() ||
+		!request.Execution.Valid() || request.Execution.Now.Before(session.snapshot.UpdatedAt) || !request.Input.Valid() {
+		return Session{}, EventBatch{}, ErrInvalidSessionInput
+	}
+	return session.applyTransition(
+		request.BatchID,
+		request.OwnershipEpoch,
+		EventCauseSystem,
+		request.Execution,
+		request.Input,
+		request.Transition,
+		EventBatchSnapshot{
+			SystemOperationID: request.SystemOperationID,
+			SystemSource:      request.Source,
+			RequestDigest:     request.RequestDigest,
+		},
+	)
+}
+
+// Suspend pauses module-driven transitions while retaining exact state and timers for later recovery.
+func (session Session) Suspend(expectedEpoch uint64, at time.Time) (Session, error) {
+	if session.snapshot.Status.Terminal() {
+		return Session{}, ErrSessionTerminal
+	}
+	if session.snapshot.Status != StatusActive {
+		return Session{}, ErrSessionSuspended
+	}
+	if expectedEpoch == 0 || expectedEpoch != session.snapshot.OwnershipEpoch {
+		return Session{}, ErrOwnershipLost
+	}
+	at = canonicalRuntimeTime(at)
+	if at.IsZero() || !at.After(session.snapshot.UpdatedAt) {
+		return Session{}, ErrInvalidSessionInput
+	}
+	next := session.Snapshot()
+	next.Status = StatusSuspended
+	next.UpdatedAt = at
+	return RestoreSession(next)
+}
+
+// Resume re-enables module-driven transitions after the exact retained runtime becomes available again.
+func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, error) {
+	if session.snapshot.Status.Terminal() {
+		return Session{}, ErrSessionTerminal
+	}
+	if session.snapshot.Status != StatusSuspended {
+		return Session{}, ErrInvalidLifecycleCommit
+	}
+	if expectedEpoch == 0 || expectedEpoch != session.snapshot.OwnershipEpoch {
+		return Session{}, ErrOwnershipLost
+	}
+	at = canonicalRuntimeTime(at)
+	if at.IsZero() || !at.After(session.snapshot.UpdatedAt) {
+		return Session{}, ErrInvalidSessionInput
+	}
+	next := session.Snapshot()
+	next.Status = StatusActive
+	next.UpdatedAt = at
+	return RestoreSession(next)
+}
+
+// Cancel terminates an active or suspended session without manufacturing an engine finish transition.
+func (session Session) Cancel(expectedEpoch uint64, at time.Time) (Session, error) {
+	if session.snapshot.Status.Terminal() {
+		return Session{}, ErrSessionTerminal
+	}
+	if expectedEpoch == 0 || expectedEpoch != session.snapshot.OwnershipEpoch {
+		return Session{}, ErrOwnershipLost
+	}
+	at = canonicalRuntimeTime(at)
+	if at.IsZero() || !at.After(session.snapshot.UpdatedAt) {
+		return Session{}, ErrInvalidSessionInput
+	}
+	next := session.Snapshot()
+	next.Status = StatusCancelled
+	next.Timers = nil
+	next.NextDeadlineAt = time.Time{}
+	next.UpdatedAt = at
+	next.EndedAt = at
+	return RestoreSession(next)
+}
+
+// applyTransition centralizes the identical state, timer, and terminal invariants shared by timer and system inputs.
+func (session Session) applyTransition(
+	batchID uuid.UUID,
+	ownershipEpoch uint64,
+	cause EventCause,
+	execution game.DeterministicContext,
+	input game.Message,
+	transition game.Transition,
+	metadata EventBatchSnapshot,
+) (Session, EventBatch, error) {
+	currentVersion := session.snapshot.State.StateVersion
+	if err := transition.Validate(currentVersion, execution.Now); err != nil || transition.Finished && len(transition.Timers) != 0 {
+		return Session{}, EventBatch{}, ErrInvalidSessionInput
+	}
+	timers, deadline, err := timersFromIntents(transition.Timers, currentVersion+1)
+	if err != nil {
+		return Session{}, EventBatch{}, err
+	}
+	nextSnapshot := session.Snapshot()
+	nextSnapshot.State = transition.Snapshot
+	nextSnapshot.Timers = timers
+	nextSnapshot.NextDeadlineAt = deadline
+	nextSnapshot.UpdatedAt = execution.Now
+	if transition.Finished {
+		nextSnapshot.Status = StatusFinished
+		nextSnapshot.EndedAt = execution.Now
+	}
+	next, err := RestoreSession(nextSnapshot)
+	if err != nil {
+		return Session{}, EventBatch{}, err
+	}
+	metadata.ID = batchID
+	metadata.SessionID = session.snapshot.ID
+	metadata.StateVersion = currentVersion + 1
+	metadata.OwnershipEpoch = ownershipEpoch
+	metadata.Cause = cause
+	metadata.Execution = execution
+	metadata.Input = input
+	metadata.Events = transition.Events
+	metadata.CommittedAt = execution.Now
+	batch, err := RestoreEventBatch(metadata)
+	if err != nil {
+		return Session{}, EventBatch{}, err
+	}
+	return next, batch, nil
+}
+
+func (session Session) timer(timerID game.Identifier) (TimerSnapshot, bool) {
+	for _, timer := range session.snapshot.Timers {
+		if timer.TimerID == timerID {
+			return timer, true
+		}
+	}
+	return TimerSnapshot{}, false
+}
+
 func (session Session) hasParticipant(userID uuid.UUID) bool {
 	for _, participant := range session.snapshot.Participants {
 		if participant.UserID == userID {
@@ -248,6 +466,10 @@ func (session Session) hasParticipant(userID uuid.UUID) bool {
 		}
 	}
 	return false
+}
+
+func sameGameMessage(left, right game.Message) bool {
+	return left.MessageType == right.MessageType && left.SchemaVersion == right.SchemaVersion && bytes.Equal(left.Payload, right.Payload)
 }
 
 func canonicalParticipants(values []Participant) ([]Participant, error) {

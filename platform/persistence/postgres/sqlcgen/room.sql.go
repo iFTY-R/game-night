@@ -216,6 +216,83 @@ func (q *Queries) DeleteRoomMembers(ctx context.Context, arg DeleteRoomMembersPa
 	return err
 }
 
+const finishPartyRoomCAS = `-- name: FinishPartyRoomCAS :one
+UPDATE party_rooms
+SET status = 'lobby',
+    participant_admission = 'closed',
+    active_session_id = NULL,
+    active_game_id = NULL,
+    room_version = $1,
+    updated_at = $2
+WHERE room_id = $3
+  AND status = 'playing'
+  AND active_session_id = $4
+  AND active_game_id = $5
+  AND room_version = $6
+  AND membership_version = $7
+RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
+    participant_admission, spectator_admission, active_session_id, active_game_id,
+    room_version, membership_version, created_at, updated_at
+`
+
+type FinishPartyRoomCASParams struct {
+	RoomVersion               int64              `json:"room_version"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	ActiveSessionID           pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID              pgtype.Text        `json:"active_game_id"`
+	ExpectedRoomVersion       int64              `json:"expected_room_version"`
+	ExpectedMembershipVersion int64              `json:"expected_membership_version"`
+}
+
+// FinishPartyRoomCAS
+//
+//	UPDATE party_rooms
+//	SET status = 'lobby',
+//	    participant_admission = 'closed',
+//	    active_session_id = NULL,
+//	    active_game_id = NULL,
+//	    room_version = $1,
+//	    updated_at = $2
+//	WHERE room_id = $3
+//	  AND status = 'playing'
+//	  AND active_session_id = $4
+//	  AND active_game_id = $5
+//	  AND room_version = $6
+//	  AND membership_version = $7
+//	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
+//	    participant_admission, spectator_admission, active_session_id, active_game_id,
+//	    room_version, membership_version, created_at, updated_at
+func (q *Queries) FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error) {
+	row := q.db.QueryRow(ctx, finishPartyRoomCAS,
+		arg.RoomVersion,
+		arg.UpdatedAt,
+		arg.RoomID,
+		arg.ActiveSessionID,
+		arg.ActiveGameID,
+		arg.ExpectedRoomVersion,
+		arg.ExpectedMembershipVersion,
+	)
+	var i PartyRoom
+	err := row.Scan(
+		&i.RoomID,
+		&i.RoomCode,
+		&i.Visibility,
+		&i.Status,
+		&i.HostUserID,
+		&i.ParticipantCapacity,
+		&i.ParticipantAdmission,
+		&i.SpectatorAdmission,
+		&i.ActiveSessionID,
+		&i.ActiveGameID,
+		&i.RoomVersion,
+		&i.MembershipVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPartyRoomByCodeForShare = `-- name: GetPartyRoomByCodeForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
@@ -343,6 +420,31 @@ func (q *Queries) GetPartyRoomForUpdate(ctx context.Context, arg GetPartyRoomFor
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getRoomMemberRole = `-- name: GetRoomMemberRole :one
+SELECT role
+FROM room_members
+WHERE room_id = $1
+  AND user_id = $2
+`
+
+type GetRoomMemberRoleParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+// GetRoomMemberRole
+//
+//	SELECT role
+//	FROM room_members
+//	WHERE room_id = $1
+//	  AND user_id = $2
+func (q *Queries) GetRoomMemberRole(ctx context.Context, arg GetRoomMemberRoleParams) (string, error) {
+	row := q.db.QueryRow(ctx, getRoomMemberRole, arg.RoomID, arg.UserID)
+	var role string
+	err := row.Scan(&role)
+	return role, err
 }
 
 const listPublicRoomCards = `-- name: ListPublicRoomCards :many

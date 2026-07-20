@@ -87,6 +87,25 @@ func (participant Participant) Valid() bool {
 	return err == nil
 }
 
+// SessionStartContext is trusted PartyRoom state that game configuration payloads cannot override.
+type SessionStartContext struct {
+	HostUserID   Identifier
+	StartingSeat uint32
+}
+
+// Valid requires both the host identity and initial seat to exist in the same frozen participant snapshot.
+func (start SessionStartContext) Valid(participants []Participant) bool {
+	if _, err := ParseIdentifier(string(start.HostUserID)); err != nil {
+		return false
+	}
+	hostFound, seatFound := false, false
+	for _, participant := range participants {
+		hostFound = hostFound || participant.UserID == start.HostUserID
+		seatFound = seatFound || participant.SeatIndex == start.StartingSeat
+	}
+	return hostFound && seatFound
+}
+
 // Snapshot is opaque to the platform runtime except for its migration and optimistic state versions.
 type Snapshot struct {
 	SnapshotVersion uint32
@@ -102,6 +121,7 @@ func (snapshot Snapshot) Valid() bool {
 // CreateRequest initializes a session from frozen participants and a versioned game configuration payload.
 type CreateRequest struct {
 	Context      DeterministicContext
+	StartContext SessionStartContext
 	Participants []Participant
 	Config       Message
 }
@@ -126,6 +146,9 @@ func (request CreateRequest) Validate(limits ParticipantLimits) error {
 		}
 		users[participant.UserID] = struct{}{}
 		seats[participant.SeatIndex] = struct{}{}
+	}
+	if !request.StartContext.Valid(request.Participants) {
+		return ErrInvalidContract
 	}
 	return nil
 }
@@ -159,6 +182,22 @@ func (request TimerRequest) Valid() bool {
 	return request.Context.Valid() && timerErr == nil && request.ExpectedStateVersion > 0 && request.Timer.Valid()
 }
 
+// SystemRequest is one runtime-originated command tied to a durable operation and source event.
+type SystemRequest struct {
+	Context              DeterministicContext
+	SystemOperationID    ActionID
+	SourceEventID        Identifier
+	ExpectedStateVersion uint64
+	System               Message
+}
+
+// Valid rejects system commands that cannot participate in exact-version replay and durable deduplication.
+func (request SystemRequest) Valid() bool {
+	_, sourceErr := ParseIdentifier(string(request.SourceEventID))
+	return request.Context.Valid() && request.SystemOperationID.Valid() && sourceErr == nil &&
+		request.ExpectedStateVersion > 0 && request.System.Valid()
+}
+
 // Event is one engine fact; the runtime owns persistent batch sequence numbers and preserves this slice order.
 type Event struct {
 	Message Message
@@ -167,6 +206,17 @@ type Event struct {
 // Valid requires a decodable game-owned event envelope.
 func (event Event) Valid() bool {
 	return event.Message.Valid()
+}
+
+// VersionedEvent associates an ordered engine fact with the state version committed by its atomic batch.
+type VersionedEvent struct {
+	StateVersion uint64
+	Event        Event
+}
+
+// Valid rejects events that cannot advance a viewer subscription cursor deterministically.
+func (event VersionedEvent) Valid() bool {
+	return event.StateVersion > 0 && event.Event.Valid()
 }
 
 // TimerIntent asks the runtime to persist or replace a timer; engines never schedule process timers directly.
@@ -279,6 +329,24 @@ func (projection Projection) Valid() bool {
 	return true
 }
 
+// EventProjection is a viewer-specific delta; it deliberately cannot carry authoritative Event values.
+type EventProjection struct {
+	Messages []Message
+}
+
+// Valid bounds delta fanout and validates every viewer-safe module-owned envelope.
+func (projection EventProjection) Valid() bool {
+	if len(projection.Messages) == 0 || len(projection.Messages) > MaximumTransitionEvents {
+		return false
+	}
+	for _, message := range projection.Messages {
+		if !message.Valid() {
+			return false
+		}
+	}
+	return true
+}
+
 // ServerGameModule is synchronous and IO-free; runtime-owned persistence, clocks, randomness, and routing stay outside.
 type ServerGameModule interface {
 	Manifest() Manifest
@@ -288,4 +356,21 @@ type ServerGameModule interface {
 	Project(Snapshot, Viewer) (Projection, error)
 	ProjectReplay([]Event, Viewer, ReplayAccessPolicy) (Projection, error)
 	Migrate(Snapshot, uint32, uint32) (Snapshot, error)
+}
+
+// SystemGameModule extends a registered module with runtime-originated commands such as participant revocation.
+type SystemGameModule interface {
+	HandleSystem(Snapshot, SystemRequest) (Transition, error)
+}
+
+// EventProjectingGameModule converts raw committed facts into one viewer-safe subscription delta.
+type EventProjectingGameModule interface {
+	ProjectEvents(Snapshot, []VersionedEvent, Viewer) (EventProjection, error)
+}
+
+// RuntimeServerGameModule is the complete contract required by the authoritative session runtime.
+type RuntimeServerGameModule interface {
+	ServerGameModule
+	SystemGameModule
+	EventProjectingGameModule
 }

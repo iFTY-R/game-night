@@ -73,6 +73,76 @@ func (q *Queries) AcquireGameSessionOwnershipCAS(ctx context.Context, arg Acquir
 	return i, err
 }
 
+const completeGameSystemOperationCAS = `-- name: CompleteGameSystemOperationCAS :one
+UPDATE game_system_operations
+SET status = 'completed',
+    result_code = $1,
+    result_digest = $2,
+    committed_state_version = $3,
+    batch_id = $4,
+    completed_at = $5
+WHERE session_id = $6
+  AND operation_id = $7
+  AND status = 'pending'
+RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+`
+
+type CompleteGameSystemOperationCASParams struct {
+	ResultCode            pgtype.Text        `json:"result_code"`
+	ResultDigest          []byte             `json:"result_digest"`
+	CommittedStateVersion pgtype.Int8        `json:"committed_state_version"`
+	BatchID               pgtype.UUID        `json:"batch_id"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+	SessionID             pgtype.UUID        `json:"session_id"`
+	OperationID           string             `json:"operation_id"`
+}
+
+// CompleteGameSystemOperationCAS
+//
+//	UPDATE game_system_operations
+//	SET status = 'completed',
+//	    result_code = $1,
+//	    result_digest = $2,
+//	    committed_state_version = $3,
+//	    batch_id = $4,
+//	    completed_at = $5
+//	WHERE session_id = $6
+//	  AND operation_id = $7
+//	  AND status = 'pending'
+//	RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+//	    logical_digest, status, result_code, result_digest, committed_state_version,
+//	    batch_id, created_at, completed_at
+func (q *Queries) CompleteGameSystemOperationCAS(ctx context.Context, arg CompleteGameSystemOperationCASParams) (GameSystemOperation, error) {
+	row := q.db.QueryRow(ctx, completeGameSystemOperationCAS,
+		arg.ResultCode,
+		arg.ResultDigest,
+		arg.CommittedStateVersion,
+		arg.BatchID,
+		arg.CompletedAt,
+		arg.SessionID,
+		arg.OperationID,
+	)
+	var i GameSystemOperation
+	err := row.Scan(
+		&i.SessionID,
+		&i.OperationID,
+		&i.SourceKind,
+		&i.SourceEventID,
+		&i.RequestedByUserID,
+		&i.LogicalDigest,
+		&i.Status,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const createGameActionReceipt = `-- name: CreateGameActionReceipt :one
 INSERT INTO game_action_receipts (
     session_id,
@@ -349,6 +419,12 @@ INSERT INTO game_session_event_batches (
     cause,
     actor_user_id,
     action_id,
+    timer_id,
+    system_operation_id,
+    system_source_kind,
+    system_source_event_id,
+    system_requested_by_user_id,
+    system_request_digest,
     executed_at,
     random_seed,
     allocated_ids,
@@ -372,29 +448,67 @@ INSERT INTO game_session_event_batches (
     $12,
     $13,
     $14,
-    $15
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21
 )
 RETURNING batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
-    action_id, executed_at, random_seed, allocated_ids, input_message_type,
+    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+    system_requested_by_user_id, system_request_digest,
+    executed_at, random_seed, allocated_ids, input_message_type,
     input_schema_version, input_payload, event_count, committed_at
 `
 
 type CreateGameSessionEventBatchParams struct {
-	BatchID            pgtype.UUID        `json:"batch_id"`
-	SessionID          pgtype.UUID        `json:"session_id"`
-	StateVersion       int64              `json:"state_version"`
-	OwnershipEpoch     int64              `json:"ownership_epoch"`
-	Cause              string             `json:"cause"`
-	ActorUserID        pgtype.UUID        `json:"actor_user_id"`
-	ActionID           pgtype.Text        `json:"action_id"`
-	ExecutedAt         pgtype.Timestamptz `json:"executed_at"`
-	RandomSeed         []byte             `json:"random_seed"`
-	AllocatedIds       []string           `json:"allocated_ids"`
-	InputMessageType   string             `json:"input_message_type"`
-	InputSchemaVersion int32              `json:"input_schema_version"`
-	InputPayload       []byte             `json:"input_payload"`
-	EventCount         int32              `json:"event_count"`
-	CommittedAt        pgtype.Timestamptz `json:"committed_at"`
+	BatchID                 pgtype.UUID        `json:"batch_id"`
+	SessionID               pgtype.UUID        `json:"session_id"`
+	StateVersion            int64              `json:"state_version"`
+	OwnershipEpoch          int64              `json:"ownership_epoch"`
+	Cause                   string             `json:"cause"`
+	ActorUserID             pgtype.UUID        `json:"actor_user_id"`
+	ActionID                pgtype.Text        `json:"action_id"`
+	TimerID                 pgtype.Text        `json:"timer_id"`
+	SystemOperationID       pgtype.Text        `json:"system_operation_id"`
+	SystemSourceKind        pgtype.Text        `json:"system_source_kind"`
+	SystemSourceEventID     pgtype.UUID        `json:"system_source_event_id"`
+	SystemRequestedByUserID pgtype.UUID        `json:"system_requested_by_user_id"`
+	SystemRequestDigest     []byte             `json:"system_request_digest"`
+	ExecutedAt              pgtype.Timestamptz `json:"executed_at"`
+	RandomSeed              []byte             `json:"random_seed"`
+	AllocatedIds            []string           `json:"allocated_ids"`
+	InputMessageType        string             `json:"input_message_type"`
+	InputSchemaVersion      int32              `json:"input_schema_version"`
+	InputPayload            []byte             `json:"input_payload"`
+	EventCount              int32              `json:"event_count"`
+	CommittedAt             pgtype.Timestamptz `json:"committed_at"`
+}
+
+type CreateGameSessionEventBatchRow struct {
+	BatchID                 pgtype.UUID        `json:"batch_id"`
+	SessionID               pgtype.UUID        `json:"session_id"`
+	StateVersion            int64              `json:"state_version"`
+	OwnershipEpoch          int64              `json:"ownership_epoch"`
+	Cause                   string             `json:"cause"`
+	ActorUserID             pgtype.UUID        `json:"actor_user_id"`
+	ActionID                pgtype.Text        `json:"action_id"`
+	TimerID                 pgtype.Text        `json:"timer_id"`
+	SystemOperationID       pgtype.Text        `json:"system_operation_id"`
+	SystemSourceKind        pgtype.Text        `json:"system_source_kind"`
+	SystemSourceEventID     pgtype.UUID        `json:"system_source_event_id"`
+	SystemRequestedByUserID pgtype.UUID        `json:"system_requested_by_user_id"`
+	SystemRequestDigest     []byte             `json:"system_request_digest"`
+	ExecutedAt              pgtype.Timestamptz `json:"executed_at"`
+	RandomSeed              []byte             `json:"random_seed"`
+	AllocatedIds            []string           `json:"allocated_ids"`
+	InputMessageType        string             `json:"input_message_type"`
+	InputSchemaVersion      int32              `json:"input_schema_version"`
+	InputPayload            []byte             `json:"input_payload"`
+	EventCount              int32              `json:"event_count"`
+	CommittedAt             pgtype.Timestamptz `json:"committed_at"`
 }
 
 // CreateGameSessionEventBatch
@@ -407,6 +521,12 @@ type CreateGameSessionEventBatchParams struct {
 //	    cause,
 //	    actor_user_id,
 //	    action_id,
+//	    timer_id,
+//	    system_operation_id,
+//	    system_source_kind,
+//	    system_source_event_id,
+//	    system_requested_by_user_id,
+//	    system_request_digest,
 //	    executed_at,
 //	    random_seed,
 //	    allocated_ids,
@@ -430,12 +550,20 @@ type CreateGameSessionEventBatchParams struct {
 //	    $12,
 //	    $13,
 //	    $14,
-//	    $15
+//	    $15,
+//	    $16,
+//	    $17,
+//	    $18,
+//	    $19,
+//	    $20,
+//	    $21
 //	)
 //	RETURNING batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
-//	    action_id, executed_at, random_seed, allocated_ids, input_message_type,
+//	    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+//	    system_requested_by_user_id, system_request_digest,
+//	    executed_at, random_seed, allocated_ids, input_message_type,
 //	    input_schema_version, input_payload, event_count, committed_at
-func (q *Queries) CreateGameSessionEventBatch(ctx context.Context, arg CreateGameSessionEventBatchParams) (GameSessionEventBatch, error) {
+func (q *Queries) CreateGameSessionEventBatch(ctx context.Context, arg CreateGameSessionEventBatchParams) (CreateGameSessionEventBatchRow, error) {
 	row := q.db.QueryRow(ctx, createGameSessionEventBatch,
 		arg.BatchID,
 		arg.SessionID,
@@ -444,6 +572,12 @@ func (q *Queries) CreateGameSessionEventBatch(ctx context.Context, arg CreateGam
 		arg.Cause,
 		arg.ActorUserID,
 		arg.ActionID,
+		arg.TimerID,
+		arg.SystemOperationID,
+		arg.SystemSourceKind,
+		arg.SystemSourceEventID,
+		arg.SystemRequestedByUserID,
+		arg.SystemRequestDigest,
 		arg.ExecutedAt,
 		arg.RandomSeed,
 		arg.AllocatedIds,
@@ -453,7 +587,7 @@ func (q *Queries) CreateGameSessionEventBatch(ctx context.Context, arg CreateGam
 		arg.EventCount,
 		arg.CommittedAt,
 	)
-	var i GameSessionEventBatch
+	var i CreateGameSessionEventBatchRow
 	err := row.Scan(
 		&i.BatchID,
 		&i.SessionID,
@@ -462,6 +596,12 @@ func (q *Queries) CreateGameSessionEventBatch(ctx context.Context, arg CreateGam
 		&i.Cause,
 		&i.ActorUserID,
 		&i.ActionID,
+		&i.TimerID,
+		&i.SystemOperationID,
+		&i.SystemSourceKind,
+		&i.SystemSourceEventID,
+		&i.SystemRequestedByUserID,
+		&i.SystemRequestDigest,
 		&i.ExecutedAt,
 		&i.RandomSeed,
 		&i.AllocatedIds,
@@ -532,6 +672,69 @@ func (q *Queries) CreateGameSessionTimer(ctx context.Context, arg CreateGameSess
 		arg.Payload,
 	)
 	return err
+}
+
+const createGameTimerReceipt = `-- name: CreateGameTimerReceipt :one
+INSERT INTO game_timer_receipts (
+    session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6,
+    $7, $8
+)
+ON CONFLICT (session_id, timer_id, expected_state_version) DO NOTHING
+RETURNING session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at
+`
+
+type CreateGameTimerReceiptParams struct {
+	SessionID             pgtype.UUID        `json:"session_id"`
+	TimerID               string             `json:"timer_id"`
+	ExpectedStateVersion  int64              `json:"expected_state_version"`
+	ResultCode            string             `json:"result_code"`
+	ResultDigest          []byte             `json:"result_digest"`
+	CommittedStateVersion int64              `json:"committed_state_version"`
+	BatchID               pgtype.UUID        `json:"batch_id"`
+	CommittedAt           pgtype.Timestamptz `json:"committed_at"`
+}
+
+// CreateGameTimerReceipt
+//
+//	INSERT INTO game_timer_receipts (
+//	    session_id, timer_id, expected_state_version, result_code, result_digest,
+//	    committed_state_version, batch_id, committed_at
+//	) VALUES (
+//	    $1, $2, $3,
+//	    $4, $5, $6,
+//	    $7, $8
+//	)
+//	ON CONFLICT (session_id, timer_id, expected_state_version) DO NOTHING
+//	RETURNING session_id, timer_id, expected_state_version, result_code, result_digest,
+//	    committed_state_version, batch_id, committed_at
+func (q *Queries) CreateGameTimerReceipt(ctx context.Context, arg CreateGameTimerReceiptParams) (GameTimerReceipt, error) {
+	row := q.db.QueryRow(ctx, createGameTimerReceipt,
+		arg.SessionID,
+		arg.TimerID,
+		arg.ExpectedStateVersion,
+		arg.ResultCode,
+		arg.ResultDigest,
+		arg.CommittedStateVersion,
+		arg.BatchID,
+		arg.CommittedAt,
+	)
+	var i GameTimerReceipt
+	err := row.Scan(
+		&i.SessionID,
+		&i.TimerID,
+		&i.ExpectedStateVersion,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CommittedAt,
+	)
+	return i, err
 }
 
 const deleteGameSessionTimers = `-- name: DeleteGameSessionTimers :exec
@@ -681,6 +884,409 @@ func (q *Queries) GetGameSessionForUpdate(ctx context.Context, arg GetGameSessio
 	return i, err
 }
 
+const getGameSessionRoomID = `-- name: GetGameSessionRoomID :one
+SELECT room_id
+FROM game_sessions
+WHERE session_id = $1
+`
+
+type GetGameSessionRoomIDParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
+}
+
+// GetGameSessionRoomID
+//
+//	SELECT room_id
+//	FROM game_sessions
+//	WHERE session_id = $1
+func (q *Queries) GetGameSessionRoomID(ctx context.Context, arg GetGameSessionRoomIDParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getGameSessionRoomID, arg.SessionID)
+	var room_id pgtype.UUID
+	err := row.Scan(&room_id)
+	return room_id, err
+}
+
+const getGameSessionTimerForUpdate = `-- name: GetGameSessionTimerForUpdate :one
+SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+FROM game_session_timers
+WHERE session_id = $1
+  AND timer_id = $2
+FOR UPDATE
+`
+
+type GetGameSessionTimerForUpdateParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
+	TimerID   string      `json:"timer_id"`
+}
+
+// GetGameSessionTimerForUpdate
+//
+//	SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+//	FROM game_session_timers
+//	WHERE session_id = $1
+//	  AND timer_id = $2
+//	FOR UPDATE
+func (q *Queries) GetGameSessionTimerForUpdate(ctx context.Context, arg GetGameSessionTimerForUpdateParams) (GameSessionTimer, error) {
+	row := q.db.QueryRow(ctx, getGameSessionTimerForUpdate, arg.SessionID, arg.TimerID)
+	var i GameSessionTimer
+	err := row.Scan(
+		&i.SessionID,
+		&i.TimerID,
+		&i.ExpectedStateVersion,
+		&i.DueAt,
+		&i.MessageType,
+		&i.SchemaVersion,
+		&i.Payload,
+	)
+	return i, err
+}
+
+const getGameSystemOperationBySourceForUpdate = `-- name: GetGameSystemOperationBySourceForUpdate :one
+SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+FROM game_system_operations
+WHERE session_id = $1
+  AND source_event_id = $2
+FOR UPDATE
+`
+
+type GetGameSystemOperationBySourceForUpdateParams struct {
+	SessionID     pgtype.UUID `json:"session_id"`
+	SourceEventID pgtype.UUID `json:"source_event_id"`
+}
+
+// GetGameSystemOperationBySourceForUpdate
+//
+//	SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+//	    logical_digest, status, result_code, result_digest, committed_state_version,
+//	    batch_id, created_at, completed_at
+//	FROM game_system_operations
+//	WHERE session_id = $1
+//	  AND source_event_id = $2
+//	FOR UPDATE
+func (q *Queries) GetGameSystemOperationBySourceForUpdate(ctx context.Context, arg GetGameSystemOperationBySourceForUpdateParams) (GameSystemOperation, error) {
+	row := q.db.QueryRow(ctx, getGameSystemOperationBySourceForUpdate, arg.SessionID, arg.SourceEventID)
+	var i GameSystemOperation
+	err := row.Scan(
+		&i.SessionID,
+		&i.OperationID,
+		&i.SourceKind,
+		&i.SourceEventID,
+		&i.RequestedByUserID,
+		&i.LogicalDigest,
+		&i.Status,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const getGameSystemOperationForUpdate = `-- name: GetGameSystemOperationForUpdate :one
+SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+FROM game_system_operations
+WHERE session_id = $1
+  AND operation_id = $2
+FOR UPDATE
+`
+
+type GetGameSystemOperationForUpdateParams struct {
+	SessionID   pgtype.UUID `json:"session_id"`
+	OperationID string      `json:"operation_id"`
+}
+
+// GetGameSystemOperationForUpdate
+//
+//	SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+//	    logical_digest, status, result_code, result_digest, committed_state_version,
+//	    batch_id, created_at, completed_at
+//	FROM game_system_operations
+//	WHERE session_id = $1
+//	  AND operation_id = $2
+//	FOR UPDATE
+func (q *Queries) GetGameSystemOperationForUpdate(ctx context.Context, arg GetGameSystemOperationForUpdateParams) (GameSystemOperation, error) {
+	row := q.db.QueryRow(ctx, getGameSystemOperationForUpdate, arg.SessionID, arg.OperationID)
+	var i GameSystemOperation
+	err := row.Scan(
+		&i.SessionID,
+		&i.OperationID,
+		&i.SourceKind,
+		&i.SourceEventID,
+		&i.RequestedByUserID,
+		&i.LogicalDigest,
+		&i.Status,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const getGameTimerReceipt = `-- name: GetGameTimerReceipt :one
+SELECT session_id, timer_id, expected_state_version, result_code, result_digest,
+    committed_state_version, batch_id, committed_at
+FROM game_timer_receipts
+WHERE session_id = $1
+  AND timer_id = $2
+  AND expected_state_version = $3
+`
+
+type GetGameTimerReceiptParams struct {
+	SessionID            pgtype.UUID `json:"session_id"`
+	TimerID              string      `json:"timer_id"`
+	ExpectedStateVersion int64       `json:"expected_state_version"`
+}
+
+// GetGameTimerReceipt
+//
+//	SELECT session_id, timer_id, expected_state_version, result_code, result_digest,
+//	    committed_state_version, batch_id, committed_at
+//	FROM game_timer_receipts
+//	WHERE session_id = $1
+//	  AND timer_id = $2
+//	  AND expected_state_version = $3
+func (q *Queries) GetGameTimerReceipt(ctx context.Context, arg GetGameTimerReceiptParams) (GameTimerReceipt, error) {
+	row := q.db.QueryRow(ctx, getGameTimerReceipt, arg.SessionID, arg.TimerID, arg.ExpectedStateVersion)
+	var i GameTimerReceipt
+	err := row.Scan(
+		&i.SessionID,
+		&i.TimerID,
+		&i.ExpectedStateVersion,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CommittedAt,
+	)
+	return i, err
+}
+
+const insertGameSystemOperationPending = `-- name: InsertGameSystemOperationPending :one
+INSERT INTO game_system_operations (
+    session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, created_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, 'pending', $7
+)
+ON CONFLICT DO NOTHING
+RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+    logical_digest, status, result_code, result_digest, committed_state_version,
+    batch_id, created_at, completed_at
+`
+
+type InsertGameSystemOperationPendingParams struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	OperationID       string             `json:"operation_id"`
+	SourceKind        string             `json:"source_kind"`
+	SourceEventID     pgtype.UUID        `json:"source_event_id"`
+	RequestedByUserID pgtype.UUID        `json:"requested_by_user_id"`
+	LogicalDigest     []byte             `json:"logical_digest"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+// InsertGameSystemOperationPending
+//
+//	INSERT INTO game_system_operations (
+//	    session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+//	    logical_digest, status, created_at
+//	) VALUES (
+//	    $1, $2, $3, $4,
+//	    $5, $6, 'pending', $7
+//	)
+//	ON CONFLICT DO NOTHING
+//	RETURNING session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
+//	    logical_digest, status, result_code, result_digest, committed_state_version,
+//	    batch_id, created_at, completed_at
+func (q *Queries) InsertGameSystemOperationPending(ctx context.Context, arg InsertGameSystemOperationPendingParams) (GameSystemOperation, error) {
+	row := q.db.QueryRow(ctx, insertGameSystemOperationPending,
+		arg.SessionID,
+		arg.OperationID,
+		arg.SourceKind,
+		arg.SourceEventID,
+		arg.RequestedByUserID,
+		arg.LogicalDigest,
+		arg.CreatedAt,
+	)
+	var i GameSystemOperation
+	err := row.Scan(
+		&i.SessionID,
+		&i.OperationID,
+		&i.SourceKind,
+		&i.SourceEventID,
+		&i.RequestedByUserID,
+		&i.LogicalDigest,
+		&i.Status,
+		&i.ResultCode,
+		&i.ResultDigest,
+		&i.CommittedStateVersion,
+		&i.BatchID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const listDueGameSessionTimerCandidates = `-- name: ListDueGameSessionTimerCandidates :many
+SELECT timer.session_id, timer.timer_id, timer.expected_state_version, timer.due_at,
+    timer.message_type, timer.schema_version, timer.payload
+FROM game_session_timers AS timer
+JOIN game_sessions AS session USING (session_id)
+WHERE session.status = 'active'
+  AND timer.due_at <= $1
+ORDER BY timer.due_at, timer.session_id, timer.timer_id
+LIMIT $2
+`
+
+type ListDueGameSessionTimerCandidatesParams struct {
+	DueAt      pgtype.Timestamptz `json:"due_at"`
+	BatchLimit int32              `json:"batch_limit"`
+}
+
+// ListDueGameSessionTimerCandidates
+//
+//	SELECT timer.session_id, timer.timer_id, timer.expected_state_version, timer.due_at,
+//	    timer.message_type, timer.schema_version, timer.payload
+//	FROM game_session_timers AS timer
+//	JOIN game_sessions AS session USING (session_id)
+//	WHERE session.status = 'active'
+//	  AND timer.due_at <= $1
+//	ORDER BY timer.due_at, timer.session_id, timer.timer_id
+//	LIMIT $2
+func (q *Queries) ListDueGameSessionTimerCandidates(ctx context.Context, arg ListDueGameSessionTimerCandidatesParams) ([]GameSessionTimer, error) {
+	rows, err := q.db.Query(ctx, listDueGameSessionTimerCandidates, arg.DueAt, arg.BatchLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GameSessionTimer{}
+	for rows.Next() {
+		var i GameSessionTimer
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.TimerID,
+			&i.ExpectedStateVersion,
+			&i.DueAt,
+			&i.MessageType,
+			&i.SchemaVersion,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGameSessionEventBatchesAfter = `-- name: ListGameSessionEventBatchesAfter :many
+SELECT batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
+    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+    system_requested_by_user_id, system_request_digest,
+    executed_at, random_seed, allocated_ids, input_message_type,
+    input_schema_version, input_payload, event_count, committed_at
+FROM game_session_event_batches
+WHERE session_id = $1
+  AND state_version > $2
+ORDER BY state_version
+LIMIT $3
+`
+
+type ListGameSessionEventBatchesAfterParams struct {
+	SessionID         pgtype.UUID `json:"session_id"`
+	AfterStateVersion int64       `json:"after_state_version"`
+	BatchLimit        int32       `json:"batch_limit"`
+}
+
+type ListGameSessionEventBatchesAfterRow struct {
+	BatchID                 pgtype.UUID        `json:"batch_id"`
+	SessionID               pgtype.UUID        `json:"session_id"`
+	StateVersion            int64              `json:"state_version"`
+	OwnershipEpoch          int64              `json:"ownership_epoch"`
+	Cause                   string             `json:"cause"`
+	ActorUserID             pgtype.UUID        `json:"actor_user_id"`
+	ActionID                pgtype.Text        `json:"action_id"`
+	TimerID                 pgtype.Text        `json:"timer_id"`
+	SystemOperationID       pgtype.Text        `json:"system_operation_id"`
+	SystemSourceKind        pgtype.Text        `json:"system_source_kind"`
+	SystemSourceEventID     pgtype.UUID        `json:"system_source_event_id"`
+	SystemRequestedByUserID pgtype.UUID        `json:"system_requested_by_user_id"`
+	SystemRequestDigest     []byte             `json:"system_request_digest"`
+	ExecutedAt              pgtype.Timestamptz `json:"executed_at"`
+	RandomSeed              []byte             `json:"random_seed"`
+	AllocatedIds            []string           `json:"allocated_ids"`
+	InputMessageType        string             `json:"input_message_type"`
+	InputSchemaVersion      int32              `json:"input_schema_version"`
+	InputPayload            []byte             `json:"input_payload"`
+	EventCount              int32              `json:"event_count"`
+	CommittedAt             pgtype.Timestamptz `json:"committed_at"`
+}
+
+// ListGameSessionEventBatchesAfter
+//
+//	SELECT batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
+//	    action_id, timer_id, system_operation_id, system_source_kind, system_source_event_id,
+//	    system_requested_by_user_id, system_request_digest,
+//	    executed_at, random_seed, allocated_ids, input_message_type,
+//	    input_schema_version, input_payload, event_count, committed_at
+//	FROM game_session_event_batches
+//	WHERE session_id = $1
+//	  AND state_version > $2
+//	ORDER BY state_version
+//	LIMIT $3
+func (q *Queries) ListGameSessionEventBatchesAfter(ctx context.Context, arg ListGameSessionEventBatchesAfterParams) ([]ListGameSessionEventBatchesAfterRow, error) {
+	rows, err := q.db.Query(ctx, listGameSessionEventBatchesAfter, arg.SessionID, arg.AfterStateVersion, arg.BatchLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListGameSessionEventBatchesAfterRow{}
+	for rows.Next() {
+		var i ListGameSessionEventBatchesAfterRow
+		if err := rows.Scan(
+			&i.BatchID,
+			&i.SessionID,
+			&i.StateVersion,
+			&i.OwnershipEpoch,
+			&i.Cause,
+			&i.ActorUserID,
+			&i.ActionID,
+			&i.TimerID,
+			&i.SystemOperationID,
+			&i.SystemSourceKind,
+			&i.SystemSourceEventID,
+			&i.SystemRequestedByUserID,
+			&i.SystemRequestDigest,
+			&i.ExecutedAt,
+			&i.RandomSeed,
+			&i.AllocatedIds,
+			&i.InputMessageType,
+			&i.InputSchemaVersion,
+			&i.InputPayload,
+			&i.EventCount,
+			&i.CommittedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGameSessionEvents = `-- name: ListGameSessionEvents :many
 SELECT batch_id, event_ordinal, message_type, schema_version, payload
 FROM game_session_events
@@ -804,6 +1410,78 @@ func (q *Queries) ListGameSessionTimers(ctx context.Context, arg ListGameSession
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateGameSessionLifecycleCAS = `-- name: UpdateGameSessionLifecycleCAS :one
+UPDATE game_sessions
+SET next_deadline_at = $1,
+    status = $2,
+    updated_at = $3,
+    ended_at = $4
+WHERE session_id = $5
+  AND state_version = $6
+  AND ownership_epoch = $7
+  AND status IN ('active', 'suspended')
+RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+    state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+`
+
+type UpdateGameSessionLifecycleCASParams struct {
+	NextDeadlineAt         pgtype.Timestamptz `json:"next_deadline_at"`
+	Status                 string             `json:"status"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	EndedAt                pgtype.Timestamptz `json:"ended_at"`
+	SessionID              pgtype.UUID        `json:"session_id"`
+	ExpectedStateVersion   int64              `json:"expected_state_version"`
+	ExpectedOwnershipEpoch int64              `json:"expected_ownership_epoch"`
+}
+
+// UpdateGameSessionLifecycleCAS
+//
+//	UPDATE game_sessions
+//	SET next_deadline_at = $1,
+//	    status = $2,
+//	    updated_at = $3,
+//	    ended_at = $4
+//	WHERE session_id = $5
+//	  AND state_version = $6
+//	  AND ownership_epoch = $7
+//	  AND status IN ('active', 'suspended')
+//	RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
+//	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+//	    state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+func (q *Queries) UpdateGameSessionLifecycleCAS(ctx context.Context, arg UpdateGameSessionLifecycleCASParams) (GameSession, error) {
+	row := q.db.QueryRow(ctx, updateGameSessionLifecycleCAS,
+		arg.NextDeadlineAt,
+		arg.Status,
+		arg.UpdatedAt,
+		arg.EndedAt,
+		arg.SessionID,
+		arg.ExpectedStateVersion,
+		arg.ExpectedOwnershipEpoch,
+	)
+	var i GameSession
+	err := row.Scan(
+		&i.SessionID,
+		&i.RoomID,
+		&i.GameID,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.StateVersion,
+		&i.OwnershipEpoch,
+		&i.SnapshotVersion,
+		&i.StateMessageType,
+		&i.StateSchemaVersion,
+		&i.StatePayload,
+		&i.NextDeadlineAt,
+		&i.Status,
+		&i.StartedAt,
+		&i.UpdatedAt,
+		&i.EndedAt,
+	)
+	return i, err
 }
 
 const updateGameSessionStateCAS = `-- name: UpdateGameSessionStateCAS :one

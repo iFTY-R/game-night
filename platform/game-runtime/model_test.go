@@ -2,6 +2,7 @@ package gameruntime
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"reflect"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
@@ -190,6 +192,136 @@ func TestApplyActionRequiresExactEpochAndStateStepAndFinishesTerminally(t *testi
 	finish.Transition = testRuntimeTransition(4, false)
 	if _, _, err := finished.ApplyAction(finish); !errors.Is(err, ErrSessionTerminal) {
 		t.Fatalf("terminal action error = %v", err)
+	}
+}
+
+func TestApplyTimerRequiresPersistedDueTimerAndProducesActorlessBatch(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 10, 0, 0, 0, time.UTC)
+	dueAt := now.Add(10 * time.Second)
+	create := testRuntimeCreateRequest(now)
+	create.Transition = testRuntimeTransition(1, false, testRuntimeTimer("turn.timeout", dueAt))
+	session, _, err := NewSession(create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	timer := session.Snapshot().Timers[0]
+	request := TimerTransitionRequest{
+		BatchID: uuid.New(), OwnershipEpoch: 1, TimerID: timer.TimerID,
+		ExpectedStateVersion: timer.ExpectedStateVersion, Execution: testRuntimeExecution(dueAt),
+		Input: timer.Message, Transition: testRuntimeTransition(2, false),
+	}
+	early := request
+	early.Execution = testRuntimeExecution(dueAt.Add(-time.Second))
+	if _, _, err := session.ApplyTimer(early); !errors.Is(err, ErrInvalidSessionInput) {
+		t.Fatalf("early timer error = %v", err)
+	}
+
+	next, batch, err := session.ApplyTimer(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batchSnapshot := batch.Snapshot()
+	if next.Snapshot().State.StateVersion != 2 || batchSnapshot.Cause != EventCauseTimer ||
+		batchSnapshot.TimerID != timer.TimerID || batchSnapshot.ActorUserID != uuid.Nil || batchSnapshot.ActionID.Valid() {
+		t.Fatalf("timer transition = %+v, batch = %+v", next.Snapshot(), batchSnapshot)
+	}
+	stale := request
+	stale.BatchID = uuid.New()
+	stale.ExpectedStateVersion = 2
+	stale.Transition = testRuntimeTransition(3, false)
+	if _, _, err := next.ApplyTimer(stale); !errors.Is(err, ErrTimerNotFound) {
+		t.Fatalf("consumed timer error = %v", err)
+	}
+}
+
+func TestApplySystemBindsOperationSourceDigestAndProducesActorlessBatch(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 11, 0, 0, 0, time.UTC)
+	session, _, err := NewSession(testRuntimeCreateRequest(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationID := testRuntimeOperationID(t, 31)
+	source := SystemSource{Kind: SystemSourceRoomOutbox, EventID: uuid.New()}
+	digest := idempotency.Digest(sha256.Sum256([]byte("participant-revoked")))
+	request := SystemTransitionRequest{
+		BatchID: uuid.New(), OwnershipEpoch: 1, ExpectedStateVersion: 1,
+		SystemOperationID: operationID, Source: source, RequestDigest: digest,
+		Execution: testRuntimeExecution(now.Add(2 * time.Second)),
+		Input:     testRuntimeMessage("participant.revoked", []byte("user")), Transition: testRuntimeTransition(2, false),
+	}
+	next, batch, err := session.ApplySystem(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batchSnapshot := batch.Snapshot()
+	if next.Snapshot().State.StateVersion != 2 || batchSnapshot.Cause != EventCauseSystem ||
+		batchSnapshot.SystemOperationID.Value() != operationID.Value() || batchSnapshot.SystemSource != source ||
+		batchSnapshot.RequestDigest != digest || batchSnapshot.ActorUserID != uuid.Nil || batchSnapshot.ActionID.Valid() {
+		t.Fatalf("system transition = %+v, batch = %+v", next.Snapshot(), batchSnapshot)
+	}
+	request.BatchID = uuid.New()
+	request.ExpectedStateVersion = 1
+	request.Transition = testRuntimeTransition(3, false)
+	if _, _, err := next.ApplySystem(request); !errors.Is(err, ErrStateVersionConflict) {
+		t.Fatalf("stale system version error = %v", err)
+	}
+}
+
+func TestSuspendResumeAndCancelApplyLifecycleTimerSemantics(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 12, 0, 0, 0, time.UTC)
+	create := testRuntimeCreateRequest(now)
+	create.Transition = testRuntimeTransition(1, false, testRuntimeTimer("turn.timeout", now.Add(time.Minute)))
+	session, _, err := NewSession(create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := session.Suspend(1, now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspendedSnapshot := suspended.Snapshot()
+	if suspendedSnapshot.Status != StatusSuspended || suspendedSnapshot.State.StateVersion != 1 ||
+		len(suspendedSnapshot.Timers) != 1 || suspendedSnapshot.NextDeadlineAt.IsZero() {
+		t.Fatalf("suspended snapshot = %+v", suspendedSnapshot)
+	}
+	if _, _, err := suspended.ApplySystem(SystemTransitionRequest{}); !errors.Is(err, ErrSessionSuspended) {
+		t.Fatalf("suspended transition error = %v", err)
+	}
+	resumed, err := suspended.Resume(1, now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.Snapshot().Status != StatusActive || len(resumed.Snapshot().Timers) != 1 {
+		t.Fatalf("resumed snapshot = %+v", resumed.Snapshot())
+	}
+	suspended, err = resumed.Suspend(1, now.Add(4*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := suspended.Cancel(1, now.Add(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelledSnapshot := cancelled.Snapshot()
+	if cancelledSnapshot.Status != StatusCancelled || cancelledSnapshot.State.StateVersion != 1 ||
+		len(cancelledSnapshot.Timers) != 0 || !cancelledSnapshot.NextDeadlineAt.IsZero() ||
+		!cancelledSnapshot.EndedAt.Equal(now.Add(5*time.Second)) {
+		t.Fatalf("cancelled snapshot = %+v", cancelledSnapshot)
+	}
+	if _, err := cancelled.Cancel(1, now.Add(6*time.Second)); !errors.Is(err, ErrSessionTerminal) {
+		t.Fatalf("terminal cancel error = %v", err)
 	}
 }
 

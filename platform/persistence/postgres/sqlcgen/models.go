@@ -223,21 +223,27 @@ type GameSessionEvent struct {
 }
 
 type GameSessionEventBatch struct {
-	BatchID            pgtype.UUID        `json:"batch_id"`
-	SessionID          pgtype.UUID        `json:"session_id"`
-	StateVersion       int64              `json:"state_version"`
-	OwnershipEpoch     int64              `json:"ownership_epoch"`
-	Cause              string             `json:"cause"`
-	ActorUserID        pgtype.UUID        `json:"actor_user_id"`
-	ActionID           pgtype.Text        `json:"action_id"`
-	ExecutedAt         pgtype.Timestamptz `json:"executed_at"`
-	RandomSeed         []byte             `json:"random_seed"`
-	AllocatedIds       []string           `json:"allocated_ids"`
-	InputMessageType   string             `json:"input_message_type"`
-	InputSchemaVersion int32              `json:"input_schema_version"`
-	InputPayload       []byte             `json:"input_payload"`
-	EventCount         int32              `json:"event_count"`
-	CommittedAt        pgtype.Timestamptz `json:"committed_at"`
+	BatchID                 pgtype.UUID        `json:"batch_id"`
+	SessionID               pgtype.UUID        `json:"session_id"`
+	StateVersion            int64              `json:"state_version"`
+	OwnershipEpoch          int64              `json:"ownership_epoch"`
+	Cause                   string             `json:"cause"`
+	ActorUserID             pgtype.UUID        `json:"actor_user_id"`
+	ActionID                pgtype.Text        `json:"action_id"`
+	ExecutedAt              pgtype.Timestamptz `json:"executed_at"`
+	RandomSeed              []byte             `json:"random_seed"`
+	AllocatedIds            []string           `json:"allocated_ids"`
+	InputMessageType        string             `json:"input_message_type"`
+	InputSchemaVersion      int32              `json:"input_schema_version"`
+	InputPayload            []byte             `json:"input_payload"`
+	EventCount              int32              `json:"event_count"`
+	CommittedAt             pgtype.Timestamptz `json:"committed_at"`
+	TimerID                 pgtype.Text        `json:"timer_id"`
+	SystemOperationID       pgtype.Text        `json:"system_operation_id"`
+	SystemSourceKind        pgtype.Text        `json:"system_source_kind"`
+	SystemSourceEventID     pgtype.UUID        `json:"system_source_event_id"`
+	SystemRequestedByUserID pgtype.UUID        `json:"system_requested_by_user_id"`
+	SystemRequestDigest     []byte             `json:"system_request_digest"`
 }
 
 type GameSessionParticipant struct {
@@ -254,6 +260,33 @@ type GameSessionTimer struct {
 	MessageType          string             `json:"message_type"`
 	SchemaVersion        int32              `json:"schema_version"`
 	Payload              []byte             `json:"payload"`
+}
+
+type GameSystemOperation struct {
+	SessionID             pgtype.UUID        `json:"session_id"`
+	OperationID           string             `json:"operation_id"`
+	SourceKind            string             `json:"source_kind"`
+	SourceEventID         pgtype.UUID        `json:"source_event_id"`
+	RequestedByUserID     pgtype.UUID        `json:"requested_by_user_id"`
+	LogicalDigest         []byte             `json:"logical_digest"`
+	Status                string             `json:"status"`
+	ResultCode            pgtype.Text        `json:"result_code"`
+	ResultDigest          []byte             `json:"result_digest"`
+	CommittedStateVersion pgtype.Int8        `json:"committed_state_version"`
+	BatchID               pgtype.UUID        `json:"batch_id"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+}
+
+type GameTimerReceipt struct {
+	SessionID             pgtype.UUID        `json:"session_id"`
+	TimerID               string             `json:"timer_id"`
+	ExpectedStateVersion  int64              `json:"expected_state_version"`
+	ResultCode            string             `json:"result_code"`
+	ResultDigest          []byte             `json:"result_digest"`
+	CommittedStateVersion int64              `json:"committed_state_version"`
+	BatchID               pgtype.UUID        `json:"batch_id"`
+	CommittedAt           pgtype.Timestamptz `json:"committed_at"`
 }
 
 type KeyRotationJob struct {

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file game/dice789/v1/dice_789.proto.
  */
 export const file_game_dice789_v1_dice_789: GenFile = /*@__PURE__*/
-  fileDesc("Ch5nYW1lL2RpY2U3ODkvdjEvZGljZV83ODkucHJvdG8SD2dhbWUuZGljZTc4OS52MSKNAwoGQ29uZmlnEhoKEmluaXRpYWxfcG9vbF90aWNrcxgBIAEoDRIcChRsYXllcl9jYXBhY2l0eV90aWNrcxgCIAEoDRIWCg5hZGRfc3RlcF90aWNrcxgDIAEoDRISCgptYXhfbGF5ZXJzGAQgASgNEhQKDHN0YWNrZWRfcG9vbBgFIAEoCBIeChZvcmRpbmFyeV9wYWlyc19yZXZlcnNlGAYgASgIEhoKEmRvdWJsZV9vbmVfZW5hYmxlZBgHIAEoCBIbChNkb3VibGVfZm91cl9lbmFibGVkGAggASgIEhoKEmRvdWJsZV9zaXhfZW5hYmxlZBgJIAEoCBI0Cg1jb250aW51ZV9tb2RlGAogASgOMh0uZ2FtZS5kaWNlNzg5LnYxLkNvbnRpbnVlTW9kZRIYChBsYXN0X2RpZ2l0X21hdGNoGAsgASgIEh4KFmFjdGlvbl90aW1lb3V0X3NlY29uZHMYDCABKA0SIgoaZHJvcF9yZXBvcnRfd2luZG93X3NlY29uZHMYDSABKA0iGgoJUG9vbExheWVyEg0KBXRpY2tzGAEgASgNIlkKC1BsYXllclN0YXRlEg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDRIOCgZhY3RpdmUYAyABKAgSFQoNcGVuYWx0eV90aWNrcxgEIAEoDSKgAwoFU3RhdGUSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SJQoFcGhhc2UYAiABKA4yFi5nYW1lLmRpY2U3ODkudjEuUGhhc2USDAoEdHVybhgDIAEoDRItCgdwbGF5ZXJzGAQgAygLMhwuZ2FtZS5kaWNlNzg5LnYxLlBsYXllclN0YXRlEhcKD2N1cnJlbnRfdXNlcl9pZBgFIAEoCRIWCg5zb3VyY2VfdXNlcl9pZBgGIAEoCRIWCg50YXJnZXRfdXNlcl9pZBgHIAEoCRIRCglkaXJlY3Rpb24YCCABKA0SKAoEcG9vbBgJIAMoCzIaLmdhbWUuZGljZTc4OS52MS5Qb29sTGF5ZXISGAoQdG90YWxfcG9vbF90aWNrcxgKIAEoDRIPCgdkaWVfb25lGAsgASgNEg8KB2RpZV90d28YDCABKA0SCwoDc3VtGA0gASgNEiMKG2FjdGlvbl9kZWFkbGluZV91bml4X21pbGxpcxgOIAEoAxInCgZjb25maWcYDyABKAsyFy5nYW1lLmRpY2U3ODkudjEuQ29uZmlnIgYKBFJvbGwiDwoNQ29uZmlybUxhbmRlZCIaCglBZGRUb1Bvb2wSDQoFdGlja3MYASABKA0iHwoMQ2hvb3NlVGFyZ2V0Eg8KB3VzZXJfaWQYASABKAkiCAoGUmVyb2xsIgYKBFBhc3MiHwoNUmVwb3J0RHJvcHBlZBIOCgZyZWFzb24YASABKAkiCAoGRmluaXNoIpcDCgdDb21tYW5kEiUKBHJvbGwYASABKAsyFS5nYW1lLmRpY2U3ODkudjEuUm9sbEgAEjgKDmNvbmZpcm1fbGFuZGVkGAIgASgLMh4uZ2FtZS5kaWNlNzg5LnYxLkNvbmZpcm1MYW5kZWRIABIxCgthZGRfdG9fcG9vbBgDIAEoCzIaLmdhbWUuZGljZTc4OS52MS5BZGRUb1Bvb2xIABI2Cg1jaG9vc2VfdGFyZ2V0GAQgASgLMh0uZ2FtZS5kaWNlNzg5LnYxLkNob29zZVRhcmdldEgAEikKBnJlcm9sbBgFIAEoCzIXLmdhbWUuZGljZTc4OS52MS5SZXJvbGxIABIlCgRwYXNzGAYgASgLMhUuZ2FtZS5kaWNlNzg5LnYxLlBhc3NIABI4Cg5yZXBvcnRfZHJvcHBlZBgHIAEoCzIeLmdhbWUuZGljZTc4OS52MS5SZXBvcnREcm9wcGVkSAASKQoGZmluaXNoGAggASgLMhcuZ2FtZS5kaWNlNzg5LnYxLkZpbmlzaEgAQgkKB2NvbW1hbmQiLAoLVHVyblN0YXJ0ZWQSDAoEdHVybhgBIAEoDRIPCgd1c2VyX2lkGAIgASgJIjsKCkRpY2VSb2xsZWQSDwoHZGllX29uZRgBIAEoDRIPCgdkaWVfdHdvGAIgASgNEgsKA3N1bRgDIAEoDSJNCgtQb29sQ2hhbmdlZBIUCgxiZWZvcmVfdGlja3MYASABKA0SEwoLYWZ0ZXJfdGlja3MYAiABKA0SEwoLYWN0b3JfdGlja3MYAyABKA0iJQoQRGlyZWN0aW9uQ2hhbmdlZBIRCglkaXJlY3Rpb24YASABKA0iQQoPUGVuYWx0eVJlY29yZGVkEg8KB3VzZXJfaWQYASABKAkSDQoFdGlja3MYAiABKA0SDgoGcmVhc29uGAMgASgJIkAKDlRhcmdldFNlbGVjdGVkEhYKDnNvdXJjZV91c2VyX2lkGAEgASgJEhYKDnRhcmdldF91c2VyX2lkGAIgASgJIi4KC1R1cm5Ecm9wcGVkEg8KB3VzZXJfaWQYASABKAkSDgoGcmVhc29uGAIgASgJIiUKElBhcnRpY2lwYW50UmV2b2tlZBIPCgd1c2VyX2lkGAEgASgJIiEKD1Nlc3Npb25GaW5pc2hlZBIOCgZyZWFzb24YASABKAkiogQKBUV2ZW50EjQKDHR1cm5fc3RhcnRlZBgBIAEoCzIcLmdhbWUuZGljZTc4OS52MS5UdXJuU3RhcnRlZEgAEjIKC2RpY2Vfcm9sbGVkGAIgASgLMhsuZ2FtZS5kaWNlNzg5LnYxLkRpY2VSb2xsZWRIABI0Cgxwb29sX2NoYW5nZWQYAyABKAsyHC5nYW1lLmRpY2U3ODkudjEuUG9vbENoYW5nZWRIABI+ChFkaXJlY3Rpb25fY2hhbmdlZBgEIAEoCzIhLmdhbWUuZGljZTc4OS52MS5EaXJlY3Rpb25DaGFuZ2VkSAASPAoQcGVuYWx0eV9yZWNvcmRlZBgFIAEoCzIgLmdhbWUuZGljZTc4OS52MS5QZW5hbHR5UmVjb3JkZWRIABI6Cg90YXJnZXRfc2VsZWN0ZWQYBiABKAsyHy5nYW1lLmRpY2U3ODkudjEuVGFyZ2V0U2VsZWN0ZWRIABI0Cgx0dXJuX2Ryb3BwZWQYByABKAsyHC5nYW1lLmRpY2U3ODkudjEuVHVybkRyb3BwZWRIABJCChNwYXJ0aWNpcGFudF9yZXZva2VkGAggASgLMiMuZ2FtZS5kaWNlNzg5LnYxLlBhcnRpY2lwYW50UmV2b2tlZEgAEjwKEHNlc3Npb25fZmluaXNoZWQYCSABKAsyIC5nYW1lLmRpY2U3ODkudjEuU2Vzc2lvbkZpbmlzaGVkSABCBwoFZXZlbnQi9gIKBFZpZXcSJQoFcGhhc2UYASABKA4yFi5nYW1lLmRpY2U3ODkudjEuUGhhc2USDAoEdHVybhgCIAEoDRItCgdwbGF5ZXJzGAMgAygLMhwuZ2FtZS5kaWNlNzg5LnYxLlBsYXllclN0YXRlEhcKD2N1cnJlbnRfdXNlcl9pZBgEIAEoCRIWCg50YXJnZXRfdXNlcl9pZBgFIAEoCRIRCglkaXJlY3Rpb24YBiABKA0SKAoEcG9vbBgHIAMoCzIaLmdhbWUuZGljZTc4OS52MS5Qb29sTGF5ZXISGAoQdG90YWxfcG9vbF90aWNrcxgIIAEoDRIPCgdkaWVfb25lGAkgASgNEg8KB2RpZV90d28YCiABKA0SCwoDc3VtGAsgASgNEiMKG2FjdGlvbl9kZWFkbGluZV91bml4X21pbGxpcxgMIAEoAxIXCg9hbGxvd2VkX2FjdGlvbnMYDSADKAkSFQoNZmluaXNoX3JlYXNvbhgOIAEoCSrNAQoFUGhhc2USFQoRUEhBU0VfVU5TUEVDSUZJRUQQABIXChNQSEFTRV9BV0FJVElOR19ST0xMEAESGAoUUEhBU0VfUkVTVUxUX1BFTkRJTkcQAhIWChJQSEFTRV9BV0FJVElOR19BREQQAxIZChVQSEFTRV9BV0FJVElOR19UQVJHRVQQBBIbChdQSEFTRV9BV0FJVElOR19DT05USU5VRRAFEhYKElBIQVNFX1RVUk5fU0VUVExFRBAGEhIKDlBIQVNFX0ZJTklTSEVEEAcqiQEKDENvbnRpbnVlTW9kZRIdChlDT05USU5VRV9NT0RFX1VOU1BFQ0lGSUVEEAASGgoWQ09OVElOVUVfTU9ERV9PUFRJT05BTBABEh8KG0NPTlRJTlVFX01PREVfRk9SQ0VEX1JFUk9MTBACEh0KGUNPTlRJTlVFX01PREVfRk9SQ0VEX1BBU1MQA0JOWkxnaXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2dhbWVzL2RpY2UtNzg5L2dlbi9nby9nYW1lL2RpY2U3ODkvdjE7ZGljZTc4OXYxYgZwcm90bzM");
+  fileDesc("Ch5nYW1lL2RpY2U3ODkvdjEvZGljZV83ODkucHJvdG8SD2dhbWUuZGljZTc4OS52MSKNAwoGQ29uZmlnEhoKEmluaXRpYWxfcG9vbF90aWNrcxgBIAEoDRIcChRsYXllcl9jYXBhY2l0eV90aWNrcxgCIAEoDRIWCg5hZGRfc3RlcF90aWNrcxgDIAEoDRISCgptYXhfbGF5ZXJzGAQgASgNEhQKDHN0YWNrZWRfcG9vbBgFIAEoCBIeChZvcmRpbmFyeV9wYWlyc19yZXZlcnNlGAYgASgIEhoKEmRvdWJsZV9vbmVfZW5hYmxlZBgHIAEoCBIbChNkb3VibGVfZm91cl9lbmFibGVkGAggASgIEhoKEmRvdWJsZV9zaXhfZW5hYmxlZBgJIAEoCBI0Cg1jb250aW51ZV9tb2RlGAogASgOMh0uZ2FtZS5kaWNlNzg5LnYxLkNvbnRpbnVlTW9kZRIYChBsYXN0X2RpZ2l0X21hdGNoGAsgASgIEh4KFmFjdGlvbl90aW1lb3V0X3NlY29uZHMYDCABKA0SIgoaZHJvcF9yZXBvcnRfd2luZG93X3NlY29uZHMYDSABKA0iKQoJUG9vbExheWVyEg0KBXRpY2tzGAEgASgNEg0KBWluZGV4GAIgASgNIlkKC1BsYXllclN0YXRlEg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDRIOCgZhY3RpdmUYAyABKAgSFQoNcGVuYWx0eV90aWNrcxgEIAEoDSKcAQoRQWN0aW9uQ29uc3RyYWludHMSGQoRbWluaW11bV9hZGRfdGlja3MYASABKA0SGQoRbWF4aW11bV9hZGRfdGlja3MYAiABKA0SFgoOYWRkX3N0ZXBfdGlja3MYAyABKA0SIAoYYWxsb3dfY2FwYWNpdHlfcmVtYWluZGVyGAQgASgIEhcKD3RhcmdldF91c2VyX2lkcxgFIAMoCSKcBQoLVHVyblN1bW1hcnkSDAoEdHVybhgBIAEoDRIWCg5zb3VyY2VfdXNlcl9pZBgCIAEoCRIPCgdkaWVfb25lGAMgASgNEg8KB2RpZV90d28YBCABKA0SCwoDc3VtGAUgASgNEicKBmVmZmVjdBgGIAEoDjIXLmdhbWUuZGljZTc4OS52MS5FZmZlY3QSFgoOdGFyZ2V0X3VzZXJfaWQYByABKAkSGQoRcG9vbF9iZWZvcmVfdGlja3MYCCABKA0SGAoQcG9vbF9hZnRlcl90aWNrcxgJIAEoDRIXCg9wZW5hbHR5X3VzZXJfaWQYCiABKAkSFQoNcGVuYWx0eV90aWNrcxgLIAEoDRIYChBkaXJlY3Rpb25fYmVmb3JlGAwgASgNEhcKD2RpcmVjdGlvbl9hZnRlchgNIAEoDRIUCgxuZXh0X3VzZXJfaWQYDiABKAkSLQoHb3V0Y29tZRgPIAEoDjIcLmdhbWUuZGljZTc4OS52MS5UdXJuT3V0Y29tZRIvCgVjYXVzZRgQIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2USGAoQZHJvcHBlZF9yZXBvcnRlZBgRIAEoCBIdChVkcm9wX29wZXJhdG9yX3VzZXJfaWQYEiABKAkSEwoLZHJvcF9yZWFzb24YEyABKAkSGQoRcmVzb2x1dGlvbl9yZWFzb24YFCABKAkSNgoScG9vbF9iZWZvcmVfbGF5ZXJzGBUgAygLMhouZ2FtZS5kaWNlNzg5LnYxLlBvb2xMYXllchI1ChFwb29sX2FmdGVyX2xheWVycxgWIAMoCzIaLmdhbWUuZGljZTc4OS52MS5Qb29sTGF5ZXISEQoJYXVkaXRfcmVmGBcgASgJIroFCgVTdGF0ZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIlCgVwaGFzZRgCIAEoDjIWLmdhbWUuZGljZTc4OS52MS5QaGFzZRIMCgR0dXJuGAMgASgNEi0KB3BsYXllcnMYBCADKAsyHC5nYW1lLmRpY2U3ODkudjEuUGxheWVyU3RhdGUSFwoPY3VycmVudF91c2VyX2lkGAUgASgJEhYKDnNvdXJjZV91c2VyX2lkGAYgASgJEhYKDnRhcmdldF91c2VyX2lkGAcgASgJEhEKCWRpcmVjdGlvbhgIIAEoDRIoCgRwb29sGAkgAygLMhouZ2FtZS5kaWNlNzg5LnYxLlBvb2xMYXllchIYChB0b3RhbF9wb29sX3RpY2tzGAogASgNEg8KB2RpZV9vbmUYCyABKA0SDwoHZGllX3R3bxgMIAEoDRILCgNzdW0YDSABKA0SIwobYWN0aW9uX2RlYWRsaW5lX3VuaXhfbWlsbGlzGA4gASgDEicKBmNvbmZpZxgPIAEoCzIXLmdhbWUuZGljZTc4OS52MS5Db25maWcSFAoMaG9zdF91c2VyX2lkGBAgASgJEicKBmVmZmVjdBgRIAEoDjIXLmdhbWUuZGljZTc4OS52MS5FZmZlY3QSFwoPYWxsb3dlZF9hY3Rpb25zGBIgAygJEjIKDHR1cm5faGlzdG9yeRgTIAMoCzIcLmdhbWUuZGljZTc4OS52MS5UdXJuU3VtbWFyeRIVCg1maW5pc2hfcmVhc29uGBQgASgJEj4KEmFjdGlvbl9jb25zdHJhaW50cxgVIAEoCzIiLmdhbWUuZGljZTc4OS52MS5BY3Rpb25Db25zdHJhaW50cxI1Cg9sYXN0X3NldHRsZW1lbnQYFiABKAsyHC5nYW1lLmRpY2U3ODkudjEuVHVyblN1bW1hcnkiBgoEUm9sbCIPCg1Db25maXJtTGFuZGVkIhoKCUFkZFRvUG9vbBINCgV0aWNrcxgBIAEoDSIfCgxDaG9vc2VUYXJnZXQSDwoHdXNlcl9pZBgBIAEoCSIICgZSZXJvbGwiBgoEUGFzcyIfCg1SZXBvcnREcm9wcGVkEg4KBnJlYXNvbhgBIAEoCSIyCgZGaW5pc2gSDgoGcmVhc29uGAEgASgJEhgKEG9wZXJhdG9yX3VzZXJfaWQYAiABKAkilwMKB0NvbW1hbmQSJQoEcm9sbBgBIAEoCzIVLmdhbWUuZGljZTc4OS52MS5Sb2xsSAASOAoOY29uZmlybV9sYW5kZWQYAiABKAsyHi5nYW1lLmRpY2U3ODkudjEuQ29uZmlybUxhbmRlZEgAEjEKC2FkZF90b19wb29sGAMgASgLMhouZ2FtZS5kaWNlNzg5LnYxLkFkZFRvUG9vbEgAEjYKDWNob29zZV90YXJnZXQYBCABKAsyHS5nYW1lLmRpY2U3ODkudjEuQ2hvb3NlVGFyZ2V0SAASKQoGcmVyb2xsGAUgASgLMhcuZ2FtZS5kaWNlNzg5LnYxLlJlcm9sbEgAEiUKBHBhc3MYBiABKAsyFS5nYW1lLmRpY2U3ODkudjEuUGFzc0gAEjgKDnJlcG9ydF9kcm9wcGVkGAcgASgLMh4uZ2FtZS5kaWNlNzg5LnYxLlJlcG9ydERyb3BwZWRIABIpCgZmaW5pc2gYCCABKAsyFy5nYW1lLmRpY2U3ODkudjEuRmluaXNoSABCCQoHY29tbWFuZCLPAgoLVHVyblN0YXJ0ZWQSDAoEdHVybhgBIAEoDRIPCgd1c2VyX2lkGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoDRI2ChBwcmV2aW91c19vdXRjb21lGAQgASgOMhwuZ2FtZS5kaWNlNzg5LnYxLlR1cm5PdXRjb21lEi8KBWNhdXNlGAUgASgOMiAuZ2FtZS5kaWNlNzg5LnYxLlJlc29sdXRpb25DYXVzZRInCgZjb25maWcYBiABKAsyFy5nYW1lLmRpY2U3ODkudjEuQ29uZmlnEi4KB3BsYXllcnMYByADKAsyHS5nYW1lLmRpY2U3ODkudjEuUmVwbGF5UGxheWVyEjAKDGluaXRpYWxfcG9vbBgIIAMoCzIaLmdhbWUuZGljZTc4OS52MS5Qb29sTGF5ZXISGgoSaW5pdGlhbF9wb29sX3RpY2tzGAkgASgNIpIBCgpEaWNlUm9sbGVkEg8KB2RpZV9vbmUYASABKA0SDwoHZGllX3R3bxgCIAEoDRILCgNzdW0YAyABKA0SDAoEdHVybhgEIAEoDRIWCg5zb3VyY2VfdXNlcl9pZBgFIAEoCRIvCgVjYXVzZRgGIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2Ui4QIKC1Bvb2xDaGFuZ2VkEhQKDGJlZm9yZV90aWNrcxgBIAEoDRITCgthZnRlcl90aWNrcxgCIAEoDRITCgthY3Rvcl90aWNrcxgDIAEoDRIxCg1iZWZvcmVfbGF5ZXJzGAQgAygLMhouZ2FtZS5kaWNlNzg5LnYxLlBvb2xMYXllchIwCgxhZnRlcl9sYXllcnMYBSADKAsyGi5nYW1lLmRpY2U3ODkudjEuUG9vbExheWVyEgwKBHR1cm4YBiABKA0SFgoOc291cmNlX3VzZXJfaWQYByABKAkSFgoOdGFyZ2V0X3VzZXJfaWQYCCABKAkSFQoNYWN0b3JfdXNlcl9pZBgJIAEoCRInCgZlZmZlY3QYCiABKA4yFy5nYW1lLmRpY2U3ODkudjEuRWZmZWN0Ei8KBWNhdXNlGAsgASgOMiAuZ2FtZS5kaWNlNzg5LnYxLlJlc29sdXRpb25DYXVzZSK/AQoQRGlyZWN0aW9uQ2hhbmdlZBIRCglkaXJlY3Rpb24YASABKA0SGAoQYmVmb3JlX2RpcmVjdGlvbhgCIAEoDRIMCgR0dXJuGAMgASgNEhYKDnNvdXJjZV91c2VyX2lkGAQgASgJEicKBmVmZmVjdBgFIAEoDjIXLmdhbWUuZGljZTc4OS52MS5FZmZlY3QSLwoFY2F1c2UYBiABKA4yIC5nYW1lLmRpY2U3ODkudjEuUmVzb2x1dGlvbkNhdXNlIvgBCg9QZW5hbHR5UmVjb3JkZWQSDwoHdXNlcl9pZBgBIAEoCRINCgV0aWNrcxgCIAEoDRIOCgZyZWFzb24YAyABKAkSGgoSYmVmb3JlX3RvdGFsX3RpY2tzGAQgASgNEhkKEWFmdGVyX3RvdGFsX3RpY2tzGAUgASgNEgwKBHR1cm4YBiABKA0SFgoOc291cmNlX3VzZXJfaWQYByABKAkSJwoGZWZmZWN0GAggASgOMhcuZ2FtZS5kaWNlNzg5LnYxLkVmZmVjdBIvCgVjYXVzZRgJIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2UiqAEKDlRhcmdldFNlbGVjdGVkEhYKDnNvdXJjZV91c2VyX2lkGAEgASgJEhYKDnRhcmdldF91c2VyX2lkGAIgASgJEgwKBHR1cm4YAyABKA0SJwoGZWZmZWN0GAQgASgOMhcuZ2FtZS5kaWNlNzg5LnYxLkVmZmVjdBIvCgVjYXVzZRgFIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2UisgEKC1R1cm5Ecm9wcGVkEg8KB3VzZXJfaWQYASABKAkSDgoGcmVhc29uGAIgASgJEhgKEG9wZXJhdG9yX3VzZXJfaWQYAyABKAkSFgoOc291cmNlX3VzZXJfaWQYBCABKAkSDAoEdHVybhgFIAEoDRIvCgVjYXVzZRgGIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2USEQoJYXVkaXRfcmVmGAcgASgJIpUCChJQYXJ0aWNpcGFudFJldm9rZWQSDwoHdXNlcl9pZBgBIAEoCRIMCgR0dXJuGAIgASgNEiwKDHBoYXNlX2JlZm9yZRgDIAEoDjIWLmdhbWUuZGljZTc4OS52MS5QaGFzZRInCgZlZmZlY3QYBCABKA4yFy5nYW1lLmRpY2U3ODkudjEuRWZmZWN0EhYKDnNvdXJjZV91c2VyX2lkGAUgASgJEhYKDnRhcmdldF91c2VyX2lkGAYgASgJEiAKGHBlbmRpbmdfZWZmZWN0X2NhbmNlbGxlZBgHIAEoCBIhChl0YXJnZXRfc2VsZWN0aW9uX3Jlb3BlbmVkGAggASgIEhQKDG5leHRfdXNlcl9pZBgJIAEoCSJ6Cg9TZXNzaW9uRmluaXNoZWQSDgoGcmVhc29uGAEgASgJEgwKBHR1cm4YAiABKA0SGAoQb3BlcmF0b3JfdXNlcl9pZBgDIAEoCRIvCgVjYXVzZRgEIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2UimgIKDkVmZmVjdFNlbGVjdGVkEgwKBHR1cm4YASABKA0SJwoGZWZmZWN0GAIgASgOMhcuZ2FtZS5kaWNlNzg5LnYxLkVmZmVjdBIWCg5zb3VyY2VfdXNlcl9pZBgDIAEoCRIWCg50YXJnZXRfdXNlcl9pZBgEIAEoCRIPCgdkaWVfb25lGAUgASgNEg8KB2RpZV90d28YBiABKA0SCwoDc3VtGAcgASgNEhUKDXJ1bGVfcHJpb3JpdHkYCCABKA0SKgoKbmV4dF9waGFzZRgJIAEoDjIWLmdhbWUuZGljZTc4OS52MS5QaGFzZRIvCgVjYXVzZRgKIAEoDjIgLmdhbWUuZGljZTc4OS52MS5SZXNvbHV0aW9uQ2F1c2UijQIKC1R1cm5TZXR0bGVkEgwKBHR1cm4YASABKA0SFgoOc291cmNlX3VzZXJfaWQYAiABKAkSFgoOdGFyZ2V0X3VzZXJfaWQYAyABKAkSFAoMbmV4dF91c2VyX2lkGAQgASgJEhEKCWRpcmVjdGlvbhgFIAEoDRInCgZlZmZlY3QYBiABKA4yFy5nYW1lLmRpY2U3ODkudjEuRWZmZWN0Ei0KB291dGNvbWUYByABKA4yHC5nYW1lLmRpY2U3ODkudjEuVHVybk91dGNvbWUSLwoFY2F1c2UYCCABKA4yIC5nYW1lLmRpY2U3ODkudjEuUmVzb2x1dGlvbkNhdXNlEg4KBnJlYXNvbhgJIAEoCSKUBQoFRXZlbnQSNAoMdHVybl9zdGFydGVkGAEgASgLMhwuZ2FtZS5kaWNlNzg5LnYxLlR1cm5TdGFydGVkSAASMgoLZGljZV9yb2xsZWQYAiABKAsyGy5nYW1lLmRpY2U3ODkudjEuRGljZVJvbGxlZEgAEjQKDHBvb2xfY2hhbmdlZBgDIAEoCzIcLmdhbWUuZGljZTc4OS52MS5Qb29sQ2hhbmdlZEgAEj4KEWRpcmVjdGlvbl9jaGFuZ2VkGAQgASgLMiEuZ2FtZS5kaWNlNzg5LnYxLkRpcmVjdGlvbkNoYW5nZWRIABI8ChBwZW5hbHR5X3JlY29yZGVkGAUgASgLMiAuZ2FtZS5kaWNlNzg5LnYxLlBlbmFsdHlSZWNvcmRlZEgAEjoKD3RhcmdldF9zZWxlY3RlZBgGIAEoCzIfLmdhbWUuZGljZTc4OS52MS5UYXJnZXRTZWxlY3RlZEgAEjQKDHR1cm5fZHJvcHBlZBgHIAEoCzIcLmdhbWUuZGljZTc4OS52MS5UdXJuRHJvcHBlZEgAEkIKE3BhcnRpY2lwYW50X3Jldm9rZWQYCCABKAsyIy5nYW1lLmRpY2U3ODkudjEuUGFydGljaXBhbnRSZXZva2VkSAASPAoQc2Vzc2lvbl9maW5pc2hlZBgJIAEoCzIgLmdhbWUuZGljZTc4OS52MS5TZXNzaW9uRmluaXNoZWRIABI6Cg9lZmZlY3Rfc2VsZWN0ZWQYCiABKAsyHy5nYW1lLmRpY2U3ODkudjEuRWZmZWN0U2VsZWN0ZWRIABI0Cgx0dXJuX3NldHRsZWQYCyABKAsyHC5nYW1lLmRpY2U3ODkudjEuVHVyblNldHRsZWRIAEIHCgVldmVudCLSAQoLQWN0aW9uVGltZXISDAoEdHVybhgBIAEoDRIlCgVwaGFzZRgCIAEoDjIWLmdhbWUuZGljZTc4OS52MS5QaGFzZRIXCg9jdXJyZW50X3VzZXJfaWQYAyABKAkSFgoOc291cmNlX3VzZXJfaWQYBCABKAkSFgoOdGFyZ2V0X3VzZXJfaWQYBSABKAkSJwoGZWZmZWN0GAYgASgOMhcuZ2FtZS5kaWNlNzg5LnYxLkVmZmVjdBIcChRkZWFkbGluZV91bml4X21pbGxpcxgHIAEoAyKjBQoEVmlldxIlCgVwaGFzZRgBIAEoDjIWLmdhbWUuZGljZTc4OS52MS5QaGFzZRIMCgR0dXJuGAIgASgNEi0KB3BsYXllcnMYAyADKAsyHC5nYW1lLmRpY2U3ODkudjEuUGxheWVyU3RhdGUSFwoPY3VycmVudF91c2VyX2lkGAQgASgJEhYKDnRhcmdldF91c2VyX2lkGAUgASgJEhEKCWRpcmVjdGlvbhgGIAEoDRIoCgRwb29sGAcgAygLMhouZ2FtZS5kaWNlNzg5LnYxLlBvb2xMYXllchIYChB0b3RhbF9wb29sX3RpY2tzGAggASgNEg8KB2RpZV9vbmUYCSABKA0SDwoHZGllX3R3bxgKIAEoDRILCgNzdW0YCyABKA0SIwobYWN0aW9uX2RlYWRsaW5lX3VuaXhfbWlsbGlzGAwgASgDEhcKD2FsbG93ZWRfYWN0aW9ucxgNIAMoCRIVCg1maW5pc2hfcmVhc29uGA4gASgJEhYKDnNvdXJjZV91c2VyX2lkGA8gASgJEicKBmVmZmVjdBgQIAEoDjIXLmdhbWUuZGljZTc4OS52MS5FZmZlY3QSPgoSYWN0aW9uX2NvbnN0cmFpbnRzGBEgASgLMiIuZ2FtZS5kaWNlNzg5LnYxLkFjdGlvbkNvbnN0cmFpbnRzEicKBmNvbmZpZxgSIAEoCzIXLmdhbWUuZGljZTc4OS52MS5Db25maWcSNQoPbGFzdF9zZXR0bGVtZW50GBMgASgLMhwuZ2FtZS5kaWNlNzg5LnYxLlR1cm5TdW1tYXJ5EhYKDnZpZXdlcl9pc19ob3N0GBQgASgIEjIKDHJlY2VudF90dXJucxgVIAMoCzIcLmdhbWUuZGljZTc4OS52MS5UdXJuU3VtbWFyeSIwCglWaWV3RGVsdGESIwoEdmlldxgBIAEoCzIVLmdhbWUuZGljZTc4OS52MS5WaWV3IjMKDFJlcGxheVBsYXllchIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0iRgoLUmVwbGF5RW50cnkSEAoIc2VxdWVuY2UYASABKAQSJQoFZXZlbnQYAiABKAsyFi5nYW1lLmRpY2U3ODkudjEuRXZlbnQifAoKUmVwbGF5VHVybhItCgdzdW1tYXJ5GAEgASgLMhwuZ2FtZS5kaWNlNzg5LnYxLlR1cm5TdW1tYXJ5Eg8KB3NldHRsZWQYAiABKAgSLgoOdGVybWluYWxfcGhhc2UYAyABKA4yFi5nYW1lLmRpY2U3ODkudjEuUGhhc2Ui6wEKBlJlcGxheRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRInCgZjb25maWcYAiABKAsyFy5nYW1lLmRpY2U3ODkudjEuQ29uZmlnEi4KB3BsYXllcnMYAyADKAsyHS5nYW1lLmRpY2U3ODkudjEuUmVwbGF5UGxheWVyEi0KB2VudHJpZXMYBCADKAsyHC5nYW1lLmRpY2U3ODkudjEuUmVwbGF5RW50cnkSFQoNZmluaXNoX3JlYXNvbhgFIAEoCRIqCgV0dXJucxgGIAMoCzIbLmdhbWUuZGljZTc4OS52MS5SZXBsYXlUdXJuKtEBCgVQaGFzZRIVChFQSEFTRV9VTlNQRUNJRklFRBAAEhcKE1BIQVNFX0FXQUlUSU5HX1JPTEwQARIYChRQSEFTRV9SRVNVTFRfUEVORElORxACEhYKElBIQVNFX0FXQUlUSU5HX0FERBADEhkKFVBIQVNFX0FXQUlUSU5HX1RBUkdFVBAEEhsKF1BIQVNFX0FXQUlUSU5HX0NPTlRJTlVFEAUSGgoSUEhBU0VfVFVSTl9TRVRUTEVEEAYaAggBEhIKDlBIQVNFX0ZJTklTSEVEEAcqiQEKDENvbnRpbnVlTW9kZRIdChlDT05USU5VRV9NT0RFX1VOU1BFQ0lGSUVEEAASGgoWQ09OVElOVUVfTU9ERV9PUFRJT05BTBABEh8KG0NPTlRJTlVFX01PREVfRk9SQ0VEX1JFUk9MTBACEh0KGUNPTlRJTlVFX01PREVfRk9SQ0VEX1BBU1MQAyrcAgoGRWZmZWN0EhYKEkVGRkVDVF9VTlNQRUNJRklFRBAAEg8KC0VGRkVDVF9QQVNTEAESGAoURUZGRUNUX1NVTV9TRVZFTl9BREQQAhIeChpFRkZFQ1RfU1VNX0VJR0hUX0hBTEZfUE9PTBADEh4KGkVGRkVDVF9TVU1fTklORV9EUkFJTl9QT09MEAQSIAocRUZGRUNUX09SRElOQVJZX1BBSVJfUkVWRVJTRRAFEh8KG0VGRkVDVF9PUkRJTkFSWV9QQUlSX1JFUk9MTBAGEiIKHkVGRkVDVF9ET1VCTEVfT05FX1RBUkdFVF9EUkFJThAHEicKI0VGRkVDVF9ET1VCTEVfRk9VUl9IQUxGX1BPT0xfUkVST0xMEAgSIAocRUZGRUNUX0RPVUJMRV9TSVhfVEFSR0VUX0FERBAJEh0KGUVGRkVDVF9EUk9QUEVEX0RSQUlOX1BPT0wQCirgAgoPUmVzb2x1dGlvbkNhdXNlEiAKHFJFU09MVVRJT05fQ0FVU0VfVU5TUEVDSUZJRUQQABIiCh5SRVNPTFVUSU9OX0NBVVNFX1BMQVlFUl9BQ1RJT04QARIjCh9SRVNPTFVUSU9OX0NBVVNFX0hPU1RfQ09ORklSTUVEEAISIgoeUkVTT0xVVElPTl9DQVVTRV9EUk9QX1JFUE9SVEVEEAMSHAoYUkVTT0xVVElPTl9DQVVTRV9USU1FT1VUEAQSKAokUkVTT0xVVElPTl9DQVVTRV9QQVJUSUNJUEFOVF9SRVZPS0VEEAUSIgoeUkVTT0xVVElPTl9DQVVTRV9IT1NUX0ZJTklTSEVEEAYSKQolUkVTT0xVVElPTl9DQVVTRV9JTlNVRkZJQ0lFTlRfUExBWUVSUxAHEicKI1JFU09MVVRJT05fQ0FVU0VfUExBVEZPUk1fQ0FOQ0VMTEVEEAgqwwEKC1R1cm5PdXRjb21lEhwKGFRVUk5fT1VUQ09NRV9VTlNQRUNJRklFRBAAEhUKEVRVUk5fT1VUQ09NRV9QQVNTEAESFwoTVFVSTl9PVVRDT01FX1JFUk9MTBACEiIKHlRVUk5fT1VUQ09NRV9UQVJHRVRfVEFLRVNfVFVSThADEh8KG1RVUk5fT1VUQ09NRV9TT1VSQ0VfUkVWT0tFRBAEEiEKHVRVUk5fT1VUQ09NRV9TRVNTSU9OX0ZJTklTSEVEEAVCTlpMZ2l0aHViLmNvbS9pRlRZLVIvZ2FtZS1uaWdodC9nYW1lcy9kaWNlLTc4OS9nZW4vZ28vZ2FtZS9kaWNlNzg5L3YxO2RpY2U3ODl2MWIGcHJvdG8z");
 
 /**
  * @generated from message game.dice789.v1.Config
@@ -90,6 +90,8 @@ export const ConfigSchema: GenMessage<Config> = /*@__PURE__*/
   messageDesc(file_game_dice789_v1_dice_789, 0);
 
 /**
+ * Pool layers are always ordered bottom-to-top with contiguous zero-based indexes.
+ *
  * @generated from message game.dice789.v1.PoolLayer
  */
 export type PoolLayer = Message<"game.dice789.v1.PoolLayer"> & {
@@ -97,6 +99,13 @@ export type PoolLayer = Message<"game.dice789.v1.PoolLayer"> & {
    * @generated from field: uint32 ticks = 1;
    */
   ticks: number;
+
+  /**
+   * Index is zero-based from the bottom and makes persisted layer snapshots self-describing.
+   *
+   * @generated from field: uint32 index = 2;
+   */
+  index: number;
 };
 
 /**
@@ -137,6 +146,174 @@ export type PlayerState = Message<"game.dice789.v1.PlayerState"> & {
  */
 export const PlayerStateSchema: GenMessage<PlayerState> = /*@__PURE__*/
   messageDesc(file_game_dice789_v1_dice_789, 2);
+
+/**
+ * @generated from message game.dice789.v1.ActionConstraints
+ */
+export type ActionConstraints = Message<"game.dice789.v1.ActionConstraints"> & {
+  /**
+   * A zero maximum means pot.add is resolved automatically and must not be offered.
+   *
+   * @generated from field: uint32 minimum_add_ticks = 1;
+   */
+  minimumAddTicks: number;
+
+  /**
+   * @generated from field: uint32 maximum_add_ticks = 2;
+   */
+  maximumAddTicks: number;
+
+  /**
+   * @generated from field: uint32 add_step_ticks = 3;
+   */
+  addStepTicks: number;
+
+  /**
+   * @generated from field: bool allow_capacity_remainder = 4;
+   */
+  allowCapacityRemainder: boolean;
+
+  /**
+   * @generated from field: repeated string target_user_ids = 5;
+   */
+  targetUserIds: string[];
+};
+
+/**
+ * Describes the message game.dice789.v1.ActionConstraints.
+ * Use `create(ActionConstraintsSchema)` to create a new message.
+ */
+export const ActionConstraintsSchema: GenMessage<ActionConstraints> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 3);
+
+/**
+ * TurnSummary is the compact authoritative history retained in snapshots and live views.
+ *
+ * @generated from message game.dice789.v1.TurnSummary
+ */
+export type TurnSummary = Message<"game.dice789.v1.TurnSummary"> & {
+  /**
+   * @generated from field: uint32 turn = 1;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 2;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: uint32 die_one = 3;
+   */
+  dieOne: number;
+
+  /**
+   * @generated from field: uint32 die_two = 4;
+   */
+  dieTwo: number;
+
+  /**
+   * @generated from field: uint32 sum = 5;
+   */
+  sum: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 6;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: string target_user_id = 7;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: uint32 pool_before_ticks = 8;
+   */
+  poolBeforeTicks: number;
+
+  /**
+   * @generated from field: uint32 pool_after_ticks = 9;
+   */
+  poolAfterTicks: number;
+
+  /**
+   * @generated from field: string penalty_user_id = 10;
+   */
+  penaltyUserId: string;
+
+  /**
+   * @generated from field: uint32 penalty_ticks = 11;
+   */
+  penaltyTicks: number;
+
+  /**
+   * @generated from field: uint32 direction_before = 12;
+   */
+  directionBefore: number;
+
+  /**
+   * @generated from field: uint32 direction_after = 13;
+   */
+  directionAfter: number;
+
+  /**
+   * @generated from field: string next_user_id = 14;
+   */
+  nextUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.TurnOutcome outcome = 15;
+   */
+  outcome: TurnOutcome;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 16;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: bool dropped_reported = 17;
+   */
+  droppedReported: boolean;
+
+  /**
+   * @generated from field: string drop_operator_user_id = 18;
+   */
+  dropOperatorUserId: string;
+
+  /**
+   * @generated from field: string drop_reason = 19;
+   */
+  dropReason: string;
+
+  /**
+   * @generated from field: string resolution_reason = 20;
+   */
+  resolutionReason: string;
+
+  /**
+   * @generated from field: repeated game.dice789.v1.PoolLayer pool_before_layers = 21;
+   */
+  poolBeforeLayers: PoolLayer[];
+
+  /**
+   * @generated from field: repeated game.dice789.v1.PoolLayer pool_after_layers = 22;
+   */
+  poolAfterLayers: PoolLayer[];
+
+  /**
+   * @generated from field: string audit_ref = 23;
+   */
+  auditRef: string;
+};
+
+/**
+ * Describes the message game.dice789.v1.TurnSummary.
+ * Use `create(TurnSummarySchema)` to create a new message.
+ */
+export const TurnSummarySchema: GenMessage<TurnSummary> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 4);
 
 /**
  * @generated from message game.dice789.v1.State
@@ -216,6 +393,51 @@ export type State = Message<"game.dice789.v1.State"> & {
    * @generated from field: game.dice789.v1.Config config = 15;
    */
   config?: Config;
+
+  /**
+   * Host identity is frozen from trusted session start context for host-only commands.
+   *
+   * @generated from field: string host_user_id = 16;
+   */
+  hostUserId: string;
+
+  /**
+   * Effect is classified while result_pending and remains set until the turn settles.
+   *
+   * @generated from field: game.dice789.v1.Effect effect = 17;
+   */
+  effect: Effect;
+
+  /**
+   * Rule-level actions are never copied directly to a View without viewer authorization.
+   *
+   * @generated from field: repeated string allowed_actions = 18;
+   */
+  allowedActions: string[];
+
+  /**
+   * The engine retains at most the latest 32 settled turns in this bounded snapshot history.
+   *
+   * @generated from field: repeated game.dice789.v1.TurnSummary turn_history = 19;
+   */
+  turnHistory: TurnSummary[];
+
+  /**
+   * @generated from field: string finish_reason = 20;
+   */
+  finishReason: string;
+
+  /**
+   * @generated from field: game.dice789.v1.ActionConstraints action_constraints = 21;
+   */
+  actionConstraints?: ActionConstraints;
+
+  /**
+   * Last settlement survives the immediate transition into the next awaiting_roll phase.
+   *
+   * @generated from field: game.dice789.v1.TurnSummary last_settlement = 22;
+   */
+  lastSettlement?: TurnSummary;
 };
 
 /**
@@ -223,7 +445,7 @@ export type State = Message<"game.dice789.v1.State"> & {
  * Use `create(StateSchema)` to create a new message.
  */
 export const StateSchema: GenMessage<State> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 3);
+  messageDesc(file_game_dice789_v1_dice_789, 5);
 
 /**
  * @generated from message game.dice789.v1.Roll
@@ -236,7 +458,7 @@ export type Roll = Message<"game.dice789.v1.Roll"> & {
  * Use `create(RollSchema)` to create a new message.
  */
 export const RollSchema: GenMessage<Roll> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 4);
+  messageDesc(file_game_dice789_v1_dice_789, 6);
 
 /**
  * @generated from message game.dice789.v1.ConfirmLanded
@@ -249,7 +471,7 @@ export type ConfirmLanded = Message<"game.dice789.v1.ConfirmLanded"> & {
  * Use `create(ConfirmLandedSchema)` to create a new message.
  */
 export const ConfirmLandedSchema: GenMessage<ConfirmLanded> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 5);
+  messageDesc(file_game_dice789_v1_dice_789, 7);
 
 /**
  * @generated from message game.dice789.v1.AddToPool
@@ -266,7 +488,7 @@ export type AddToPool = Message<"game.dice789.v1.AddToPool"> & {
  * Use `create(AddToPoolSchema)` to create a new message.
  */
 export const AddToPoolSchema: GenMessage<AddToPool> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 6);
+  messageDesc(file_game_dice789_v1_dice_789, 8);
 
 /**
  * @generated from message game.dice789.v1.ChooseTarget
@@ -283,7 +505,7 @@ export type ChooseTarget = Message<"game.dice789.v1.ChooseTarget"> & {
  * Use `create(ChooseTargetSchema)` to create a new message.
  */
 export const ChooseTargetSchema: GenMessage<ChooseTarget> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 7);
+  messageDesc(file_game_dice789_v1_dice_789, 9);
 
 /**
  * @generated from message game.dice789.v1.Reroll
@@ -296,7 +518,7 @@ export type Reroll = Message<"game.dice789.v1.Reroll"> & {
  * Use `create(RerollSchema)` to create a new message.
  */
 export const RerollSchema: GenMessage<Reroll> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 8);
+  messageDesc(file_game_dice789_v1_dice_789, 10);
 
 /**
  * @generated from message game.dice789.v1.Pass
@@ -309,7 +531,7 @@ export type Pass = Message<"game.dice789.v1.Pass"> & {
  * Use `create(PassSchema)` to create a new message.
  */
 export const PassSchema: GenMessage<Pass> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 9);
+  messageDesc(file_game_dice789_v1_dice_789, 11);
 
 /**
  * @generated from message game.dice789.v1.ReportDropped
@@ -326,12 +548,25 @@ export type ReportDropped = Message<"game.dice789.v1.ReportDropped"> & {
  * Use `create(ReportDroppedSchema)` to create a new message.
  */
 export const ReportDroppedSchema: GenMessage<ReportDropped> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 10);
+  messageDesc(file_game_dice789_v1_dice_789, 12);
 
 /**
  * @generated from message game.dice789.v1.Finish
  */
 export type Finish = Message<"game.dice789.v1.Finish"> & {
+  /**
+   * Empty means a runtime-authorized host finish; platform cancellation is explicit.
+   *
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+
+  /**
+   * Runtime supplies the currently authorized PartyRoom host; the game never infers it from initial state.
+   *
+   * @generated from field: string operator_user_id = 2;
+   */
+  operatorUserId: string;
 };
 
 /**
@@ -339,7 +574,7 @@ export type Finish = Message<"game.dice789.v1.Finish"> & {
  * Use `create(FinishSchema)` to create a new message.
  */
 export const FinishSchema: GenMessage<Finish> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 11);
+  messageDesc(file_game_dice789_v1_dice_789, 13);
 
 /**
  * @generated from message game.dice789.v1.Command
@@ -404,7 +639,7 @@ export type Command = Message<"game.dice789.v1.Command"> & {
  * Use `create(CommandSchema)` to create a new message.
  */
 export const CommandSchema: GenMessage<Command> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 12);
+  messageDesc(file_game_dice789_v1_dice_789, 14);
 
 /**
  * @generated from message game.dice789.v1.TurnStarted
@@ -419,6 +654,43 @@ export type TurnStarted = Message<"game.dice789.v1.TurnStarted"> & {
    * @generated from field: string user_id = 2;
    */
   userId: string;
+
+  /**
+   * @generated from field: uint32 direction = 3;
+   */
+  direction: number;
+
+  /**
+   * @generated from field: game.dice789.v1.TurnOutcome previous_outcome = 4;
+   */
+  previousOutcome: TurnOutcome;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 5;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * Initialization fields are required on turn 1 and must be absent on later turns.
+   *
+   * @generated from field: game.dice789.v1.Config config = 6;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: repeated game.dice789.v1.ReplayPlayer players = 7;
+   */
+  players: ReplayPlayer[];
+
+  /**
+   * @generated from field: repeated game.dice789.v1.PoolLayer initial_pool = 8;
+   */
+  initialPool: PoolLayer[];
+
+  /**
+   * @generated from field: uint32 initial_pool_ticks = 9;
+   */
+  initialPoolTicks: number;
 };
 
 /**
@@ -426,7 +698,7 @@ export type TurnStarted = Message<"game.dice789.v1.TurnStarted"> & {
  * Use `create(TurnStartedSchema)` to create a new message.
  */
 export const TurnStartedSchema: GenMessage<TurnStarted> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 13);
+  messageDesc(file_game_dice789_v1_dice_789, 15);
 
 /**
  * @generated from message game.dice789.v1.DiceRolled
@@ -446,6 +718,21 @@ export type DiceRolled = Message<"game.dice789.v1.DiceRolled"> & {
    * @generated from field: uint32 sum = 3;
    */
   sum: number;
+
+  /**
+   * @generated from field: uint32 turn = 4;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 5;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -453,7 +740,7 @@ export type DiceRolled = Message<"game.dice789.v1.DiceRolled"> & {
  * Use `create(DiceRolledSchema)` to create a new message.
  */
 export const DiceRolledSchema: GenMessage<DiceRolled> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 14);
+  messageDesc(file_game_dice789_v1_dice_789, 16);
 
 /**
  * @generated from message game.dice789.v1.PoolChanged
@@ -470,9 +757,51 @@ export type PoolChanged = Message<"game.dice789.v1.PoolChanged"> & {
   afterTicks: number;
 
   /**
+   * Actor ticks is the amount added to or removed from the pool by this event.
+   *
    * @generated from field: uint32 actor_ticks = 3;
    */
   actorTicks: number;
+
+  /**
+   * @generated from field: repeated game.dice789.v1.PoolLayer before_layers = 4;
+   */
+  beforeLayers: PoolLayer[];
+
+  /**
+   * @generated from field: repeated game.dice789.v1.PoolLayer after_layers = 5;
+   */
+  afterLayers: PoolLayer[];
+
+  /**
+   * @generated from field: uint32 turn = 6;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 7;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: string target_user_id = 8;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: string actor_user_id = 9;
+   */
+  actorUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 10;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 11;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -480,7 +809,7 @@ export type PoolChanged = Message<"game.dice789.v1.PoolChanged"> & {
  * Use `create(PoolChangedSchema)` to create a new message.
  */
 export const PoolChangedSchema: GenMessage<PoolChanged> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 15);
+  messageDesc(file_game_dice789_v1_dice_789, 17);
 
 /**
  * @generated from message game.dice789.v1.DirectionChanged
@@ -490,6 +819,31 @@ export type DirectionChanged = Message<"game.dice789.v1.DirectionChanged"> & {
    * @generated from field: uint32 direction = 1;
    */
   direction: number;
+
+  /**
+   * @generated from field: uint32 before_direction = 2;
+   */
+  beforeDirection: number;
+
+  /**
+   * @generated from field: uint32 turn = 3;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 4;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 5;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -497,7 +851,7 @@ export type DirectionChanged = Message<"game.dice789.v1.DirectionChanged"> & {
  * Use `create(DirectionChangedSchema)` to create a new message.
  */
 export const DirectionChangedSchema: GenMessage<DirectionChanged> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 16);
+  messageDesc(file_game_dice789_v1_dice_789, 18);
 
 /**
  * @generated from message game.dice789.v1.PenaltyRecorded
@@ -517,6 +871,36 @@ export type PenaltyRecorded = Message<"game.dice789.v1.PenaltyRecorded"> & {
    * @generated from field: string reason = 3;
    */
   reason: string;
+
+  /**
+   * @generated from field: uint32 before_total_ticks = 4;
+   */
+  beforeTotalTicks: number;
+
+  /**
+   * @generated from field: uint32 after_total_ticks = 5;
+   */
+  afterTotalTicks: number;
+
+  /**
+   * @generated from field: uint32 turn = 6;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 7;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 8;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 9;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -524,7 +908,7 @@ export type PenaltyRecorded = Message<"game.dice789.v1.PenaltyRecorded"> & {
  * Use `create(PenaltyRecordedSchema)` to create a new message.
  */
 export const PenaltyRecordedSchema: GenMessage<PenaltyRecorded> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 17);
+  messageDesc(file_game_dice789_v1_dice_789, 19);
 
 /**
  * @generated from message game.dice789.v1.TargetSelected
@@ -539,6 +923,21 @@ export type TargetSelected = Message<"game.dice789.v1.TargetSelected"> & {
    * @generated from field: string target_user_id = 2;
    */
   targetUserId: string;
+
+  /**
+   * @generated from field: uint32 turn = 3;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 4;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 5;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -546,13 +945,17 @@ export type TargetSelected = Message<"game.dice789.v1.TargetSelected"> & {
  * Use `create(TargetSelectedSchema)` to create a new message.
  */
 export const TargetSelectedSchema: GenMessage<TargetSelected> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 18);
+  messageDesc(file_game_dice789_v1_dice_789, 20);
 
 /**
+ * TurnDropped is the durable host audit for a manually confirmed dropped roll.
+ *
  * @generated from message game.dice789.v1.TurnDropped
  */
 export type TurnDropped = Message<"game.dice789.v1.TurnDropped"> & {
   /**
+   * User ID remains the legacy source-player field for schema compatibility.
+   *
    * @generated from field: string user_id = 1;
    */
   userId: string;
@@ -561,6 +964,33 @@ export type TurnDropped = Message<"game.dice789.v1.TurnDropped"> & {
    * @generated from field: string reason = 2;
    */
   reason: string;
+
+  /**
+   * @generated from field: string operator_user_id = 3;
+   */
+  operatorUserId: string;
+
+  /**
+   * @generated from field: string source_user_id = 4;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: uint32 turn = 5;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * Audit ref is the trusted runtime ActionID of the host report.
+   *
+   * @generated from field: string audit_ref = 7;
+   */
+  auditRef: string;
 };
 
 /**
@@ -568,7 +998,7 @@ export type TurnDropped = Message<"game.dice789.v1.TurnDropped"> & {
  * Use `create(TurnDroppedSchema)` to create a new message.
  */
 export const TurnDroppedSchema: GenMessage<TurnDropped> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 19);
+  messageDesc(file_game_dice789_v1_dice_789, 21);
 
 /**
  * @generated from message game.dice789.v1.ParticipantRevoked
@@ -578,6 +1008,46 @@ export type ParticipantRevoked = Message<"game.dice789.v1.ParticipantRevoked"> &
    * @generated from field: string user_id = 1;
    */
   userId: string;
+
+  /**
+   * @generated from field: uint32 turn = 2;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Phase phase_before = 3;
+   */
+  phaseBefore: Phase;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 4;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: string source_user_id = 5;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: string target_user_id = 6;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: bool pending_effect_cancelled = 7;
+   */
+  pendingEffectCancelled: boolean;
+
+  /**
+   * @generated from field: bool target_selection_reopened = 8;
+   */
+  targetSelectionReopened: boolean;
+
+  /**
+   * @generated from field: string next_user_id = 9;
+   */
+  nextUserId: string;
 };
 
 /**
@@ -585,7 +1055,7 @@ export type ParticipantRevoked = Message<"game.dice789.v1.ParticipantRevoked"> &
  * Use `create(ParticipantRevokedSchema)` to create a new message.
  */
 export const ParticipantRevokedSchema: GenMessage<ParticipantRevoked> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 20);
+  messageDesc(file_game_dice789_v1_dice_789, 22);
 
 /**
  * @generated from message game.dice789.v1.SessionFinished
@@ -595,6 +1065,21 @@ export type SessionFinished = Message<"game.dice789.v1.SessionFinished"> & {
    * @generated from field: string reason = 1;
    */
   reason: string;
+
+  /**
+   * @generated from field: uint32 turn = 2;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string operator_user_id = 3;
+   */
+  operatorUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 4;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -602,7 +1087,126 @@ export type SessionFinished = Message<"game.dice789.v1.SessionFinished"> & {
  * Use `create(SessionFinishedSchema)` to create a new message.
  */
 export const SessionFinishedSchema: GenMessage<SessionFinished> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 21);
+  messageDesc(file_game_dice789_v1_dice_789, 23);
+
+/**
+ * @generated from message game.dice789.v1.EffectSelected
+ */
+export type EffectSelected = Message<"game.dice789.v1.EffectSelected"> & {
+  /**
+   * @generated from field: uint32 turn = 1;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 2;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: string source_user_id = 3;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: string target_user_id = 4;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: uint32 die_one = 5;
+   */
+  dieOne: number;
+
+  /**
+   * @generated from field: uint32 die_two = 6;
+   */
+  dieTwo: number;
+
+  /**
+   * @generated from field: uint32 sum = 7;
+   */
+  sum: number;
+
+  /**
+   * @generated from field: uint32 rule_priority = 8;
+   */
+  rulePriority: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Phase next_phase = 9;
+   */
+  nextPhase: Phase;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 10;
+   */
+  cause: ResolutionCause;
+};
+
+/**
+ * Describes the message game.dice789.v1.EffectSelected.
+ * Use `create(EffectSelectedSchema)` to create a new message.
+ */
+export const EffectSelectedSchema: GenMessage<EffectSelected> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 24);
+
+/**
+ * @generated from message game.dice789.v1.TurnSettled
+ */
+export type TurnSettled = Message<"game.dice789.v1.TurnSettled"> & {
+  /**
+   * @generated from field: uint32 turn = 1;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: string source_user_id = 2;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: string target_user_id = 3;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: string next_user_id = 4;
+   */
+  nextUserId: string;
+
+  /**
+   * @generated from field: uint32 direction = 5;
+   */
+  direction: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 6;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: game.dice789.v1.TurnOutcome outcome = 7;
+   */
+  outcome: TurnOutcome;
+
+  /**
+   * @generated from field: game.dice789.v1.ResolutionCause cause = 8;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: string reason = 9;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message game.dice789.v1.TurnSettled.
+ * Use `create(TurnSettledSchema)` to create a new message.
+ */
+export const TurnSettledSchema: GenMessage<TurnSettled> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 25);
 
 /**
  * @generated from message game.dice789.v1.Event
@@ -665,6 +1269,18 @@ export type Event = Message<"game.dice789.v1.Event"> & {
      */
     value: SessionFinished;
     case: "sessionFinished";
+  } | {
+    /**
+     * @generated from field: game.dice789.v1.EffectSelected effect_selected = 10;
+     */
+    value: EffectSelected;
+    case: "effectSelected";
+  } | {
+    /**
+     * @generated from field: game.dice789.v1.TurnSettled turn_settled = 11;
+     */
+    value: TurnSettled;
+    case: "turnSettled";
   } | { case: undefined; value?: undefined };
 };
 
@@ -673,7 +1289,56 @@ export type Event = Message<"game.dice789.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 22);
+  messageDesc(file_game_dice789_v1_dice_789, 26);
+
+/**
+ * ActionTimer binds a persisted timeout to the exact pending transition it may settle.
+ *
+ * @generated from message game.dice789.v1.ActionTimer
+ */
+export type ActionTimer = Message<"game.dice789.v1.ActionTimer"> & {
+  /**
+   * @generated from field: uint32 turn = 1;
+   */
+  turn: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Phase phase = 2;
+   */
+  phase: Phase;
+
+  /**
+   * @generated from field: string current_user_id = 3;
+   */
+  currentUserId: string;
+
+  /**
+   * @generated from field: string source_user_id = 4;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: string target_user_id = 5;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 6;
+   */
+  effect: Effect;
+
+  /**
+   * @generated from field: int64 deadline_unix_millis = 7;
+   */
+  deadlineUnixMillis: bigint;
+};
+
+/**
+ * Describes the message game.dice789.v1.ActionTimer.
+ * Use `create(ActionTimerSchema)` to create a new message.
+ */
+export const ActionTimerSchema: GenMessage<ActionTimer> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 27);
 
 /**
  * @generated from message game.dice789.v1.View
@@ -740,6 +1405,8 @@ export type View = Message<"game.dice789.v1.View"> & {
   actionDeadlineUnixMillis: bigint;
 
   /**
+   * The projection recalculates this list for the viewer; State.allowed_actions is not forwarded.
+   *
    * @generated from field: repeated string allowed_actions = 13;
    */
   allowedActions: string[];
@@ -748,6 +1415,47 @@ export type View = Message<"game.dice789.v1.View"> & {
    * @generated from field: string finish_reason = 14;
    */
   finishReason: string;
+
+  /**
+   * @generated from field: string source_user_id = 15;
+   */
+  sourceUserId: string;
+
+  /**
+   * @generated from field: game.dice789.v1.Effect effect = 16;
+   */
+  effect: Effect;
+
+  /**
+   * Constraints are included only when the viewer may perform their associated action.
+   *
+   * @generated from field: game.dice789.v1.ActionConstraints action_constraints = 17;
+   */
+  actionConstraints?: ActionConstraints;
+
+  /**
+   * @generated from field: game.dice789.v1.Config config = 18;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: game.dice789.v1.TurnSummary last_settlement = 19;
+   */
+  lastSettlement?: TurnSummary;
+
+  /**
+   * This viewer-scoped flag never grants actions; allowed_actions is computed by the projection.
+   *
+   * @generated from field: bool viewer_is_host = 20;
+   */
+  viewerIsHost: boolean;
+
+  /**
+   * Live projections expose at most the same latest 32 settlements retained by State.
+   *
+   * @generated from field: repeated game.dice789.v1.TurnSummary recent_turns = 21;
+   */
+  recentTurns: TurnSummary[];
 };
 
 /**
@@ -755,7 +1463,145 @@ export type View = Message<"game.dice789.v1.View"> & {
  * Use `create(ViewSchema)` to create a new message.
  */
 export const ViewSchema: GenMessage<View> = /*@__PURE__*/
-  messageDesc(file_game_dice789_v1_dice_789, 23);
+  messageDesc(file_game_dice789_v1_dice_789, 28);
+
+/**
+ * ViewDelta replaces the current viewer-safe public view after validated events.
+ *
+ * @generated from message game.dice789.v1.ViewDelta
+ */
+export type ViewDelta = Message<"game.dice789.v1.ViewDelta"> & {
+  /**
+   * @generated from field: game.dice789.v1.View view = 1;
+   */
+  view?: View;
+};
+
+/**
+ * Describes the message game.dice789.v1.ViewDelta.
+ * Use `create(ViewDeltaSchema)` to create a new message.
+ */
+export const ViewDeltaSchema: GenMessage<ViewDelta> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 29);
+
+/**
+ * @generated from message game.dice789.v1.ReplayPlayer
+ */
+export type ReplayPlayer = Message<"game.dice789.v1.ReplayPlayer"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: uint32 seat_index = 2;
+   */
+  seatIndex: number;
+};
+
+/**
+ * Describes the message game.dice789.v1.ReplayPlayer.
+ * Use `create(ReplayPlayerSchema)` to create a new message.
+ */
+export const ReplayPlayerSchema: GenMessage<ReplayPlayer> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 30);
+
+/**
+ * ReplayEntry preserves public event order without exposing snapshots, seeds, or runtime envelopes.
+ *
+ * @generated from message game.dice789.v1.ReplayEntry
+ */
+export type ReplayEntry = Message<"game.dice789.v1.ReplayEntry"> & {
+  /**
+   * @generated from field: uint64 sequence = 1;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: game.dice789.v1.Event event = 2;
+   */
+  event?: Event;
+};
+
+/**
+ * Describes the message game.dice789.v1.ReplayEntry.
+ * Use `create(ReplayEntrySchema)` to create a new message.
+ */
+export const ReplayEntrySchema: GenMessage<ReplayEntry> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 31);
+
+/**
+ * ReplayTurn also represents a publicly rolled turn left pending by platform cancellation.
+ *
+ * @generated from message game.dice789.v1.ReplayTurn
+ */
+export type ReplayTurn = Message<"game.dice789.v1.ReplayTurn"> & {
+  /**
+   * @generated from field: game.dice789.v1.TurnSummary summary = 1;
+   */
+  summary?: TurnSummary;
+
+  /**
+   * @generated from field: bool settled = 2;
+   */
+  settled: boolean;
+
+  /**
+   * @generated from field: game.dice789.v1.Phase terminal_phase = 3;
+   */
+  terminalPhase: Phase;
+};
+
+/**
+ * Describes the message game.dice789.v1.ReplayTurn.
+ * Use `create(ReplayTurnSchema)` to create a new message.
+ */
+export const ReplayTurnSchema: GenMessage<ReplayTurn> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 32);
+
+/**
+ * Replay is a deterministic public artifact from which every visible transition can be reproduced.
+ *
+ * @generated from message game.dice789.v1.Replay
+ */
+export type Replay = Message<"game.dice789.v1.Replay"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: game.dice789.v1.Config config = 2;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: repeated game.dice789.v1.ReplayPlayer players = 3;
+   */
+  players: ReplayPlayer[];
+
+  /**
+   * @generated from field: repeated game.dice789.v1.ReplayEntry entries = 4;
+   */
+  entries: ReplayEntry[];
+
+  /**
+   * @generated from field: string finish_reason = 5;
+   */
+  finishReason: string;
+
+  /**
+   * @generated from field: repeated game.dice789.v1.ReplayTurn turns = 6;
+   */
+  turns: ReplayTurn[];
+};
+
+/**
+ * Describes the message game.dice789.v1.Replay.
+ * Use `create(ReplaySchema)` to create a new message.
+ */
+export const ReplaySchema: GenMessage<Replay> = /*@__PURE__*/
+  messageDesc(file_game_dice789_v1_dice_789, 33);
 
 /**
  * @generated from enum game.dice789.v1.Phase
@@ -792,7 +1638,10 @@ export enum Phase {
   AWAITING_CONTINUE = 5,
 
   /**
-   * @generated from enum value: PHASE_TURN_SETTLED = 6;
+   * Retained for wire compatibility; turn settlement is an event and must never be persisted as a phase.
+   *
+   * @generated from enum value: PHASE_TURN_SETTLED = 6 [deprecated = true];
+   * @deprecated
    */
   TURN_SETTLED = 6,
 
@@ -838,3 +1687,170 @@ export enum ContinueMode {
  */
 export const ContinueModeSchema: GenEnum<ContinueMode> = /*@__PURE__*/
   enumDesc(file_game_dice789_v1_dice_789, 1);
+
+/**
+ * Effect identifies the single highest-priority rule selected for one roll.
+ *
+ * @generated from enum game.dice789.v1.Effect
+ */
+export enum Effect {
+  /**
+   * @generated from enum value: EFFECT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: EFFECT_PASS = 1;
+   */
+  PASS = 1,
+
+  /**
+   * @generated from enum value: EFFECT_SUM_SEVEN_ADD = 2;
+   */
+  SUM_SEVEN_ADD = 2,
+
+  /**
+   * @generated from enum value: EFFECT_SUM_EIGHT_HALF_POOL = 3;
+   */
+  SUM_EIGHT_HALF_POOL = 3,
+
+  /**
+   * @generated from enum value: EFFECT_SUM_NINE_DRAIN_POOL = 4;
+   */
+  SUM_NINE_DRAIN_POOL = 4,
+
+  /**
+   * @generated from enum value: EFFECT_ORDINARY_PAIR_REVERSE = 5;
+   */
+  ORDINARY_PAIR_REVERSE = 5,
+
+  /**
+   * @generated from enum value: EFFECT_ORDINARY_PAIR_REROLL = 6;
+   */
+  ORDINARY_PAIR_REROLL = 6,
+
+  /**
+   * @generated from enum value: EFFECT_DOUBLE_ONE_TARGET_DRAIN = 7;
+   */
+  DOUBLE_ONE_TARGET_DRAIN = 7,
+
+  /**
+   * @generated from enum value: EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL = 8;
+   */
+  DOUBLE_FOUR_HALF_POOL_REROLL = 8,
+
+  /**
+   * @generated from enum value: EFFECT_DOUBLE_SIX_TARGET_ADD = 9;
+   */
+  DOUBLE_SIX_TARGET_ADD = 9,
+
+  /**
+   * @generated from enum value: EFFECT_DROPPED_DRAIN_POOL = 10;
+   */
+  DROPPED_DRAIN_POOL = 10,
+}
+
+/**
+ * Describes the enum game.dice789.v1.Effect.
+ */
+export const EffectSchema: GenEnum<Effect> = /*@__PURE__*/
+  enumDesc(file_game_dice789_v1_dice_789, 2);
+
+/**
+ * ResolutionCause records why an authoritative transition occurred.
+ *
+ * @generated from enum game.dice789.v1.ResolutionCause
+ */
+export enum ResolutionCause {
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PLAYER_ACTION = 1;
+   */
+  PLAYER_ACTION = 1,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_HOST_CONFIRMED = 2;
+   */
+  HOST_CONFIRMED = 2,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_DROP_REPORTED = 3;
+   */
+  DROP_REPORTED = 3,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_TIMEOUT = 4;
+   */
+  TIMEOUT = 4,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PARTICIPANT_REVOKED = 5;
+   */
+  PARTICIPANT_REVOKED = 5,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_HOST_FINISHED = 6;
+   */
+  HOST_FINISHED = 6,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS = 7;
+   */
+  INSUFFICIENT_PLAYERS = 7,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PLATFORM_CANCELLED = 8;
+   */
+  PLATFORM_CANCELLED = 8,
+}
+
+/**
+ * Describes the enum game.dice789.v1.ResolutionCause.
+ */
+export const ResolutionCauseSchema: GenEnum<ResolutionCause> = /*@__PURE__*/
+  enumDesc(file_game_dice789_v1_dice_789, 3);
+
+/**
+ * @generated from enum game.dice789.v1.TurnOutcome
+ */
+export enum TurnOutcome {
+  /**
+   * @generated from enum value: TURN_OUTCOME_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: TURN_OUTCOME_PASS = 1;
+   */
+  PASS = 1,
+
+  /**
+   * @generated from enum value: TURN_OUTCOME_REROLL = 2;
+   */
+  REROLL = 2,
+
+  /**
+   * @generated from enum value: TURN_OUTCOME_TARGET_TAKES_TURN = 3;
+   */
+  TARGET_TAKES_TURN = 3,
+
+  /**
+   * @generated from enum value: TURN_OUTCOME_SOURCE_REVOKED = 4;
+   */
+  SOURCE_REVOKED = 4,
+
+  /**
+   * @generated from enum value: TURN_OUTCOME_SESSION_FINISHED = 5;
+   */
+  SESSION_FINISHED = 5,
+}
+
+/**
+ * Describes the enum game.dice789.v1.TurnOutcome.
+ */
+export const TurnOutcomeSchema: GenEnum<TurnOutcome> = /*@__PURE__*/
+  enumDesc(file_game_dice789_v1_dice_789, 4);

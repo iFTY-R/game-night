@@ -11,7 +11,8 @@ enum Phase {
   PHASE_AWAITING_ADD = 3;
   PHASE_AWAITING_TARGET = 4;
   PHASE_AWAITING_CONTINUE = 5;
-  PHASE_TURN_SETTLED = 6;
+  // Retained for wire compatibility; turn settlement is an event and must never be persisted as a phase.
+  PHASE_TURN_SETTLED = 6 [deprecated = true];
   PHASE_FINISHED = 7;
 }
 
@@ -20,6 +21,43 @@ enum ContinueMode {
   CONTINUE_MODE_OPTIONAL = 1;
   CONTINUE_MODE_FORCED_REROLL = 2;
   CONTINUE_MODE_FORCED_PASS = 3;
+}
+
+// Effect identifies the single highest-priority rule selected for one roll.
+enum Effect {
+  EFFECT_UNSPECIFIED = 0;
+  EFFECT_PASS = 1;
+  EFFECT_SUM_SEVEN_ADD = 2;
+  EFFECT_SUM_EIGHT_HALF_POOL = 3;
+  EFFECT_SUM_NINE_DRAIN_POOL = 4;
+  EFFECT_ORDINARY_PAIR_REVERSE = 5;
+  EFFECT_ORDINARY_PAIR_REROLL = 6;
+  EFFECT_DOUBLE_ONE_TARGET_DRAIN = 7;
+  EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL = 8;
+  EFFECT_DOUBLE_SIX_TARGET_ADD = 9;
+  EFFECT_DROPPED_DRAIN_POOL = 10;
+}
+
+// ResolutionCause records why an authoritative transition occurred.
+enum ResolutionCause {
+  RESOLUTION_CAUSE_UNSPECIFIED = 0;
+  RESOLUTION_CAUSE_PLAYER_ACTION = 1;
+  RESOLUTION_CAUSE_HOST_CONFIRMED = 2;
+  RESOLUTION_CAUSE_DROP_REPORTED = 3;
+  RESOLUTION_CAUSE_TIMEOUT = 4;
+  RESOLUTION_CAUSE_PARTICIPANT_REVOKED = 5;
+  RESOLUTION_CAUSE_HOST_FINISHED = 6;
+  RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS = 7;
+  RESOLUTION_CAUSE_PLATFORM_CANCELLED = 8;
+}
+
+enum TurnOutcome {
+  TURN_OUTCOME_UNSPECIFIED = 0;
+  TURN_OUTCOME_PASS = 1;
+  TURN_OUTCOME_REROLL = 2;
+  TURN_OUTCOME_TARGET_TAKES_TURN = 3;
+  TURN_OUTCOME_SOURCE_REVOKED = 4;
+  TURN_OUTCOME_SESSION_FINISHED = 5;
 }
 
 message Config {
@@ -38,8 +76,11 @@ message Config {
   uint32 drop_report_window_seconds = 13;
 }
 
+// Pool layers are always ordered bottom-to-top with contiguous zero-based indexes.
 message PoolLayer {
   uint32 ticks = 1;
+  // Index is zero-based from the bottom and makes persisted layer snapshots self-describing.
+  uint32 index = 2;
 }
 
 message PlayerState {
@@ -47,6 +88,42 @@ message PlayerState {
   uint32 seat_index = 2;
   bool active = 3;
   uint32 penalty_ticks = 4;
+}
+
+message ActionConstraints {
+  // A zero maximum means pot.add is resolved automatically and must not be offered.
+  uint32 minimum_add_ticks = 1;
+  uint32 maximum_add_ticks = 2;
+  uint32 add_step_ticks = 3;
+  bool allow_capacity_remainder = 4;
+  repeated string target_user_ids = 5;
+}
+
+// TurnSummary is the compact authoritative history retained in snapshots and live views.
+message TurnSummary {
+  uint32 turn = 1;
+  string source_user_id = 2;
+  uint32 die_one = 3;
+  uint32 die_two = 4;
+  uint32 sum = 5;
+  Effect effect = 6;
+  string target_user_id = 7;
+  uint32 pool_before_ticks = 8;
+  uint32 pool_after_ticks = 9;
+  string penalty_user_id = 10;
+  uint32 penalty_ticks = 11;
+  uint32 direction_before = 12;
+  uint32 direction_after = 13;
+  string next_user_id = 14;
+  TurnOutcome outcome = 15;
+  ResolutionCause cause = 16;
+  bool dropped_reported = 17;
+  string drop_operator_user_id = 18;
+  string drop_reason = 19;
+  string resolution_reason = 20;
+  repeated PoolLayer pool_before_layers = 21;
+  repeated PoolLayer pool_after_layers = 22;
+  string audit_ref = 23;
 }
 
 message State {
@@ -65,6 +142,18 @@ message State {
   uint32 sum = 13;
   int64 action_deadline_unix_millis = 14;
   Config config = 15;
+  // Host identity is frozen from trusted session start context for host-only commands.
+  string host_user_id = 16;
+  // Effect is classified while result_pending and remains set until the turn settles.
+  Effect effect = 17;
+  // Rule-level actions are never copied directly to a View without viewer authorization.
+  repeated string allowed_actions = 18;
+  // The engine retains at most the latest 32 settled turns in this bounded snapshot history.
+  repeated TurnSummary turn_history = 19;
+  string finish_reason = 20;
+  ActionConstraints action_constraints = 21;
+  // Last settlement survives the immediate transition into the next awaiting_roll phase.
+  TurnSummary last_settlement = 22;
 }
 
 message Roll {}
@@ -74,7 +163,12 @@ message ChooseTarget { string user_id = 1; }
 message Reroll {}
 message Pass {}
 message ReportDropped { string reason = 1; }
-message Finish {}
+message Finish {
+  // Empty means a runtime-authorized host finish; platform cancellation is explicit.
+  string reason = 1;
+  // Runtime supplies the currently authorized PartyRoom host; the game never infers it from initial state.
+  string operator_user_id = 2;
+}
 
 message Command {
   oneof command {
@@ -89,15 +183,128 @@ message Command {
   }
 }
 
-message TurnStarted { uint32 turn = 1; string user_id = 2; }
-message DiceRolled { uint32 die_one = 1; uint32 die_two = 2; uint32 sum = 3; }
-message PoolChanged { uint32 before_ticks = 1; uint32 after_ticks = 2; uint32 actor_ticks = 3; }
-message DirectionChanged { uint32 direction = 1; }
-message PenaltyRecorded { string user_id = 1; uint32 ticks = 2; string reason = 3; }
-message TargetSelected { string source_user_id = 1; string target_user_id = 2; }
-message TurnDropped { string user_id = 1; string reason = 2; }
-message ParticipantRevoked { string user_id = 1; }
-message SessionFinished { string reason = 1; }
+message TurnStarted {
+  uint32 turn = 1;
+  string user_id = 2;
+  uint32 direction = 3;
+  TurnOutcome previous_outcome = 4;
+  ResolutionCause cause = 5;
+  // Initialization fields are required on turn 1 and must be absent on later turns.
+  Config config = 6;
+  repeated ReplayPlayer players = 7;
+  repeated PoolLayer initial_pool = 8;
+  uint32 initial_pool_ticks = 9;
+}
+
+message DiceRolled {
+  uint32 die_one = 1;
+  uint32 die_two = 2;
+  uint32 sum = 3;
+  uint32 turn = 4;
+  string source_user_id = 5;
+  ResolutionCause cause = 6;
+}
+
+message PoolChanged {
+  uint32 before_ticks = 1;
+  uint32 after_ticks = 2;
+  // Actor ticks is the amount added to or removed from the pool by this event.
+  uint32 actor_ticks = 3;
+  repeated PoolLayer before_layers = 4;
+  repeated PoolLayer after_layers = 5;
+  uint32 turn = 6;
+  string source_user_id = 7;
+  string target_user_id = 8;
+  string actor_user_id = 9;
+  Effect effect = 10;
+  ResolutionCause cause = 11;
+}
+
+message DirectionChanged {
+  uint32 direction = 1;
+  uint32 before_direction = 2;
+  uint32 turn = 3;
+  string source_user_id = 4;
+  Effect effect = 5;
+  ResolutionCause cause = 6;
+}
+
+message PenaltyRecorded {
+  string user_id = 1;
+  uint32 ticks = 2;
+  string reason = 3;
+  uint32 before_total_ticks = 4;
+  uint32 after_total_ticks = 5;
+  uint32 turn = 6;
+  string source_user_id = 7;
+  Effect effect = 8;
+  ResolutionCause cause = 9;
+}
+
+message TargetSelected {
+  string source_user_id = 1;
+  string target_user_id = 2;
+  uint32 turn = 3;
+  Effect effect = 4;
+  ResolutionCause cause = 5;
+}
+
+// TurnDropped is the durable host audit for a manually confirmed dropped roll.
+message TurnDropped {
+  // User ID remains the legacy source-player field for schema compatibility.
+  string user_id = 1;
+  string reason = 2;
+  string operator_user_id = 3;
+  string source_user_id = 4;
+  uint32 turn = 5;
+  ResolutionCause cause = 6;
+  // Audit ref is the trusted runtime ActionID of the host report.
+  string audit_ref = 7;
+}
+
+message ParticipantRevoked {
+  string user_id = 1;
+  uint32 turn = 2;
+  Phase phase_before = 3;
+  Effect effect = 4;
+  string source_user_id = 5;
+  string target_user_id = 6;
+  bool pending_effect_cancelled = 7;
+  bool target_selection_reopened = 8;
+  string next_user_id = 9;
+}
+
+message SessionFinished {
+  string reason = 1;
+  uint32 turn = 2;
+  string operator_user_id = 3;
+  ResolutionCause cause = 4;
+}
+
+message EffectSelected {
+  uint32 turn = 1;
+  Effect effect = 2;
+  string source_user_id = 3;
+  string target_user_id = 4;
+  uint32 die_one = 5;
+  uint32 die_two = 6;
+  uint32 sum = 7;
+  uint32 rule_priority = 8;
+  Phase next_phase = 9;
+  ResolutionCause cause = 10;
+}
+
+message TurnSettled {
+  uint32 turn = 1;
+  string source_user_id = 2;
+  string target_user_id = 3;
+  string next_user_id = 4;
+  uint32 direction = 5;
+  Effect effect = 6;
+  TurnOutcome outcome = 7;
+  ResolutionCause cause = 8;
+  string reason = 9;
+}
 
 message Event {
   oneof event {
@@ -110,7 +317,20 @@ message Event {
     TurnDropped turn_dropped = 7;
     ParticipantRevoked participant_revoked = 8;
     SessionFinished session_finished = 9;
+    EffectSelected effect_selected = 10;
+    TurnSettled turn_settled = 11;
   }
+}
+
+// ActionTimer binds a persisted timeout to the exact pending transition it may settle.
+message ActionTimer {
+  uint32 turn = 1;
+  Phase phase = 2;
+  string current_user_id = 3;
+  string source_user_id = 4;
+  string target_user_id = 5;
+  Effect effect = 6;
+  int64 deadline_unix_millis = 7;
 }
 
 message View {
@@ -126,6 +346,50 @@ message View {
   uint32 die_two = 10;
   uint32 sum = 11;
   int64 action_deadline_unix_millis = 12;
+  // The projection recalculates this list for the viewer; State.allowed_actions is not forwarded.
   repeated string allowed_actions = 13;
   string finish_reason = 14;
+  string source_user_id = 15;
+  Effect effect = 16;
+  // Constraints are included only when the viewer may perform their associated action.
+  ActionConstraints action_constraints = 17;
+  Config config = 18;
+  TurnSummary last_settlement = 19;
+  // This viewer-scoped flag never grants actions; allowed_actions is computed by the projection.
+  bool viewer_is_host = 20;
+  // Live projections expose at most the same latest 32 settlements retained by State.
+  repeated TurnSummary recent_turns = 21;
+}
+
+// ViewDelta replaces the current viewer-safe public view after validated events.
+message ViewDelta {
+  View view = 1;
+}
+
+message ReplayPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+}
+
+// ReplayEntry preserves public event order without exposing snapshots, seeds, or runtime envelopes.
+message ReplayEntry {
+  uint64 sequence = 1;
+  Event event = 2;
+}
+
+// ReplayTurn also represents a publicly rolled turn left pending by platform cancellation.
+message ReplayTurn {
+  TurnSummary summary = 1;
+  bool settled = 2;
+  Phase terminal_phase = 3;
+}
+
+// Replay is a deterministic public artifact from which every visible transition can be reproduced.
+message Replay {
+  uint32 schema_version = 1;
+  Config config = 2;
+  repeated ReplayPlayer players = 3;
+  repeated ReplayEntry entries = 4;
+  string finish_reason = 5;
+  repeated ReplayTurn turns = 6;
 }

@@ -30,8 +30,11 @@ const (
 	Phase_PHASE_AWAITING_ADD      Phase = 3
 	Phase_PHASE_AWAITING_TARGET   Phase = 4
 	Phase_PHASE_AWAITING_CONTINUE Phase = 5
-	Phase_PHASE_TURN_SETTLED      Phase = 6
-	Phase_PHASE_FINISHED          Phase = 7
+	// Retained for wire compatibility; turn settlement is an event and must never be persisted as a phase.
+	//
+	// Deprecated: Marked as deprecated in game/dice789/v1/dice_789.proto.
+	Phase_PHASE_TURN_SETTLED Phase = 6
+	Phase_PHASE_FINISHED     Phase = 7
 )
 
 // Enum value maps for Phase.
@@ -135,6 +138,206 @@ func (x ContinueMode) Number() protoreflect.EnumNumber {
 // Deprecated: Use ContinueMode.Descriptor instead.
 func (ContinueMode) EnumDescriptor() ([]byte, []int) {
 	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{1}
+}
+
+// Effect identifies the single highest-priority rule selected for one roll.
+type Effect int32
+
+const (
+	Effect_EFFECT_UNSPECIFIED                  Effect = 0
+	Effect_EFFECT_PASS                         Effect = 1
+	Effect_EFFECT_SUM_SEVEN_ADD                Effect = 2
+	Effect_EFFECT_SUM_EIGHT_HALF_POOL          Effect = 3
+	Effect_EFFECT_SUM_NINE_DRAIN_POOL          Effect = 4
+	Effect_EFFECT_ORDINARY_PAIR_REVERSE        Effect = 5
+	Effect_EFFECT_ORDINARY_PAIR_REROLL         Effect = 6
+	Effect_EFFECT_DOUBLE_ONE_TARGET_DRAIN      Effect = 7
+	Effect_EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL Effect = 8
+	Effect_EFFECT_DOUBLE_SIX_TARGET_ADD        Effect = 9
+	Effect_EFFECT_DROPPED_DRAIN_POOL           Effect = 10
+)
+
+// Enum value maps for Effect.
+var (
+	Effect_name = map[int32]string{
+		0:  "EFFECT_UNSPECIFIED",
+		1:  "EFFECT_PASS",
+		2:  "EFFECT_SUM_SEVEN_ADD",
+		3:  "EFFECT_SUM_EIGHT_HALF_POOL",
+		4:  "EFFECT_SUM_NINE_DRAIN_POOL",
+		5:  "EFFECT_ORDINARY_PAIR_REVERSE",
+		6:  "EFFECT_ORDINARY_PAIR_REROLL",
+		7:  "EFFECT_DOUBLE_ONE_TARGET_DRAIN",
+		8:  "EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL",
+		9:  "EFFECT_DOUBLE_SIX_TARGET_ADD",
+		10: "EFFECT_DROPPED_DRAIN_POOL",
+	}
+	Effect_value = map[string]int32{
+		"EFFECT_UNSPECIFIED":                  0,
+		"EFFECT_PASS":                         1,
+		"EFFECT_SUM_SEVEN_ADD":                2,
+		"EFFECT_SUM_EIGHT_HALF_POOL":          3,
+		"EFFECT_SUM_NINE_DRAIN_POOL":          4,
+		"EFFECT_ORDINARY_PAIR_REVERSE":        5,
+		"EFFECT_ORDINARY_PAIR_REROLL":         6,
+		"EFFECT_DOUBLE_ONE_TARGET_DRAIN":      7,
+		"EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL": 8,
+		"EFFECT_DOUBLE_SIX_TARGET_ADD":        9,
+		"EFFECT_DROPPED_DRAIN_POOL":           10,
+	}
+)
+
+func (x Effect) Enum() *Effect {
+	p := new(Effect)
+	*p = x
+	return p
+}
+
+func (x Effect) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Effect) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_dice789_v1_dice_789_proto_enumTypes[2].Descriptor()
+}
+
+func (Effect) Type() protoreflect.EnumType {
+	return &file_game_dice789_v1_dice_789_proto_enumTypes[2]
+}
+
+func (x Effect) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Effect.Descriptor instead.
+func (Effect) EnumDescriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{2}
+}
+
+// ResolutionCause records why an authoritative transition occurred.
+type ResolutionCause int32
+
+const (
+	ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED          ResolutionCause = 0
+	ResolutionCause_RESOLUTION_CAUSE_PLAYER_ACTION        ResolutionCause = 1
+	ResolutionCause_RESOLUTION_CAUSE_HOST_CONFIRMED       ResolutionCause = 2
+	ResolutionCause_RESOLUTION_CAUSE_DROP_REPORTED        ResolutionCause = 3
+	ResolutionCause_RESOLUTION_CAUSE_TIMEOUT              ResolutionCause = 4
+	ResolutionCause_RESOLUTION_CAUSE_PARTICIPANT_REVOKED  ResolutionCause = 5
+	ResolutionCause_RESOLUTION_CAUSE_HOST_FINISHED        ResolutionCause = 6
+	ResolutionCause_RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS ResolutionCause = 7
+	ResolutionCause_RESOLUTION_CAUSE_PLATFORM_CANCELLED   ResolutionCause = 8
+)
+
+// Enum value maps for ResolutionCause.
+var (
+	ResolutionCause_name = map[int32]string{
+		0: "RESOLUTION_CAUSE_UNSPECIFIED",
+		1: "RESOLUTION_CAUSE_PLAYER_ACTION",
+		2: "RESOLUTION_CAUSE_HOST_CONFIRMED",
+		3: "RESOLUTION_CAUSE_DROP_REPORTED",
+		4: "RESOLUTION_CAUSE_TIMEOUT",
+		5: "RESOLUTION_CAUSE_PARTICIPANT_REVOKED",
+		6: "RESOLUTION_CAUSE_HOST_FINISHED",
+		7: "RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS",
+		8: "RESOLUTION_CAUSE_PLATFORM_CANCELLED",
+	}
+	ResolutionCause_value = map[string]int32{
+		"RESOLUTION_CAUSE_UNSPECIFIED":          0,
+		"RESOLUTION_CAUSE_PLAYER_ACTION":        1,
+		"RESOLUTION_CAUSE_HOST_CONFIRMED":       2,
+		"RESOLUTION_CAUSE_DROP_REPORTED":        3,
+		"RESOLUTION_CAUSE_TIMEOUT":              4,
+		"RESOLUTION_CAUSE_PARTICIPANT_REVOKED":  5,
+		"RESOLUTION_CAUSE_HOST_FINISHED":        6,
+		"RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS": 7,
+		"RESOLUTION_CAUSE_PLATFORM_CANCELLED":   8,
+	}
+)
+
+func (x ResolutionCause) Enum() *ResolutionCause {
+	p := new(ResolutionCause)
+	*p = x
+	return p
+}
+
+func (x ResolutionCause) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResolutionCause) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_dice789_v1_dice_789_proto_enumTypes[3].Descriptor()
+}
+
+func (ResolutionCause) Type() protoreflect.EnumType {
+	return &file_game_dice789_v1_dice_789_proto_enumTypes[3]
+}
+
+func (x ResolutionCause) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResolutionCause.Descriptor instead.
+func (ResolutionCause) EnumDescriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{3}
+}
+
+type TurnOutcome int32
+
+const (
+	TurnOutcome_TURN_OUTCOME_UNSPECIFIED       TurnOutcome = 0
+	TurnOutcome_TURN_OUTCOME_PASS              TurnOutcome = 1
+	TurnOutcome_TURN_OUTCOME_REROLL            TurnOutcome = 2
+	TurnOutcome_TURN_OUTCOME_TARGET_TAKES_TURN TurnOutcome = 3
+	TurnOutcome_TURN_OUTCOME_SOURCE_REVOKED    TurnOutcome = 4
+	TurnOutcome_TURN_OUTCOME_SESSION_FINISHED  TurnOutcome = 5
+)
+
+// Enum value maps for TurnOutcome.
+var (
+	TurnOutcome_name = map[int32]string{
+		0: "TURN_OUTCOME_UNSPECIFIED",
+		1: "TURN_OUTCOME_PASS",
+		2: "TURN_OUTCOME_REROLL",
+		3: "TURN_OUTCOME_TARGET_TAKES_TURN",
+		4: "TURN_OUTCOME_SOURCE_REVOKED",
+		5: "TURN_OUTCOME_SESSION_FINISHED",
+	}
+	TurnOutcome_value = map[string]int32{
+		"TURN_OUTCOME_UNSPECIFIED":       0,
+		"TURN_OUTCOME_PASS":              1,
+		"TURN_OUTCOME_REROLL":            2,
+		"TURN_OUTCOME_TARGET_TAKES_TURN": 3,
+		"TURN_OUTCOME_SOURCE_REVOKED":    4,
+		"TURN_OUTCOME_SESSION_FINISHED":  5,
+	}
+)
+
+func (x TurnOutcome) Enum() *TurnOutcome {
+	p := new(TurnOutcome)
+	*p = x
+	return p
+}
+
+func (x TurnOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TurnOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_dice789_v1_dice_789_proto_enumTypes[4].Descriptor()
+}
+
+func (TurnOutcome) Type() protoreflect.EnumType {
+	return &file_game_dice789_v1_dice_789_proto_enumTypes[4]
+}
+
+func (x TurnOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TurnOutcome.Descriptor instead.
+func (TurnOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{4}
 }
 
 type Config struct {
@@ -277,9 +480,12 @@ func (x *Config) GetDropReportWindowSeconds() uint32 {
 	return 0
 }
 
+// Pool layers are always ordered bottom-to-top with contiguous zero-based indexes.
 type PoolLayer struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ticks         uint32                 `protobuf:"varint,1,opt,name=ticks,proto3" json:"ticks,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Ticks uint32                 `protobuf:"varint,1,opt,name=ticks,proto3" json:"ticks,omitempty"`
+	// Index is zero-based from the bottom and makes persisted layer snapshots self-describing.
+	Index         uint32 `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -317,6 +523,13 @@ func (*PoolLayer) Descriptor() ([]byte, []int) {
 func (x *PoolLayer) GetTicks() uint32 {
 	if x != nil {
 		return x.Ticks
+	}
+	return 0
+}
+
+func (x *PoolLayer) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
 	}
 	return 0
 }
@@ -389,6 +602,304 @@ func (x *PlayerState) GetPenaltyTicks() uint32 {
 	return 0
 }
 
+type ActionConstraints struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A zero maximum means pot.add is resolved automatically and must not be offered.
+	MinimumAddTicks        uint32   `protobuf:"varint,1,opt,name=minimum_add_ticks,json=minimumAddTicks,proto3" json:"minimum_add_ticks,omitempty"`
+	MaximumAddTicks        uint32   `protobuf:"varint,2,opt,name=maximum_add_ticks,json=maximumAddTicks,proto3" json:"maximum_add_ticks,omitempty"`
+	AddStepTicks           uint32   `protobuf:"varint,3,opt,name=add_step_ticks,json=addStepTicks,proto3" json:"add_step_ticks,omitempty"`
+	AllowCapacityRemainder bool     `protobuf:"varint,4,opt,name=allow_capacity_remainder,json=allowCapacityRemainder,proto3" json:"allow_capacity_remainder,omitempty"`
+	TargetUserIds          []string `protobuf:"bytes,5,rep,name=target_user_ids,json=targetUserIds,proto3" json:"target_user_ids,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *ActionConstraints) Reset() {
+	*x = ActionConstraints{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionConstraints) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionConstraints) ProtoMessage() {}
+
+func (x *ActionConstraints) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionConstraints.ProtoReflect.Descriptor instead.
+func (*ActionConstraints) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ActionConstraints) GetMinimumAddTicks() uint32 {
+	if x != nil {
+		return x.MinimumAddTicks
+	}
+	return 0
+}
+
+func (x *ActionConstraints) GetMaximumAddTicks() uint32 {
+	if x != nil {
+		return x.MaximumAddTicks
+	}
+	return 0
+}
+
+func (x *ActionConstraints) GetAddStepTicks() uint32 {
+	if x != nil {
+		return x.AddStepTicks
+	}
+	return 0
+}
+
+func (x *ActionConstraints) GetAllowCapacityRemainder() bool {
+	if x != nil {
+		return x.AllowCapacityRemainder
+	}
+	return false
+}
+
+func (x *ActionConstraints) GetTargetUserIds() []string {
+	if x != nil {
+		return x.TargetUserIds
+	}
+	return nil
+}
+
+// TurnSummary is the compact authoritative history retained in snapshots and live views.
+type TurnSummary struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Turn               uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId       string                 `protobuf:"bytes,2,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	DieOne             uint32                 `protobuf:"varint,3,opt,name=die_one,json=dieOne,proto3" json:"die_one,omitempty"`
+	DieTwo             uint32                 `protobuf:"varint,4,opt,name=die_two,json=dieTwo,proto3" json:"die_two,omitempty"`
+	Sum                uint32                 `protobuf:"varint,5,opt,name=sum,proto3" json:"sum,omitempty"`
+	Effect             Effect                 `protobuf:"varint,6,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	TargetUserId       string                 `protobuf:"bytes,7,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	PoolBeforeTicks    uint32                 `protobuf:"varint,8,opt,name=pool_before_ticks,json=poolBeforeTicks,proto3" json:"pool_before_ticks,omitempty"`
+	PoolAfterTicks     uint32                 `protobuf:"varint,9,opt,name=pool_after_ticks,json=poolAfterTicks,proto3" json:"pool_after_ticks,omitempty"`
+	PenaltyUserId      string                 `protobuf:"bytes,10,opt,name=penalty_user_id,json=penaltyUserId,proto3" json:"penalty_user_id,omitempty"`
+	PenaltyTicks       uint32                 `protobuf:"varint,11,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	DirectionBefore    uint32                 `protobuf:"varint,12,opt,name=direction_before,json=directionBefore,proto3" json:"direction_before,omitempty"`
+	DirectionAfter     uint32                 `protobuf:"varint,13,opt,name=direction_after,json=directionAfter,proto3" json:"direction_after,omitempty"`
+	NextUserId         string                 `protobuf:"bytes,14,opt,name=next_user_id,json=nextUserId,proto3" json:"next_user_id,omitempty"`
+	Outcome            TurnOutcome            `protobuf:"varint,15,opt,name=outcome,proto3,enum=game.dice789.v1.TurnOutcome" json:"outcome,omitempty"`
+	Cause              ResolutionCause        `protobuf:"varint,16,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	DroppedReported    bool                   `protobuf:"varint,17,opt,name=dropped_reported,json=droppedReported,proto3" json:"dropped_reported,omitempty"`
+	DropOperatorUserId string                 `protobuf:"bytes,18,opt,name=drop_operator_user_id,json=dropOperatorUserId,proto3" json:"drop_operator_user_id,omitempty"`
+	DropReason         string                 `protobuf:"bytes,19,opt,name=drop_reason,json=dropReason,proto3" json:"drop_reason,omitempty"`
+	ResolutionReason   string                 `protobuf:"bytes,20,opt,name=resolution_reason,json=resolutionReason,proto3" json:"resolution_reason,omitempty"`
+	PoolBeforeLayers   []*PoolLayer           `protobuf:"bytes,21,rep,name=pool_before_layers,json=poolBeforeLayers,proto3" json:"pool_before_layers,omitempty"`
+	PoolAfterLayers    []*PoolLayer           `protobuf:"bytes,22,rep,name=pool_after_layers,json=poolAfterLayers,proto3" json:"pool_after_layers,omitempty"`
+	AuditRef           string                 `protobuf:"bytes,23,opt,name=audit_ref,json=auditRef,proto3" json:"audit_ref,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *TurnSummary) Reset() {
+	*x = TurnSummary{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TurnSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TurnSummary) ProtoMessage() {}
+
+func (x *TurnSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TurnSummary.ProtoReflect.Descriptor instead.
+func (*TurnSummary) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TurnSummary) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetDieOne() uint32 {
+	if x != nil {
+		return x.DieOne
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetDieTwo() uint32 {
+	if x != nil {
+		return x.DieTwo
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetSum() uint32 {
+	if x != nil {
+		return x.Sum
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *TurnSummary) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetPoolBeforeTicks() uint32 {
+	if x != nil {
+		return x.PoolBeforeTicks
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetPoolAfterTicks() uint32 {
+	if x != nil {
+		return x.PoolAfterTicks
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetPenaltyUserId() string {
+	if x != nil {
+		return x.PenaltyUserId
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetPenaltyTicks() uint32 {
+	if x != nil {
+		return x.PenaltyTicks
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetDirectionBefore() uint32 {
+	if x != nil {
+		return x.DirectionBefore
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetDirectionAfter() uint32 {
+	if x != nil {
+		return x.DirectionAfter
+	}
+	return 0
+}
+
+func (x *TurnSummary) GetNextUserId() string {
+	if x != nil {
+		return x.NextUserId
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetOutcome() TurnOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return TurnOutcome_TURN_OUTCOME_UNSPECIFIED
+}
+
+func (x *TurnSummary) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TurnSummary) GetDroppedReported() bool {
+	if x != nil {
+		return x.DroppedReported
+	}
+	return false
+}
+
+func (x *TurnSummary) GetDropOperatorUserId() string {
+	if x != nil {
+		return x.DropOperatorUserId
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetDropReason() string {
+	if x != nil {
+		return x.DropReason
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetResolutionReason() string {
+	if x != nil {
+		return x.ResolutionReason
+	}
+	return ""
+}
+
+func (x *TurnSummary) GetPoolBeforeLayers() []*PoolLayer {
+	if x != nil {
+		return x.PoolBeforeLayers
+	}
+	return nil
+}
+
+func (x *TurnSummary) GetPoolAfterLayers() []*PoolLayer {
+	if x != nil {
+		return x.PoolAfterLayers
+	}
+	return nil
+}
+
+func (x *TurnSummary) GetAuditRef() string {
+	if x != nil {
+		return x.AuditRef
+	}
+	return ""
+}
+
 type State struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	SchemaVersion            uint32                 `protobuf:"varint,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
@@ -406,13 +917,25 @@ type State struct {
 	Sum                      uint32                 `protobuf:"varint,13,opt,name=sum,proto3" json:"sum,omitempty"`
 	ActionDeadlineUnixMillis int64                  `protobuf:"varint,14,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
 	Config                   *Config                `protobuf:"bytes,15,opt,name=config,proto3" json:"config,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Host identity is frozen from trusted session start context for host-only commands.
+	HostUserId string `protobuf:"bytes,16,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`
+	// Effect is classified while result_pending and remains set until the turn settles.
+	Effect Effect `protobuf:"varint,17,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	// Rule-level actions are never copied directly to a View without viewer authorization.
+	AllowedActions []string `protobuf:"bytes,18,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
+	// The engine retains at most the latest 32 settled turns in this bounded snapshot history.
+	TurnHistory       []*TurnSummary     `protobuf:"bytes,19,rep,name=turn_history,json=turnHistory,proto3" json:"turn_history,omitempty"`
+	FinishReason      string             `protobuf:"bytes,20,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	ActionConstraints *ActionConstraints `protobuf:"bytes,21,opt,name=action_constraints,json=actionConstraints,proto3" json:"action_constraints,omitempty"`
+	// Last settlement survives the immediate transition into the next awaiting_roll phase.
+	LastSettlement *TurnSummary `protobuf:"bytes,22,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *State) Reset() {
 	*x = State{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[3]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +947,7 @@ func (x *State) String() string {
 func (*State) ProtoMessage() {}
 
 func (x *State) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[3]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,7 +960,7 @@ func (x *State) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use State.ProtoReflect.Descriptor instead.
 func (*State) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{3}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *State) GetSchemaVersion() uint32 {
@@ -545,6 +1068,55 @@ func (x *State) GetConfig() *Config {
 	return nil
 }
 
+func (x *State) GetHostUserId() string {
+	if x != nil {
+		return x.HostUserId
+	}
+	return ""
+}
+
+func (x *State) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *State) GetAllowedActions() []string {
+	if x != nil {
+		return x.AllowedActions
+	}
+	return nil
+}
+
+func (x *State) GetTurnHistory() []*TurnSummary {
+	if x != nil {
+		return x.TurnHistory
+	}
+	return nil
+}
+
+func (x *State) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
+func (x *State) GetActionConstraints() *ActionConstraints {
+	if x != nil {
+		return x.ActionConstraints
+	}
+	return nil
+}
+
+func (x *State) GetLastSettlement() *TurnSummary {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
 type Roll struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -553,7 +1125,7 @@ type Roll struct {
 
 func (x *Roll) Reset() {
 	*x = Roll{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[4]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +1137,7 @@ func (x *Roll) String() string {
 func (*Roll) ProtoMessage() {}
 
 func (x *Roll) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[4]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +1150,7 @@ func (x *Roll) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Roll.ProtoReflect.Descriptor instead.
 func (*Roll) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{4}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{6}
 }
 
 type ConfirmLanded struct {
@@ -589,7 +1161,7 @@ type ConfirmLanded struct {
 
 func (x *ConfirmLanded) Reset() {
 	*x = ConfirmLanded{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[5]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -601,7 +1173,7 @@ func (x *ConfirmLanded) String() string {
 func (*ConfirmLanded) ProtoMessage() {}
 
 func (x *ConfirmLanded) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[5]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,7 +1186,7 @@ func (x *ConfirmLanded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmLanded.ProtoReflect.Descriptor instead.
 func (*ConfirmLanded) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{5}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{7}
 }
 
 type AddToPool struct {
@@ -626,7 +1198,7 @@ type AddToPool struct {
 
 func (x *AddToPool) Reset() {
 	*x = AddToPool{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[6]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +1210,7 @@ func (x *AddToPool) String() string {
 func (*AddToPool) ProtoMessage() {}
 
 func (x *AddToPool) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[6]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +1223,7 @@ func (x *AddToPool) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddToPool.ProtoReflect.Descriptor instead.
 func (*AddToPool) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{6}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AddToPool) GetTicks() uint32 {
@@ -670,7 +1242,7 @@ type ChooseTarget struct {
 
 func (x *ChooseTarget) Reset() {
 	*x = ChooseTarget{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[7]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +1254,7 @@ func (x *ChooseTarget) String() string {
 func (*ChooseTarget) ProtoMessage() {}
 
 func (x *ChooseTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[7]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +1267,7 @@ func (x *ChooseTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChooseTarget.ProtoReflect.Descriptor instead.
 func (*ChooseTarget) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{7}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ChooseTarget) GetUserId() string {
@@ -713,7 +1285,7 @@ type Reroll struct {
 
 func (x *Reroll) Reset() {
 	*x = Reroll{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[8]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +1297,7 @@ func (x *Reroll) String() string {
 func (*Reroll) ProtoMessage() {}
 
 func (x *Reroll) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[8]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +1310,7 @@ func (x *Reroll) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reroll.ProtoReflect.Descriptor instead.
 func (*Reroll) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{8}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{10}
 }
 
 type Pass struct {
@@ -749,7 +1321,7 @@ type Pass struct {
 
 func (x *Pass) Reset() {
 	*x = Pass{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[9]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +1333,7 @@ func (x *Pass) String() string {
 func (*Pass) ProtoMessage() {}
 
 func (x *Pass) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[9]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +1346,7 @@ func (x *Pass) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pass.ProtoReflect.Descriptor instead.
 func (*Pass) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{9}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{11}
 }
 
 type ReportDropped struct {
@@ -786,7 +1358,7 @@ type ReportDropped struct {
 
 func (x *ReportDropped) Reset() {
 	*x = ReportDropped{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[10]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -798,7 +1370,7 @@ func (x *ReportDropped) String() string {
 func (*ReportDropped) ProtoMessage() {}
 
 func (x *ReportDropped) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[10]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -811,7 +1383,7 @@ func (x *ReportDropped) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportDropped.ProtoReflect.Descriptor instead.
 func (*ReportDropped) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{10}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ReportDropped) GetReason() string {
@@ -822,14 +1394,18 @@ func (x *ReportDropped) GetReason() string {
 }
 
 type Finish struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty means a runtime-authorized host finish; platform cancellation is explicit.
+	Reason string `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Runtime supplies the currently authorized PartyRoom host; the game never infers it from initial state.
+	OperatorUserId string `protobuf:"bytes,2,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Finish) Reset() {
 	*x = Finish{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[11]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -841,7 +1417,7 @@ func (x *Finish) String() string {
 func (*Finish) ProtoMessage() {}
 
 func (x *Finish) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[11]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -854,7 +1430,21 @@ func (x *Finish) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Finish.ProtoReflect.Descriptor instead.
 func (*Finish) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{11}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *Finish) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Finish) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
 }
 
 type Command struct {
@@ -876,7 +1466,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[12]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -888,7 +1478,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[12]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -901,7 +1491,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{12}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Command) GetCommand() isCommand_Command {
@@ -1036,16 +1626,24 @@ func (*Command_ReportDropped) isCommand_Command() {}
 func (*Command_Finish) isCommand_Command() {}
 
 type TurnStarted struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Turn          uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Turn            uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	UserId          string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Direction       uint32                 `protobuf:"varint,3,opt,name=direction,proto3" json:"direction,omitempty"`
+	PreviousOutcome TurnOutcome            `protobuf:"varint,4,opt,name=previous_outcome,json=previousOutcome,proto3,enum=game.dice789.v1.TurnOutcome" json:"previous_outcome,omitempty"`
+	Cause           ResolutionCause        `protobuf:"varint,5,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	// Initialization fields are required on turn 1 and must be absent on later turns.
+	Config           *Config         `protobuf:"bytes,6,opt,name=config,proto3" json:"config,omitempty"`
+	Players          []*ReplayPlayer `protobuf:"bytes,7,rep,name=players,proto3" json:"players,omitempty"`
+	InitialPool      []*PoolLayer    `protobuf:"bytes,8,rep,name=initial_pool,json=initialPool,proto3" json:"initial_pool,omitempty"`
+	InitialPoolTicks uint32          `protobuf:"varint,9,opt,name=initial_pool_ticks,json=initialPoolTicks,proto3" json:"initial_pool_ticks,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TurnStarted) Reset() {
 	*x = TurnStarted{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[13]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1655,7 @@ func (x *TurnStarted) String() string {
 func (*TurnStarted) ProtoMessage() {}
 
 func (x *TurnStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[13]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1668,7 @@ func (x *TurnStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnStarted.ProtoReflect.Descriptor instead.
 func (*TurnStarted) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{13}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TurnStarted) GetTurn() uint32 {
@@ -1087,18 +1685,70 @@ func (x *TurnStarted) GetUserId() string {
 	return ""
 }
 
+func (x *TurnStarted) GetDirection() uint32 {
+	if x != nil {
+		return x.Direction
+	}
+	return 0
+}
+
+func (x *TurnStarted) GetPreviousOutcome() TurnOutcome {
+	if x != nil {
+		return x.PreviousOutcome
+	}
+	return TurnOutcome_TURN_OUTCOME_UNSPECIFIED
+}
+
+func (x *TurnStarted) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TurnStarted) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *TurnStarted) GetPlayers() []*ReplayPlayer {
+	if x != nil {
+		return x.Players
+	}
+	return nil
+}
+
+func (x *TurnStarted) GetInitialPool() []*PoolLayer {
+	if x != nil {
+		return x.InitialPool
+	}
+	return nil
+}
+
+func (x *TurnStarted) GetInitialPoolTicks() uint32 {
+	if x != nil {
+		return x.InitialPoolTicks
+	}
+	return 0
+}
+
 type DiceRolled struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DieOne        uint32                 `protobuf:"varint,1,opt,name=die_one,json=dieOne,proto3" json:"die_one,omitempty"`
 	DieTwo        uint32                 `protobuf:"varint,2,opt,name=die_two,json=dieTwo,proto3" json:"die_two,omitempty"`
 	Sum           uint32                 `protobuf:"varint,3,opt,name=sum,proto3" json:"sum,omitempty"`
+	Turn          uint32                 `protobuf:"varint,4,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId  string                 `protobuf:"bytes,5,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	Cause         ResolutionCause        `protobuf:"varint,6,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DiceRolled) Reset() {
 	*x = DiceRolled{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[14]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1110,7 +1760,7 @@ func (x *DiceRolled) String() string {
 func (*DiceRolled) ProtoMessage() {}
 
 func (x *DiceRolled) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[14]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1123,7 +1773,7 @@ func (x *DiceRolled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiceRolled.ProtoReflect.Descriptor instead.
 func (*DiceRolled) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{14}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DiceRolled) GetDieOne() uint32 {
@@ -1147,18 +1797,48 @@ func (x *DiceRolled) GetSum() uint32 {
 	return 0
 }
 
+func (x *DiceRolled) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *DiceRolled) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *DiceRolled) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type PoolChanged struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BeforeTicks   uint32                 `protobuf:"varint,1,opt,name=before_ticks,json=beforeTicks,proto3" json:"before_ticks,omitempty"`
-	AfterTicks    uint32                 `protobuf:"varint,2,opt,name=after_ticks,json=afterTicks,proto3" json:"after_ticks,omitempty"`
-	ActorTicks    uint32                 `protobuf:"varint,3,opt,name=actor_ticks,json=actorTicks,proto3" json:"actor_ticks,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	BeforeTicks uint32                 `protobuf:"varint,1,opt,name=before_ticks,json=beforeTicks,proto3" json:"before_ticks,omitempty"`
+	AfterTicks  uint32                 `protobuf:"varint,2,opt,name=after_ticks,json=afterTicks,proto3" json:"after_ticks,omitempty"`
+	// Actor ticks is the amount added to or removed from the pool by this event.
+	ActorTicks    uint32          `protobuf:"varint,3,opt,name=actor_ticks,json=actorTicks,proto3" json:"actor_ticks,omitempty"`
+	BeforeLayers  []*PoolLayer    `protobuf:"bytes,4,rep,name=before_layers,json=beforeLayers,proto3" json:"before_layers,omitempty"`
+	AfterLayers   []*PoolLayer    `protobuf:"bytes,5,rep,name=after_layers,json=afterLayers,proto3" json:"after_layers,omitempty"`
+	Turn          uint32          `protobuf:"varint,6,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId  string          `protobuf:"bytes,7,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	TargetUserId  string          `protobuf:"bytes,8,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	ActorUserId   string          `protobuf:"bytes,9,opt,name=actor_user_id,json=actorUserId,proto3" json:"actor_user_id,omitempty"`
+	Effect        Effect          `protobuf:"varint,10,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	Cause         ResolutionCause `protobuf:"varint,11,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PoolChanged) Reset() {
 	*x = PoolChanged{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[15]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1170,7 +1850,7 @@ func (x *PoolChanged) String() string {
 func (*PoolChanged) ProtoMessage() {}
 
 func (x *PoolChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[15]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1183,7 +1863,7 @@ func (x *PoolChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PoolChanged.ProtoReflect.Descriptor instead.
 func (*PoolChanged) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{15}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PoolChanged) GetBeforeTicks() uint32 {
@@ -1207,16 +1887,77 @@ func (x *PoolChanged) GetActorTicks() uint32 {
 	return 0
 }
 
+func (x *PoolChanged) GetBeforeLayers() []*PoolLayer {
+	if x != nil {
+		return x.BeforeLayers
+	}
+	return nil
+}
+
+func (x *PoolChanged) GetAfterLayers() []*PoolLayer {
+	if x != nil {
+		return x.AfterLayers
+	}
+	return nil
+}
+
+func (x *PoolChanged) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *PoolChanged) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *PoolChanged) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *PoolChanged) GetActorUserId() string {
+	if x != nil {
+		return x.ActorUserId
+	}
+	return ""
+}
+
+func (x *PoolChanged) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *PoolChanged) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type DirectionChanged struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Direction     uint32                 `protobuf:"varint,1,opt,name=direction,proto3" json:"direction,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Direction       uint32                 `protobuf:"varint,1,opt,name=direction,proto3" json:"direction,omitempty"`
+	BeforeDirection uint32                 `protobuf:"varint,2,opt,name=before_direction,json=beforeDirection,proto3" json:"before_direction,omitempty"`
+	Turn            uint32                 `protobuf:"varint,3,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId    string                 `protobuf:"bytes,4,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	Effect          Effect                 `protobuf:"varint,5,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	Cause           ResolutionCause        `protobuf:"varint,6,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *DirectionChanged) Reset() {
 	*x = DirectionChanged{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[16]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1228,7 +1969,7 @@ func (x *DirectionChanged) String() string {
 func (*DirectionChanged) ProtoMessage() {}
 
 func (x *DirectionChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[16]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1241,7 +1982,7 @@ func (x *DirectionChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectionChanged.ProtoReflect.Descriptor instead.
 func (*DirectionChanged) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{16}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DirectionChanged) GetDirection() uint32 {
@@ -1251,18 +1992,59 @@ func (x *DirectionChanged) GetDirection() uint32 {
 	return 0
 }
 
+func (x *DirectionChanged) GetBeforeDirection() uint32 {
+	if x != nil {
+		return x.BeforeDirection
+	}
+	return 0
+}
+
+func (x *DirectionChanged) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *DirectionChanged) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *DirectionChanged) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *DirectionChanged) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type PenaltyRecorded struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Ticks         uint32                 `protobuf:"varint,2,opt,name=ticks,proto3" json:"ticks,omitempty"`
-	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Ticks            uint32                 `protobuf:"varint,2,opt,name=ticks,proto3" json:"ticks,omitempty"`
+	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	BeforeTotalTicks uint32                 `protobuf:"varint,4,opt,name=before_total_ticks,json=beforeTotalTicks,proto3" json:"before_total_ticks,omitempty"`
+	AfterTotalTicks  uint32                 `protobuf:"varint,5,opt,name=after_total_ticks,json=afterTotalTicks,proto3" json:"after_total_ticks,omitempty"`
+	Turn             uint32                 `protobuf:"varint,6,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId     string                 `protobuf:"bytes,7,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	Effect           Effect                 `protobuf:"varint,8,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	Cause            ResolutionCause        `protobuf:"varint,9,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PenaltyRecorded) Reset() {
 	*x = PenaltyRecorded{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[17]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1274,7 +2056,7 @@ func (x *PenaltyRecorded) String() string {
 func (*PenaltyRecorded) ProtoMessage() {}
 
 func (x *PenaltyRecorded) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[17]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1287,7 +2069,7 @@ func (x *PenaltyRecorded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PenaltyRecorded.ProtoReflect.Descriptor instead.
 func (*PenaltyRecorded) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{17}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PenaltyRecorded) GetUserId() string {
@@ -1311,17 +2093,62 @@ func (x *PenaltyRecorded) GetReason() string {
 	return ""
 }
 
+func (x *PenaltyRecorded) GetBeforeTotalTicks() uint32 {
+	if x != nil {
+		return x.BeforeTotalTicks
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetAfterTotalTicks() uint32 {
+	if x != nil {
+		return x.AfterTotalTicks
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *PenaltyRecorded) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *PenaltyRecorded) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type TargetSelected struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceUserId  string                 `protobuf:"bytes,1,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
 	TargetUserId  string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Turn          uint32                 `protobuf:"varint,3,opt,name=turn,proto3" json:"turn,omitempty"`
+	Effect        Effect                 `protobuf:"varint,4,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	Cause         ResolutionCause        `protobuf:"varint,5,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TargetSelected) Reset() {
 	*x = TargetSelected{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[18]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1333,7 +2160,7 @@ func (x *TargetSelected) String() string {
 func (*TargetSelected) ProtoMessage() {}
 
 func (x *TargetSelected) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[18]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1346,7 +2173,7 @@ func (x *TargetSelected) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetSelected.ProtoReflect.Descriptor instead.
 func (*TargetSelected) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{18}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TargetSelected) GetSourceUserId() string {
@@ -1363,17 +2190,46 @@ func (x *TargetSelected) GetTargetUserId() string {
 	return ""
 }
 
+func (x *TargetSelected) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *TargetSelected) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *TargetSelected) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+// TurnDropped is the durable host audit for a manually confirmed dropped roll.
 type TurnDropped struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// User ID remains the legacy source-player field for schema compatibility.
+	UserId         string          `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Reason         string          `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	OperatorUserId string          `protobuf:"bytes,3,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	SourceUserId   string          `protobuf:"bytes,4,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	Turn           uint32          `protobuf:"varint,5,opt,name=turn,proto3" json:"turn,omitempty"`
+	Cause          ResolutionCause `protobuf:"varint,6,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	// Audit ref is the trusted runtime ActionID of the host report.
+	AuditRef      string `protobuf:"bytes,7,opt,name=audit_ref,json=auditRef,proto3" json:"audit_ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TurnDropped) Reset() {
 	*x = TurnDropped{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[19]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +2241,7 @@ func (x *TurnDropped) String() string {
 func (*TurnDropped) ProtoMessage() {}
 
 func (x *TurnDropped) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[19]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +2254,7 @@ func (x *TurnDropped) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnDropped.ProtoReflect.Descriptor instead.
 func (*TurnDropped) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{19}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *TurnDropped) GetUserId() string {
@@ -1415,16 +2271,59 @@ func (x *TurnDropped) GetReason() string {
 	return ""
 }
 
+func (x *TurnDropped) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *TurnDropped) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *TurnDropped) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *TurnDropped) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TurnDropped) GetAuditRef() string {
+	if x != nil {
+		return x.AuditRef
+	}
+	return ""
+}
+
 type ParticipantRevoked struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	UserId                  string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Turn                    uint32                 `protobuf:"varint,2,opt,name=turn,proto3" json:"turn,omitempty"`
+	PhaseBefore             Phase                  `protobuf:"varint,3,opt,name=phase_before,json=phaseBefore,proto3,enum=game.dice789.v1.Phase" json:"phase_before,omitempty"`
+	Effect                  Effect                 `protobuf:"varint,4,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	SourceUserId            string                 `protobuf:"bytes,5,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	TargetUserId            string                 `protobuf:"bytes,6,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	PendingEffectCancelled  bool                   `protobuf:"varint,7,opt,name=pending_effect_cancelled,json=pendingEffectCancelled,proto3" json:"pending_effect_cancelled,omitempty"`
+	TargetSelectionReopened bool                   `protobuf:"varint,8,opt,name=target_selection_reopened,json=targetSelectionReopened,proto3" json:"target_selection_reopened,omitempty"`
+	NextUserId              string                 `protobuf:"bytes,9,opt,name=next_user_id,json=nextUserId,proto3" json:"next_user_id,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *ParticipantRevoked) Reset() {
 	*x = ParticipantRevoked{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[20]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1436,7 +2335,7 @@ func (x *ParticipantRevoked) String() string {
 func (*ParticipantRevoked) ProtoMessage() {}
 
 func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[20]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1449,7 +2348,7 @@ func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantRevoked.ProtoReflect.Descriptor instead.
 func (*ParticipantRevoked) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{20}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ParticipantRevoked) GetUserId() string {
@@ -1459,16 +2358,75 @@ func (x *ParticipantRevoked) GetUserId() string {
 	return ""
 }
 
+func (x *ParticipantRevoked) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *ParticipantRevoked) GetPhaseBefore() Phase {
+	if x != nil {
+		return x.PhaseBefore
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+func (x *ParticipantRevoked) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *ParticipantRevoked) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *ParticipantRevoked) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ParticipantRevoked) GetPendingEffectCancelled() bool {
+	if x != nil {
+		return x.PendingEffectCancelled
+	}
+	return false
+}
+
+func (x *ParticipantRevoked) GetTargetSelectionReopened() bool {
+	if x != nil {
+		return x.TargetSelectionReopened
+	}
+	return false
+}
+
+func (x *ParticipantRevoked) GetNextUserId() string {
+	if x != nil {
+		return x.NextUserId
+	}
+	return ""
+}
+
 type SessionFinished struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Reason         string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Turn           uint32                 `protobuf:"varint,2,opt,name=turn,proto3" json:"turn,omitempty"`
+	OperatorUserId string                 `protobuf:"bytes,3,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	Cause          ResolutionCause        `protobuf:"varint,4,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SessionFinished) Reset() {
 	*x = SessionFinished{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[21]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1480,7 +2438,7 @@ func (x *SessionFinished) String() string {
 func (*SessionFinished) ProtoMessage() {}
 
 func (x *SessionFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[21]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1493,10 +2451,255 @@ func (x *SessionFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFinished.ProtoReflect.Descriptor instead.
 func (*SessionFinished) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{21}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SessionFinished) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *SessionFinished) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *SessionFinished) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *SessionFinished) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+type EffectSelected struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Turn          uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	Effect        Effect                 `protobuf:"varint,2,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	SourceUserId  string                 `protobuf:"bytes,3,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	TargetUserId  string                 `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	DieOne        uint32                 `protobuf:"varint,5,opt,name=die_one,json=dieOne,proto3" json:"die_one,omitempty"`
+	DieTwo        uint32                 `protobuf:"varint,6,opt,name=die_two,json=dieTwo,proto3" json:"die_two,omitempty"`
+	Sum           uint32                 `protobuf:"varint,7,opt,name=sum,proto3" json:"sum,omitempty"`
+	RulePriority  uint32                 `protobuf:"varint,8,opt,name=rule_priority,json=rulePriority,proto3" json:"rule_priority,omitempty"`
+	NextPhase     Phase                  `protobuf:"varint,9,opt,name=next_phase,json=nextPhase,proto3,enum=game.dice789.v1.Phase" json:"next_phase,omitempty"`
+	Cause         ResolutionCause        `protobuf:"varint,10,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EffectSelected) Reset() {
+	*x = EffectSelected{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EffectSelected) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EffectSelected) ProtoMessage() {}
+
+func (x *EffectSelected) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EffectSelected.ProtoReflect.Descriptor instead.
+func (*EffectSelected) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *EffectSelected) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *EffectSelected) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *EffectSelected) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *EffectSelected) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *EffectSelected) GetDieOne() uint32 {
+	if x != nil {
+		return x.DieOne
+	}
+	return 0
+}
+
+func (x *EffectSelected) GetDieTwo() uint32 {
+	if x != nil {
+		return x.DieTwo
+	}
+	return 0
+}
+
+func (x *EffectSelected) GetSum() uint32 {
+	if x != nil {
+		return x.Sum
+	}
+	return 0
+}
+
+func (x *EffectSelected) GetRulePriority() uint32 {
+	if x != nil {
+		return x.RulePriority
+	}
+	return 0
+}
+
+func (x *EffectSelected) GetNextPhase() Phase {
+	if x != nil {
+		return x.NextPhase
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+func (x *EffectSelected) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+type TurnSettled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Turn          uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	SourceUserId  string                 `protobuf:"bytes,2,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	TargetUserId  string                 `protobuf:"bytes,3,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	NextUserId    string                 `protobuf:"bytes,4,opt,name=next_user_id,json=nextUserId,proto3" json:"next_user_id,omitempty"`
+	Direction     uint32                 `protobuf:"varint,5,opt,name=direction,proto3" json:"direction,omitempty"`
+	Effect        Effect                 `protobuf:"varint,6,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	Outcome       TurnOutcome            `protobuf:"varint,7,opt,name=outcome,proto3,enum=game.dice789.v1.TurnOutcome" json:"outcome,omitempty"`
+	Cause         ResolutionCause        `protobuf:"varint,8,opt,name=cause,proto3,enum=game.dice789.v1.ResolutionCause" json:"cause,omitempty"`
+	Reason        string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TurnSettled) Reset() {
+	*x = TurnSettled{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TurnSettled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TurnSettled) ProtoMessage() {}
+
+func (x *TurnSettled) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TurnSettled.ProtoReflect.Descriptor instead.
+func (*TurnSettled) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *TurnSettled) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *TurnSettled) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *TurnSettled) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *TurnSettled) GetNextUserId() string {
+	if x != nil {
+		return x.NextUserId
+	}
+	return ""
+}
+
+func (x *TurnSettled) GetDirection() uint32 {
+	if x != nil {
+		return x.Direction
+	}
+	return 0
+}
+
+func (x *TurnSettled) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *TurnSettled) GetOutcome() TurnOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return TurnOutcome_TURN_OUTCOME_UNSPECIFIED
+}
+
+func (x *TurnSettled) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TurnSettled) GetReason() string {
 	if x != nil {
 		return x.Reason
 	}
@@ -1516,6 +2719,8 @@ type Event struct {
 	//	*Event_TurnDropped
 	//	*Event_ParticipantRevoked
 	//	*Event_SessionFinished
+	//	*Event_EffectSelected
+	//	*Event_TurnSettled
 	Event         isEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1523,7 +2728,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[22]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1535,7 +2740,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[22]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1548,7 +2753,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{22}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Event) GetEvent() isEvent_Event {
@@ -1639,6 +2844,24 @@ func (x *Event) GetSessionFinished() *SessionFinished {
 	return nil
 }
 
+func (x *Event) GetEffectSelected() *EffectSelected {
+	if x != nil {
+		if x, ok := x.Event.(*Event_EffectSelected); ok {
+			return x.EffectSelected
+		}
+	}
+	return nil
+}
+
+func (x *Event) GetTurnSettled() *TurnSettled {
+	if x != nil {
+		if x, ok := x.Event.(*Event_TurnSettled); ok {
+			return x.TurnSettled
+		}
+	}
+	return nil
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -1679,6 +2902,14 @@ type Event_SessionFinished struct {
 	SessionFinished *SessionFinished `protobuf:"bytes,9,opt,name=session_finished,json=sessionFinished,proto3,oneof"`
 }
 
+type Event_EffectSelected struct {
+	EffectSelected *EffectSelected `protobuf:"bytes,10,opt,name=effect_selected,json=effectSelected,proto3,oneof"`
+}
+
+type Event_TurnSettled struct {
+	TurnSettled *TurnSettled `protobuf:"bytes,11,opt,name=turn_settled,json=turnSettled,proto3,oneof"`
+}
+
 func (*Event_TurnStarted) isEvent_Event() {}
 
 func (*Event_DiceRolled) isEvent_Event() {}
@@ -1697,6 +2928,103 @@ func (*Event_ParticipantRevoked) isEvent_Event() {}
 
 func (*Event_SessionFinished) isEvent_Event() {}
 
+func (*Event_EffectSelected) isEvent_Event() {}
+
+func (*Event_TurnSettled) isEvent_Event() {}
+
+// ActionTimer binds a persisted timeout to the exact pending transition it may settle.
+type ActionTimer struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Turn               uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	Phase              Phase                  `protobuf:"varint,2,opt,name=phase,proto3,enum=game.dice789.v1.Phase" json:"phase,omitempty"`
+	CurrentUserId      string                 `protobuf:"bytes,3,opt,name=current_user_id,json=currentUserId,proto3" json:"current_user_id,omitempty"`
+	SourceUserId       string                 `protobuf:"bytes,4,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	TargetUserId       string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Effect             Effect                 `protobuf:"varint,6,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	DeadlineUnixMillis int64                  `protobuf:"varint,7,opt,name=deadline_unix_millis,json=deadlineUnixMillis,proto3" json:"deadline_unix_millis,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ActionTimer) Reset() {
+	*x = ActionTimer{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionTimer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionTimer) ProtoMessage() {}
+
+func (x *ActionTimer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionTimer.ProtoReflect.Descriptor instead.
+func (*ActionTimer) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ActionTimer) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetPhase() Phase {
+	if x != nil {
+		return x.Phase
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+func (x *ActionTimer) GetCurrentUserId() string {
+	if x != nil {
+		return x.CurrentUserId
+	}
+	return ""
+}
+
+func (x *ActionTimer) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *ActionTimer) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ActionTimer) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *ActionTimer) GetDeadlineUnixMillis() int64 {
+	if x != nil {
+		return x.DeadlineUnixMillis
+	}
+	return 0
+}
+
 type View struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	Phase                    Phase                  `protobuf:"varint,1,opt,name=phase,proto3,enum=game.dice789.v1.Phase" json:"phase,omitempty"`
@@ -1711,15 +3039,26 @@ type View struct {
 	DieTwo                   uint32                 `protobuf:"varint,10,opt,name=die_two,json=dieTwo,proto3" json:"die_two,omitempty"`
 	Sum                      uint32                 `protobuf:"varint,11,opt,name=sum,proto3" json:"sum,omitempty"`
 	ActionDeadlineUnixMillis int64                  `protobuf:"varint,12,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
-	AllowedActions           []string               `protobuf:"bytes,13,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
-	FinishReason             string                 `protobuf:"bytes,14,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// The projection recalculates this list for the viewer; State.allowed_actions is not forwarded.
+	AllowedActions []string `protobuf:"bytes,13,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
+	FinishReason   string   `protobuf:"bytes,14,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	SourceUserId   string   `protobuf:"bytes,15,opt,name=source_user_id,json=sourceUserId,proto3" json:"source_user_id,omitempty"`
+	Effect         Effect   `protobuf:"varint,16,opt,name=effect,proto3,enum=game.dice789.v1.Effect" json:"effect,omitempty"`
+	// Constraints are included only when the viewer may perform their associated action.
+	ActionConstraints *ActionConstraints `protobuf:"bytes,17,opt,name=action_constraints,json=actionConstraints,proto3" json:"action_constraints,omitempty"`
+	Config            *Config            `protobuf:"bytes,18,opt,name=config,proto3" json:"config,omitempty"`
+	LastSettlement    *TurnSummary       `protobuf:"bytes,19,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	// This viewer-scoped flag never grants actions; allowed_actions is computed by the projection.
+	ViewerIsHost bool `protobuf:"varint,20,opt,name=viewer_is_host,json=viewerIsHost,proto3" json:"viewer_is_host,omitempty"`
+	// Live projections expose at most the same latest 32 settlements retained by State.
+	RecentTurns   []*TurnSummary `protobuf:"bytes,21,rep,name=recent_turns,json=recentTurns,proto3" json:"recent_turns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *View) Reset() {
 	*x = View{}
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[23]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1731,7 +3070,7 @@ func (x *View) String() string {
 func (*View) ProtoMessage() {}
 
 func (x *View) ProtoReflect() protoreflect.Message {
-	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[23]
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1744,7 +3083,7 @@ func (x *View) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use View.ProtoReflect.Descriptor instead.
 func (*View) Descriptor() ([]byte, []int) {
-	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{23}
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *View) GetPhase() Phase {
@@ -1845,6 +3184,351 @@ func (x *View) GetFinishReason() string {
 	return ""
 }
 
+func (x *View) GetSourceUserId() string {
+	if x != nil {
+		return x.SourceUserId
+	}
+	return ""
+}
+
+func (x *View) GetEffect() Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return Effect_EFFECT_UNSPECIFIED
+}
+
+func (x *View) GetActionConstraints() *ActionConstraints {
+	if x != nil {
+		return x.ActionConstraints
+	}
+	return nil
+}
+
+func (x *View) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *View) GetLastSettlement() *TurnSummary {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
+func (x *View) GetViewerIsHost() bool {
+	if x != nil {
+		return x.ViewerIsHost
+	}
+	return false
+}
+
+func (x *View) GetRecentTurns() []*TurnSummary {
+	if x != nil {
+		return x.RecentTurns
+	}
+	return nil
+}
+
+// ViewDelta replaces the current viewer-safe public view after validated events.
+type ViewDelta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	View          *View                  `protobuf:"bytes,1,opt,name=view,proto3" json:"view,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ViewDelta) Reset() {
+	*x = ViewDelta{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ViewDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ViewDelta) ProtoMessage() {}
+
+func (x *ViewDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ViewDelta.ProtoReflect.Descriptor instead.
+func (*ViewDelta) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ViewDelta) GetView() *View {
+	if x != nil {
+		return x.View
+	}
+	return nil
+}
+
+type ReplayPlayer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeatIndex     uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayPlayer) Reset() {
+	*x = ReplayPlayer{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayPlayer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayPlayer) ProtoMessage() {}
+
+func (x *ReplayPlayer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayPlayer.ProtoReflect.Descriptor instead.
+func (*ReplayPlayer) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ReplayPlayer) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ReplayPlayer) GetSeatIndex() uint32 {
+	if x != nil {
+		return x.SeatIndex
+	}
+	return 0
+}
+
+// ReplayEntry preserves public event order without exposing snapshots, seeds, or runtime envelopes.
+type ReplayEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Event         *Event                 `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayEntry) Reset() {
+	*x = ReplayEntry{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayEntry) ProtoMessage() {}
+
+func (x *ReplayEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayEntry.ProtoReflect.Descriptor instead.
+func (*ReplayEntry) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ReplayEntry) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *ReplayEntry) GetEvent() *Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+// ReplayTurn also represents a publicly rolled turn left pending by platform cancellation.
+type ReplayTurn struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Summary       *TurnSummary           `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	Settled       bool                   `protobuf:"varint,2,opt,name=settled,proto3" json:"settled,omitempty"`
+	TerminalPhase Phase                  `protobuf:"varint,3,opt,name=terminal_phase,json=terminalPhase,proto3,enum=game.dice789.v1.Phase" json:"terminal_phase,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayTurn) Reset() {
+	*x = ReplayTurn{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayTurn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayTurn) ProtoMessage() {}
+
+func (x *ReplayTurn) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayTurn.ProtoReflect.Descriptor instead.
+func (*ReplayTurn) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ReplayTurn) GetSummary() *TurnSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+func (x *ReplayTurn) GetSettled() bool {
+	if x != nil {
+		return x.Settled
+	}
+	return false
+}
+
+func (x *ReplayTurn) GetTerminalPhase() Phase {
+	if x != nil {
+		return x.TerminalPhase
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+// Replay is a deterministic public artifact from which every visible transition can be reproduced.
+type Replay struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SchemaVersion uint32                 `protobuf:"varint,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Config        *Config                `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
+	Players       []*ReplayPlayer        `protobuf:"bytes,3,rep,name=players,proto3" json:"players,omitempty"`
+	Entries       []*ReplayEntry         `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
+	FinishReason  string                 `protobuf:"bytes,5,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	Turns         []*ReplayTurn          `protobuf:"bytes,6,rep,name=turns,proto3" json:"turns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Replay) Reset() {
+	*x = Replay{}
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Replay) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Replay) ProtoMessage() {}
+
+func (x *Replay) ProtoReflect() protoreflect.Message {
+	mi := &file_game_dice789_v1_dice_789_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Replay.ProtoReflect.Descriptor instead.
+func (*Replay) Descriptor() ([]byte, []int) {
+	return file_game_dice789_v1_dice_789_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *Replay) GetSchemaVersion() uint32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *Replay) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *Replay) GetPlayers() []*ReplayPlayer {
+	if x != nil {
+		return x.Players
+	}
+	return nil
+}
+
+func (x *Replay) GetEntries() []*ReplayEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *Replay) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
+func (x *Replay) GetTurns() []*ReplayTurn {
+	if x != nil {
+		return x.Turns
+	}
+	return nil
+}
+
 var File_game_dice789_v1_dice_789_proto protoreflect.FileDescriptor
 
 const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
@@ -1865,15 +3549,49 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	" \x01(\x0e2\x1d.game.dice789.v1.ContinueModeR\fcontinueMode\x12(\n" +
 	"\x10last_digit_match\x18\v \x01(\bR\x0elastDigitMatch\x124\n" +
 	"\x16action_timeout_seconds\x18\f \x01(\rR\x14actionTimeoutSeconds\x12;\n" +
-	"\x1adrop_report_window_seconds\x18\r \x01(\rR\x17dropReportWindowSeconds\"!\n" +
+	"\x1adrop_report_window_seconds\x18\r \x01(\rR\x17dropReportWindowSeconds\"7\n" +
 	"\tPoolLayer\x12\x14\n" +
-	"\x05ticks\x18\x01 \x01(\rR\x05ticks\"\x82\x01\n" +
+	"\x05ticks\x18\x01 \x01(\rR\x05ticks\x12\x14\n" +
+	"\x05index\x18\x02 \x01(\rR\x05index\"\x82\x01\n" +
 	"\vPlayerState\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
 	"seat_index\x18\x02 \x01(\rR\tseatIndex\x12\x16\n" +
 	"\x06active\x18\x03 \x01(\bR\x06active\x12#\n" +
-	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\"\xc8\x04\n" +
+	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\"\xf3\x01\n" +
+	"\x11ActionConstraints\x12*\n" +
+	"\x11minimum_add_ticks\x18\x01 \x01(\rR\x0fminimumAddTicks\x12*\n" +
+	"\x11maximum_add_ticks\x18\x02 \x01(\rR\x0fmaximumAddTicks\x12$\n" +
+	"\x0eadd_step_ticks\x18\x03 \x01(\rR\faddStepTicks\x128\n" +
+	"\x18allow_capacity_remainder\x18\x04 \x01(\bR\x16allowCapacityRemainder\x12&\n" +
+	"\x0ftarget_user_ids\x18\x05 \x03(\tR\rtargetUserIds\"\xc6\a\n" +
+	"\vTurnSummary\x12\x12\n" +
+	"\x04turn\x18\x01 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\x02 \x01(\tR\fsourceUserId\x12\x17\n" +
+	"\adie_one\x18\x03 \x01(\rR\x06dieOne\x12\x17\n" +
+	"\adie_two\x18\x04 \x01(\rR\x06dieTwo\x12\x10\n" +
+	"\x03sum\x18\x05 \x01(\rR\x03sum\x12/\n" +
+	"\x06effect\x18\x06 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x12$\n" +
+	"\x0etarget_user_id\x18\a \x01(\tR\ftargetUserId\x12*\n" +
+	"\x11pool_before_ticks\x18\b \x01(\rR\x0fpoolBeforeTicks\x12(\n" +
+	"\x10pool_after_ticks\x18\t \x01(\rR\x0epoolAfterTicks\x12&\n" +
+	"\x0fpenalty_user_id\x18\n" +
+	" \x01(\tR\rpenaltyUserId\x12#\n" +
+	"\rpenalty_ticks\x18\v \x01(\rR\fpenaltyTicks\x12)\n" +
+	"\x10direction_before\x18\f \x01(\rR\x0fdirectionBefore\x12'\n" +
+	"\x0fdirection_after\x18\r \x01(\rR\x0edirectionAfter\x12 \n" +
+	"\fnext_user_id\x18\x0e \x01(\tR\n" +
+	"nextUserId\x126\n" +
+	"\aoutcome\x18\x0f \x01(\x0e2\x1c.game.dice789.v1.TurnOutcomeR\aoutcome\x126\n" +
+	"\x05cause\x18\x10 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\x12)\n" +
+	"\x10dropped_reported\x18\x11 \x01(\bR\x0fdroppedReported\x121\n" +
+	"\x15drop_operator_user_id\x18\x12 \x01(\tR\x12dropOperatorUserId\x12\x1f\n" +
+	"\vdrop_reason\x18\x13 \x01(\tR\n" +
+	"dropReason\x12+\n" +
+	"\x11resolution_reason\x18\x14 \x01(\tR\x10resolutionReason\x12H\n" +
+	"\x12pool_before_layers\x18\x15 \x03(\v2\x1a.game.dice789.v1.PoolLayerR\x10poolBeforeLayers\x12F\n" +
+	"\x11pool_after_layers\x18\x16 \x03(\v2\x1a.game.dice789.v1.PoolLayerR\x0fpoolAfterLayers\x12\x1b\n" +
+	"\taudit_ref\x18\x17 \x01(\tR\bauditRef\"\xc4\a\n" +
 	"\x05State\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x12,\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x16.game.dice789.v1.PhaseR\x05phase\x12\x12\n" +
@@ -1890,7 +3608,15 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	"\adie_two\x18\f \x01(\rR\x06dieTwo\x12\x10\n" +
 	"\x03sum\x18\r \x01(\rR\x03sum\x12=\n" +
 	"\x1baction_deadline_unix_millis\x18\x0e \x01(\x03R\x18actionDeadlineUnixMillis\x12/\n" +
-	"\x06config\x18\x0f \x01(\v2\x17.game.dice789.v1.ConfigR\x06config\"\x06\n" +
+	"\x06config\x18\x0f \x01(\v2\x17.game.dice789.v1.ConfigR\x06config\x12 \n" +
+	"\fhost_user_id\x18\x10 \x01(\tR\n" +
+	"hostUserId\x12/\n" +
+	"\x06effect\x18\x11 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x12'\n" +
+	"\x0fallowed_actions\x18\x12 \x03(\tR\x0eallowedActions\x12?\n" +
+	"\fturn_history\x18\x13 \x03(\v2\x1c.game.dice789.v1.TurnSummaryR\vturnHistory\x12#\n" +
+	"\rfinish_reason\x18\x14 \x01(\tR\ffinishReason\x12Q\n" +
+	"\x12action_constraints\x18\x15 \x01(\v2\".game.dice789.v1.ActionConstraintsR\x11actionConstraints\x12E\n" +
+	"\x0flast_settlement\x18\x16 \x01(\v2\x1c.game.dice789.v1.TurnSummaryR\x0elastSettlement\"\x06\n" +
 	"\x04Roll\"\x0f\n" +
 	"\rConfirmLanded\"!\n" +
 	"\tAddToPool\x12\x14\n" +
@@ -1900,8 +3626,10 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	"\x06Reroll\"\x06\n" +
 	"\x04Pass\"'\n" +
 	"\rReportDropped\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\b\n" +
-	"\x06Finish\"\xea\x03\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\"J\n" +
+	"\x06Finish\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12(\n" +
+	"\x10operator_user_id\x18\x02 \x01(\tR\x0eoperatorUserId\"\xea\x03\n" +
 	"\aCommand\x12+\n" +
 	"\x04roll\x18\x01 \x01(\v2\x15.game.dice789.v1.RollH\x00R\x04roll\x12G\n" +
 	"\x0econfirm_landed\x18\x02 \x01(\v2\x1e.game.dice789.v1.ConfirmLandedH\x00R\rconfirmLanded\x12<\n" +
@@ -1911,37 +3639,111 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	"\x04pass\x18\x06 \x01(\v2\x15.game.dice789.v1.PassH\x00R\x04pass\x12G\n" +
 	"\x0ereport_dropped\x18\a \x01(\v2\x1e.game.dice789.v1.ReportDroppedH\x00R\rreportDropped\x121\n" +
 	"\x06finish\x18\b \x01(\v2\x17.game.dice789.v1.FinishH\x00R\x06finishB\t\n" +
-	"\acommand\":\n" +
+	"\acommand\"\xb0\x03\n" +
 	"\vTurnStarted\x12\x12\n" +
 	"\x04turn\x18\x01 \x01(\rR\x04turn\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"P\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1c\n" +
+	"\tdirection\x18\x03 \x01(\rR\tdirection\x12G\n" +
+	"\x10previous_outcome\x18\x04 \x01(\x0e2\x1c.game.dice789.v1.TurnOutcomeR\x0fpreviousOutcome\x126\n" +
+	"\x05cause\x18\x05 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\x12/\n" +
+	"\x06config\x18\x06 \x01(\v2\x17.game.dice789.v1.ConfigR\x06config\x127\n" +
+	"\aplayers\x18\a \x03(\v2\x1d.game.dice789.v1.ReplayPlayerR\aplayers\x12=\n" +
+	"\finitial_pool\x18\b \x03(\v2\x1a.game.dice789.v1.PoolLayerR\vinitialPool\x12,\n" +
+	"\x12initial_pool_ticks\x18\t \x01(\rR\x10initialPoolTicks\"\xc2\x01\n" +
 	"\n" +
 	"DiceRolled\x12\x17\n" +
 	"\adie_one\x18\x01 \x01(\rR\x06dieOne\x12\x17\n" +
 	"\adie_two\x18\x02 \x01(\rR\x06dieTwo\x12\x10\n" +
-	"\x03sum\x18\x03 \x01(\rR\x03sum\"r\n" +
+	"\x03sum\x18\x03 \x01(\rR\x03sum\x12\x12\n" +
+	"\x04turn\x18\x04 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\x05 \x01(\tR\fsourceUserId\x126\n" +
+	"\x05cause\x18\x06 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xdf\x03\n" +
 	"\vPoolChanged\x12!\n" +
 	"\fbefore_ticks\x18\x01 \x01(\rR\vbeforeTicks\x12\x1f\n" +
 	"\vafter_ticks\x18\x02 \x01(\rR\n" +
 	"afterTicks\x12\x1f\n" +
 	"\vactor_ticks\x18\x03 \x01(\rR\n" +
-	"actorTicks\"0\n" +
+	"actorTicks\x12?\n" +
+	"\rbefore_layers\x18\x04 \x03(\v2\x1a.game.dice789.v1.PoolLayerR\fbeforeLayers\x12=\n" +
+	"\fafter_layers\x18\x05 \x03(\v2\x1a.game.dice789.v1.PoolLayerR\vafterLayers\x12\x12\n" +
+	"\x04turn\x18\x06 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\a \x01(\tR\fsourceUserId\x12$\n" +
+	"\x0etarget_user_id\x18\b \x01(\tR\ftargetUserId\x12\"\n" +
+	"\ractor_user_id\x18\t \x01(\tR\vactorUserId\x12/\n" +
+	"\x06effect\x18\n" +
+	" \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x126\n" +
+	"\x05cause\x18\v \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xfe\x01\n" +
 	"\x10DirectionChanged\x12\x1c\n" +
-	"\tdirection\x18\x01 \x01(\rR\tdirection\"X\n" +
+	"\tdirection\x18\x01 \x01(\rR\tdirection\x12)\n" +
+	"\x10before_direction\x18\x02 \x01(\rR\x0fbeforeDirection\x12\x12\n" +
+	"\x04turn\x18\x03 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\x04 \x01(\tR\fsourceUserId\x12/\n" +
+	"\x06effect\x18\x05 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x126\n" +
+	"\x05cause\x18\x06 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xd5\x02\n" +
 	"\x0fPenaltyRecorded\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05ticks\x18\x02 \x01(\rR\x05ticks\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\\\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12,\n" +
+	"\x12before_total_ticks\x18\x04 \x01(\rR\x10beforeTotalTicks\x12*\n" +
+	"\x11after_total_ticks\x18\x05 \x01(\rR\x0fafterTotalTicks\x12\x12\n" +
+	"\x04turn\x18\x06 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\a \x01(\tR\fsourceUserId\x12/\n" +
+	"\x06effect\x18\b \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x126\n" +
+	"\x05cause\x18\t \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xd9\x01\n" +
 	"\x0eTargetSelected\x12$\n" +
 	"\x0esource_user_id\x18\x01 \x01(\tR\fsourceUserId\x12$\n" +
-	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\">\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x12\n" +
+	"\x04turn\x18\x03 \x01(\rR\x04turn\x12/\n" +
+	"\x06effect\x18\x04 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x126\n" +
+	"\x05cause\x18\x05 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xf7\x01\n" +
 	"\vTurnDropped\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"-\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12(\n" +
+	"\x10operator_user_id\x18\x03 \x01(\tR\x0eoperatorUserId\x12$\n" +
+	"\x0esource_user_id\x18\x04 \x01(\tR\fsourceUserId\x12\x12\n" +
+	"\x04turn\x18\x05 \x01(\rR\x04turn\x126\n" +
+	"\x05cause\x18\x06 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\x12\x1b\n" +
+	"\taudit_ref\x18\a \x01(\tR\bauditRef\"\x91\x03\n" +
 	"\x12ParticipantRevoked\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\")\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
+	"\x04turn\x18\x02 \x01(\rR\x04turn\x129\n" +
+	"\fphase_before\x18\x03 \x01(\x0e2\x16.game.dice789.v1.PhaseR\vphaseBefore\x12/\n" +
+	"\x06effect\x18\x04 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x12$\n" +
+	"\x0esource_user_id\x18\x05 \x01(\tR\fsourceUserId\x12$\n" +
+	"\x0etarget_user_id\x18\x06 \x01(\tR\ftargetUserId\x128\n" +
+	"\x18pending_effect_cancelled\x18\a \x01(\bR\x16pendingEffectCancelled\x12:\n" +
+	"\x19target_selection_reopened\x18\b \x01(\bR\x17targetSelectionReopened\x12 \n" +
+	"\fnext_user_id\x18\t \x01(\tR\n" +
+	"nextUserId\"\x9f\x01\n" +
 	"\x0fSessionFinished\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\xad\x05\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x12\n" +
+	"\x04turn\x18\x02 \x01(\rR\x04turn\x12(\n" +
+	"\x10operator_user_id\x18\x03 \x01(\tR\x0eoperatorUserId\x126\n" +
+	"\x05cause\x18\x04 \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xf9\x02\n" +
+	"\x0eEffectSelected\x12\x12\n" +
+	"\x04turn\x18\x01 \x01(\rR\x04turn\x12/\n" +
+	"\x06effect\x18\x02 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x12$\n" +
+	"\x0esource_user_id\x18\x03 \x01(\tR\fsourceUserId\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12\x17\n" +
+	"\adie_one\x18\x05 \x01(\rR\x06dieOne\x12\x17\n" +
+	"\adie_two\x18\x06 \x01(\rR\x06dieTwo\x12\x10\n" +
+	"\x03sum\x18\a \x01(\rR\x03sum\x12#\n" +
+	"\rrule_priority\x18\b \x01(\rR\frulePriority\x125\n" +
+	"\n" +
+	"next_phase\x18\t \x01(\x0e2\x16.game.dice789.v1.PhaseR\tnextPhase\x126\n" +
+	"\x05cause\x18\n" +
+	" \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\"\xe6\x02\n" +
+	"\vTurnSettled\x12\x12\n" +
+	"\x04turn\x18\x01 \x01(\rR\x04turn\x12$\n" +
+	"\x0esource_user_id\x18\x02 \x01(\tR\fsourceUserId\x12$\n" +
+	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId\x12 \n" +
+	"\fnext_user_id\x18\x04 \x01(\tR\n" +
+	"nextUserId\x12\x1c\n" +
+	"\tdirection\x18\x05 \x01(\rR\tdirection\x12/\n" +
+	"\x06effect\x18\x06 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x126\n" +
+	"\aoutcome\x18\a \x01(\x0e2\x1c.game.dice789.v1.TurnOutcomeR\aoutcome\x126\n" +
+	"\x05cause\x18\b \x01(\x0e2 .game.dice789.v1.ResolutionCauseR\x05cause\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\"\xbc\x06\n" +
 	"\x05Event\x12A\n" +
 	"\fturn_started\x18\x01 \x01(\v2\x1c.game.dice789.v1.TurnStartedH\x00R\vturnStarted\x12>\n" +
 	"\vdice_rolled\x18\x02 \x01(\v2\x1b.game.dice789.v1.DiceRolledH\x00R\n" +
@@ -1952,8 +3754,19 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	"\x0ftarget_selected\x18\x06 \x01(\v2\x1f.game.dice789.v1.TargetSelectedH\x00R\x0etargetSelected\x12A\n" +
 	"\fturn_dropped\x18\a \x01(\v2\x1c.game.dice789.v1.TurnDroppedH\x00R\vturnDropped\x12V\n" +
 	"\x13participant_revoked\x18\b \x01(\v2#.game.dice789.v1.ParticipantRevokedH\x00R\x12participantRevoked\x12M\n" +
-	"\x10session_finished\x18\t \x01(\v2 .game.dice789.v1.SessionFinishedH\x00R\x0fsessionFinishedB\a\n" +
-	"\x05event\"\x97\x04\n" +
+	"\x10session_finished\x18\t \x01(\v2 .game.dice789.v1.SessionFinishedH\x00R\x0fsessionFinished\x12J\n" +
+	"\x0feffect_selected\x18\n" +
+	" \x01(\v2\x1f.game.dice789.v1.EffectSelectedH\x00R\x0eeffectSelected\x12A\n" +
+	"\fturn_settled\x18\v \x01(\v2\x1c.game.dice789.v1.TurnSettledH\x00R\vturnSettledB\a\n" +
+	"\x05event\"\xa6\x02\n" +
+	"\vActionTimer\x12\x12\n" +
+	"\x04turn\x18\x01 \x01(\rR\x04turn\x12,\n" +
+	"\x05phase\x18\x02 \x01(\x0e2\x16.game.dice789.v1.PhaseR\x05phase\x12&\n" +
+	"\x0fcurrent_user_id\x18\x03 \x01(\tR\rcurrentUserId\x12$\n" +
+	"\x0esource_user_id\x18\x04 \x01(\tR\fsourceUserId\x12$\n" +
+	"\x0etarget_user_id\x18\x05 \x01(\tR\ftargetUserId\x12/\n" +
+	"\x06effect\x18\x06 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x120\n" +
+	"\x14deadline_unix_millis\x18\a \x01(\x03R\x12deadlineUnixMillis\"\xa0\a\n" +
 	"\x04View\x12,\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x16.game.dice789.v1.PhaseR\x05phase\x12\x12\n" +
 	"\x04turn\x18\x02 \x01(\rR\x04turn\x126\n" +
@@ -1969,21 +3782,79 @@ const file_game_dice789_v1_dice_789_proto_rawDesc = "" +
 	"\x03sum\x18\v \x01(\rR\x03sum\x12=\n" +
 	"\x1baction_deadline_unix_millis\x18\f \x01(\x03R\x18actionDeadlineUnixMillis\x12'\n" +
 	"\x0fallowed_actions\x18\r \x03(\tR\x0eallowedActions\x12#\n" +
-	"\rfinish_reason\x18\x0e \x01(\tR\ffinishReason*\xcd\x01\n" +
+	"\rfinish_reason\x18\x0e \x01(\tR\ffinishReason\x12$\n" +
+	"\x0esource_user_id\x18\x0f \x01(\tR\fsourceUserId\x12/\n" +
+	"\x06effect\x18\x10 \x01(\x0e2\x17.game.dice789.v1.EffectR\x06effect\x12Q\n" +
+	"\x12action_constraints\x18\x11 \x01(\v2\".game.dice789.v1.ActionConstraintsR\x11actionConstraints\x12/\n" +
+	"\x06config\x18\x12 \x01(\v2\x17.game.dice789.v1.ConfigR\x06config\x12E\n" +
+	"\x0flast_settlement\x18\x13 \x01(\v2\x1c.game.dice789.v1.TurnSummaryR\x0elastSettlement\x12$\n" +
+	"\x0eviewer_is_host\x18\x14 \x01(\bR\fviewerIsHost\x12?\n" +
+	"\frecent_turns\x18\x15 \x03(\v2\x1c.game.dice789.v1.TurnSummaryR\vrecentTurns\"6\n" +
+	"\tViewDelta\x12)\n" +
+	"\x04view\x18\x01 \x01(\v2\x15.game.dice789.v1.ViewR\x04view\"F\n" +
+	"\fReplayPlayer\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"seat_index\x18\x02 \x01(\rR\tseatIndex\"W\n" +
+	"\vReplayEntry\x12\x1a\n" +
+	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12,\n" +
+	"\x05event\x18\x02 \x01(\v2\x16.game.dice789.v1.EventR\x05event\"\x9d\x01\n" +
+	"\n" +
+	"ReplayTurn\x126\n" +
+	"\asummary\x18\x01 \x01(\v2\x1c.game.dice789.v1.TurnSummaryR\asummary\x12\x18\n" +
+	"\asettled\x18\x02 \x01(\bR\asettled\x12=\n" +
+	"\x0eterminal_phase\x18\x03 \x01(\x0e2\x16.game.dice789.v1.PhaseR\rterminalPhase\"\xa9\x02\n" +
+	"\x06Replay\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x12/\n" +
+	"\x06config\x18\x02 \x01(\v2\x17.game.dice789.v1.ConfigR\x06config\x127\n" +
+	"\aplayers\x18\x03 \x03(\v2\x1d.game.dice789.v1.ReplayPlayerR\aplayers\x126\n" +
+	"\aentries\x18\x04 \x03(\v2\x1c.game.dice789.v1.ReplayEntryR\aentries\x12#\n" +
+	"\rfinish_reason\x18\x05 \x01(\tR\ffinishReason\x121\n" +
+	"\x05turns\x18\x06 \x03(\v2\x1b.game.dice789.v1.ReplayTurnR\x05turns*\xd1\x01\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13PHASE_AWAITING_ROLL\x10\x01\x12\x18\n" +
 	"\x14PHASE_RESULT_PENDING\x10\x02\x12\x16\n" +
 	"\x12PHASE_AWAITING_ADD\x10\x03\x12\x19\n" +
 	"\x15PHASE_AWAITING_TARGET\x10\x04\x12\x1b\n" +
-	"\x17PHASE_AWAITING_CONTINUE\x10\x05\x12\x16\n" +
-	"\x12PHASE_TURN_SETTLED\x10\x06\x12\x12\n" +
+	"\x17PHASE_AWAITING_CONTINUE\x10\x05\x12\x1a\n" +
+	"\x12PHASE_TURN_SETTLED\x10\x06\x1a\x02\b\x01\x12\x12\n" +
 	"\x0ePHASE_FINISHED\x10\a*\x89\x01\n" +
 	"\fContinueMode\x12\x1d\n" +
 	"\x19CONTINUE_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16CONTINUE_MODE_OPTIONAL\x10\x01\x12\x1f\n" +
 	"\x1bCONTINUE_MODE_FORCED_REROLL\x10\x02\x12\x1d\n" +
-	"\x19CONTINUE_MODE_FORCED_PASS\x10\x03BNZLgithub.com/iFTY-R/game-night/games/dice-789/gen/go/game/dice789/v1;dice789v1b\x06proto3"
+	"\x19CONTINUE_MODE_FORCED_PASS\x10\x03*\xdc\x02\n" +
+	"\x06Effect\x12\x16\n" +
+	"\x12EFFECT_UNSPECIFIED\x10\x00\x12\x0f\n" +
+	"\vEFFECT_PASS\x10\x01\x12\x18\n" +
+	"\x14EFFECT_SUM_SEVEN_ADD\x10\x02\x12\x1e\n" +
+	"\x1aEFFECT_SUM_EIGHT_HALF_POOL\x10\x03\x12\x1e\n" +
+	"\x1aEFFECT_SUM_NINE_DRAIN_POOL\x10\x04\x12 \n" +
+	"\x1cEFFECT_ORDINARY_PAIR_REVERSE\x10\x05\x12\x1f\n" +
+	"\x1bEFFECT_ORDINARY_PAIR_REROLL\x10\x06\x12\"\n" +
+	"\x1eEFFECT_DOUBLE_ONE_TARGET_DRAIN\x10\a\x12'\n" +
+	"#EFFECT_DOUBLE_FOUR_HALF_POOL_REROLL\x10\b\x12 \n" +
+	"\x1cEFFECT_DOUBLE_SIX_TARGET_ADD\x10\t\x12\x1d\n" +
+	"\x19EFFECT_DROPPED_DRAIN_POOL\x10\n" +
+	"*\xe0\x02\n" +
+	"\x0fResolutionCause\x12 \n" +
+	"\x1cRESOLUTION_CAUSE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_PLAYER_ACTION\x10\x01\x12#\n" +
+	"\x1fRESOLUTION_CAUSE_HOST_CONFIRMED\x10\x02\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_DROP_REPORTED\x10\x03\x12\x1c\n" +
+	"\x18RESOLUTION_CAUSE_TIMEOUT\x10\x04\x12(\n" +
+	"$RESOLUTION_CAUSE_PARTICIPANT_REVOKED\x10\x05\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_HOST_FINISHED\x10\x06\x12)\n" +
+	"%RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS\x10\a\x12'\n" +
+	"#RESOLUTION_CAUSE_PLATFORM_CANCELLED\x10\b*\xc3\x01\n" +
+	"\vTurnOutcome\x12\x1c\n" +
+	"\x18TURN_OUTCOME_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11TURN_OUTCOME_PASS\x10\x01\x12\x17\n" +
+	"\x13TURN_OUTCOME_REROLL\x10\x02\x12\"\n" +
+	"\x1eTURN_OUTCOME_TARGET_TAKES_TURN\x10\x03\x12\x1f\n" +
+	"\x1bTURN_OUTCOME_SOURCE_REVOKED\x10\x04\x12!\n" +
+	"\x1dTURN_OUTCOME_SESSION_FINISHED\x10\x05BNZLgithub.com/iFTY-R/game-night/games/dice-789/gen/go/game/dice789/v1;dice789v1b\x06proto3"
 
 var (
 	file_game_dice789_v1_dice_789_proto_rawDescOnce sync.Once
@@ -1997,67 +3868,132 @@ func file_game_dice789_v1_dice_789_proto_rawDescGZIP() []byte {
 	return file_game_dice789_v1_dice_789_proto_rawDescData
 }
 
-var file_game_dice789_v1_dice_789_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_game_dice789_v1_dice_789_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_game_dice789_v1_dice_789_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_game_dice789_v1_dice_789_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_game_dice789_v1_dice_789_proto_goTypes = []any{
 	(Phase)(0),                 // 0: game.dice789.v1.Phase
 	(ContinueMode)(0),          // 1: game.dice789.v1.ContinueMode
-	(*Config)(nil),             // 2: game.dice789.v1.Config
-	(*PoolLayer)(nil),          // 3: game.dice789.v1.PoolLayer
-	(*PlayerState)(nil),        // 4: game.dice789.v1.PlayerState
-	(*State)(nil),              // 5: game.dice789.v1.State
-	(*Roll)(nil),               // 6: game.dice789.v1.Roll
-	(*ConfirmLanded)(nil),      // 7: game.dice789.v1.ConfirmLanded
-	(*AddToPool)(nil),          // 8: game.dice789.v1.AddToPool
-	(*ChooseTarget)(nil),       // 9: game.dice789.v1.ChooseTarget
-	(*Reroll)(nil),             // 10: game.dice789.v1.Reroll
-	(*Pass)(nil),               // 11: game.dice789.v1.Pass
-	(*ReportDropped)(nil),      // 12: game.dice789.v1.ReportDropped
-	(*Finish)(nil),             // 13: game.dice789.v1.Finish
-	(*Command)(nil),            // 14: game.dice789.v1.Command
-	(*TurnStarted)(nil),        // 15: game.dice789.v1.TurnStarted
-	(*DiceRolled)(nil),         // 16: game.dice789.v1.DiceRolled
-	(*PoolChanged)(nil),        // 17: game.dice789.v1.PoolChanged
-	(*DirectionChanged)(nil),   // 18: game.dice789.v1.DirectionChanged
-	(*PenaltyRecorded)(nil),    // 19: game.dice789.v1.PenaltyRecorded
-	(*TargetSelected)(nil),     // 20: game.dice789.v1.TargetSelected
-	(*TurnDropped)(nil),        // 21: game.dice789.v1.TurnDropped
-	(*ParticipantRevoked)(nil), // 22: game.dice789.v1.ParticipantRevoked
-	(*SessionFinished)(nil),    // 23: game.dice789.v1.SessionFinished
-	(*Event)(nil),              // 24: game.dice789.v1.Event
-	(*View)(nil),               // 25: game.dice789.v1.View
+	(Effect)(0),                // 2: game.dice789.v1.Effect
+	(ResolutionCause)(0),       // 3: game.dice789.v1.ResolutionCause
+	(TurnOutcome)(0),           // 4: game.dice789.v1.TurnOutcome
+	(*Config)(nil),             // 5: game.dice789.v1.Config
+	(*PoolLayer)(nil),          // 6: game.dice789.v1.PoolLayer
+	(*PlayerState)(nil),        // 7: game.dice789.v1.PlayerState
+	(*ActionConstraints)(nil),  // 8: game.dice789.v1.ActionConstraints
+	(*TurnSummary)(nil),        // 9: game.dice789.v1.TurnSummary
+	(*State)(nil),              // 10: game.dice789.v1.State
+	(*Roll)(nil),               // 11: game.dice789.v1.Roll
+	(*ConfirmLanded)(nil),      // 12: game.dice789.v1.ConfirmLanded
+	(*AddToPool)(nil),          // 13: game.dice789.v1.AddToPool
+	(*ChooseTarget)(nil),       // 14: game.dice789.v1.ChooseTarget
+	(*Reroll)(nil),             // 15: game.dice789.v1.Reroll
+	(*Pass)(nil),               // 16: game.dice789.v1.Pass
+	(*ReportDropped)(nil),      // 17: game.dice789.v1.ReportDropped
+	(*Finish)(nil),             // 18: game.dice789.v1.Finish
+	(*Command)(nil),            // 19: game.dice789.v1.Command
+	(*TurnStarted)(nil),        // 20: game.dice789.v1.TurnStarted
+	(*DiceRolled)(nil),         // 21: game.dice789.v1.DiceRolled
+	(*PoolChanged)(nil),        // 22: game.dice789.v1.PoolChanged
+	(*DirectionChanged)(nil),   // 23: game.dice789.v1.DirectionChanged
+	(*PenaltyRecorded)(nil),    // 24: game.dice789.v1.PenaltyRecorded
+	(*TargetSelected)(nil),     // 25: game.dice789.v1.TargetSelected
+	(*TurnDropped)(nil),        // 26: game.dice789.v1.TurnDropped
+	(*ParticipantRevoked)(nil), // 27: game.dice789.v1.ParticipantRevoked
+	(*SessionFinished)(nil),    // 28: game.dice789.v1.SessionFinished
+	(*EffectSelected)(nil),     // 29: game.dice789.v1.EffectSelected
+	(*TurnSettled)(nil),        // 30: game.dice789.v1.TurnSettled
+	(*Event)(nil),              // 31: game.dice789.v1.Event
+	(*ActionTimer)(nil),        // 32: game.dice789.v1.ActionTimer
+	(*View)(nil),               // 33: game.dice789.v1.View
+	(*ViewDelta)(nil),          // 34: game.dice789.v1.ViewDelta
+	(*ReplayPlayer)(nil),       // 35: game.dice789.v1.ReplayPlayer
+	(*ReplayEntry)(nil),        // 36: game.dice789.v1.ReplayEntry
+	(*ReplayTurn)(nil),         // 37: game.dice789.v1.ReplayTurn
+	(*Replay)(nil),             // 38: game.dice789.v1.Replay
 }
 var file_game_dice789_v1_dice_789_proto_depIdxs = []int32{
 	1,  // 0: game.dice789.v1.Config.continue_mode:type_name -> game.dice789.v1.ContinueMode
-	0,  // 1: game.dice789.v1.State.phase:type_name -> game.dice789.v1.Phase
-	4,  // 2: game.dice789.v1.State.players:type_name -> game.dice789.v1.PlayerState
-	3,  // 3: game.dice789.v1.State.pool:type_name -> game.dice789.v1.PoolLayer
-	2,  // 4: game.dice789.v1.State.config:type_name -> game.dice789.v1.Config
-	6,  // 5: game.dice789.v1.Command.roll:type_name -> game.dice789.v1.Roll
-	7,  // 6: game.dice789.v1.Command.confirm_landed:type_name -> game.dice789.v1.ConfirmLanded
-	8,  // 7: game.dice789.v1.Command.add_to_pool:type_name -> game.dice789.v1.AddToPool
-	9,  // 8: game.dice789.v1.Command.choose_target:type_name -> game.dice789.v1.ChooseTarget
-	10, // 9: game.dice789.v1.Command.reroll:type_name -> game.dice789.v1.Reroll
-	11, // 10: game.dice789.v1.Command.pass:type_name -> game.dice789.v1.Pass
-	12, // 11: game.dice789.v1.Command.report_dropped:type_name -> game.dice789.v1.ReportDropped
-	13, // 12: game.dice789.v1.Command.finish:type_name -> game.dice789.v1.Finish
-	15, // 13: game.dice789.v1.Event.turn_started:type_name -> game.dice789.v1.TurnStarted
-	16, // 14: game.dice789.v1.Event.dice_rolled:type_name -> game.dice789.v1.DiceRolled
-	17, // 15: game.dice789.v1.Event.pool_changed:type_name -> game.dice789.v1.PoolChanged
-	18, // 16: game.dice789.v1.Event.direction_changed:type_name -> game.dice789.v1.DirectionChanged
-	19, // 17: game.dice789.v1.Event.penalty_recorded:type_name -> game.dice789.v1.PenaltyRecorded
-	20, // 18: game.dice789.v1.Event.target_selected:type_name -> game.dice789.v1.TargetSelected
-	21, // 19: game.dice789.v1.Event.turn_dropped:type_name -> game.dice789.v1.TurnDropped
-	22, // 20: game.dice789.v1.Event.participant_revoked:type_name -> game.dice789.v1.ParticipantRevoked
-	23, // 21: game.dice789.v1.Event.session_finished:type_name -> game.dice789.v1.SessionFinished
-	0,  // 22: game.dice789.v1.View.phase:type_name -> game.dice789.v1.Phase
-	4,  // 23: game.dice789.v1.View.players:type_name -> game.dice789.v1.PlayerState
-	3,  // 24: game.dice789.v1.View.pool:type_name -> game.dice789.v1.PoolLayer
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	2,  // 1: game.dice789.v1.TurnSummary.effect:type_name -> game.dice789.v1.Effect
+	4,  // 2: game.dice789.v1.TurnSummary.outcome:type_name -> game.dice789.v1.TurnOutcome
+	3,  // 3: game.dice789.v1.TurnSummary.cause:type_name -> game.dice789.v1.ResolutionCause
+	6,  // 4: game.dice789.v1.TurnSummary.pool_before_layers:type_name -> game.dice789.v1.PoolLayer
+	6,  // 5: game.dice789.v1.TurnSummary.pool_after_layers:type_name -> game.dice789.v1.PoolLayer
+	0,  // 6: game.dice789.v1.State.phase:type_name -> game.dice789.v1.Phase
+	7,  // 7: game.dice789.v1.State.players:type_name -> game.dice789.v1.PlayerState
+	6,  // 8: game.dice789.v1.State.pool:type_name -> game.dice789.v1.PoolLayer
+	5,  // 9: game.dice789.v1.State.config:type_name -> game.dice789.v1.Config
+	2,  // 10: game.dice789.v1.State.effect:type_name -> game.dice789.v1.Effect
+	9,  // 11: game.dice789.v1.State.turn_history:type_name -> game.dice789.v1.TurnSummary
+	8,  // 12: game.dice789.v1.State.action_constraints:type_name -> game.dice789.v1.ActionConstraints
+	9,  // 13: game.dice789.v1.State.last_settlement:type_name -> game.dice789.v1.TurnSummary
+	11, // 14: game.dice789.v1.Command.roll:type_name -> game.dice789.v1.Roll
+	12, // 15: game.dice789.v1.Command.confirm_landed:type_name -> game.dice789.v1.ConfirmLanded
+	13, // 16: game.dice789.v1.Command.add_to_pool:type_name -> game.dice789.v1.AddToPool
+	14, // 17: game.dice789.v1.Command.choose_target:type_name -> game.dice789.v1.ChooseTarget
+	15, // 18: game.dice789.v1.Command.reroll:type_name -> game.dice789.v1.Reroll
+	16, // 19: game.dice789.v1.Command.pass:type_name -> game.dice789.v1.Pass
+	17, // 20: game.dice789.v1.Command.report_dropped:type_name -> game.dice789.v1.ReportDropped
+	18, // 21: game.dice789.v1.Command.finish:type_name -> game.dice789.v1.Finish
+	4,  // 22: game.dice789.v1.TurnStarted.previous_outcome:type_name -> game.dice789.v1.TurnOutcome
+	3,  // 23: game.dice789.v1.TurnStarted.cause:type_name -> game.dice789.v1.ResolutionCause
+	5,  // 24: game.dice789.v1.TurnStarted.config:type_name -> game.dice789.v1.Config
+	35, // 25: game.dice789.v1.TurnStarted.players:type_name -> game.dice789.v1.ReplayPlayer
+	6,  // 26: game.dice789.v1.TurnStarted.initial_pool:type_name -> game.dice789.v1.PoolLayer
+	3,  // 27: game.dice789.v1.DiceRolled.cause:type_name -> game.dice789.v1.ResolutionCause
+	6,  // 28: game.dice789.v1.PoolChanged.before_layers:type_name -> game.dice789.v1.PoolLayer
+	6,  // 29: game.dice789.v1.PoolChanged.after_layers:type_name -> game.dice789.v1.PoolLayer
+	2,  // 30: game.dice789.v1.PoolChanged.effect:type_name -> game.dice789.v1.Effect
+	3,  // 31: game.dice789.v1.PoolChanged.cause:type_name -> game.dice789.v1.ResolutionCause
+	2,  // 32: game.dice789.v1.DirectionChanged.effect:type_name -> game.dice789.v1.Effect
+	3,  // 33: game.dice789.v1.DirectionChanged.cause:type_name -> game.dice789.v1.ResolutionCause
+	2,  // 34: game.dice789.v1.PenaltyRecorded.effect:type_name -> game.dice789.v1.Effect
+	3,  // 35: game.dice789.v1.PenaltyRecorded.cause:type_name -> game.dice789.v1.ResolutionCause
+	2,  // 36: game.dice789.v1.TargetSelected.effect:type_name -> game.dice789.v1.Effect
+	3,  // 37: game.dice789.v1.TargetSelected.cause:type_name -> game.dice789.v1.ResolutionCause
+	3,  // 38: game.dice789.v1.TurnDropped.cause:type_name -> game.dice789.v1.ResolutionCause
+	0,  // 39: game.dice789.v1.ParticipantRevoked.phase_before:type_name -> game.dice789.v1.Phase
+	2,  // 40: game.dice789.v1.ParticipantRevoked.effect:type_name -> game.dice789.v1.Effect
+	3,  // 41: game.dice789.v1.SessionFinished.cause:type_name -> game.dice789.v1.ResolutionCause
+	2,  // 42: game.dice789.v1.EffectSelected.effect:type_name -> game.dice789.v1.Effect
+	0,  // 43: game.dice789.v1.EffectSelected.next_phase:type_name -> game.dice789.v1.Phase
+	3,  // 44: game.dice789.v1.EffectSelected.cause:type_name -> game.dice789.v1.ResolutionCause
+	2,  // 45: game.dice789.v1.TurnSettled.effect:type_name -> game.dice789.v1.Effect
+	4,  // 46: game.dice789.v1.TurnSettled.outcome:type_name -> game.dice789.v1.TurnOutcome
+	3,  // 47: game.dice789.v1.TurnSettled.cause:type_name -> game.dice789.v1.ResolutionCause
+	20, // 48: game.dice789.v1.Event.turn_started:type_name -> game.dice789.v1.TurnStarted
+	21, // 49: game.dice789.v1.Event.dice_rolled:type_name -> game.dice789.v1.DiceRolled
+	22, // 50: game.dice789.v1.Event.pool_changed:type_name -> game.dice789.v1.PoolChanged
+	23, // 51: game.dice789.v1.Event.direction_changed:type_name -> game.dice789.v1.DirectionChanged
+	24, // 52: game.dice789.v1.Event.penalty_recorded:type_name -> game.dice789.v1.PenaltyRecorded
+	25, // 53: game.dice789.v1.Event.target_selected:type_name -> game.dice789.v1.TargetSelected
+	26, // 54: game.dice789.v1.Event.turn_dropped:type_name -> game.dice789.v1.TurnDropped
+	27, // 55: game.dice789.v1.Event.participant_revoked:type_name -> game.dice789.v1.ParticipantRevoked
+	28, // 56: game.dice789.v1.Event.session_finished:type_name -> game.dice789.v1.SessionFinished
+	29, // 57: game.dice789.v1.Event.effect_selected:type_name -> game.dice789.v1.EffectSelected
+	30, // 58: game.dice789.v1.Event.turn_settled:type_name -> game.dice789.v1.TurnSettled
+	0,  // 59: game.dice789.v1.ActionTimer.phase:type_name -> game.dice789.v1.Phase
+	2,  // 60: game.dice789.v1.ActionTimer.effect:type_name -> game.dice789.v1.Effect
+	0,  // 61: game.dice789.v1.View.phase:type_name -> game.dice789.v1.Phase
+	7,  // 62: game.dice789.v1.View.players:type_name -> game.dice789.v1.PlayerState
+	6,  // 63: game.dice789.v1.View.pool:type_name -> game.dice789.v1.PoolLayer
+	2,  // 64: game.dice789.v1.View.effect:type_name -> game.dice789.v1.Effect
+	8,  // 65: game.dice789.v1.View.action_constraints:type_name -> game.dice789.v1.ActionConstraints
+	5,  // 66: game.dice789.v1.View.config:type_name -> game.dice789.v1.Config
+	9,  // 67: game.dice789.v1.View.last_settlement:type_name -> game.dice789.v1.TurnSummary
+	9,  // 68: game.dice789.v1.View.recent_turns:type_name -> game.dice789.v1.TurnSummary
+	33, // 69: game.dice789.v1.ViewDelta.view:type_name -> game.dice789.v1.View
+	31, // 70: game.dice789.v1.ReplayEntry.event:type_name -> game.dice789.v1.Event
+	9,  // 71: game.dice789.v1.ReplayTurn.summary:type_name -> game.dice789.v1.TurnSummary
+	0,  // 72: game.dice789.v1.ReplayTurn.terminal_phase:type_name -> game.dice789.v1.Phase
+	5,  // 73: game.dice789.v1.Replay.config:type_name -> game.dice789.v1.Config
+	35, // 74: game.dice789.v1.Replay.players:type_name -> game.dice789.v1.ReplayPlayer
+	36, // 75: game.dice789.v1.Replay.entries:type_name -> game.dice789.v1.ReplayEntry
+	37, // 76: game.dice789.v1.Replay.turns:type_name -> game.dice789.v1.ReplayTurn
+	77, // [77:77] is the sub-list for method output_type
+	77, // [77:77] is the sub-list for method input_type
+	77, // [77:77] is the sub-list for extension type_name
+	77, // [77:77] is the sub-list for extension extendee
+	0,  // [0:77] is the sub-list for field type_name
 }
 
 func init() { file_game_dice789_v1_dice_789_proto_init() }
@@ -2065,7 +4001,7 @@ func file_game_dice789_v1_dice_789_proto_init() {
 	if File_game_dice789_v1_dice_789_proto != nil {
 		return
 	}
-	file_game_dice789_v1_dice_789_proto_msgTypes[12].OneofWrappers = []any{
+	file_game_dice789_v1_dice_789_proto_msgTypes[14].OneofWrappers = []any{
 		(*Command_Roll)(nil),
 		(*Command_ConfirmLanded)(nil),
 		(*Command_AddToPool)(nil),
@@ -2075,7 +4011,7 @@ func file_game_dice789_v1_dice_789_proto_init() {
 		(*Command_ReportDropped)(nil),
 		(*Command_Finish)(nil),
 	}
-	file_game_dice789_v1_dice_789_proto_msgTypes[22].OneofWrappers = []any{
+	file_game_dice789_v1_dice_789_proto_msgTypes[26].OneofWrappers = []any{
 		(*Event_TurnStarted)(nil),
 		(*Event_DiceRolled)(nil),
 		(*Event_PoolChanged)(nil),
@@ -2085,14 +4021,16 @@ func file_game_dice789_v1_dice_789_proto_init() {
 		(*Event_TurnDropped)(nil),
 		(*Event_ParticipantRevoked)(nil),
 		(*Event_SessionFinished)(nil),
+		(*Event_EffectSelected)(nil),
+		(*Event_TurnSettled)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_game_dice789_v1_dice_789_proto_rawDesc), len(file_game_dice789_v1_dice_789_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   24,
+			NumEnums:      5,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

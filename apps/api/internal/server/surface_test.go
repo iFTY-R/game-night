@@ -11,6 +11,8 @@ import (
 	"connectrpc.com/connect"
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
@@ -22,7 +24,7 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	var userCalls atomic.Int32
 	var adminCalls atomic.Int32
 	userSurface, err := NewUserSurface(UserSurfaceConfig{
-		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Readiness: readiness,
+		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Game: &testGameHandler{}, Readiness: readiness,
 		Interceptors: []connect.Interceptor{countingInterceptor(&userCalls)},
 	})
 	if err != nil {
@@ -49,6 +51,10 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	if _, err = roomClient.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{})); err != nil {
 		t.Fatalf("call room surface: %v", err)
 	}
+	gameClient := gamev1connect.NewGameServiceClient(userServer.Client(), userServer.URL)
+	if _, err = gameClient.GetProjection(t.Context(), connect.NewRequest(&gamev1.GetProjectionRequest{})); err != nil {
+		t.Fatalf("call game surface: %v", err)
+	}
 	adminAuthClient := adminv1connect.NewAdminAuthServiceClient(adminServer.Client(), adminServer.URL)
 	if _, err = adminAuthClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatalf("call admin auth surface: %v", err)
@@ -62,7 +68,8 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	assertHTTPStatus(t, userServer, adminv1connect.AdminIdentityServiceGetUserProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
-	if userCalls.Load() != 2 || adminCalls.Load() != 2 {
+	assertHTTPStatus(t, adminServer, gamev1connect.GameServiceGetProjectionProcedure, http.StatusNotFound)
+	if userCalls.Load() != 3 || adminCalls.Load() != 2 {
 		t.Fatalf("interceptor calls crossed surfaces: user=%d admin=%d", userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -72,7 +79,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	var userCalls atomic.Int32
 	var adminCalls atomic.Int32
 	userSurface, err := NewUserSurface(UserSurfaceConfig{
-		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Readiness: readiness,
+		Identity: &testIdentityHandler{}, Room: &testRoomHandler{}, Game: &testGameHandler{}, Readiness: readiness,
 		Interceptors: []connect.Interceptor{countingInterceptor(&userCalls)},
 	})
 	if err != nil {
@@ -103,6 +110,10 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	if _, err = roomClient.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{})); err != nil {
 		t.Fatal(err)
 	}
+	gameClient := gamev1connect.NewGameServiceClient(testServer.Client(), testServer.URL)
+	if _, err = gameClient.GetProjection(t.Context(), connect.NewRequest(&gamev1.GetProjectionRequest{})); err != nil {
+		t.Fatal(err)
+	}
 	adminClient := adminv1connect.NewAdminAuthServiceClient(testServer.Client(), testServer.URL)
 	if _, err = adminClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatal(err)
@@ -112,7 +123,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 2 || adminCalls.Load() != 1 {
+	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 3 || adminCalls.Load() != 1 {
 		t.Fatalf("combined routing: metrics=%d user=%d admin=%d", response.StatusCode, userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -157,6 +168,14 @@ type testAdminAuthHandler struct {
 
 type testRoomHandler struct {
 	roomv1connect.UnimplementedRoomServiceHandler
+}
+
+type testGameHandler struct {
+	gamev1connect.UnimplementedGameServiceHandler
+}
+
+func (*testGameHandler) GetProjection(context.Context, *connect.Request[gamev1.GetProjectionRequest]) (*connect.Response[gamev1.GetProjectionResponse], error) {
+	return connect.NewResponse(&gamev1.GetProjectionResponse{}), nil
 }
 
 func (*testRoomHandler) GetRoom(context.Context, *connect.Request[roomv1.GetRoomRequest]) (*connect.Response[roomv1.GetRoomResponse], error) {

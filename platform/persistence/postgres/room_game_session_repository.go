@@ -27,6 +27,34 @@ func NewRoomGameSessionRepository(pool *pgxpool.Pool) *RoomGameSessionRepository
 	return &RoomGameSessionRepository{runner: NewTransactionRunner(pool)}
 }
 
+// GetStartReceipt checks PostgreSQL before module execution so ordinary network retries remain side-effect free.
+func (repository *RoomGameSessionRepository) GetStartReceipt(
+	ctx context.Context,
+	key gameruntime.StartKey,
+	requestDigest idempotency.Digest,
+) (gameruntime.StartReceipt, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !key.Valid() {
+		return gameruntime.StartReceipt{}, gameruntime.ErrInvalidSessionInput
+	}
+	var receipt gameruntime.StartReceipt
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		row, err := queries.GetGameSessionStartReceipt(ctx, startReceiptKeyParams(key))
+		if err != nil {
+			return err
+		}
+		receipt, err = startReceiptFromRow(row)
+		if err != nil {
+			return err
+		}
+		_, err = receipt.Replay(requestDigest)
+		return err
+	})
+	if err != nil {
+		return gameruntime.StartReceipt{}, mapGameSessionRepositoryError(ctx, err, gameruntime.ErrStartReceiptNotFound)
+	}
+	return receipt, nil
+}
+
 // Start atomically locks the room, commits its CAS transition, creates the session children, and inserts outbox events.
 // A failure after either aggregate write rolls back both aggregates and leaves the room in its previous state.
 func (repository *RoomGameSessionRepository) Start(
@@ -34,27 +62,36 @@ func (repository *RoomGameSessionRepository) Start(
 	before roomDomain.Room,
 	after roomDomain.Room,
 	commit gameruntime.CreationCommit,
-) (roomDomain.Room, gameruntime.Session, error) {
+	receipt gameruntime.StartReceipt,
+) (roomDomain.Room, gameruntime.Session, bool, error) {
 	if repository == nil || repository.runner == nil || ctx == nil {
-		return roomDomain.Room{}, gameruntime.Session{}, roomDomain.ErrInvalidRoomInput
+		return roomDomain.Room{}, gameruntime.Session{}, false, roomDomain.ErrInvalidRoomInput
 	}
 	if err := validateRoomTransition(before.Snapshot(), after.Snapshot()); err != nil {
-		return roomDomain.Room{}, gameruntime.Session{}, err
+		return roomDomain.Room{}, gameruntime.Session{}, false, err
 	}
 	if !commit.Valid() {
-		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidSessionInput
+		return roomDomain.Room{}, gameruntime.Session{}, false, gameruntime.ErrInvalidSessionInput
 	}
 	if err := validateCreationWidths(commit); err != nil {
-		return roomDomain.Room{}, gameruntime.Session{}, err
+		return roomDomain.Room{}, gameruntime.Session{}, false, err
 	}
 	if err := validateRoomGameSessionStart(before, after, commit); err != nil {
-		return roomDomain.Room{}, gameruntime.Session{}, err
+		return roomDomain.Room{}, gameruntime.Session{}, false, err
+	}
+	receiptSnapshot := receipt.Snapshot()
+	beforeSnapshot := before.Snapshot()
+	if !receiptSnapshot.Valid() || receiptSnapshot.Key.RoomID != beforeSnapshot.ID ||
+		receiptSnapshot.Key.ActorUserID != beforeSnapshot.HostUserID ||
+		receiptSnapshot.SessionID != commit.Session.Snapshot().ID ||
+		!receiptSnapshot.CommittedAt.Equal(commit.Session.Snapshot().StartedAt) {
+		return roomDomain.Room{}, gameruntime.Session{}, false, gameruntime.ErrInvalidSessionInput
 	}
 
 	var storedRoom roomDomain.Room
 	var storedSession gameruntime.Session
+	var replayed bool
 	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
-		beforeSnapshot := before.Snapshot()
 		lockedRow, err := queries.GetPartyRoomForUpdate(ctx, sqlcgen.GetPartyRoomForUpdateParams{RoomID: uuidToPG(beforeSnapshot.ID)})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -71,6 +108,25 @@ func (repository *RoomGameSessionRepository) Start(
 			return err
 		}
 		lockedSnapshot := lockedRoom.Snapshot()
+		existingRow, receiptErr := queries.GetGameSessionStartReceiptForUpdate(ctx, startReceiptForUpdateParams(receiptSnapshot.Key))
+		if receiptErr == nil {
+			existing, parseErr := startReceiptFromRow(existingRow)
+			if parseErr != nil {
+				return parseErr
+			}
+			if _, replayErr := existing.Replay(receiptSnapshot.RequestDigest); replayErr != nil {
+				return replayErr
+			}
+			storedSession, err = getGameSessionForUpdate(ctx, queries, existing.Snapshot().SessionID)
+			if err != nil {
+				return err
+			}
+			storedRoom, replayed = lockedRoom, true
+			return nil
+		}
+		if !errors.Is(receiptErr, pgx.ErrNoRows) {
+			return receiptErr
+		}
 		if !sameRoomSnapshot(lockedSnapshot, beforeSnapshot) {
 			return roomDomain.ErrRoomVersionConflict
 		}
@@ -83,12 +139,70 @@ func (repository *RoomGameSessionRepository) Start(
 			return err
 		}
 		storedSession, err = createGameSessionAggregate(ctx, queries, commit)
-		return err
+		if err != nil {
+			return err
+		}
+		createdReceipt, err := queries.CreateGameSessionStartReceipt(ctx, startReceiptCreateParams(receiptSnapshot))
+		if err != nil {
+			return err
+		}
+		persistedReceipt, err := startReceiptFromRow(createdReceipt)
+		if err != nil {
+			return err
+		}
+		if _, err := persistedReceipt.Replay(receiptSnapshot.RequestDigest); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
-		return roomDomain.Room{}, gameruntime.Session{}, mapRoomGameSessionStartError(ctx, err)
+		return roomDomain.Room{}, gameruntime.Session{}, false, mapRoomGameSessionStartError(ctx, err)
 	}
-	return storedRoom, storedSession, nil
+	return storedRoom, storedSession, replayed, nil
+}
+
+func startReceiptKeyParams(key gameruntime.StartKey) sqlcgen.GetGameSessionStartReceiptParams {
+	return sqlcgen.GetGameSessionStartReceiptParams{
+		ActorUserID: uuidToPG(key.ActorUserID), RoomID: uuidToPG(key.RoomID), OperationID: key.OperationID.Value(),
+	}
+}
+
+func startReceiptForUpdateParams(key gameruntime.StartKey) sqlcgen.GetGameSessionStartReceiptForUpdateParams {
+	return sqlcgen.GetGameSessionStartReceiptForUpdateParams{
+		ActorUserID: uuidToPG(key.ActorUserID), RoomID: uuidToPG(key.RoomID), OperationID: key.OperationID.Value(),
+	}
+}
+
+func startReceiptCreateParams(snapshot gameruntime.StartReceiptSnapshot) sqlcgen.CreateGameSessionStartReceiptParams {
+	return sqlcgen.CreateGameSessionStartReceiptParams{
+		ActorUserID: uuidToPG(snapshot.Key.ActorUserID), RoomID: uuidToPG(snapshot.Key.RoomID),
+		OperationID: snapshot.Key.OperationID.Value(), RequestDigest: snapshot.RequestDigest.Bytes(),
+		SessionID: uuidToPG(snapshot.SessionID), CommittedAt: timeToPG(snapshot.CommittedAt),
+	}
+}
+
+func startReceiptFromRow(row sqlcgen.GameSessionStartReceipt) (gameruntime.StartReceipt, error) {
+	if !row.ActorUserID.Valid || !row.RoomID.Valid || !row.SessionID.Valid || !row.CommittedAt.Valid {
+		return gameruntime.StartReceipt{}, gameruntime.ErrGameSessionIntegrity
+	}
+	operationID, err := idempotency.ParseOperationID(row.OperationID)
+	if err != nil {
+		return gameruntime.StartReceipt{}, gameruntime.ErrGameSessionIntegrity
+	}
+	requestDigest, err := idempotency.NewDigest(row.RequestDigest)
+	if err != nil || !row.CommittedAt.Valid {
+		return gameruntime.StartReceipt{}, gameruntime.ErrGameSessionIntegrity
+	}
+	receipt, err := gameruntime.NewStartReceipt(gameruntime.StartReceiptSnapshot{
+		Key: gameruntime.StartKey{
+			ActorUserID: uuid.UUID(row.ActorUserID.Bytes), RoomID: uuid.UUID(row.RoomID.Bytes), OperationID: operationID,
+		},
+		RequestDigest: requestDigest, SessionID: uuid.UUID(row.SessionID.Bytes), CommittedAt: row.CommittedAt.Time.Round(0).UTC(),
+	})
+	if err != nil {
+		return gameruntime.StartReceipt{}, gameruntime.ErrGameSessionIntegrity
+	}
+	return receipt, nil
 }
 
 // FinishAction atomically commits a naturally terminal player transition and returns the room to its post-game lobby.

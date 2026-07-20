@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -21,6 +22,7 @@ func TestAllGeneratedProceduresAreExplicitlyRegistered(t *testing.T) {
 	services := []protoreflect.ServiceDescriptor{
 		identityv1.File_platform_identity_v1_identity_proto.Services().ByName("IdentityService"),
 		roomv1.File_platform_room_v1_room_proto.Services().ByName("RoomService"),
+		gamev1.File_platform_game_v1_game_proto.Services().ByName("GameService"),
 		adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService"),
 		adminv1.File_platform_admin_v1_admin_identity_proto.Services().ByName("AdminIdentityService"),
 	}

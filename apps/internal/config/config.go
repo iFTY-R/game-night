@@ -157,6 +157,33 @@ func LoadWorker(lookupEnv LookupEnv) (WorkerDependencies, error) {
 	}, nil
 }
 
+// LoadRealtime reads only authoritative game persistence, Redis coordination, and browser Origin policy.
+func LoadRealtime(lookupEnv LookupEnv) (RealtimeDependencies, error) {
+	if lookupEnv == nil {
+		return RealtimeDependencies{}, errors.New("LookupEnv: invalid configuration")
+	}
+	reader := environmentReader{lookup: lookupEnv}
+	environment, err := loadEnvironment(reader)
+	if err != nil {
+		return RealtimeDependencies{}, err
+	}
+	postgres, err := loadPostgreSQL(reader, environment)
+	if err != nil {
+		return RealtimeDependencies{}, err
+	}
+	redisConfig, err := loadRedis(reader, environment)
+	if err != nil {
+		return RealtimeDependencies{}, err
+	}
+	network, err := loadNetwork(reader, environment)
+	if err != nil {
+		return RealtimeDependencies{}, err
+	}
+	return RealtimeDependencies{
+		Environment: environment, PostgreSQL: postgres, Redis: redisConfig, Network: network,
+	}, nil
+}
+
 type environmentReader struct {
 	lookup LookupEnv
 }

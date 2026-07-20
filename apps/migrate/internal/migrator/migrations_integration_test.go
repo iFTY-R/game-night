@@ -800,6 +800,7 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"game_session_event_batches",
 		"game_session_events",
 		"game_session_participants",
+		"game_session_start_receipts",
 		"game_session_timers",
 		"game_sessions",
 		"game_system_operations",

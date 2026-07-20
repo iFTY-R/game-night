@@ -49,6 +49,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	image := requireNginxRuntime(t)
 	identity := startEchoUpstream(t, "identity")
 	admin := startEchoUpstream(t, "admin")
+	realtime := startEchoUpstream(t, "realtime")
 	userHost, adminHost := "play.game-night.test", "admin.game-night.test"
 	tlsDirectory, roots := writeTestTLSIdentity(t, userHost, adminHost)
 	configurationDirectory := t.TempDir()
@@ -59,6 +60,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 		"--add-host", "host.docker.internal:host-gateway",
 		"--env", "GAME_NIGHT_IDENTITY_UPSTREAM=" + identity.containerAddress(),
 		"--env", "GAME_NIGHT_ADMIN_UPSTREAM=" + admin.containerAddress(),
+		"--env", "GAME_NIGHT_REALTIME_UPSTREAM=" + realtime.containerAddress(),
 		"--env", "GAME_NIGHT_USER_HOST=" + userHost,
 		"--env", "GAME_NIGHT_ADMIN_HOST=" + adminHost,
 		"--mount", bindMount(nginxConfig, "/etc/nginx/nginx.conf", true),
@@ -99,6 +101,16 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	roomResponse := requestNginx(t, client, endpoint, userHost,
 		"/platform.room.v1.RoomService/GetRoom", false)
 	assertAllowedResponse(t, roomResponse, "identity")
+	gameResponse := requestNginx(t, client, endpoint, userHost,
+		"/platform.game.v1.GameService/GetProjection", false)
+	assertAllowedResponse(t, gameResponse, "identity")
+	realtimeResponse := requestNginxUpgrade(t, client, endpoint, userHost, "/realtime/game")
+	assertAllowedResponse(t, realtimeResponse, "realtime")
+	realtimeRequest := realtime.lastRequest(t)
+	assertForwardingHeadersReplaced(t, realtimeRequest, userHost)
+	if realtimeRequest.Upgrade != "websocket" || !strings.EqualFold(realtimeRequest.Connection, "upgrade") {
+		t.Fatalf("WebSocket upgrade headers = %q / %q", realtimeRequest.Upgrade, realtimeRequest.Connection)
+	}
 
 	adminAuthResponse := requestNginx(t, client, endpoint, adminHost,
 		"/platform.admin.v1.AdminAuthService/GetStatus", false)
@@ -114,6 +126,9 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 		{host: userHost, path: "/platform.admin.v1.AdminAuthService/GetStatus"},
 		{host: adminHost, path: "/platform.identity.v1.IdentityService/Bootstrap"},
 		{host: adminHost, path: "/platform.room.v1.RoomService/GetRoom"},
+		{host: adminHost, path: "/platform.game.v1.GameService/GetProjection"},
+		{host: adminHost, path: "/realtime/game"},
+		{host: userHost, path: "/realtime/game/other"},
 		{host: userHost, path: "/platform.identity.v1.UnknownService/Call"},
 		{host: "unexpected.game-night.test", path: "/platform.identity.v1.IdentityService/Bootstrap"},
 	} {
@@ -133,6 +148,8 @@ type capturedRequest struct {
 	XForwardedPort  []string
 	XRealIP         []string
 	Host            string
+	Upgrade         string
+	Connection      string
 }
 
 type echoUpstream struct {
@@ -156,6 +173,7 @@ func startEchoUpstream(t testing.TB, name string) *echoUpstream {
 			Forwarded: request.Header.Values("Forwarded"), XForwardedFor: request.Header.Values("X-Forwarded-For"),
 			XForwardedProto: request.Header.Values("X-Forwarded-Proto"), XForwardedHost: request.Header.Values("X-Forwarded-Host"),
 			XForwardedPort: request.Header.Values("X-Forwarded-Port"), XRealIP: request.Header.Values("X-Real-IP"), Host: request.Host,
+			Upgrade: request.Header.Get("Upgrade"), Connection: request.Header.Get("Connection"),
 		})
 		upstream.mu.Unlock()
 		writer.Header().Set("Cache-Control", "public, max-age=3600")
@@ -215,6 +233,33 @@ func requestNginx(t testing.TB, client *http.Client, endpoint, host, path string
 		request.Header.Set("X-Forwarded-Port", "80")
 		request.Header.Set("X-Real-IP", "198.51.100.10")
 	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	result := nginxResponse{
+		StatusCode: response.StatusCode, Upstream: response.Header.Get("X-Game-Night-Upstream"),
+		CacheControl: response.Header.Get("Cache-Control"), Pragma: response.Header.Get("Pragma"),
+		HSTS: response.Header.Get("Strict-Transport-Security"),
+	}
+	if response.TLS != nil {
+		result.TLSVersion = response.TLS.Version
+	}
+	return result
+}
+
+func requestNginxUpgrade(t testing.TB, client *http.Client, endpoint, host, path string) nginxResponse {
+	t.Helper()
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, endpoint+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Host = host
+	request.Header.Set("Connection", "upgrade")
+	request.Header.Set("Upgrade", "websocket")
+	request.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	request.Header.Set("Sec-WebSocket-Version", "13")
 	response, err := client.Do(request)
 	if err != nil {
 		t.Fatal(err)

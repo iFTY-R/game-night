@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/admin"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/identifier"
 	"github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/room"
@@ -27,6 +28,9 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 		{name: "admin auth", err: admin.ErrAuthentication, wantConnect: connect.CodeUnauthenticated, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, wantKey: "admin.auth.invalid"},
 		{name: "room version", err: room.ErrRoomVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, wantKey: "room.version.conflict"},
 		{name: "room admission", err: room.ErrAdmissionClosed, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED, wantKey: "room.admission.closed"},
+		{name: "game state version", err: gameruntime.ErrStateVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_STATE_VERSION_CONFLICT, wantKey: "game.state.version_conflict"},
+		{name: "game participant", err: gameruntime.ErrParticipantNotActive, wantConnect: connect.CodePermissionDenied, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PARTICIPANT_NOT_ACTIVE, wantKey: "game.participant.not_active"},
+		{name: "game replay", err: gameruntime.ErrReplayUnavailable, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, wantKey: "game.replay.unavailable"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

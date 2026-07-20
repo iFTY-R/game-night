@@ -12,8 +12,11 @@ import (
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/identifier"
 	"github.com/iFTY-R/game-night/platform/identity"
+	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
 	"github.com/iFTY-R/game-night/platform/room"
@@ -81,7 +84,8 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_REVOKED, "identity.device.revoked"}
 	case stderrors.Is(err, identity.ErrRecoveryInvalid), stderrors.Is(err, secretresult.ErrReplayUnauthorized):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RECOVERY_INVALID, "identity.recovery.invalid"}
-	case stderrors.Is(err, secretresult.ErrIdempotencyConflict), stderrors.Is(err, admin.ErrIdempotencyConflict):
+	case stderrors.Is(err, secretresult.ErrIdempotencyConflict), stderrors.Is(err, admin.ErrIdempotencyConflict),
+		stderrors.Is(err, idempotency.ErrConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT, "operation.idempotency_conflict"}
 	case stderrors.Is(err, secretresult.ErrSecretNoLongerAvailable):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SECRET_RESULT_NO_LONGER_AVAILABLE, "operation.secret_no_longer_available"}
@@ -89,6 +93,24 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RATE_LIMITED, "request.rate_limited"}
 	case stderrors.Is(err, room.ErrRoomNotFound):
 		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_NOT_FOUND, "room.not_found"}
+	case stderrors.Is(err, gameruntime.ErrSessionNotFound):
+		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_NOT_FOUND, "game.session.not_found"}
+	case stderrors.Is(err, gameruntime.ErrStateVersionConflict):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_STATE_VERSION_CONFLICT, "game.state.version_conflict"}
+	case stderrors.Is(err, gameruntime.ErrOwnershipLost):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_OWNERSHIP_LOST, "game.ownership.lost"}
+	case stderrors.Is(err, gameruntime.ErrSessionSuspended):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_SUSPENDED, "game.session.suspended"}
+	case stderrors.Is(err, gameruntime.ErrSessionTerminal):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_TERMINAL, "game.session.terminal"}
+	case stderrors.Is(err, gameruntime.ErrParticipantNotActive):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PARTICIPANT_NOT_ACTIVE, "game.participant.not_active"}
+	case stderrors.Is(err, gameruntime.ErrModuleUnavailable):
+		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_MODULE_UNAVAILABLE, "game.module.unavailable"}
+	case stderrors.Is(err, gameruntime.ErrReplayUnavailable):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, "game.replay.unavailable"}
+	case stderrors.Is(err, gameruntime.ErrProjectionUnsafe):
+		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PROJECTION_UNSAFE, "game.projection.unsafe"}
 	case stderrors.Is(err, room.ErrRoomCodeUnavailable):
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE, "room.code.unavailable"}
 	case stderrors.Is(err, room.ErrRoomVersionConflict):
@@ -130,14 +152,17 @@ func classify(err error) descriptor {
 		stderrors.Is(err, identity.ErrInvalidRecoveryAttempt), stderrors.Is(err, identity.ErrInvalidAssistedRecoveryGrant),
 		stderrors.Is(err, profile.ErrInvalidProfileInput), stderrors.Is(err, profile.ErrProfileExportCursor),
 		stderrors.Is(err, admin.ErrInvalidInput), stderrors.Is(err, admin.ErrPasswordPolicy),
-		stderrors.Is(err, secretresult.ErrInvalidInput), stderrors.Is(err, room.ErrInvalidRoomInput):
+		stderrors.Is(err, secretresult.ErrInvalidInput), stderrors.Is(err, room.ErrInvalidRoomInput),
+		stderrors.Is(err, gameruntime.ErrInvalidSessionInput), stderrors.Is(err, gameruntime.ErrInvalidActionCommit),
+		stderrors.Is(err, gameruntime.ErrInvalidSystemCommit), stderrors.Is(err, redisstore.ErrInvalidCoordinationInput):
 		return descriptor{connectCode: connect.CodeInvalidArgument, messageKey: "request.invalid"}
 	case stderrors.Is(err, profile.ErrProfileExportClosed), stderrors.Is(err, profile.ErrProfileExportExpired),
 		stderrors.Is(err, admin.ErrUnavailable):
 		return descriptor{connectCode: connect.CodeFailedPrecondition, messageKey: "operation.failed_precondition"}
 	case stderrors.Is(err, ratelimit.ErrUnavailable), stderrors.Is(err, identity.ErrIdentityRepositoryUnavailable),
 		stderrors.Is(err, profile.ErrProfileRepositoryUnavailable), stderrors.Is(err, admin.ErrRepositoryUnavailable),
-		stderrors.Is(err, secretresult.ErrRepositoryUnavailable), stderrors.Is(err, room.ErrRoomRepositoryUnavailable):
+		stderrors.Is(err, secretresult.ErrRepositoryUnavailable), stderrors.Is(err, room.ErrRoomRepositoryUnavailable),
+		stderrors.Is(err, gameruntime.ErrGameSessionRepositoryUnavailable), stderrors.Is(err, redisstore.ErrCoordinationUnavailable):
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}
 	default:
 		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.internal_error"}

@@ -149,3 +149,11 @@ type WorkerDependencies struct {
 	Checkpoint  CheckpointConfig
 	Keyrings    OperationsKeyringFiles
 }
+
+// RealtimeDependencies omits every identity, administrator, PII, and audit key from the realtime process.
+type RealtimeDependencies struct {
+	Environment Environment
+	PostgreSQL  PostgreSQLConfig
+	Redis       RedisConfig
+	Network     NetworkConfig
+}

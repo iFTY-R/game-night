@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
@@ -19,9 +21,12 @@ func TestRoomGameSessionRepositoryStartsRoomAndSessionAtomically(t *testing.T) {
 	fixture := openRoomGameSessionStartFixture(t)
 	repository := NewRoomGameSessionRepository(fixture.fixture.Pool)
 
-	storedRoom, storedSession, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit)
+	storedRoom, storedSession, replayed, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if replayed {
+		t.Fatal("first start was reported as a replay")
 	}
 	if storedRoom.Snapshot().Status != roomDomain.RoomStatusPlaying || storedRoom.Snapshot().ActiveSessionID != fixture.sessionID {
 		t.Fatalf("stored room = %+v", storedRoom.Snapshot())
@@ -42,6 +47,10 @@ func TestRoomGameSessionRepositoryStartsRoomAndSessionAtomically(t *testing.T) {
 		t.Fatalf("room/session link mismatch: room=%+v session=%+v", loadedRoom.Snapshot(), loadedSession.Snapshot())
 	}
 	assertGameSessionCounts(t, fixture.ctx, fixture.fixture, fixture.sessionID, 1, 0, 1, 1)
+	loadedReceipt, err := repository.GetStartReceipt(fixture.ctx, fixture.receipt.Snapshot().Key, fixture.receipt.Snapshot().RequestDigest)
+	if err != nil || loadedReceipt.Snapshot() != fixture.receipt.Snapshot() {
+		t.Fatalf("loaded start receipt=%+v error=%v", loadedReceipt.Snapshot(), err)
+	}
 }
 
 func TestRoomGameSessionRepositoryRollsBackRoomWhenOutboxInsertFails(t *testing.T) {
@@ -58,7 +67,9 @@ func TestRoomGameSessionRepositoryRollsBackRoomWhenOutboxInsertFails(t *testing.
 		t.Fatal(err)
 	}
 
-	if _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(fixture.ctx, fixture.before, fixture.after, fixture.commit); err == nil {
+	if _, _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+		fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
+	); err == nil {
 		t.Fatal("expected outbox conflict to abort the cross-aggregate start")
 	}
 	roomAfterFailure, err := NewRoomRepository(fixture.fixture.Pool).GetByID(fixture.ctx, fixture.before.Snapshot().ID)
@@ -87,7 +98,9 @@ func TestRoomGameSessionRepositoryRejectsStaleRoomBeforeCreatingSession(t *testi
 		t.Fatal(err)
 	}
 
-	if _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(fixture.ctx, fixture.before, fixture.after, fixture.commit); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
+	if _, _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+		fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
+	); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
 		t.Fatalf("stale start error = %v", err)
 	}
 	if _, err := NewGameSessionRepository(fixture.fixture.Pool).Get(fixture.ctx, fixture.sessionID); !errors.Is(err, gameruntime.ErrSessionNotFound) {
@@ -95,36 +108,39 @@ func TestRoomGameSessionRepositoryRejectsStaleRoomBeforeCreatingSession(t *testi
 	}
 }
 
-func TestRoomGameSessionRepositorySerializesConcurrentStarts(t *testing.T) {
+func TestRoomGameSessionRepositorySerializesConcurrentIdempotentStarts(t *testing.T) {
 	fixture := openRoomGameSessionStartFixture(t)
-	results := make(chan error, 2)
+	type startResult struct {
+		replayed bool
+		err      error
+	}
+	results := make(chan startResult, 2)
 	var wait sync.WaitGroup
 	for range 2 {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			_, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
-				fixture.ctx, fixture.before, fixture.after, fixture.commit,
+			_, _, replayed, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+				fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
 			)
-			results <- err
+			results <- startResult{replayed: replayed, err: err}
 		}()
 	}
 	wait.Wait()
 	close(results)
 
-	successes, conflicts := 0, 0
-	for err := range results {
-		switch {
-		case err == nil:
-			successes++
-		case errors.Is(err, roomDomain.ErrRoomVersionConflict):
-			conflicts++
-		default:
-			t.Fatalf("concurrent start error = %v", err)
+	successes, replays := 0, 0
+	for result := range results {
+		if result.err != nil {
+			t.Fatalf("concurrent start error = %v", result.err)
+		}
+		successes++
+		if result.replayed {
+			replays++
 		}
 	}
-	if successes != 1 || conflicts != 1 {
-		t.Fatalf("concurrent starts: successes=%d conflicts=%d", successes, conflicts)
+	if successes != 2 || replays != 1 {
+		t.Fatalf("concurrent starts: successes=%d replays=%d", successes, replays)
 	}
 	assertGameSessionCounts(t, fixture.ctx, fixture.fixture, fixture.sessionID, 1, 0, 1, 1)
 }
@@ -152,6 +168,7 @@ type roomGameSessionStartFixture struct {
 	before    roomDomain.Room
 	after     roomDomain.Room
 	commit    gameruntime.CreationCommit
+	receipt   gameruntime.StartReceipt
 }
 
 func openRoomGameSessionStartFixture(t *testing.T) roomGameSessionStartFixture {
@@ -190,8 +207,40 @@ func openRoomGameSessionStartFixture(t *testing.T) roomGameSessionStartFixture {
 		t.Fatal(err)
 	}
 	event := newGameSessionOutboxEvent(t, gameruntime.GameSessionCreatedEventType, sessionID, uuid.New(), start.StartedAt, []byte("atomic-created"))
+	commit := gameruntime.CreationCommit{Session: session, Batch: batch, OutboxEvents: []outbox.Event{event}}
+	receipt := gameSessionStartReceiptForTest(t, before, commit, "atomic-start-request")
 	return roomGameSessionStartFixture{
 		fixture: fixture, ctx: ctx, now: now, hostID: hostID, sessionID: sessionID,
-		before: before, after: after, commit: gameruntime.CreationCommit{Session: session, Batch: batch, OutboxEvents: []outbox.Event{event}},
+		before: before, after: after, commit: commit,
+		receipt: receipt,
 	}
+}
+
+func gameSessionStartReceiptForTest(
+	t testing.TB,
+	room roomDomain.Room,
+	commit gameruntime.CreationCommit,
+	marker string,
+) gameruntime.StartReceipt {
+	t.Helper()
+	digestBytes := sha256.Sum256([]byte(marker))
+	operationID, err := idempotency.NewOperationID(digestBytes[:16])
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := idempotency.NewDigest(digestBytes[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := commit.Session.Snapshot()
+	receipt, err := gameruntime.NewStartReceipt(gameruntime.StartReceiptSnapshot{
+		Key: gameruntime.StartKey{
+			ActorUserID: room.Snapshot().HostUserID, RoomID: room.Snapshot().ID, OperationID: operationID,
+		},
+		RequestDigest: digest, SessionID: session.ID, CommittedAt: session.StartedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return receipt
 }

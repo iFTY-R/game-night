@@ -112,8 +112,10 @@ func (aggregateType AggregateType) Value() string { return string(aggregateType)
 type ConsumerID string
 
 const (
-	// ConsumerIDAuditCheckpoint is the only production consumer registered during the audit milestone.
+	// ConsumerIDAuditCheckpoint owns WORM delivery of signed audit checkpoints.
 	ConsumerIDAuditCheckpoint ConsumerID = "audit.checkpoint"
+	// ConsumerIDGameSessionFanout republishes committed game cursors to non-authoritative Redis wake-up channels.
+	ConsumerIDGameSessionFanout ConsumerID = "realtime.game_fanout"
 )
 
 // ParseConsumerID validates a stable namespace-qualified consumer identity.

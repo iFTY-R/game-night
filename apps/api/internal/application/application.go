@@ -17,6 +17,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	transporterrors "github.com/iFTY-R/game-night/apps/api/internal/transport/errors"
+	gametransport "github.com/iFTY-R/game-night/apps/api/internal/transport/game"
 	identitytransport "github.com/iFTY-R/game-night/apps/api/internal/transport/identity"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/metrics"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
@@ -54,7 +55,13 @@ var (
 )
 
 // maximumDatabaseClockSkew fails startup when infrastructure clocks are too far apart for security expiry decisions.
-const maximumDatabaseClockSkew = 5 * time.Minute
+const (
+	maximumDatabaseClockSkew = 5 * time.Minute
+	// gameConnectionTicketTTL bounds the browser's upgrade window without becoming a reusable session credential.
+	gameConnectionTicketTTL = 30 * time.Second
+	// gameSessionLeaseTTL is shared with realtime ownership coordination even while module registration remains disabled.
+	gameSessionLeaseTTL = 15 * time.Second
+)
 
 // Options supplies process-owned observers and the current durable checkpoint sink probe.
 type Options struct {
@@ -129,6 +136,13 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeRedis
 	}
+	gameCoordinator, err := redisstore.NewGameCoordinator(redisClient, redisstore.CoordinationConfig{
+		KeyPrefix: config.Shared.Redis.KeyPrefix, Timeout: config.Shared.Redis.Timeout,
+		TicketTTL: gameConnectionTicketTTL, LeaseTTL: gameSessionLeaseTTL,
+	})
+	if err != nil {
+		return nil, errInitializeRedis
+	}
 	userLimiter, err := ratetransport.New(redisLimiter, metricRegistry)
 	if err != nil {
 		return nil, errInitializeRedis
@@ -142,8 +156,17 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	roomRepository := postgres.NewRoomRepository(pool)
+	gameSessionRepository := postgres.NewGameSessionRepository(pool)
+	gameRuntime, err := gametransport.NewRemoteRuntime(&http.Client{Timeout: 30 * time.Second}, gametransport.RemoteRuntimeConfig{
+		BootstrapURL: config.Realtime.BootstrapURL, PeerURLs: config.Realtime.PeerURLs,
+		InternalToken: config.Realtime.InternalToken,
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	roomService, err := roomdomain.NewService(
-		postgres.NewRoomRepository(pool), roomdomain.NewSecureCodeGenerator(), roomdomain.NewDisabledGameCatalog(), source,
+		roomRepository, roomdomain.NewSecureCodeGenerator(), roomdomain.NewDisabledGameCatalog(), source,
 	)
 	if err != nil {
 		return nil, errInitializeServices
@@ -177,7 +200,8 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 		return nil, errInitializeTransport
 	}
 	handler, err := transportHandler(
-		config.Shared, source, userService, roomService, adminService, adminIdentityService,
+		config.Shared, source, userService, roomService, gameRuntime, gameSessionRepository, roomRepository,
+		gameCoordinator, adminService, adminIdentityService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -390,6 +414,10 @@ func transportHandler(
 	source clock.Clock,
 	userService *identitydomain.Service,
 	roomService *roomdomain.Service,
+	gameRuntime gametransport.Runtime,
+	gameSessions *postgres.GameSessionRepository,
+	rooms *postgres.RoomRepository,
+	gameCoordinator *redisstore.GameCoordinator,
 	adminService *admin.Service,
 	adminIdentityService *admin.IdentityService,
 	metricRegistry *metrics.Registry,
@@ -434,6 +462,17 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	gameAuthenticator, err := gametransport.NewIdentityAuthenticator(userService)
+	if err != nil {
+		return nil, err
+	}
+	gameHandler, err := gametransport.NewService(
+		gameRuntime, gameSessions, rooms, gameAuthenticator, userOrigins, userCSRF,
+		gameCoordinator, gameCoordinator, source, gameConnectionTicketTTL,
+	)
+	if err != nil {
+		return nil, err
+	}
 	adminContext, err := adminauth.NewContextInterceptor(adminOrigins, csrf.NewAdminValidator(), adminProxy)
 	if err != nil {
 		return nil, err
@@ -451,6 +490,7 @@ func transportHandler(
 		return nil, err
 	}
 	userOperations := append(append([]string(nil), sensitive.IdentityOperations...), sensitive.RoomOperations...)
+	userOperations = append(userOperations, sensitive.GameOperations...)
 	userSensitive, err := sensitive.New(userOperations...)
 	if err != nil {
 		return nil, err
@@ -469,7 +509,7 @@ func transportHandler(
 		return nil, err
 	}
 	userSurface, err := server.NewUserSurface(server.UserSurfaceConfig{
-		Identity: identityHandler, Room: roomHandler, Readiness: readiness,
+		Identity: identityHandler, Room: roomHandler, Game: gameHandler, Readiness: readiness,
 		Interceptors: []connect.Interceptor{userSensitive.Interceptor(), userMetrics, transporterrors.Interceptor()},
 	})
 	if err != nil {

@@ -252,6 +252,15 @@ type GameSessionParticipant struct {
 	SeatIndex int32       `json:"seat_index"`
 }
 
+type GameSessionStartReceipt struct {
+	ActorUserID   pgtype.UUID        `json:"actor_user_id"`
+	RoomID        pgtype.UUID        `json:"room_id"`
+	OperationID   string             `json:"operation_id"`
+	RequestDigest []byte             `json:"request_digest"`
+	SessionID     pgtype.UUID        `json:"session_id"`
+	CommittedAt   pgtype.Timestamptz `json:"committed_at"`
+}
+
 type GameSessionTimer struct {
 	SessionID            pgtype.UUID        `json:"session_id"`
 	TimerID              string             `json:"timer_id"`

@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 )
@@ -44,6 +45,16 @@ var RoomOperations = []string{
 	roomv1connect.RoomServiceFinishGameProcedure,
 	roomv1connect.RoomServiceRemoveMemberProcedure,
 	roomv1connect.RoomServiceCloseRoomProcedure,
+}
+
+// GameOperations contains every viewer-scoped game read, mutation, replay, and ticket handshake.
+var GameOperations = []string{
+	gamev1connect.GameServiceStartSessionProcedure,
+	gamev1connect.GameServiceGameActionProcedure,
+	gamev1connect.GameServiceGetProjectionProcedure,
+	gamev1connect.GameServiceGetReplayProjectionProcedure,
+	gamev1connect.GameServiceFinishSessionProcedure,
+	gamev1connect.GameServiceOpenSubscriptionProcedure,
 }
 
 // AdminAuthOperations contains every reviewed administrator authentication procedure.
@@ -106,9 +117,10 @@ func New(operations ...string) (*Registry, error) {
 
 // AllOperations returns an independent list suitable for metrics and the process-wide cache policy registry.
 func AllOperations() []string {
-	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(AdminAuthOperations)+len(AdminIdentityOperations))
+	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminIdentityOperations))
 	operations = append(operations, IdentityOperations...)
 	operations = append(operations, RoomOperations...)
+	operations = append(operations, GameOperations...)
 	operations = append(operations, AdminAuthOperations...)
 	operations = append(operations, AdminIdentityOperations...)
 	return operations

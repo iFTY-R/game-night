@@ -2,15 +2,17 @@
 // @generated from file platform/game/v1/game.proto (package platform.game.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file platform/game/v1/game.proto.
  */
 export const file_platform_game_v1_game: GenFile = /*@__PURE__*/
-  fileDesc("ChtwbGF0Zm9ybS9nYW1lL3YxL2dhbWUucHJvdG8SEHBsYXRmb3JtLmdhbWUudjEiQAoMVmVyc2lvblR1cGxlEg4KBmVuZ2luZRgBIAEoCRIQCghwcm90b2NvbBgCIAEoCRIOCgZjbGllbnQYAyABKAkijwEKDEdhbWVFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEi8KB3ZlcnNpb24YAiABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLlZlcnNpb25UdXBsZRIWCg5zY2hlbWFfdmVyc2lvbhgDIAEoDRIUCgxtZXNzYWdlX3R5cGUYBCABKAkSDwoHcGF5bG9hZBgFIAEoDCK0AQoRR2FtZUFjdGlvblJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEhEKCWFjdGlvbl9pZBgDIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAQgASgEEi8KB2NvbW1hbmQYBSABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIWCg5yZXF1ZXN0X2RpZ2VzdBgGIAEoDCKxAQoSR2FtZUFjdGlvblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSFQoNc3RhdGVfdmVyc2lvbhgCIAEoBBITCgtyZXN1bHRfY29kZRgDIAEoCRIVCg1yZXN1bHRfZGlnZXN0GAQgASgMEjIKCnByb2plY3Rpb24YBSABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIQCghyZXBsYXllZBgGIAEoCCKmAQoUR2FtZVN1YnNjcmliZVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEjEKC3ZpZXdlcl9raW5kGAMgASgOMhwucGxhdGZvcm0uZ2FtZS52MS5WaWV3ZXJLaW5kEhoKEmxhc3Rfc3RhdGVfdmVyc2lvbhgEIAEoBBIaChJsYXN0X2V2ZW50X29yZGluYWwYBSABKA0itQEKDkdhbWVQcm9qZWN0aW9uEhIKCnNlc3Npb25faWQYASABKAkSFQoNc3RhdGVfdmVyc2lvbhgCIAEoBBIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIsCgR2aWV3GAQgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFwoPYWxsb3dlZF9hY3Rpb25zGAUgAygJIroBCglHYW1lRGVsdGESEgoKc2Vzc2lvbl9pZBgBIAEoCRIaChJmcm9tX3N0YXRlX3ZlcnNpb24YAiABKAQSGAoQdG9fc3RhdGVfdmVyc2lvbhgDIAEoBBIxCgt2aWV3ZXJfa2luZBgEIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIwCghtZXNzYWdlcxgFIAMoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlIsYBChFHYW1lU3lzdGVtUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEhsKE3N5c3RlbV9vcGVyYXRpb25faWQYAiABKAkSFwoPc291cmNlX2V2ZW50X2lkGAMgASgJEh4KFmV4cGVjdGVkX3N0YXRlX3ZlcnNpb24YBCABKAQSLwoHY29tbWFuZBgFIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhYKDnJlcXVlc3RfZGlnZXN0GAYgASgMIocBChBHYW1lVGltZXJSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkSEAoIdGltZXJfaWQYAiABKAkSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgDIAEoBBItCgV0aW1lchgEIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlIqQBCgtHYW1lUmVjZWlwdBISCgpzZXNzaW9uX2lkGAEgASgJEhQKDG9wZXJhdGlvbl9pZBgCIAEoCRIVCg1zdGF0ZV92ZXJzaW9uGAMgASgEEhMKC3Jlc3VsdF9jb2RlGAQgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAUgASgMEhUKDXJlc3VsdF9kaWdlc3QYBiABKAwSEAoIcmVwbGF5ZWQYByABKAgqdAoKVmlld2VyS2luZBIbChdWSUVXRVJfS0lORF9VTlNQRUNJRklFRBAAEhYKElZJRVdFUl9LSU5EX1BMQVlFUhABEhkKFVZJRVdFUl9LSU5EX1NQRUNUQVRPUhACEhYKElZJRVdFUl9LSU5EX1JFUExBWRADQkdaRWdpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9nYW1lL3YxO2dhbWV2MWIGcHJvdG8z");
+  fileDesc("ChtwbGF0Zm9ybS9nYW1lL3YxL2dhbWUucHJvdG8SEHBsYXRmb3JtLmdhbWUudjEiQAoMVmVyc2lvblR1cGxlEg4KBmVuZ2luZRgBIAEoCRIQCghwcm90b2NvbBgCIAEoCRIOCgZjbGllbnQYAyABKAkijwEKDEdhbWVFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEi8KB3ZlcnNpb24YAiABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLlZlcnNpb25UdXBsZRIWCg5zY2hlbWFfdmVyc2lvbhgDIAEoDRIUCgxtZXNzYWdlX3R5cGUYBCABKAkSDwoHcGF5bG9hZBgFIAEoDCJcCgpHYW1lQ29uZmlnEg8KB2dhbWVfaWQYASABKAkSFgoOc2NoZW1hX3ZlcnNpb24YAiABKA0SFAoMbWVzc2FnZV90eXBlGAMgASgJEg8KB3BheWxvYWQYBCABKAwi4AEKEkdhbWVTZXNzaW9uU3VtbWFyeRISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSDwoHZ2FtZV9pZBgDIAEoCRIvCgd2ZXJzaW9uGAQgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5WZXJzaW9uVHVwbGUSFQoNc3RhdGVfdmVyc2lvbhgFIAEoBBIXCg9vd25lcnNoaXBfZXBvY2gYBiABKAQSMwoGc3RhdHVzGAcgASgOMiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN0YXR1cyLXAQoTU3RhcnRTZXNzaW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSHQoVZXhwZWN0ZWRfcm9vbV92ZXJzaW9uGAMgASgEEiMKG2V4cGVjdGVkX21lbWJlcnNoaXBfdmVyc2lvbhgEIAEoBBIsCgZjb25maWcYBSABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVDb25maWcSFAoMb3BlcmF0aW9uX2lkGAYgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAcgASgMIoMBChRTdGFydFNlc3Npb25SZXNwb25zZRI1CgdzZXNzaW9uGAEgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSNAoKcHJvamVjdGlvbhgCIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb24itAEKEUdhbWVBY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIRCglhY3Rpb25faWQYAyABKAkSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgEIAEoBBIvCgdjb21tYW5kGAUgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYBiABKAwi4wEKEkdhbWVBY3Rpb25SZXNwb25zZRISCgpzZXNzaW9uX2lkGAEgASgJEhUKDXN0YXRlX3ZlcnNpb24YAiABKAQSEwoLcmVzdWx0X2NvZGUYAyABKAkSFQoNcmVzdWx0X2RpZ2VzdBgEIAEoDBI0Cgpwcm9qZWN0aW9uGAUgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhIQCghyZXBsYXllZBgGIAEoCBIuCgdyZWNlaXB0GAcgASgLMh0ucGxhdGZvcm0uZ2FtZS52MS5HYW1lUmVjZWlwdCJuChRHZXRQcm9qZWN0aW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQihAEKFUdldFByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkikwEKGkdldFJlcGxheVByb2plY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIdChV0aHJvdWdoX3N0YXRlX3ZlcnNpb24YBCABKAQinAEKG0dldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSEAoIY29tcGxldGUYAyABKAgilwIKFEZpbmlzaFNlc3Npb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIUCgxvcGVyYXRpb25faWQYAyABKAkSFwoPc291cmNlX2V2ZW50X2lkGAQgASgJEh0KFWV4cGVjdGVkX3Jvb21fdmVyc2lvbhgFIAEoBBIjChtleHBlY3RlZF9tZW1iZXJzaGlwX3ZlcnNpb24YBiABKAQSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgHIAEoBBIvCgdjb21tYW5kGAggASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYCSABKAwixgEKFUZpbmlzaFNlc3Npb25SZXNwb25zZRI1CgdzZXNzaW9uGAEgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSLgoHcmVjZWlwdBgCIAEoCzIdLnBsYXRmb3JtLmdhbWUudjEuR2FtZVJlY2VpcHQSNAoKcHJvamVjdGlvbhgDIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb24SEAoIcmVwbGF5ZWQYBCABKAgipgEKFEdhbWVTdWJzY3JpYmVSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIaChJsYXN0X3N0YXRlX3ZlcnNpb24YBCABKAQSGgoSbGFzdF9ldmVudF9vcmRpbmFsGAUgASgNIrUBCg5HYW1lUHJvamVjdGlvbhISCgpzZXNzaW9uX2lkGAEgASgJEhUKDXN0YXRlX3ZlcnNpb24YAiABKAQSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSLAoEdmlldxgEIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhcKD2FsbG93ZWRfYWN0aW9ucxgFIAMoCSKLAgoJR2FtZURlbHRhEhIKCnNlc3Npb25faWQYASABKAkSGgoSZnJvbV9zdGF0ZV92ZXJzaW9uGAIgASgEEhgKEHRvX3N0YXRlX3ZlcnNpb24YAyABKAQSMQoLdmlld2VyX2tpbmQYBCABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSMAoIbWVzc2FnZXMYBSADKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIaChJmcm9tX2V2ZW50X29yZGluYWwYBiABKA0SGAoQdG9fZXZlbnRfb3JkaW5hbBgHIAEoDRIZChFzbmFwc2hvdF9mYWxsYmFjaxgIIAEoCCKpAQoXT3BlblN1YnNjcmlwdGlvblJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEjEKC3ZpZXdlcl9raW5kGAMgASgOMhwucGxhdGZvcm0uZ2FtZS52MS5WaWV3ZXJLaW5kEhoKEmxhc3Rfc3RhdGVfdmVyc2lvbhgEIAEoBBIaChJsYXN0X2V2ZW50X29yZGluYWwYBSABKA0i1gEKGE9wZW5TdWJzY3JpcHRpb25SZXNwb25zZRIOCgZ0aWNrZXQYASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoHc2Vzc2lvbhgDIAEoCzIkLnBsYXRmb3JtLmdhbWUudjEuR2FtZVNlc3Npb25TdW1tYXJ5EjQKCnByb2plY3Rpb24YBCABKAsyIC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVQcm9qZWN0aW9uEg0KBWdyYW50GAUgASgMIogCChFTdWJzY3JpcHRpb25HcmFudBIPCgd1c2VyX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSEgoKc2Vzc2lvbl9pZBgDIAEoCRIxCgt2aWV3ZXJfa2luZBgEIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBISCgpzZWF0X2luZGV4GAUgASgNEhoKEmxhc3Rfc3RhdGVfdmVyc2lvbhgGIAEoBBIaChJsYXN0X2V2ZW50X29yZGluYWwYByABKA0SDgoGb3JpZ2luGAggASgJEi4KCmV4cGlyZXNfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wInkKC0NsaWVudEZyYW1lEjQKBWhlbGxvGAEgASgLMiMucGxhdGZvcm0uZ2FtZS52MS5TdWJzY3JpcHRpb25IZWxsb0gAEiwKBHBpbmcYAiABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLkNsaWVudFBpbmdIAEIGCgRib2R5IjIKEVN1YnNjcmlwdGlvbkhlbGxvEg4KBnRpY2tldBgBIAEoDBINCgVncmFudBgCIAEoDCIbCgpDbGllbnRQaW5nEg0KBW5vbmNlGAEgASgEIs0CCgtTZXJ2ZXJGcmFtZRI2Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbkgAEiwKBWRlbHRhGAIgASgLMhsucGxhdGZvcm0uZ2FtZS52MS5HYW1lRGVsdGFIABIwCgdyZWNlaXB0GAMgASgLMh0ucGxhdGZvcm0uZ2FtZS52MS5HYW1lUmVjZWlwdEgAEjoKCGRyYWluaW5nGAQgASgLMiYucGxhdGZvcm0uZ2FtZS52MS5TdWJzY3JpcHRpb25EcmFpbmluZ0gAEiwKBHBvbmcYBSABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLlNlcnZlclBvbmdIABI0CgVlcnJvchgGIAEoCzIjLnBsYXRmb3JtLmdhbWUudjEuU3Vic2NyaXB0aW9uRXJyb3JIAEIGCgRib2R5IlsKFFN1YnNjcmlwdGlvbkRyYWluaW5nEg4KBnJlYXNvbhgBIAEoCRIzCg9yZWNvbm5lY3RfYWZ0ZXIYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhsKClNlcnZlclBvbmcSDQoFbm9uY2UYASABKAQiIQoRU3Vic2NyaXB0aW9uRXJyb3ISDAoEY29kZRgBIAEoCSLGAQoRR2FtZVN5c3RlbVJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIbChNzeXN0ZW1fb3BlcmF0aW9uX2lkGAIgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgDIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAQgASgEEi8KB2NvbW1hbmQYBSABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIWCg5yZXF1ZXN0X2RpZ2VzdBgGIAEoDCKHAQoQR2FtZVRpbWVyUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEhAKCHRpbWVyX2lkGAIgASgJEh4KFmV4cGVjdGVkX3N0YXRlX3ZlcnNpb24YAyABKAQSLQoFdGltZXIYBCABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZSKkAQoLR2FtZVJlY2VpcHQSEgoKc2Vzc2lvbl9pZBgBIAEoCRIUCgxvcGVyYXRpb25faWQYAiABKAkSFQoNc3RhdGVfdmVyc2lvbhgDIAEoBBITCgtyZXN1bHRfY29kZRgEIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgFIAEoDBIVCg1yZXN1bHRfZGlnZXN0GAYgASgMEhAKCHJlcGxheWVkGAcgASgIKsABChFHYW1lU2Vzc2lvblN0YXR1cxIjCh9HQU1FX1NFU1NJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHgoaR0FNRV9TRVNTSU9OX1NUQVRVU19BQ1RJVkUQARIhCh1HQU1FX1NFU1NJT05fU1RBVFVTX1NVU1BFTkRFRBACEiAKHEdBTUVfU0VTU0lPTl9TVEFUVVNfRklOSVNIRUQQAxIhCh1HQU1FX1NFU1NJT05fU1RBVFVTX0NBTkNFTExFRBAEKnQKClZpZXdlcktpbmQSGwoXVklFV0VSX0tJTkRfVU5TUEVDSUZJRUQQABIWChJWSUVXRVJfS0lORF9QTEFZRVIQARIZChVWSUVXRVJfS0lORF9TUEVDVEFUT1IQAhIWChJWSUVXRVJfS0lORF9SRVBMQVkQAzLoBAoLR2FtZVNlcnZpY2USXQoMU3RhcnRTZXNzaW9uEiUucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXF1ZXN0GiYucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXNwb25zZRJXCgpHYW1lQWN0aW9uEiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lQWN0aW9uUmVxdWVzdBokLnBsYXRmb3JtLmdhbWUudjEuR2FtZUFjdGlvblJlc3BvbnNlEmAKDUdldFByb2plY3Rpb24SJi5wbGF0Zm9ybS5nYW1lLnYxLkdldFByb2plY3Rpb25SZXF1ZXN0GicucGxhdGZvcm0uZ2FtZS52MS5HZXRQcm9qZWN0aW9uUmVzcG9uc2UScgoTR2V0UmVwbGF5UHJvamVjdGlvbhIsLnBsYXRmb3JtLmdhbWUudjEuR2V0UmVwbGF5UHJvamVjdGlvblJlcXVlc3QaLS5wbGF0Zm9ybS5nYW1lLnYxLkdldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRJgCg1GaW5pc2hTZXNzaW9uEiYucGxhdGZvcm0uZ2FtZS52MS5GaW5pc2hTZXNzaW9uUmVxdWVzdBonLnBsYXRmb3JtLmdhbWUudjEuRmluaXNoU2Vzc2lvblJlc3BvbnNlEmkKEE9wZW5TdWJzY3JpcHRpb24SKS5wbGF0Zm9ybS5nYW1lLnYxLk9wZW5TdWJzY3JpcHRpb25SZXF1ZXN0GioucGxhdGZvcm0uZ2FtZS52MS5PcGVuU3Vic2NyaXB0aW9uUmVzcG9uc2VCR1pFZ2l0aHViLmNvbS9pRlRZLVIvZ2FtZS1uaWdodC9jb250cmFjdHMvZ2VuL2dvL3BsYXRmb3JtL2dhbWUvdjE7Z2FtZXYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * VersionTuple pins the exact engine, protocol, and client artifacts of one session.
@@ -81,6 +83,158 @@ export const GameEnvelopeSchema: GenMessage<GameEnvelope> = /*@__PURE__*/
   messageDesc(file_platform_game_v1_game, 1);
 
 /**
+ * GameConfig is the only client-owned input accepted when a new session is created.
+ *
+ * @generated from message platform.game.v1.GameConfig
+ */
+export type GameConfig = Message<"platform.game.v1.GameConfig"> & {
+  /**
+   * @generated from field: string game_id = 1;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: uint32 schema_version = 2;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string message_type = 3;
+   */
+  messageType: string;
+
+  /**
+   * @generated from field: bytes payload = 4;
+   */
+  payload: Uint8Array;
+};
+
+/**
+ * Describes the message platform.game.v1.GameConfig.
+ * Use `create(GameConfigSchema)` to create a new message.
+ */
+export const GameConfigSchema: GenMessage<GameConfig> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 2);
+
+/**
+ * GameSessionSummary intentionally omits authoritative state and private event payloads.
+ *
+ * @generated from message platform.game.v1.GameSessionSummary
+ */
+export type GameSessionSummary = Message<"platform.game.v1.GameSessionSummary"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string room_id = 2;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string game_id = 3;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: platform.game.v1.VersionTuple version = 4;
+   */
+  version?: VersionTuple;
+
+  /**
+   * @generated from field: uint64 state_version = 5;
+   */
+  stateVersion: bigint;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 6;
+   */
+  ownershipEpoch: bigint;
+
+  /**
+   * @generated from field: platform.game.v1.GameSessionStatus status = 7;
+   */
+  status: GameSessionStatus;
+};
+
+/**
+ * Describes the message platform.game.v1.GameSessionSummary.
+ * Use `create(GameSessionSummarySchema)` to create a new message.
+ */
+export const GameSessionSummarySchema: GenMessage<GameSessionSummary> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 3);
+
+/**
+ * @generated from message platform.game.v1.StartSessionRequest
+ */
+export type StartSessionRequest = Message<"platform.game.v1.StartSessionRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: uint64 expected_room_version = 3;
+   */
+  expectedRoomVersion: bigint;
+
+  /**
+   * @generated from field: uint64 expected_membership_version = 4;
+   */
+  expectedMembershipVersion: bigint;
+
+  /**
+   * @generated from field: platform.game.v1.GameConfig config = 5;
+   */
+  config?: GameConfig;
+
+  /**
+   * @generated from field: string operation_id = 6;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 7;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.game.v1.StartSessionRequest.
+ * Use `create(StartSessionRequestSchema)` to create a new message.
+ */
+export const StartSessionRequestSchema: GenMessage<StartSessionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 4);
+
+/**
+ * @generated from message platform.game.v1.StartSessionResponse
+ */
+export type StartSessionResponse = Message<"platform.game.v1.StartSessionResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.GameSessionSummary session = 1;
+   */
+  session?: GameSessionSummary;
+
+  /**
+   * @generated from field: platform.game.v1.GameProjection projection = 2;
+   */
+  projection?: GameProjection;
+};
+
+/**
+ * Describes the message platform.game.v1.StartSessionResponse.
+ * Use `create(StartSessionResponseSchema)` to create a new message.
+ */
+export const StartSessionResponseSchema: GenMessage<StartSessionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 5);
+
+/**
  * GameActionRequest is the authenticated, optimistic, idempotent command boundary.
  *
  * @generated from message platform.game.v1.GameActionRequest
@@ -122,7 +276,7 @@ export type GameActionRequest = Message<"platform.game.v1.GameActionRequest"> & 
  * Use `create(GameActionRequestSchema)` to create a new message.
  */
 export const GameActionRequestSchema: GenMessage<GameActionRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 2);
+  messageDesc(file_platform_game_v1_game, 6);
 
 /**
  * GameActionResponse is safe to replay after a committed action receipt.
@@ -151,14 +305,19 @@ export type GameActionResponse = Message<"platform.game.v1.GameActionResponse"> 
   resultDigest: Uint8Array;
 
   /**
-   * @generated from field: platform.game.v1.GameEnvelope projection = 5;
+   * @generated from field: platform.game.v1.GameProjection projection = 5;
    */
-  projection?: GameEnvelope;
+  projection?: GameProjection;
 
   /**
    * @generated from field: bool replayed = 6;
    */
   replayed: boolean;
+
+  /**
+   * @generated from field: platform.game.v1.GameReceipt receipt = 7;
+   */
+  receipt?: GameReceipt;
 };
 
 /**
@@ -166,7 +325,204 @@ export type GameActionResponse = Message<"platform.game.v1.GameActionResponse"> 
  * Use `create(GameActionResponseSchema)` to create a new message.
  */
 export const GameActionResponseSchema: GenMessage<GameActionResponse> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 3);
+  messageDesc(file_platform_game_v1_game, 7);
+
+/**
+ * @generated from message platform.game.v1.GetProjectionRequest
+ */
+export type GetProjectionRequest = Message<"platform.game.v1.GetProjectionRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ViewerKind viewer_kind = 3;
+   */
+  viewerKind: ViewerKind;
+};
+
+/**
+ * Describes the message platform.game.v1.GetProjectionRequest.
+ * Use `create(GetProjectionRequestSchema)` to create a new message.
+ */
+export const GetProjectionRequestSchema: GenMessage<GetProjectionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 8);
+
+/**
+ * @generated from message platform.game.v1.GetProjectionResponse
+ */
+export type GetProjectionResponse = Message<"platform.game.v1.GetProjectionResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.GameProjection projection = 1;
+   */
+  projection?: GameProjection;
+
+  /**
+   * @generated from field: platform.game.v1.GameSessionSummary session = 2;
+   */
+  session?: GameSessionSummary;
+};
+
+/**
+ * Describes the message platform.game.v1.GetProjectionResponse.
+ * Use `create(GetProjectionResponseSchema)` to create a new message.
+ */
+export const GetProjectionResponseSchema: GenMessage<GetProjectionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 9);
+
+/**
+ * @generated from message platform.game.v1.GetReplayProjectionRequest
+ */
+export type GetReplayProjectionRequest = Message<"platform.game.v1.GetReplayProjectionRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ViewerKind viewer_kind = 3;
+   */
+  viewerKind: ViewerKind;
+
+  /**
+   * @generated from field: uint64 through_state_version = 4;
+   */
+  throughStateVersion: bigint;
+};
+
+/**
+ * Describes the message platform.game.v1.GetReplayProjectionRequest.
+ * Use `create(GetReplayProjectionRequestSchema)` to create a new message.
+ */
+export const GetReplayProjectionRequestSchema: GenMessage<GetReplayProjectionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 10);
+
+/**
+ * @generated from message platform.game.v1.GetReplayProjectionResponse
+ */
+export type GetReplayProjectionResponse = Message<"platform.game.v1.GetReplayProjectionResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.GameProjection projection = 1;
+   */
+  projection?: GameProjection;
+
+  /**
+   * @generated from field: platform.game.v1.GameSessionSummary session = 2;
+   */
+  session?: GameSessionSummary;
+
+  /**
+   * @generated from field: bool complete = 3;
+   */
+  complete: boolean;
+};
+
+/**
+ * Describes the message platform.game.v1.GetReplayProjectionResponse.
+ * Use `create(GetReplayProjectionResponseSchema)` to create a new message.
+ */
+export const GetReplayProjectionResponseSchema: GenMessage<GetReplayProjectionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 11);
+
+/**
+ * @generated from message platform.game.v1.FinishSessionRequest
+ */
+export type FinishSessionRequest = Message<"platform.game.v1.FinishSessionRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string operation_id = 3;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string source_event_id = 4;
+   */
+  sourceEventId: string;
+
+  /**
+   * @generated from field: uint64 expected_room_version = 5;
+   */
+  expectedRoomVersion: bigint;
+
+  /**
+   * @generated from field: uint64 expected_membership_version = 6;
+   */
+  expectedMembershipVersion: bigint;
+
+  /**
+   * @generated from field: uint64 expected_state_version = 7;
+   */
+  expectedStateVersion: bigint;
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope command = 8;
+   */
+  command?: GameEnvelope;
+
+  /**
+   * @generated from field: bytes request_digest = 9;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.game.v1.FinishSessionRequest.
+ * Use `create(FinishSessionRequestSchema)` to create a new message.
+ */
+export const FinishSessionRequestSchema: GenMessage<FinishSessionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 12);
+
+/**
+ * @generated from message platform.game.v1.FinishSessionResponse
+ */
+export type FinishSessionResponse = Message<"platform.game.v1.FinishSessionResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.GameSessionSummary session = 1;
+   */
+  session?: GameSessionSummary;
+
+  /**
+   * @generated from field: platform.game.v1.GameReceipt receipt = 2;
+   */
+  receipt?: GameReceipt;
+
+  /**
+   * @generated from field: platform.game.v1.GameProjection projection = 3;
+   */
+  projection?: GameProjection;
+
+  /**
+   * @generated from field: bool replayed = 4;
+   */
+  replayed: boolean;
+};
+
+/**
+ * Describes the message platform.game.v1.FinishSessionResponse.
+ * Use `create(FinishSessionResponseSchema)` to create a new message.
+ */
+export const FinishSessionResponseSchema: GenMessage<FinishSessionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 13);
 
 /**
  * GameSubscribeRequest starts a viewer-scoped realtime stream.
@@ -205,7 +561,7 @@ export type GameSubscribeRequest = Message<"platform.game.v1.GameSubscribeReques
  * Use `create(GameSubscribeRequestSchema)` to create a new message.
  */
 export const GameSubscribeRequestSchema: GenMessage<GameSubscribeRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 4);
+  messageDesc(file_platform_game_v1_game, 14);
 
 /**
  * GameProjection is a viewer-safe current snapshot produced by the module.
@@ -244,7 +600,7 @@ export type GameProjection = Message<"platform.game.v1.GameProjection"> & {
  * Use `create(GameProjectionSchema)` to create a new message.
  */
 export const GameProjectionSchema: GenMessage<GameProjection> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 5);
+  messageDesc(file_platform_game_v1_game, 15);
 
 /**
  * GameDelta contains only module-projected messages; raw authoritative events never cross this boundary.
@@ -276,6 +632,21 @@ export type GameDelta = Message<"platform.game.v1.GameDelta"> & {
    * @generated from field: repeated platform.game.v1.GameEnvelope messages = 5;
    */
   messages: GameEnvelope[];
+
+  /**
+   * @generated from field: uint32 from_event_ordinal = 6;
+   */
+  fromEventOrdinal: number;
+
+  /**
+   * @generated from field: uint32 to_event_ordinal = 7;
+   */
+  toEventOrdinal: number;
+
+  /**
+   * @generated from field: bool snapshot_fallback = 8;
+   */
+  snapshotFallback: boolean;
 };
 
 /**
@@ -283,7 +654,321 @@ export type GameDelta = Message<"platform.game.v1.GameDelta"> & {
  * Use `create(GameDeltaSchema)` to create a new message.
  */
 export const GameDeltaSchema: GenMessage<GameDelta> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 6);
+  messageDesc(file_platform_game_v1_game, 16);
+
+/**
+ * @generated from message platform.game.v1.OpenSubscriptionRequest
+ */
+export type OpenSubscriptionRequest = Message<"platform.game.v1.OpenSubscriptionRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ViewerKind viewer_kind = 3;
+   */
+  viewerKind: ViewerKind;
+
+  /**
+   * @generated from field: uint64 last_state_version = 4;
+   */
+  lastStateVersion: bigint;
+
+  /**
+   * @generated from field: uint32 last_event_ordinal = 5;
+   */
+  lastEventOrdinal: number;
+};
+
+/**
+ * Describes the message platform.game.v1.OpenSubscriptionRequest.
+ * Use `create(OpenSubscriptionRequestSchema)` to create a new message.
+ */
+export const OpenSubscriptionRequestSchema: GenMessage<OpenSubscriptionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 17);
+
+/**
+ * @generated from message platform.game.v1.OpenSubscriptionResponse
+ */
+export type OpenSubscriptionResponse = Message<"platform.game.v1.OpenSubscriptionResponse"> & {
+  /**
+   * @generated from field: bytes ticket = 1;
+   */
+  ticket: Uint8Array;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 2;
+   */
+  expiresAt?: Timestamp;
+
+  /**
+   * @generated from field: platform.game.v1.GameSessionSummary session = 3;
+   */
+  session?: GameSessionSummary;
+
+  /**
+   * @generated from field: platform.game.v1.GameProjection projection = 4;
+   */
+  projection?: GameProjection;
+
+  /**
+   * @generated from field: bytes grant = 5;
+   */
+  grant: Uint8Array;
+};
+
+/**
+ * Describes the message platform.game.v1.OpenSubscriptionResponse.
+ * Use `create(OpenSubscriptionResponseSchema)` to create a new message.
+ */
+export const OpenSubscriptionResponseSchema: GenMessage<OpenSubscriptionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 18);
+
+/**
+ * SubscriptionGrant is server-produced authorization stored behind one Redis ticket.
+ *
+ * @generated from message platform.game.v1.SubscriptionGrant
+ */
+export type SubscriptionGrant = Message<"platform.game.v1.SubscriptionGrant"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string room_id = 2;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 3;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ViewerKind viewer_kind = 4;
+   */
+  viewerKind: ViewerKind;
+
+  /**
+   * @generated from field: uint32 seat_index = 5;
+   */
+  seatIndex: number;
+
+  /**
+   * @generated from field: uint64 last_state_version = 6;
+   */
+  lastStateVersion: bigint;
+
+  /**
+   * @generated from field: uint32 last_event_ordinal = 7;
+   */
+  lastEventOrdinal: number;
+
+  /**
+   * @generated from field: string origin = 8;
+   */
+  origin: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 9;
+   */
+  expiresAt?: Timestamp;
+};
+
+/**
+ * Describes the message platform.game.v1.SubscriptionGrant.
+ * Use `create(SubscriptionGrantSchema)` to create a new message.
+ */
+export const SubscriptionGrantSchema: GenMessage<SubscriptionGrant> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 19);
+
+/**
+ * ClientFrame is sent as one deterministic protobuf binary WebSocket message.
+ *
+ * @generated from message platform.game.v1.ClientFrame
+ */
+export type ClientFrame = Message<"platform.game.v1.ClientFrame"> & {
+  /**
+   * @generated from oneof platform.game.v1.ClientFrame.body
+   */
+  body: {
+    /**
+     * @generated from field: platform.game.v1.SubscriptionHello hello = 1;
+     */
+    value: SubscriptionHello;
+    case: "hello";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.ClientPing ping = 2;
+     */
+    value: ClientPing;
+    case: "ping";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message platform.game.v1.ClientFrame.
+ * Use `create(ClientFrameSchema)` to create a new message.
+ */
+export const ClientFrameSchema: GenMessage<ClientFrame> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 20);
+
+/**
+ * @generated from message platform.game.v1.SubscriptionHello
+ */
+export type SubscriptionHello = Message<"platform.game.v1.SubscriptionHello"> & {
+  /**
+   * @generated from field: bytes ticket = 1;
+   */
+  ticket: Uint8Array;
+
+  /**
+   * @generated from field: bytes grant = 2;
+   */
+  grant: Uint8Array;
+};
+
+/**
+ * Describes the message platform.game.v1.SubscriptionHello.
+ * Use `create(SubscriptionHelloSchema)` to create a new message.
+ */
+export const SubscriptionHelloSchema: GenMessage<SubscriptionHello> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 21);
+
+/**
+ * @generated from message platform.game.v1.ClientPing
+ */
+export type ClientPing = Message<"platform.game.v1.ClientPing"> & {
+  /**
+   * @generated from field: uint64 nonce = 1;
+   */
+  nonce: bigint;
+};
+
+/**
+ * Describes the message platform.game.v1.ClientPing.
+ * Use `create(ClientPingSchema)` to create a new message.
+ */
+export const ClientPingSchema: GenMessage<ClientPing> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 22);
+
+/**
+ * ServerFrame never carries raw event batches or authoritative snapshots.
+ *
+ * @generated from message platform.game.v1.ServerFrame
+ */
+export type ServerFrame = Message<"platform.game.v1.ServerFrame"> & {
+  /**
+   * @generated from oneof platform.game.v1.ServerFrame.body
+   */
+  body: {
+    /**
+     * @generated from field: platform.game.v1.GameProjection projection = 1;
+     */
+    value: GameProjection;
+    case: "projection";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.GameDelta delta = 2;
+     */
+    value: GameDelta;
+    case: "delta";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.GameReceipt receipt = 3;
+     */
+    value: GameReceipt;
+    case: "receipt";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.SubscriptionDraining draining = 4;
+     */
+    value: SubscriptionDraining;
+    case: "draining";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.ServerPong pong = 5;
+     */
+    value: ServerPong;
+    case: "pong";
+  } | {
+    /**
+     * @generated from field: platform.game.v1.SubscriptionError error = 6;
+     */
+    value: SubscriptionError;
+    case: "error";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message platform.game.v1.ServerFrame.
+ * Use `create(ServerFrameSchema)` to create a new message.
+ */
+export const ServerFrameSchema: GenMessage<ServerFrame> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 23);
+
+/**
+ * @generated from message platform.game.v1.SubscriptionDraining
+ */
+export type SubscriptionDraining = Message<"platform.game.v1.SubscriptionDraining"> & {
+  /**
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp reconnect_after = 2;
+   */
+  reconnectAfter?: Timestamp;
+};
+
+/**
+ * Describes the message platform.game.v1.SubscriptionDraining.
+ * Use `create(SubscriptionDrainingSchema)` to create a new message.
+ */
+export const SubscriptionDrainingSchema: GenMessage<SubscriptionDraining> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 24);
+
+/**
+ * @generated from message platform.game.v1.ServerPong
+ */
+export type ServerPong = Message<"platform.game.v1.ServerPong"> & {
+  /**
+   * @generated from field: uint64 nonce = 1;
+   */
+  nonce: bigint;
+};
+
+/**
+ * Describes the message platform.game.v1.ServerPong.
+ * Use `create(ServerPongSchema)` to create a new message.
+ */
+export const ServerPongSchema: GenMessage<ServerPong> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 25);
+
+/**
+ * @generated from message platform.game.v1.SubscriptionError
+ */
+export type SubscriptionError = Message<"platform.game.v1.SubscriptionError"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+};
+
+/**
+ * Describes the message platform.game.v1.SubscriptionError.
+ * Use `create(SubscriptionErrorSchema)` to create a new message.
+ */
+export const SubscriptionErrorSchema: GenMessage<SubscriptionError> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 26);
 
 /**
  * GameSystemRequest identifies durable platform-originated lifecycle work.
@@ -327,7 +1012,7 @@ export type GameSystemRequest = Message<"platform.game.v1.GameSystemRequest"> & 
  * Use `create(GameSystemRequestSchema)` to create a new message.
  */
 export const GameSystemRequestSchema: GenMessage<GameSystemRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 7);
+  messageDesc(file_platform_game_v1_game, 27);
 
 /**
  * GameTimerRequest identifies a persisted timer firing and never carries a player actor.
@@ -361,7 +1046,7 @@ export type GameTimerRequest = Message<"platform.game.v1.GameTimerRequest"> & {
  * Use `create(GameTimerRequestSchema)` to create a new message.
  */
 export const GameTimerRequestSchema: GenMessage<GameTimerRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 8);
+  messageDesc(file_platform_game_v1_game, 28);
 
 /**
  * @generated from message platform.game.v1.GameReceipt
@@ -408,7 +1093,43 @@ export type GameReceipt = Message<"platform.game.v1.GameReceipt"> & {
  * Use `create(GameReceiptSchema)` to create a new message.
  */
 export const GameReceiptSchema: GenMessage<GameReceipt> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 9);
+  messageDesc(file_platform_game_v1_game, 29);
+
+/**
+ * @generated from enum platform.game.v1.GameSessionStatus
+ */
+export enum GameSessionStatus {
+  /**
+   * @generated from enum value: GAME_SESSION_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: GAME_SESSION_STATUS_ACTIVE = 1;
+   */
+  ACTIVE = 1,
+
+  /**
+   * @generated from enum value: GAME_SESSION_STATUS_SUSPENDED = 2;
+   */
+  SUSPENDED = 2,
+
+  /**
+   * @generated from enum value: GAME_SESSION_STATUS_FINISHED = 3;
+   */
+  FINISHED = 3,
+
+  /**
+   * @generated from enum value: GAME_SESSION_STATUS_CANCELLED = 4;
+   */
+  CANCELLED = 4,
+}
+
+/**
+ * Describes the enum platform.game.v1.GameSessionStatus.
+ */
+export const GameSessionStatusSchema: GenEnum<GameSessionStatus> = /*@__PURE__*/
+  enumDesc(file_platform_game_v1_game, 0);
 
 /**
  * @generated from enum platform.game.v1.ViewerKind
@@ -439,4 +1160,61 @@ export enum ViewerKind {
  * Describes the enum platform.game.v1.ViewerKind.
  */
 export const ViewerKindSchema: GenEnum<ViewerKind> = /*@__PURE__*/
-  enumDesc(file_platform_game_v1_game, 0);
+  enumDesc(file_platform_game_v1_game, 1);
+
+/**
+ * GameService is the authenticated user-facing boundary for session state and commands.
+ *
+ * @generated from service platform.game.v1.GameService
+ */
+export const GameService: GenService<{
+  /**
+   * @generated from rpc platform.game.v1.GameService.StartSession
+   */
+  startSession: {
+    methodKind: "unary";
+    input: typeof StartSessionRequestSchema;
+    output: typeof StartSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.GameAction
+   */
+  gameAction: {
+    methodKind: "unary";
+    input: typeof GameActionRequestSchema;
+    output: typeof GameActionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.GetProjection
+   */
+  getProjection: {
+    methodKind: "unary";
+    input: typeof GetProjectionRequestSchema;
+    output: typeof GetProjectionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.GetReplayProjection
+   */
+  getReplayProjection: {
+    methodKind: "unary";
+    input: typeof GetReplayProjectionRequestSchema;
+    output: typeof GetReplayProjectionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.FinishSession
+   */
+  finishSession: {
+    methodKind: "unary";
+    input: typeof FinishSessionRequestSchema;
+    output: typeof FinishSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.OpenSubscription
+   */
+  openSubscription: {
+    methodKind: "unary";
+    input: typeof OpenSubscriptionRequestSchema;
+    output: typeof OpenSubscriptionResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_platform_game_v1_game, 0);

@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"hash"
 	"time"
@@ -34,7 +33,8 @@ type Registry interface {
 
 // RoomSessionStore is the cross-aggregate transaction boundary for every room pointer transition.
 type RoomSessionStore interface {
-	Start(context.Context, roomDomain.Room, roomDomain.Room, CreationCommit) (roomDomain.Room, Session, error)
+	GetStartReceipt(context.Context, StartKey, idempotency.Digest) (StartReceipt, error)
+	Start(context.Context, roomDomain.Room, roomDomain.Room, CreationCommit, StartReceipt) (roomDomain.Room, Session, bool, error)
 	FinishAction(context.Context, roomDomain.Room, roomDomain.Room, ActionCommit) (roomDomain.Room, ActionCommitResult, error)
 	FinishTimer(context.Context, roomDomain.Room, roomDomain.Room, TimerCommit) (roomDomain.Room, TimerCommitResult, error)
 	FinishSystem(context.Context, roomDomain.Room, roomDomain.Room, uuid.UUID, SystemCommit) (roomDomain.Room, SystemCommitResult, error)
@@ -107,15 +107,29 @@ type StartCommand struct {
 	GameID      game.GameID
 	Expected    roomDomain.Version
 	Config      game.Message
+	OperationID idempotency.OperationID
+	// RequestDigest is an optional client echo of the server canonical start binding.
+	RequestDigest *idempotency.Digest
 }
 
 // Start creates the room transition and GameSession creation commit before publishing both atomically.
 func (service *Service) Start(ctx context.Context, command StartCommand) (roomDomain.Room, Session, error) {
-	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || !command.Config.Valid() {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil ||
+		!command.Config.Valid() || !command.OperationID.Valid() || command.Expected.Room == 0 || command.Expected.Membership == 0 {
 		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
 	}
 	if _, err := game.ParseGameID(string(command.GameID)); err != nil {
 		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	requestDigest := startDigest(command)
+	if command.RequestDigest != nil && *command.RequestDigest != requestDigest {
+		return roomDomain.Room{}, Session{}, idempotency.ErrConflict
+	}
+	startKey := StartKey{ActorUserID: command.ActorUserID, RoomID: command.RoomID, OperationID: command.OperationID}
+	if receipt, receiptErr := service.roomSessions.GetStartReceipt(ctx, startKey, requestDigest); receiptErr == nil {
+		return service.replayStart(ctx, receipt)
+	} else if !errors.Is(receiptErr, ErrStartReceiptNotFound) {
+		return roomDomain.Room{}, Session{}, receiptErr
 	}
 	manifest, module, err := service.defaultRuntimeModule(ctx, command.GameID)
 	if err != nil {
@@ -176,11 +190,20 @@ func (service *Service) Start(ctx context.Context, command StartCommand) (roomDo
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}
-	storedRoom, storedSession, err := service.roomSessions.Start(ctx, room, nextRoom, CreationCommit{
-		Session: session, Batch: batch, OutboxEvents: []outbox.Event{event},
+	receipt, err := NewStartReceipt(StartReceiptSnapshot{
+		Key: startKey, RequestDigest: requestDigest, SessionID: sessionID, CommittedAt: start.StartedAt,
 	})
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
+	}
+	storedRoom, storedSession, replayed, err := service.roomSessions.Start(ctx, room, nextRoom, CreationCommit{
+		Session: session, Batch: batch, OutboxEvents: []outbox.Event{event},
+	}, receipt)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	if replayed && storedSession.Snapshot().OwnershipEpoch > 0 {
+		return storedRoom, storedSession, nil
 	}
 	// Epoch zero is never allowed to process commands. Advancing it after the atomic start leaves a recoverable,
 	// fail-closed window if this process exits before ownership acquisition commits.
@@ -195,6 +218,39 @@ func (service *Service) Start(ctx context.Context, command StartCommand) (roomDo
 	return storedRoom, owned, nil
 }
 
+// replayStart returns the current authoritative aggregates for the original operation result.
+// An epoch-zero session is a recoverable crash window and is claimed before it can accept commands.
+func (service *Service) replayStart(ctx context.Context, receipt StartReceipt) (roomDomain.Room, Session, error) {
+	snapshot := receipt.Snapshot()
+	room, err := service.rooms.GetByID(ctx, snapshot.Key.RoomID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	session, err := service.sessions.Get(ctx, snapshot.SessionID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	if session.Snapshot().RoomID != snapshot.Key.RoomID {
+		return roomDomain.Room{}, Session{}, ErrGameSessionIntegrity
+	}
+	if session.Snapshot().OwnershipEpoch > 0 {
+		return room, session, nil
+	}
+	at := service.clock.Now().Round(0).UTC()
+	if !at.After(session.Snapshot().UpdatedAt) {
+		at = session.Snapshot().UpdatedAt.Add(time.Microsecond)
+	}
+	owned, err := session.AcquireOwnership(0, at)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	owned, err = service.sessions.AcquireOwnershipCAS(ctx, session, owned)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	return room, owned, nil
+}
+
 // ActionCommand is one authenticated player command against an exact session release and ownership epoch.
 type ActionCommand struct {
 	SessionID            uuid.UUID
@@ -204,6 +260,9 @@ type ActionCommand struct {
 	OwnershipEpoch       uint64
 	VersionKey           game.VersionKey
 	Command              game.Message
+	// RequestDigest is an optional client echo of the server canonical request binding.
+	// It is never trusted as the persisted digest; a mismatch rejects the request before any replay or module call.
+	RequestDigest *idempotency.Digest
 }
 
 // ActionResult contains only a durable receipt and the caller's viewer-safe current projection.
@@ -221,11 +280,14 @@ func (service *Service) HandleAction(ctx context.Context, command ActionCommand)
 		!command.VersionKey.Valid() || !command.Command.Valid() {
 		return ActionResult{}, ErrInvalidSessionInput
 	}
+	requestDigest := actionDigest(command)
+	if command.RequestDigest != nil && *command.RequestDigest != requestDigest {
+		return ActionResult{}, idempotency.ErrConflict
+	}
 	operationID, err := idempotency.ParseOperationID(string(command.ActionID))
 	if err != nil {
 		return ActionResult{}, ErrInvalidSessionInput
 	}
-	requestDigest := actionDigest(command)
 	actionKey := ActionKey{SessionID: command.SessionID, ActorUserID: command.ActorUserID, ActionID: operationID}
 	if receipt, receiptErr := service.sessions.GetActionReceipt(ctx, actionKey, requestDigest); receiptErr == nil {
 		current, getErr := service.sessions.Get(ctx, command.SessionID)
@@ -400,20 +462,25 @@ func (service *Service) HandleTimer(ctx context.Context, due DueTimer, ownership
 	return service.sessions.CommitTimer(ctx, commit)
 }
 
-// SystemCommand is a durable platform-originated command. Its logical digest deliberately excludes state version and epoch.
+// SystemCommand is a durable platform command. Outbox/platform digests exclude recomputed versions;
+// HostAPI digests bind the caller's optimistic state version while every source excludes the ownership epoch.
 type SystemCommand struct {
 	SessionID            uuid.UUID
 	OperationID          idempotency.OperationID
 	Source               SystemSource
 	ExpectedStateVersion uint64
 	OwnershipEpoch       uint64
+	VersionKey           game.VersionKey
 	Message              game.Message
+	// RequestDigest is an optional client echo of the server canonical operation binding.
+	// Platform-originated callers omit it; a supplied mismatch is rejected before receipt lookup.
+	RequestDigest *idempotency.Digest
 }
 
-// HandleSystem recomputes pending work after concurrent state changes while preserving one operation/source digest.
+// HandleSystem recomputes durable platform work after contention while keeping HostAPI commands strictly optimistic.
 func (service *Service) HandleSystem(ctx context.Context, command SystemCommand) (SystemCommitResult, error) {
 	if service == nil || ctx == nil || command.SessionID == uuid.Nil || !command.OperationID.Valid() || !command.Source.Valid() ||
-		command.ExpectedStateVersion == 0 || command.OwnershipEpoch == 0 || !command.Message.Valid() {
+		command.ExpectedStateVersion == 0 || command.OwnershipEpoch == 0 || !command.VersionKey.Valid() || !command.Message.Valid() {
 		return SystemCommitResult{}, ErrInvalidSessionInput
 	}
 	if command.Source.Kind == SystemSourceHostAPI {
@@ -422,6 +489,9 @@ func (service *Service) HandleSystem(ctx context.Context, command SystemCommand)
 		}
 	}
 	logicalDigest := systemDigest(command)
+	if command.RequestDigest != nil && *command.RequestDigest != logicalDigest {
+		return SystemCommitResult{}, idempotency.ErrConflict
+	}
 	key := SystemKey{SessionID: command.SessionID, OperationID: command.OperationID, Source: command.Source}
 	if receipt, receiptErr := service.sessions.GetSystemReceipt(ctx, key, logicalDigest); receiptErr == nil {
 		current, getErr := service.sessions.Get(ctx, command.SessionID)
@@ -436,6 +506,14 @@ func (service *Service) HandleSystem(ctx context.Context, command SystemCommand)
 		before, err := service.sessions.Get(ctx, command.SessionID)
 		if err != nil {
 			return SystemCommitResult{}, err
+		}
+		if before.Snapshot().VersionKey != command.VersionKey {
+			return SystemCommitResult{}, ErrStateVersionConflict
+		}
+		// HostAPI is a user-facing optimistic command. Unlike durable room-outbox work,
+		// an old finish request must not silently apply to a newer game state.
+		if command.Source.Kind == SystemSourceHostAPI && before.Snapshot().State.StateVersion != command.ExpectedStateVersion {
+			return SystemCommitResult{}, ErrStateVersionConflict
 		}
 		if before.Snapshot().Status.Terminal() {
 			return service.sessions.CompleteSystemNoop(ctx, key, logicalDigest, service.clock.Now())
@@ -507,6 +585,9 @@ func (service *Service) HandleSystem(ctx context.Context, command SystemCommand)
 		}
 		if !result.Retry {
 			return result, nil
+		}
+		if command.Source.Kind == SystemSourceHostAPI {
+			return SystemCommitResult{}, ErrStateVersionConflict
 		}
 		command.ExpectedStateVersion = result.Session.Snapshot().State.StateVersion
 		command.OwnershipEpoch = result.Session.Snapshot().OwnershipEpoch
@@ -626,25 +707,34 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 
 // Project returns a current viewer-safe snapshot from the exact retained module.
 func (service *Service) Project(ctx context.Context, sessionID uuid.UUID, viewer game.Viewer) (game.Projection, error) {
+	_, projection, err := service.ProjectCurrent(ctx, sessionID, viewer)
+	return projection, err
+}
+
+// ProjectCurrent returns the exact session snapshot used to produce the viewer projection and response cursor.
+func (service *Service) ProjectCurrent(ctx context.Context, sessionID uuid.UUID, viewer game.Viewer) (Session, game.Projection, error) {
 	if service == nil || ctx == nil || sessionID == uuid.Nil || !viewer.Valid() {
-		return game.Projection{}, ErrInvalidSessionInput
+		return Session{}, game.Projection{}, ErrInvalidSessionInput
+	}
+	if viewer.Kind == game.ViewerReplay {
+		return Session{}, game.Projection{}, ErrReplayUnavailable
 	}
 	session, err := service.sessions.Get(ctx, sessionID)
 	if err != nil {
-		return game.Projection{}, err
+		return Session{}, game.Projection{}, err
 	}
 	module, err := service.registry.Resolve(session.Snapshot().VersionKey)
 	if err != nil {
-		return game.Projection{}, err
+		return Session{}, game.Projection{}, err
 	}
 	projection, err := module.Project(session.Snapshot().State, viewer)
 	if err != nil {
-		return game.Projection{}, err
+		return Session{}, game.Projection{}, err
 	}
 	if !projection.Valid() {
-		return game.Projection{}, ErrProjectionUnsafe
+		return Session{}, game.Projection{}, ErrProjectionUnsafe
 	}
-	return projection, nil
+	return session, projection, nil
 }
 
 // ProjectEvents returns a viewer delta, falling back to a current viewer snapshot when safe delta projection is unavailable.
@@ -654,20 +744,51 @@ func (service *Service) ProjectEvents(
 	afterStateVersion uint64,
 	viewer game.Viewer,
 ) (game.EventProjection, game.Projection, bool, error) {
+	_, delta, projection, fallback, err := service.ProjectEventsCurrent(ctx, sessionID, afterStateVersion, viewer)
+	return delta, projection, fallback, err
+}
+
+// ProjectEventsCurrent pairs a complete viewer update with the exact current session cursor.
+func (service *Service) ProjectEventsCurrent(
+	ctx context.Context,
+	sessionID uuid.UUID,
+	afterStateVersion uint64,
+	viewer game.Viewer,
+) (Session, game.EventProjection, game.Projection, bool, error) {
 	if service == nil || ctx == nil || sessionID == uuid.Nil || !viewer.Valid() {
-		return game.EventProjection{}, game.Projection{}, false, ErrInvalidSessionInput
+		return Session{}, game.EventProjection{}, game.Projection{}, false, ErrInvalidSessionInput
+	}
+	if viewer.Kind == game.ViewerReplay {
+		return Session{}, game.EventProjection{}, game.Projection{}, false, ErrReplayUnavailable
 	}
 	session, err := service.sessions.Get(ctx, sessionID)
 	if err != nil {
-		return game.EventProjection{}, game.Projection{}, false, err
+		return Session{}, game.EventProjection{}, game.Projection{}, false, err
+	}
+	currentStateVersion := session.Snapshot().State.StateVersion
+	if afterStateVersion > currentStateVersion {
+		return Session{}, game.EventProjection{}, game.Projection{}, false, ErrStateVersionConflict
+	}
+	if afterStateVersion == currentStateVersion {
+		return session, game.EventProjection{}, game.Projection{}, false, nil
 	}
 	module, err := service.registry.Resolve(session.Snapshot().VersionKey)
 	if err != nil {
-		return game.EventProjection{}, game.Projection{}, false, err
+		return Session{}, game.EventProjection{}, game.Projection{}, false, err
 	}
 	batches, err := service.sessions.ReadEventBatches(ctx, sessionID, afterStateVersion, 256)
 	if err == nil {
-		if projector, ok := module.(game.EventProjectingGameModule); ok && len(batches) > 0 {
+		complete := len(batches) > 0
+		expectedVersion := afterStateVersion + 1
+		for _, batch := range batches {
+			if batch.Snapshot().StateVersion != expectedVersion {
+				complete = false
+				break
+			}
+			expectedVersion++
+		}
+		complete = complete && expectedVersion-1 == currentStateVersion
+		if projector, ok := module.(game.EventProjectingGameModule); ok && complete {
 			events := make([]game.VersionedEvent, 0)
 			for _, batch := range batches {
 				batchSnapshot := batch.Snapshot()
@@ -677,18 +798,138 @@ func (service *Service) ProjectEvents(
 			}
 			delta, projectErr := projector.ProjectEvents(session.Snapshot().State, events, viewer)
 			if projectErr == nil && delta.Valid() {
-				return delta, game.Projection{}, false, nil
+				return session, delta, game.Projection{}, false, nil
 			}
 		}
 	}
 	projection, projectErr := module.Project(session.Snapshot().State, viewer)
 	if projectErr != nil {
-		return game.EventProjection{}, game.Projection{}, false, projectErr
+		return Session{}, game.EventProjection{}, game.Projection{}, false, projectErr
 	}
 	if !projection.Valid() {
-		return game.EventProjection{}, game.Projection{}, false, ErrProjectionUnsafe
+		return Session{}, game.EventProjection{}, game.Projection{}, false, ErrProjectionUnsafe
 	}
-	return game.EventProjection{}, projection, true, nil
+	return session, game.EventProjection{}, projection, true, nil
+}
+
+const (
+	// maximumReplayBatches bounds the amount of durable history one replay projection may materialize.
+	maximumReplayBatches uint32 = 4096
+	// maximumReplayReadPage stays within every Store implementation's bounded event-read contract.
+	maximumReplayReadPage uint32 = 256
+	// maximumReplayEvents and maximumReplayPayloadBytes cap aggregate module input even when batches are small.
+	maximumReplayEvents       = 65536
+	maximumReplayPayloadBytes = 16 << 20
+)
+
+// ProjectReplay reads only a bounded terminal history and delegates all field disclosure to the retained module.
+// Resource authorization is represented by the already-authorized viewer and policy; raw batches never leave this method.
+func (service *Service) ProjectReplay(
+	ctx context.Context,
+	sessionID uuid.UUID,
+	viewer game.Viewer,
+	policy game.ReplayAccessPolicy,
+) (game.Projection, error) {
+	_, projection, err := service.ProjectReplayCurrent(ctx, sessionID, viewer, policy)
+	return projection, err
+}
+
+// ProjectReplayCurrent pairs the terminal session version with the replay-safe projection it produced.
+func (service *Service) ProjectReplayCurrent(
+	ctx context.Context,
+	sessionID uuid.UUID,
+	viewer game.Viewer,
+	policy game.ReplayAccessPolicy,
+) (Session, game.Projection, error) {
+	if service == nil || ctx == nil || sessionID == uuid.Nil || !viewer.Valid() || viewer.Kind != game.ViewerReplay || !policy.Valid() {
+		return Session{}, game.Projection{}, ErrInvalidSessionInput
+	}
+	session, err := service.sessions.Get(ctx, sessionID)
+	if err != nil {
+		return Session{}, game.Projection{}, err
+	}
+	snapshot := session.Snapshot()
+	if !snapshot.Status.Terminal() {
+		return Session{}, game.Projection{}, ErrReplayUnavailable
+	}
+	module, err := service.registry.Resolve(snapshot.VersionKey)
+	if err != nil {
+		return Session{}, game.Projection{}, err
+	}
+	manifest := module.Manifest()
+	if manifest.Key() != snapshot.VersionKey {
+		return Session{}, game.Projection{}, ErrModuleUnavailable
+	}
+	if !manifest.Capabilities.Replay {
+		return Session{}, game.Projection{}, ErrReplayUnavailable
+	}
+	batches, err := service.readReplayBatches(ctx, sessionID)
+	if err != nil {
+		return Session{}, game.Projection{}, err
+	}
+	if len(batches) == 0 || uint32(len(batches)) > maximumReplayBatches {
+		return Session{}, game.Projection{}, ErrReplayUnavailable
+	}
+	events := make([]game.Event, 0)
+	var payloadBytes int
+	var previousVersion uint64
+	for _, batch := range batches {
+		batchSnapshot := batch.Snapshot()
+		if batchSnapshot.SessionID != sessionID || batchSnapshot.StateVersion != previousVersion+1 {
+			return Session{}, game.Projection{}, ErrReplayUnavailable
+		}
+		previousVersion = batchSnapshot.StateVersion
+		for _, event := range batchSnapshot.Events {
+			if len(events) >= maximumReplayEvents {
+				return Session{}, game.Projection{}, ErrReplayUnavailable
+			}
+			if len(event.Message.Payload) > maximumReplayPayloadBytes-payloadBytes {
+				return Session{}, game.Projection{}, ErrReplayUnavailable
+			}
+			payloadBytes += len(event.Message.Payload)
+			events = append(events, event)
+		}
+	}
+	if previousVersion != snapshot.State.StateVersion {
+		return Session{}, game.Projection{}, ErrReplayUnavailable
+	}
+	projection, err := module.ProjectReplay(events, viewer, policy)
+	if err != nil {
+		return Session{}, game.Projection{}, err
+	}
+	if !projection.Valid() {
+		return Session{}, game.Projection{}, ErrProjectionUnsafe
+	}
+	return session, projection, nil
+}
+
+func (service *Service) readReplayBatches(ctx context.Context, sessionID uuid.UUID) ([]EventBatch, error) {
+	batches := make([]EventBatch, 0)
+	var afterStateVersion uint64
+	for uint32(len(batches)) <= maximumReplayBatches {
+		remaining := maximumReplayBatches + 1 - uint32(len(batches))
+		pageLimit := min(maximumReplayReadPage, remaining)
+		page, err := service.sessions.ReadEventBatches(ctx, sessionID, afterStateVersion, pageLimit)
+		if err != nil {
+			return nil, err
+		}
+		if uint32(len(page)) > pageLimit {
+			return nil, ErrReplayUnavailable
+		}
+		if len(page) == 0 {
+			break
+		}
+		nextAfter := page[len(page)-1].Snapshot().StateVersion
+		if nextAfter <= afterStateVersion {
+			return nil, ErrReplayUnavailable
+		}
+		batches = append(batches, page...)
+		afterStateVersion = nextAfter
+		if uint32(len(page)) < pageLimit {
+			break
+		}
+	}
+	return batches, nil
 }
 
 func (service *Service) defaultRuntimeModule(ctx context.Context, gameID game.GameID) (game.Manifest, game.RuntimeServerGameModule, error) {
@@ -753,10 +994,7 @@ func (service *Service) newOutboxEvent(eventType outbox.EventType, sessionID uui
 	if err != nil {
 		return outbox.Event{}, ErrInvalidSessionInput
 	}
-	payload, err := json.Marshal(struct {
-		SessionID    string `json:"sessionId"`
-		StateVersion uint64 `json:"stateVersion"`
-	}{SessionID: sessionID.String(), StateVersion: stateVersion})
+	payload, err := MarshalSessionNotification(SessionNotification{SessionID: sessionID, StateVersion: stateVersion})
 	if err != nil {
 		return outbox.Event{}, ErrInvalidSessionInput
 	}
@@ -816,6 +1054,18 @@ func actionDigest(command ActionCommand) idempotency.Digest {
 	return digestFromHash(hasher)
 }
 
+func startDigest(command StartCommand) idempotency.Digest {
+	hasher := sha256.New()
+	writeDigestField(hasher, command.ActorUserID[:])
+	writeDigestField(hasher, command.RoomID[:])
+	writeDigestField(hasher, []byte(command.OperationID.Value()))
+	writeDigestField(hasher, []byte(command.GameID))
+	writeDigestUint64(hasher, command.Expected.Room)
+	writeDigestUint64(hasher, command.Expected.Membership)
+	writeMessage(hasher, command.Config)
+	return digestFromHash(hasher)
+}
+
 func systemDigest(command SystemCommand) idempotency.Digest {
 	hasher := sha256.New()
 	writeDigestField(hasher, command.SessionID[:])
@@ -823,6 +1073,12 @@ func systemDigest(command SystemCommand) idempotency.Digest {
 	writeDigestField(hasher, []byte(command.Source.Kind))
 	writeDigestField(hasher, command.Source.EventID[:])
 	writeDigestField(hasher, command.Source.RequestedByUserID[:])
+	writeVersionKey(hasher, command.VersionKey)
+	if command.Source.Kind == SystemSourceHostAPI {
+		// HostAPI requests are optimistic user commands; binding the expected version prevents
+		// an old operation ID from being reused against a later state after a conflict.
+		writeDigestUint64(hasher, command.ExpectedStateVersion)
+	}
 	writeMessage(hasher, command.Message)
 	return digestFromHash(hasher)
 }

@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 )
@@ -23,6 +24,7 @@ const (
 type UserSurfaceConfig struct {
 	Identity     identityv1connect.IdentityServiceHandler
 	Room         roomv1connect.RoomServiceHandler
+	Game         gamev1connect.GameServiceHandler
 	Interceptors []connect.Interceptor
 	Readiness    *Readiness
 }
@@ -41,15 +43,17 @@ type UserSurface struct{ handler http.Handler }
 
 // NewUserSurface builds an immutable user mux with its own interceptor chain.
 func NewUserSurface(config UserSurfaceConfig) (*UserSurface, error) {
-	if config.Identity == nil || config.Room == nil || config.Readiness == nil || invalidInterceptors(config.Interceptors) {
+	if config.Identity == nil || config.Room == nil || config.Game == nil || config.Readiness == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
 	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(config.Identity, options...)
 	roomPath, roomHandler := roomv1connect.NewRoomServiceHandler(config.Room, options...)
+	gamePath, gameHandler := gamev1connect.NewGameServiceHandler(config.Game, options...)
 	mux := http.NewServeMux()
 	mux.Handle(identityPath, identityHandler)
 	mux.Handle(roomPath, roomHandler)
+	mux.Handle(gamePath, gameHandler)
 	mountReadiness(mux, config.Readiness)
 	return &UserSurface{handler: mux}, nil
 }
@@ -106,6 +110,7 @@ func NewHandler(config HandlerConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/"+identityv1connect.IdentityServiceName+"/", config.User)
 	mux.Handle("/"+roomv1connect.RoomServiceName+"/", config.User)
+	mux.Handle("/"+gamev1connect.GameServiceName+"/", config.User)
 	mux.Handle("/"+adminv1connect.AdminAuthServiceName+"/", config.Admin)
 	mux.Handle("/"+adminv1connect.AdminIdentityServiceName+"/", config.Admin)
 	// Both immutable surfaces own the same readiness instance; routing through one avoids duplicate public paths.

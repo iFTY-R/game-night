@@ -9,6 +9,8 @@ var (
 	ErrSessionNotFound = errors.New("game session not found")
 	// ErrSessionAlreadyExists rejects reuse of a session or initial event-batch identity.
 	ErrSessionAlreadyExists = errors.New("game session already exists")
+	// ErrStartReceiptNotFound distinguishes a new start operation from a durable idempotent replay.
+	ErrStartReceiptNotFound = errors.New("game session start receipt not found")
 	// ErrStateVersionConflict rejects a transition that did not start from the persisted authoritative version.
 	ErrStateVersionConflict = errors.New("game session state version conflict")
 	// ErrOwnershipLost fences a runtime whose PostgreSQL ownership epoch is no longer current.
@@ -43,6 +45,8 @@ var (
 	ErrModuleUnavailable = errors.New("game module is unavailable")
 	// ErrProjectionUnsafe rejects module output that violates the viewer-safe projection contract.
 	ErrProjectionUnsafe = errors.New("game projection is unsafe")
+	// ErrReplayUnavailable rejects live, incomplete, oversized, or unsupported replay histories.
+	ErrReplayUnavailable = errors.New("game replay is unavailable")
 	// ErrGameSessionRepositoryUnavailable hides database and driver details from runtime callers.
 	ErrGameSessionRepositoryUnavailable = errors.New("game session repository unavailable")
 	// ErrGameSessionIntegrity reports persisted rows that cannot restore a valid authoritative aggregate.

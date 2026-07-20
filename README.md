@@ -13,8 +13,8 @@
 
 ## 当前阶段
 
-身份、后台、持续房间与公开大厅发现的后端纵向链路已经交付。
-服务端 Game SDK 契约与精确版本注册表已经交付；具体游戏 Manifest 与规则、GameSession 运行时、聊天治理、实时网关、客户端和三款游戏仍按依赖顺序继续实现。
+身份、后台、持续房间、公开大厅、GameSession 权威运行时和 GameService 后端纵向链路已经交付。
+Realtime 已具备 ownership fencing、timer 恢复、durable/低延迟 fanout、一次性订阅授权和 viewer-safe 投影 Hub；公网 WebSocket 传输适配、聊天治理、客户端和三款具体游戏仍按依赖顺序继续实现。
 
 ## 技术方向
 

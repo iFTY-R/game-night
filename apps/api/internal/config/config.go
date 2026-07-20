@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -14,15 +15,18 @@ import (
 
 const (
 	// API environment variables remain private to the API binary instead of expanding the shared configuration surface.
-	listenAddressEnvironment     = "GAME_NIGHT_API_LISTEN_ADDRESS"
-	readHeaderTimeoutEnvironment = "GAME_NIGHT_API_READ_HEADER_TIMEOUT"
-	readTimeoutEnvironment       = "GAME_NIGHT_API_READ_TIMEOUT"
-	writeTimeoutEnvironment      = "GAME_NIGHT_API_WRITE_TIMEOUT"
-	idleTimeoutEnvironment       = "GAME_NIGHT_API_IDLE_TIMEOUT"
-	shutdownTimeoutEnvironment   = "GAME_NIGHT_API_SHUTDOWN_TIMEOUT"
-	maxHeaderBytesEnvironment    = "GAME_NIGHT_API_MAX_HEADER_BYTES"
-	argon2WorkersEnvironment     = "GAME_NIGHT_API_ARGON2_WORKERS"
-	argon2QueueEnvironment       = "GAME_NIGHT_API_ARGON2_QUEUE_CAPACITY"
+	listenAddressEnvironment         = "GAME_NIGHT_API_LISTEN_ADDRESS"
+	readHeaderTimeoutEnvironment     = "GAME_NIGHT_API_READ_HEADER_TIMEOUT"
+	readTimeoutEnvironment           = "GAME_NIGHT_API_READ_TIMEOUT"
+	writeTimeoutEnvironment          = "GAME_NIGHT_API_WRITE_TIMEOUT"
+	idleTimeoutEnvironment           = "GAME_NIGHT_API_IDLE_TIMEOUT"
+	shutdownTimeoutEnvironment       = "GAME_NIGHT_API_SHUTDOWN_TIMEOUT"
+	maxHeaderBytesEnvironment        = "GAME_NIGHT_API_MAX_HEADER_BYTES"
+	argon2WorkersEnvironment         = "GAME_NIGHT_API_ARGON2_WORKERS"
+	argon2QueueEnvironment           = "GAME_NIGHT_API_ARGON2_QUEUE_CAPACITY"
+	realtimeBootstrapURLEnvironment  = "GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL"
+	realtimePeerURLsEnvironment      = "GAME_NIGHT_API_REALTIME_PEER_URLS"
+	realtimeInternalTokenEnvironment = "GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN"
 	// Listener defaults support mobile requests without allowing stalled clients to hold resources indefinitely.
 	defaultListenAddress     = ":8080"
 	defaultReadHeaderTimeout = 5 * time.Second
@@ -40,10 +44,11 @@ const (
 	minimumMaxHeaderBytes = 4 << 10
 	maximumMaxHeaderBytes = 4 << 20
 	// Two workers keep the default aggregate Argon2 memory at 128 MiB; the hard cap matches security package limits.
-	defaultArgon2Workers = 2
-	maximumArgon2Workers = 8
-	defaultArgon2Queue   = 64
-	maximumArgon2Queue   = 4096
+	defaultArgon2Workers        = 2
+	maximumArgon2Workers        = 8
+	defaultArgon2Queue          = 64
+	maximumArgon2Queue          = 4096
+	defaultRealtimeBootstrapURL = "http://127.0.0.1:8091"
 )
 
 // ListenerConfig bounds HTTP resource use and graceful shutdown time for the API process.
@@ -63,12 +68,20 @@ type Argon2Config struct {
 	QueueCapacity int
 }
 
+// RealtimeConfig pins private owner routing to an operator-controlled peer allowlist.
+type RealtimeConfig struct {
+	BootstrapURL  string
+	PeerURLs      []string
+	InternalToken string
+}
+
 // Config combines the shared dependency/security settings with API-only listener behavior.
 type Config struct {
 	Shared            sharedconfig.Config
 	CheckpointStorage checkpointstorage.Config
 	Listener          ListenerConfig
 	Argon2            Argon2Config
+	Realtime          RealtimeConfig
 }
 
 // Load validates shared configuration first, then parses bounded API listener settings without opening sockets.
@@ -90,7 +103,11 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config}, nil
+	realtimeConfig, err := loadRealtime(reader, shared.Environment)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config, Realtime: realtimeConfig}, nil
 }
 
 type environmentReader struct {
@@ -159,6 +176,49 @@ func loadArgon2(reader environmentReader) (Argon2Config, error) {
 		return Argon2Config{}, err
 	}
 	return Argon2Config{Workers: workers, QueueCapacity: queueCapacity}, nil
+}
+
+func loadRealtime(reader environmentReader, environment sharedconfig.Environment) (RealtimeConfig, error) {
+	bootstrapURL := reader.valueOrDefault(realtimeBootstrapURLEnvironment, defaultRealtimeBootstrapURL)
+	if !validRealtimeURL(bootstrapURL, environment == sharedconfig.EnvironmentProduction) {
+		return RealtimeConfig{}, fieldError(realtimeBootstrapURLEnvironment, "invalid realtime URL")
+	}
+	peerRaw := reader.valueOrDefault(realtimePeerURLsEnvironment, bootstrapURL)
+	peers := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, candidate := range strings.Split(peerRaw, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if !validRealtimeURL(candidate, environment == sharedconfig.EnvironmentProduction) {
+			return RealtimeConfig{}, fieldError(realtimePeerURLsEnvironment, "invalid realtime peer URL")
+		}
+		if _, exists := seen[candidate]; !exists {
+			seen[candidate] = struct{}{}
+			peers = append(peers, candidate)
+		}
+	}
+	if _, exists := seen[bootstrapURL]; !exists || len(peers) == 0 || len(peers) > 64 {
+		return RealtimeConfig{}, fieldError(realtimePeerURLsEnvironment, "bootstrap URL is not an allowed peer")
+	}
+	token := reader.optional(realtimeInternalTokenEnvironment)
+	if len(token) < 32 || len(token) > 256 {
+		return RealtimeConfig{}, fieldError(realtimeInternalTokenEnvironment, "missing or invalid internal credential")
+	}
+	for index := range len(token) {
+		if token[index] < 0x21 || token[index] > 0x7e {
+			return RealtimeConfig{}, fieldError(realtimeInternalTokenEnvironment, "missing or invalid internal credential")
+		}
+	}
+	return RealtimeConfig{BootstrapURL: bootstrapURL, PeerURLs: peers, InternalToken: token}, nil
+}
+
+func validRealtimeURL(value string, requireTLS bool) bool {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+		(parsed.Path != "" && parsed.Path != "/") || (parsed.Scheme != "http" && parsed.Scheme != "https") ||
+		parsed.Hostname() == "" || parsed.Port() == "" {
+		return false
+	}
+	return !requireTLS || parsed.Scheme == "https"
 }
 
 func validListenAddress(value string) bool {

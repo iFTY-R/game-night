@@ -13,11 +13,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"net/netip"
 	"net/url"
 	"os"
@@ -40,8 +42,12 @@ import (
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
+	realtimev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1/realtimev1connect"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
@@ -71,6 +77,7 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 	identityClient := identityv1connect.NewIdentityServiceClient(runtime.client, runtime.baseURL)
 	identity := onboardAndRecoverIdentity(t, ctx, runtime, identityClient)
 	exerciseRoomLifecycle(t, ctx, runtime, roomv1connect.NewRoomServiceClient(runtime.client, runtime.baseURL))
+	exerciseDisabledGameSurface(t, ctx, runtime, gamev1connect.NewGameServiceClient(runtime.client, runtime.baseURL))
 
 	authClient := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
 	adminIdentityClient := adminv1connect.NewAdminIdentityServiceClient(runtime.client, runtime.baseURL)
@@ -132,6 +139,31 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 		strings.Contains(runtime.logs.String(), applicationActivePassword) ||
 		strings.Contains(runtime.logs.String(), applicationTestRealName) {
 		t.Fatal("application logs contain a configured password or real name")
+	}
+}
+
+// exerciseDisabledGameSurface proves the complete GameService is mounted while module registration remains fail closed.
+func exerciseDisabledGameSurface(
+	t testing.TB,
+	ctx context.Context,
+	runtime *applicationIntegrationRuntime,
+	client gamev1connect.GameServiceClient,
+) {
+	t.Helper()
+	request := connect.NewRequest(&gamev1.StartSessionRequest{
+		RoomId: uuid.NewString(), GameId: "liars-dice", ExpectedRoomVersion: 1, ExpectedMembershipVersion: 1,
+		OperationId:   applicationOperationID(t),
+		RequestDigest: bytes.Repeat([]byte{1}, 32),
+		Config:        &gamev1.GameConfig{GameId: "liars-dice", SchemaVersion: 1, MessageType: "session.config"},
+	})
+	runtime.authorizeUserWrite(t, request)
+	_, err := client.StartSession(ctx, request)
+	if connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("disabled game service error = %v", err)
+	}
+	var connectError *connect.Error
+	if !errors.As(err, &connectError) || connectError.Meta().Get("Cache-Control") != "no-store" {
+		t.Fatalf("disabled game service cache metadata = %v", err)
 	}
 }
 
@@ -516,6 +548,7 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 		t.Fatalf("read integrated administrator bootstrap secret: mounted=%t err=%v", mounted, err)
 	}
 	redisPrefix := "gn:e2e:" + strings.ReplaceAll(uuid.NewString(), "-", "")[:16] + ":"
+	realtimeServer := newDisabledRealtimeServer(t)
 	config := apiConfig.Config{
 		Shared: sharedconfig.Config{
 			Environment: sharedconfig.EnvironmentTest,
@@ -537,6 +570,9 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 			WriteTimeout: 30 * time.Second, IdleTimeout: time.Minute, ShutdownTimeout: 5 * time.Second, MaxHeaderBytes: 1 << 20,
 		},
 		Argon2: apiConfig.Argon2Config{Workers: 1, QueueCapacity: 16},
+		Realtime: apiConfig.RealtimeConfig{
+			BootstrapURL: realtimeServer.URL, PeerURLs: []string{realtimeServer.URL}, InternalToken: strings.Repeat("r", 32),
+		},
 	}
 	logs := &bytes.Buffer{}
 	application, err := New(ctx, config, Options{
@@ -591,6 +627,36 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 		}
 	})
 	return runtime
+}
+
+type disabledRealtimeService struct {
+	realtimev1connect.UnimplementedOwnerServiceHandler
+}
+
+func (*disabledRealtimeService) StartSession(
+	context.Context,
+	*connect.Request[realtimev1.StartSessionRequest],
+) (*connect.Response[realtimev1.StartSessionResponse], error) {
+	connectError := connect.NewError(connect.CodeUnavailable, errors.New("game.module.unavailable"))
+	detail, err := connect.NewErrorDetail(&commonv1.BusinessErrorDetail{
+		Code:       commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_MODULE_UNAVAILABLE,
+		MessageKey: "game.module.unavailable",
+	})
+	if err != nil {
+		return nil, err
+	}
+	connectError.AddDetail(detail)
+	return nil, connectError
+}
+
+func newDisabledRealtimeServer(t testing.TB) *httptest.Server {
+	t.Helper()
+	path, handler := realtimev1connect.NewOwnerServiceHandler(&disabledRealtimeService{})
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
 }
 
 // authorizeUserWrite applies the exact browser Origin and double-submit token expected by user mutations.

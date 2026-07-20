@@ -8,6 +8,11 @@ upstream game_night_admin_api {
     keepalive 16;
 }
 
+upstream game_night_realtime {
+    server ${GAME_NIGHT_REALTIME_UPSTREAM};
+    keepalive 16;
+}
+
 # Unknown SNI/Host values terminate at this server and never reach an application upstream.
 server {
     listen 8443 ssl default_server;
@@ -64,6 +69,55 @@ server {
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Pragma;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location ^~ /platform.game.v1.GameService/ {
+        proxy_pass http://game_night_identity_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Pragma;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location = /realtime/game {
+        proxy_pass http://game_night_realtime;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 75s;
+        proxy_send_timeout 10s;
 
         proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
         proxy_set_header X-Forwarded-For $remote_addr;

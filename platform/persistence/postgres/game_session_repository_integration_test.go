@@ -1002,7 +1002,9 @@ func openGameSessionFixture(t *testing.T) (*integrationtest.PostgresSchema, *Gam
 	}
 	createdEvent := newGameSessionOutboxEvent(t, gameruntime.GameSessionCreatedEventType, session.Snapshot().ID, uuid.New(), start.StartedAt, []byte("created"))
 	commit := gameruntime.CreationCommit{Session: session, Batch: batch, OutboxEvents: []outbox.Event{createdEvent}}
-	_, session, err = NewRoomGameSessionRepository(fixture.Pool).Start(ctx, room, playing, commit)
+	_, session, _, err = NewRoomGameSessionRepository(fixture.Pool).Start(
+		ctx, room, playing, commit, gameSessionStartReceiptForTest(t, room, commit, "game-session-fixture"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

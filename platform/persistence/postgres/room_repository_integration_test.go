@@ -182,9 +182,10 @@ func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 		t.Fatal(err)
 	}
 	playingEvent := newGameSessionOutboxEvent(t, gameruntime.GameSessionCreatedEventType, start.SessionID, uuid.New(), start.StartedAt, []byte("lobby-created"))
-	playingRoom, _, err = NewRoomGameSessionRepository(fixture.Pool).Start(
+	playingCommit := gameruntime.CreationCommit{Session: playingSession, Batch: playingBatch, OutboxEvents: []outbox.Event{playingEvent}}
+	playingRoom, _, _, err = NewRoomGameSessionRepository(fixture.Pool).Start(
 		ctx, withParticipant, playingRoom,
-		gameruntime.CreationCommit{Session: playingSession, Batch: playingBatch, OutboxEvents: []outbox.Event{playingEvent}},
+		playingCommit, gameSessionStartReceiptForTest(t, withParticipant, playingCommit, "lobby-playing-session"),
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -778,6 +778,17 @@ type Querier interface {
 	//  INSERT INTO game_session_participants (session_id, user_id, seat_index)
 	//  VALUES ($1, $2, $3)
 	CreateGameSessionParticipant(ctx context.Context, arg CreateGameSessionParticipantParams) error
+	//CreateGameSessionStartReceipt
+	//
+	//  INSERT INTO game_session_start_receipts (
+	//      actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+	//  ) VALUES (
+	//      $1, $2, $3,
+	//      $4, $5, $6
+	//  )
+	//  ON CONFLICT (actor_user_id, room_id, operation_id) DO NOTHING
+	//  RETURNING actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+	CreateGameSessionStartReceipt(ctx context.Context, arg CreateGameSessionStartReceiptParams) (GameSessionStartReceipt, error)
 	//CreateGameSessionTimer
 	//
 	//  INSERT INTO game_session_timers (
@@ -1417,6 +1428,23 @@ type Querier interface {
 	//  FROM game_sessions
 	//  WHERE session_id = $1
 	GetGameSessionRoomID(ctx context.Context, arg GetGameSessionRoomIDParams) (pgtype.UUID, error)
+	//GetGameSessionStartReceipt
+	//
+	//  SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+	//  FROM game_session_start_receipts
+	//  WHERE actor_user_id = $1
+	//    AND room_id = $2
+	//    AND operation_id = $3
+	GetGameSessionStartReceipt(ctx context.Context, arg GetGameSessionStartReceiptParams) (GameSessionStartReceipt, error)
+	//GetGameSessionStartReceiptForUpdate
+	//
+	//  SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+	//  FROM game_session_start_receipts
+	//  WHERE actor_user_id = $1
+	//    AND room_id = $2
+	//    AND operation_id = $3
+	//  FOR UPDATE
+	GetGameSessionStartReceiptForUpdate(ctx context.Context, arg GetGameSessionStartReceiptForUpdateParams) (GameSessionStartReceipt, error)
 	//GetGameSessionTimerForUpdate
 	//
 	//  SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload

@@ -73,6 +73,31 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
 
+-- name: CreateGameSessionStartReceipt :one
+INSERT INTO game_session_start_receipts (
+    actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+) VALUES (
+    sqlc.arg(actor_user_id), sqlc.arg(room_id), sqlc.arg(operation_id),
+    sqlc.arg(request_digest), sqlc.arg(session_id), sqlc.arg(committed_at)
+)
+ON CONFLICT (actor_user_id, room_id, operation_id) DO NOTHING
+RETURNING actor_user_id, room_id, operation_id, request_digest, session_id, committed_at;
+
+-- name: GetGameSessionStartReceipt :one
+SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+FROM game_session_start_receipts
+WHERE actor_user_id = sqlc.arg(actor_user_id)
+  AND room_id = sqlc.arg(room_id)
+  AND operation_id = sqlc.arg(operation_id);
+
+-- name: GetGameSessionStartReceiptForUpdate :one
+SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+FROM game_session_start_receipts
+WHERE actor_user_id = sqlc.arg(actor_user_id)
+  AND room_id = sqlc.arg(room_id)
+  AND operation_id = sqlc.arg(operation_id)
+FOR UPDATE;
+
 -- name: UpdateGameSessionStateCAS :one
 UPDATE game_sessions
 SET state_version = sqlc.arg(state_version),

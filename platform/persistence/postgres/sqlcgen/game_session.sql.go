@@ -634,6 +634,57 @@ func (q *Queries) CreateGameSessionParticipant(ctx context.Context, arg CreateGa
 	return err
 }
 
+const createGameSessionStartReceipt = `-- name: CreateGameSessionStartReceipt :one
+INSERT INTO game_session_start_receipts (
+    actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6
+)
+ON CONFLICT (actor_user_id, room_id, operation_id) DO NOTHING
+RETURNING actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+`
+
+type CreateGameSessionStartReceiptParams struct {
+	ActorUserID   pgtype.UUID        `json:"actor_user_id"`
+	RoomID        pgtype.UUID        `json:"room_id"`
+	OperationID   string             `json:"operation_id"`
+	RequestDigest []byte             `json:"request_digest"`
+	SessionID     pgtype.UUID        `json:"session_id"`
+	CommittedAt   pgtype.Timestamptz `json:"committed_at"`
+}
+
+// CreateGameSessionStartReceipt
+//
+//	INSERT INTO game_session_start_receipts (
+//	    actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+//	) VALUES (
+//	    $1, $2, $3,
+//	    $4, $5, $6
+//	)
+//	ON CONFLICT (actor_user_id, room_id, operation_id) DO NOTHING
+//	RETURNING actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+func (q *Queries) CreateGameSessionStartReceipt(ctx context.Context, arg CreateGameSessionStartReceiptParams) (GameSessionStartReceipt, error) {
+	row := q.db.QueryRow(ctx, createGameSessionStartReceipt,
+		arg.ActorUserID,
+		arg.RoomID,
+		arg.OperationID,
+		arg.RequestDigest,
+		arg.SessionID,
+		arg.CommittedAt,
+	)
+	var i GameSessionStartReceipt
+	err := row.Scan(
+		&i.ActorUserID,
+		&i.RoomID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.SessionID,
+		&i.CommittedAt,
+	)
+	return i, err
+}
+
 const createGameSessionTimer = `-- name: CreateGameSessionTimer :exec
 INSERT INTO game_session_timers (
     session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
@@ -904,6 +955,78 @@ func (q *Queries) GetGameSessionRoomID(ctx context.Context, arg GetGameSessionRo
 	var room_id pgtype.UUID
 	err := row.Scan(&room_id)
 	return room_id, err
+}
+
+const getGameSessionStartReceipt = `-- name: GetGameSessionStartReceipt :one
+SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+FROM game_session_start_receipts
+WHERE actor_user_id = $1
+  AND room_id = $2
+  AND operation_id = $3
+`
+
+type GetGameSessionStartReceiptParams struct {
+	ActorUserID pgtype.UUID `json:"actor_user_id"`
+	RoomID      pgtype.UUID `json:"room_id"`
+	OperationID string      `json:"operation_id"`
+}
+
+// GetGameSessionStartReceipt
+//
+//	SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+//	FROM game_session_start_receipts
+//	WHERE actor_user_id = $1
+//	  AND room_id = $2
+//	  AND operation_id = $3
+func (q *Queries) GetGameSessionStartReceipt(ctx context.Context, arg GetGameSessionStartReceiptParams) (GameSessionStartReceipt, error) {
+	row := q.db.QueryRow(ctx, getGameSessionStartReceipt, arg.ActorUserID, arg.RoomID, arg.OperationID)
+	var i GameSessionStartReceipt
+	err := row.Scan(
+		&i.ActorUserID,
+		&i.RoomID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.SessionID,
+		&i.CommittedAt,
+	)
+	return i, err
+}
+
+const getGameSessionStartReceiptForUpdate = `-- name: GetGameSessionStartReceiptForUpdate :one
+SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+FROM game_session_start_receipts
+WHERE actor_user_id = $1
+  AND room_id = $2
+  AND operation_id = $3
+FOR UPDATE
+`
+
+type GetGameSessionStartReceiptForUpdateParams struct {
+	ActorUserID pgtype.UUID `json:"actor_user_id"`
+	RoomID      pgtype.UUID `json:"room_id"`
+	OperationID string      `json:"operation_id"`
+}
+
+// GetGameSessionStartReceiptForUpdate
+//
+//	SELECT actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
+//	FROM game_session_start_receipts
+//	WHERE actor_user_id = $1
+//	  AND room_id = $2
+//	  AND operation_id = $3
+//	FOR UPDATE
+func (q *Queries) GetGameSessionStartReceiptForUpdate(ctx context.Context, arg GetGameSessionStartReceiptForUpdateParams) (GameSessionStartReceipt, error) {
+	row := q.db.QueryRow(ctx, getGameSessionStartReceiptForUpdate, arg.ActorUserID, arg.RoomID, arg.OperationID)
+	var i GameSessionStartReceipt
+	err := row.Scan(
+		&i.ActorUserID,
+		&i.RoomID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.SessionID,
+		&i.CommittedAt,
+	)
+	return i, err
 }
 
 const getGameSessionTimerForUpdate = `-- name: GetGameSessionTimerForUpdate :one

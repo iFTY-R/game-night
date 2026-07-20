@@ -2,7 +2,19 @@ syntax = "proto3";
 
 package platform.game.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1;gamev1";
+
+// GameService is the authenticated user-facing boundary for session state and commands.
+service GameService {
+  rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
+  rpc GameAction(GameActionRequest) returns (GameActionResponse);
+  rpc GetProjection(GetProjectionRequest) returns (GetProjectionResponse);
+  rpc GetReplayProjection(GetReplayProjectionRequest) returns (GetReplayProjectionResponse);
+  rpc FinishSession(FinishSessionRequest) returns (FinishSessionResponse);
+  rpc OpenSubscription(OpenSubscriptionRequest) returns (OpenSubscriptionResponse);
+}
 
 // VersionTuple pins the exact engine, protocol, and client artifacts of one session.
 message VersionTuple {
@@ -18,6 +30,48 @@ message GameEnvelope {
   uint32 schema_version = 3;
   string message_type = 4;
   bytes payload = 5;
+}
+
+// GameConfig is the only client-owned input accepted when a new session is created.
+message GameConfig {
+  string game_id = 1;
+  uint32 schema_version = 2;
+  string message_type = 3;
+  bytes payload = 4;
+}
+
+enum GameSessionStatus {
+  GAME_SESSION_STATUS_UNSPECIFIED = 0;
+  GAME_SESSION_STATUS_ACTIVE = 1;
+  GAME_SESSION_STATUS_SUSPENDED = 2;
+  GAME_SESSION_STATUS_FINISHED = 3;
+  GAME_SESSION_STATUS_CANCELLED = 4;
+}
+
+// GameSessionSummary intentionally omits authoritative state and private event payloads.
+message GameSessionSummary {
+  string session_id = 1;
+  string room_id = 2;
+  string game_id = 3;
+  VersionTuple version = 4;
+  uint64 state_version = 5;
+  uint64 ownership_epoch = 6;
+  GameSessionStatus status = 7;
+}
+
+message StartSessionRequest {
+  string room_id = 1;
+  string game_id = 2;
+  uint64 expected_room_version = 3;
+  uint64 expected_membership_version = 4;
+  GameConfig config = 5;
+  string operation_id = 6;
+  bytes request_digest = 7;
+}
+
+message StartSessionResponse {
+  GameSessionSummary session = 1;
+  GameProjection projection = 2;
 }
 
 enum ViewerKind {
@@ -43,8 +97,52 @@ message GameActionResponse {
   uint64 state_version = 2;
   string result_code = 3;
   bytes result_digest = 4;
-  GameEnvelope projection = 5;
+  GameProjection projection = 5;
   bool replayed = 6;
+  GameReceipt receipt = 7;
+}
+
+message GetProjectionRequest {
+  string room_id = 1;
+  string session_id = 2;
+  ViewerKind viewer_kind = 3;
+}
+
+message GetProjectionResponse {
+  GameProjection projection = 1;
+  GameSessionSummary session = 2;
+}
+
+message GetReplayProjectionRequest {
+  string room_id = 1;
+  string session_id = 2;
+  ViewerKind viewer_kind = 3;
+  uint64 through_state_version = 4;
+}
+
+message GetReplayProjectionResponse {
+  GameProjection projection = 1;
+  GameSessionSummary session = 2;
+  bool complete = 3;
+}
+
+message FinishSessionRequest {
+  string room_id = 1;
+  string session_id = 2;
+  string operation_id = 3;
+  string source_event_id = 4;
+  uint64 expected_room_version = 5;
+  uint64 expected_membership_version = 6;
+  uint64 expected_state_version = 7;
+  GameEnvelope command = 8;
+  bytes request_digest = 9;
+}
+
+message FinishSessionResponse {
+  GameSessionSummary session = 1;
+  GameReceipt receipt = 2;
+  GameProjection projection = 3;
+  bool replayed = 4;
 }
 
 // GameSubscribeRequest starts a viewer-scoped realtime stream.
@@ -72,6 +170,80 @@ message GameDelta {
   uint64 to_state_version = 3;
   ViewerKind viewer_kind = 4;
   repeated GameEnvelope messages = 5;
+  uint32 from_event_ordinal = 6;
+  uint32 to_event_ordinal = 7;
+  bool snapshot_fallback = 8;
+}
+
+message OpenSubscriptionRequest {
+  string room_id = 1;
+  string session_id = 2;
+  ViewerKind viewer_kind = 3;
+  uint64 last_state_version = 4;
+  uint32 last_event_ordinal = 5;
+}
+
+message OpenSubscriptionResponse {
+  bytes ticket = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  GameSessionSummary session = 3;
+  GameProjection projection = 4;
+  bytes grant = 5;
+}
+
+// SubscriptionGrant is server-produced authorization stored behind one Redis ticket.
+message SubscriptionGrant {
+  string user_id = 1;
+  string room_id = 2;
+  string session_id = 3;
+  ViewerKind viewer_kind = 4;
+  uint32 seat_index = 5;
+  uint64 last_state_version = 6;
+  uint32 last_event_ordinal = 7;
+  string origin = 8;
+  google.protobuf.Timestamp expires_at = 9;
+}
+
+// ClientFrame is sent as one deterministic protobuf binary WebSocket message.
+message ClientFrame {
+  oneof body {
+    SubscriptionHello hello = 1;
+    ClientPing ping = 2;
+  }
+}
+
+message SubscriptionHello {
+  bytes ticket = 1;
+  bytes grant = 2;
+}
+
+message ClientPing {
+  uint64 nonce = 1;
+}
+
+// ServerFrame never carries raw event batches or authoritative snapshots.
+message ServerFrame {
+  oneof body {
+    GameProjection projection = 1;
+    GameDelta delta = 2;
+    GameReceipt receipt = 3;
+    SubscriptionDraining draining = 4;
+    ServerPong pong = 5;
+    SubscriptionError error = 6;
+  }
+}
+
+message SubscriptionDraining {
+  string reason = 1;
+  google.protobuf.Timestamp reconnect_after = 2;
+}
+
+message ServerPong {
+  uint64 nonce = 1;
+}
+
+message SubscriptionError {
+  string code = 1;
 }
 
 // GameSystemRequest identifies durable platform-originated lifecycle work.

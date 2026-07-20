@@ -38,6 +38,10 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	if loaded.Argon2 != (Argon2Config{Workers: 4, QueueCapacity: 128}) {
 		t.Fatalf("unexpected Argon2 config: %+v", loaded.Argon2)
 	}
+	if loaded.Realtime.BootstrapURL != defaultRealtimeBootstrapURL || len(loaded.Realtime.PeerURLs) != 1 ||
+		loaded.Realtime.PeerURLs[0] != defaultRealtimeBootstrapURL {
+		t.Fatalf("unexpected realtime config: %+v", loaded.Realtime)
+	}
 	if loaded.CheckpointStorage.LocalDirectory == "" {
 		t.Fatal("checkpoint storage configuration was not composed")
 	}
@@ -63,6 +67,24 @@ func TestLoadUsesBoundedAPIListenerDefaults(t *testing.T) {
 	}
 	if loaded.Argon2 != (Argon2Config{Workers: 2, QueueCapacity: 64}) {
 		t.Fatalf("unexpected Argon2 defaults: %+v", loaded.Argon2)
+	}
+}
+
+func TestLoadRealtimeRoutingRequiresAllowlistedTLSPeersInProduction(t *testing.T) {
+	environment := validAPIEnvironment(t)
+	environment[realtimeBootstrapURLEnvironment] = "https://realtime-a.internal:8091"
+	environment[realtimePeerURLsEnvironment] = "https://realtime-a.internal:8091,https://realtime-b.internal:8091"
+	reader := environmentReader{lookup: mapLookup(environment)}
+	loaded, err := loadRealtime(reader, sharedconfig.EnvironmentProduction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.PeerURLs) != 2 {
+		t.Fatalf("realtime peers = %v", loaded.PeerURLs)
+	}
+	environment[realtimePeerURLsEnvironment] = "https://realtime-b.internal:8091"
+	if _, err := loadRealtime(reader, sharedconfig.EnvironmentProduction); err == nil || !strings.Contains(err.Error(), realtimePeerURLsEnvironment) {
+		t.Fatalf("missing bootstrap allowlist error = %v", err)
 	}
 }
 
@@ -147,6 +169,7 @@ func validAPIEnvironment(t *testing.T) map[string]string {
 		"GAME_NIGHT_AUDIT_KEYRING_FILE":           filepath.Join(secretDirectory, "audit.json"),
 		"GAME_NIGHT_CHECKPOINT_SINK":              "local",
 		"GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY":   filepath.Join(secretDirectory, "checkpoints"),
+		realtimeInternalTokenEnvironment:          strings.Repeat("r", 32),
 	}
 }
 

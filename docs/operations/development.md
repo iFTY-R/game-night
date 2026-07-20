@@ -112,6 +112,29 @@ $taskIds = @($dryRun.tasks.taskId)
 
 `pnpm run check` 会先运行仓库依赖边界检查，再运行 workspace check 任务；`pnpm test` 同时运行根 Go 测试和 workspace test 任务。
 
+## Realtime 开发进程
+
+Realtime 只加载 PostgreSQL、Redis、Origin/代理策略和独立内部凭据，不加载设备、管理员、PII 或审计密钥。开发环境使用占位凭据启动：
+
+```powershell
+$env:GAME_NIGHT_ENVIRONMENT = 'development'
+$env:GAME_NIGHT_DATABASE_URL = 'postgresql://runtime:replace-me@127.0.0.1:5432/game_night?sslmode=disable'
+$env:GAME_NIGHT_DATABASE_SCHEMA = 'public'
+$env:GAME_NIGHT_REDIS_URL = 'redis://:replace-me@127.0.0.1:6379/0'
+$env:GAME_NIGHT_REDIS_KEY_PREFIX = 'game-night:dev:'
+$env:GAME_NIGHT_USER_ORIGINS = 'http://127.0.0.1:5173'
+$env:GAME_NIGHT_ADMIN_ORIGINS = 'http://127.0.0.1:5174'
+$env:GAME_NIGHT_TRUSTED_PROXY_CIDRS = '127.0.0.1/32,::1/128'
+$env:GAME_NIGHT_REALTIME_INTERNAL_TOKEN = ('t' * 32)
+$env:GAME_NIGHT_REALTIME_INSTANCE_ID = 'realtime-local'
+$env:GAME_NIGHT_REALTIME_ADVERTISED_URL = 'http://127.0.0.1:8091'
+go run ./apps/realtime
+```
+
+公网监听默认 `:8090`，私网 owner RPC 默认 `:8091`。生产环境必须给 Nginx 提供 `GAME_NIGHT_REALTIME_UPSTREAM=<realtime-host>:8090`，且只通过用户域的精确 `/realtime/game` 路径暴露公网连接；`:8091` 不得接入公网代理。
+
+权威 timer 默认每 `250ms` 扫描 128 条候选、单条超时 `5s`，可通过 `GAME_NIGHT_REALTIME_TIMER_SCAN_INTERVAL`、`GAME_NIGHT_REALTIME_TIMER_BATCH_SIZE`、`GAME_NIGHT_REALTIME_TIMER_OPERATION_TIMEOUT` 调整。durable fanout consumer 默认使用 `15s` lease、每 `250ms` 读取 128 条，可通过 `GAME_NIGHT_REALTIME_OUTBOX_LEASE_DURATION`、`GAME_NIGHT_REALTIME_OUTBOX_POLL_INTERVAL`、`GAME_NIGHT_REALTIME_OUTBOX_BATCH_SIZE` 调整；所有值均受进程配置硬上限约束。
+
 ## 协议验证
 
 smoke 模块用于证明固定的 Go、Connect-Go 和 TypeScript 插件可以重复生成并编译：

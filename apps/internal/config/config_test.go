@@ -8,6 +8,25 @@ import (
 	"time"
 )
 
+func TestLoadRealtimeDoesNotRequireSecurityKeyrings(t *testing.T) {
+	environment := validEnvironment(t)
+	for _, name := range []string{
+		piiKeyringFileEnvironment, totpKeyringFileEnvironment, resultEnvelopeKeyringFileEnvironment,
+		deviceKeyringFileEnvironment, rateLimitKeyringFileEnvironment, userChallengeKeyringFileEnvironment,
+		adminChallengeKeyringFileEnvironment, adminSessionKeyringFileEnvironment, auditKeyringFileEnvironment,
+		bootstrapSecretFileEnvironment,
+	} {
+		delete(environment, name)
+	}
+	loaded, err := LoadRealtime(mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.PostgreSQL.DSN == "" || loaded.Redis.URL == "" || len(loaded.Network.UserOrigins) == 0 {
+		t.Fatalf("realtime dependencies = %+v", loaded)
+	}
+}
+
 func TestLoadBuildsValidatedSharedConfig(t *testing.T) {
 	environment := validEnvironment(t)
 	environment[environmentName] = string(EnvironmentProduction)

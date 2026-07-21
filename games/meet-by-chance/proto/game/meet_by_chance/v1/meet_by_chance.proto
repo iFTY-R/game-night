@@ -11,7 +11,8 @@ enum Phase {
   PHASE_RESOLVING_MATCH = 3;
   PHASE_TARGET_DECISION = 4;
   PHASE_TARGET_ROLLING = 5;
-  PHASE_ROUND_SETTLED = 6;
+  // Retained as an event boundary; settled rounds immediately advance to the next decision state.
+  PHASE_ROUND_SETTLED = 6 [deprecated = true];
   PHASE_FINISHED = 7;
 }
 
@@ -21,7 +22,48 @@ enum HandClass {
   HAND_CLASS_PAIR = 2;
   HAND_CLASS_STRAIGHT = 3;
   HAND_CLASS_LEOPARD = 4;
-  HAND_CLASS_SPECIAL_235 = 5;
+  // Retained for wire compatibility. A 235 is ranked by its round-wide context, not as a fixed class.
+  HAND_CLASS_SPECIAL_235 = 5 [deprecated = true];
+}
+
+// Special235Outcome records the public result of the round-wide 235 context evaluation.
+enum Special235Outcome {
+  SPECIAL235_OUTCOME_UNSPECIFIED = 0;
+  SPECIAL235_OUTCOME_NOT_APPLICABLE = 1;
+  SPECIAL235_OUTCOME_BEATS_LEOPARDS = 2;
+  SPECIAL235_OUTCOME_MINIMUM_SINGLE = 3;
+}
+
+// MatchKind identifies one automatically resolved group without exposing internal comparison keys.
+enum MatchKind {
+  MATCH_KIND_UNSPECIFIED = 0;
+  MATCH_KIND_EXACT = 1;
+  MATCH_KIND_HIGHEST = 2;
+  MATCH_KIND_LOWEST = 3;
+}
+
+// ResolutionCause records which trusted input initiated an authoritative transition.
+enum ResolutionCause {
+  RESOLUTION_CAUSE_UNSPECIFIED = 0;
+  RESOLUTION_CAUSE_INITIAL_ROLL = 1;
+  RESOLUTION_CAUSE_MATCH_REROLL = 2;
+  RESOLUTION_CAUSE_PLAYER_REROLL = 3;
+  RESOLUTION_CAUSE_PLAYER_STAND = 4;
+  RESOLUTION_CAUSE_TIMEOUT_STAND = 5;
+  RESOLUTION_CAUSE_PARTICIPANT_REVOKED = 6;
+  RESOLUTION_CAUSE_TARGET_REVOKED = 7;
+  RESOLUTION_CAUSE_HOST_FINISHED = 8;
+  RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS = 9;
+  RESOLUTION_CAUSE_PLATFORM_CANCELLED = 10;
+}
+
+enum RoundOutcome {
+  ROUND_OUTCOME_UNSPECIFIED = 0;
+  ROUND_OUTCOME_STOOD = 1;
+  ROUND_OUTCOME_TARGET_EXCEEDED_ALL = 2;
+  ROUND_OUTCOME_REROLL_LIMIT_REACHED = 3;
+  ROUND_OUTCOME_TARGET_REVOKED = 4;
+  ROUND_OUTCOME_SESSION_FINISHED = 5;
 }
 
 message Config {
@@ -40,15 +82,77 @@ message Config {
   uint32 action_timeout_seconds = 13;
 }
 
+// PlayerState is authoritative and must never be serialized directly into a viewer projection.
 message PlayerState {
   string user_id = 1;
   uint32 seat_index = 2;
   bool active = 3;
   uint32 penalty_ticks = 4;
+  // Dice are the raw revealed faces in roll order.
   repeated uint32 dice = 5;
   HandClass hand_class = 6;
   repeated int32 full_key = 7;
   repeated int32 tie_key = 8;
+  bool special_235 = 9;
+  Special235Outcome special_235_outcome = 10;
+  bool targeted_this_round = 11;
+  repeated uint32 normalized_dice = 12;
+  // True when this hand contributed to the most recently completed classification pass.
+  bool included_in_current_resolution = 13;
+}
+
+// PublicPlayer contains only facts that are safe for players, spectators, deltas, and replay.
+message PublicPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 penalty_ticks = 4;
+  repeated uint32 dice = 5;
+  repeated uint32 normalized_dice = 6;
+  HandClass hand_class = 7;
+  bool special_235 = 8;
+  Special235Outcome special_235_outcome = 9;
+  bool targeted_this_round = 10;
+}
+
+// PublicDice is emitted before classification and therefore carries no derived hand result.
+message PublicDice {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  repeated uint32 dice = 3;
+}
+
+message MatchGroup {
+  MatchKind kind = 1;
+  repeated string user_ids = 2;
+  uint32 penalty_ticks = 3;
+  string weakest_user_id = 4;
+  uint32 weak_extra_penalty_ticks = 5;
+}
+
+// MatchBatch represents all disjoint groups handled by one bounded automatic resolution pass.
+message MatchBatch {
+  uint32 round = 1;
+  uint32 batch_index = 2;
+  uint32 resolution_count = 3;
+  repeated MatchGroup groups = 4;
+  repeated string rerolled_user_ids = 5;
+  bool capped = 6;
+}
+
+// RoundSummary is the compact public result retained in authoritative snapshots.
+message RoundSummary {
+  uint32 round = 1;
+  string target_user_id = 2;
+  RoundOutcome outcome = 3;
+  ResolutionCause cause = 4;
+  uint32 target_reroll_count = 5;
+  uint32 match_resolution_count = 6;
+  repeated PublicPlayer final_players = 7;
+  repeated string target_history_user_ids = 8;
+  string reason = 9;
+  bool settled = 10;
+  uint32 target_streak = 11;
 }
 
 message State {
@@ -62,11 +166,26 @@ message State {
   uint32 match_resolution_count = 8;
   int64 action_deadline_unix_millis = 9;
   Config config = 10;
+  // Host identity is frozen from trusted session start context for audit and system transitions.
+  string host_user_id = 11;
+  // Rule-level actions are recalculated per viewer and are not copied directly into View.
+  repeated string allowed_actions = 12;
+  string finish_reason = 13;
+  // The engine retains at most the latest 32 settled rounds.
+  repeated RoundSummary round_history = 14;
+  RoundSummary last_settlement = 15;
+  MatchBatch last_match_batch = 16;
+  repeated MatchBatch match_history = 17;
 }
 
 message Reroll {}
 message Stand {}
-message Finish {}
+message Finish {
+  // Empty means a runtime-authorized host finish; platform cancellation is explicit.
+  string reason = 1;
+  // Runtime supplies the currently authorized PartyRoom host.
+  string operator_user_id = 2;
+}
 
 message Command {
   oneof command {
@@ -76,15 +195,117 @@ message Command {
   }
 }
 
-message RoundStarted { uint32 round = 1; }
-message DiceRevealed { repeated PlayerState players = 1; }
-message HandClassified { string user_id = 1; HandClass hand_class = 2; repeated int32 full_key = 3; repeated int32 tie_key = 4; }
-message MatchResolved { repeated string user_ids = 1; string kind = 2; uint32 penalty_ticks = 3; }
-message TargetSelected { string user_id = 1; uint32 penalty_ticks = 2; }
-message TargetRerolled { string user_id = 1; uint32 count = 2; }
-message PenaltyRecorded { string user_id = 1; uint32 ticks = 2; string reason = 3; }
-message ParticipantRevoked { string user_id = 1; }
-message SessionFinished { string reason = 1; }
+message ReplayPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+}
+
+message RoundStarted {
+  uint32 round = 1;
+  ResolutionCause cause = 2;
+  RoundOutcome previous_outcome = 3;
+  // Initialization fields are required on round 1 and absent on later rounds.
+  Config config = 4;
+  repeated ReplayPlayer players = 5;
+  string host_user_id = 6;
+}
+
+message DiceRevealed {
+  // Deprecated because PlayerState contains internal comparison keys. Producers must leave it empty.
+  repeated PlayerState players = 1 [deprecated = true];
+  repeated PublicDice public_dice = 2;
+  uint32 round = 3;
+  uint32 batch_index = 4;
+  repeated string rolled_user_ids = 5;
+  ResolutionCause cause = 6;
+}
+
+message HandClassified {
+  string user_id = 1;
+  HandClass hand_class = 2;
+  // Deprecated internal fields. Producers and strict decoders must require them to be empty.
+  repeated int32 full_key = 3 [deprecated = true];
+  repeated int32 tie_key = 4 [deprecated = true];
+  uint32 round = 5;
+  uint32 batch_index = 6;
+  repeated uint32 dice = 7;
+  repeated uint32 normalized_dice = 8;
+  bool special_235 = 9;
+  Special235Outcome special_235_outcome = 10;
+}
+
+message MatchResolved {
+  // Legacy summary fields remain available for wire compatibility.
+  repeated string user_ids = 1 [deprecated = true];
+  string kind = 2 [deprecated = true];
+  uint32 penalty_ticks = 3 [deprecated = true];
+  uint32 round = 4;
+  MatchBatch batch = 5;
+  ResolutionCause cause = 6;
+}
+
+message TargetSelected {
+  string user_id = 1;
+  uint32 penalty_ticks = 2;
+  uint32 round = 3;
+  string previous_user_id = 4;
+  bool first_selection_this_round = 5;
+  uint32 target_reroll_count = 6;
+  uint32 target_streak = 7;
+  ResolutionCause cause = 8;
+  uint32 match_resolution_count = 9;
+}
+
+message TargetRerolled {
+  string user_id = 1;
+  // Count is the round-wide target reroll count and never resets on target transfer.
+  uint32 count = 2;
+  uint32 round = 3;
+  uint32 target_streak = 4;
+  uint32 penalty_ticks = 5;
+  ResolutionCause cause = 6;
+  uint32 match_resolution_count = 7;
+}
+
+message PenaltyRecorded {
+  string user_id = 1;
+  uint32 ticks = 2;
+  string reason = 3;
+  uint32 before_total_ticks = 4;
+  uint32 after_total_ticks = 5;
+  uint32 round = 6;
+  uint32 batch_index = 7;
+  ResolutionCause cause = 8;
+}
+
+message ParticipantRevoked {
+  string user_id = 1;
+  uint32 round = 2;
+  Phase phase_before = 3;
+  bool was_target = 4;
+  bool round_cancelled = 5;
+  uint32 next_round = 6;
+  uint32 active_player_count = 7;
+}
+
+message SessionFinished {
+  string reason = 1;
+  uint32 round = 2;
+  string operator_user_id = 3;
+  ResolutionCause cause = 4;
+}
+
+message Special235Evaluated {
+  uint32 round = 1;
+  uint32 batch_index = 2;
+  repeated string special_user_ids = 3;
+  bool all_other_players_are_leopards = 4;
+  Special235Outcome outcome = 5;
+}
+
+message RoundSettled {
+  RoundSummary summary = 1;
+}
 
 message Event {
   oneof event {
@@ -97,13 +318,27 @@ message Event {
     PenaltyRecorded penalty_recorded = 7;
     ParticipantRevoked participant_revoked = 8;
     SessionFinished session_finished = 9;
+    Special235Evaluated special_235_evaluated = 10;
+    RoundSettled round_settled = 11;
   }
+}
+
+// ActionTimer binds a timeout to the exact decision it is allowed to settle.
+message ActionTimer {
+  uint32 round = 1;
+  Phase phase = 2;
+  string target_user_id = 3;
+  uint32 target_reroll_count = 4;
+  int64 deadline_unix_millis = 5;
+  uint32 target_streak = 6;
+  uint32 match_resolution_count = 7;
 }
 
 message View {
   Phase phase = 1;
   uint32 round = 2;
-  repeated PlayerState players = 3;
+  // Deprecated because PlayerState contains internal keys. Producers must leave it empty.
+  repeated PlayerState players = 3 [deprecated = true];
   string target_user_id = 4;
   uint32 target_reroll_count = 5;
   uint32 target_reroll_limit = 6;
@@ -112,4 +347,38 @@ message View {
   int64 action_deadline_unix_millis = 9;
   repeated string allowed_actions = 10;
   string finish_reason = 11;
+  repeated PublicPlayer public_players = 12;
+  uint32 target_streak = 13;
+  Config config = 14;
+  RoundSummary last_settlement = 15;
+  repeated RoundSummary recent_rounds = 16;
+  MatchBatch last_match_batch = 17;
+  // This viewer-scoped flag never grants actions; allowed_actions remains authoritative.
+  bool viewer_is_host = 18;
+}
+
+// ViewDelta replaces the current viewer-safe public view after validated events.
+message ViewDelta {
+  View view = 1;
+}
+
+// ReplayEntry preserves public event order without exposing snapshots, seeds, or comparison keys.
+message ReplayEntry {
+  uint64 sequence = 1;
+  Event event = 2;
+}
+
+message ReplayRound {
+  RoundSummary summary = 1;
+  reserved 2;
+}
+
+// Replay contains only settled rounds; a pending round is never appended to rounds.
+message Replay {
+  uint32 schema_version = 1;
+  Config config = 2;
+  repeated ReplayPlayer players = 3;
+  repeated ReplayEntry entries = 4;
+  string finish_reason = 5;
+  repeated ReplayRound rounds = 6;
 }

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file game/meet_by_chance/v1/meet_by_chance.proto.
  */
 export const file_game_meet_by_chance_v1_meet_by_chance: GenFile = /*@__PURE__*/
-  fileDesc("CitnYW1lL21lZXRfYnlfY2hhbmNlL3YxL21lZXRfYnlfY2hhbmNlLnByb3RvEhZnYW1lLm1lZXRfYnlfY2hhbmNlLnYxIugCCgZDb25maWcSFAoMc3RyYWlnaHRfMTIzGAEgASgIEhQKDHN0cmFpZ2h0XzIzNBgCIAEoCBIUCgxzdHJhaWdodF8zNDUYAyABKAgSFAoMc3RyYWlnaHRfNDU2GAQgASgIEhsKE3NwZWNpYWxfMjM1X2VuYWJsZWQYBSABKAgSEQoJb25lc193aWxkGAYgASgIEhwKFHRhcmdldF9wZW5hbHR5X3RpY2tzGAcgASgNEhwKFHJlcm9sbF9wZW5hbHR5X3RpY2tzGAggASgNEhsKE21hdGNoX3BlbmFsdHlfdGlja3MYCSABKA0SIAoYd2Vha19leHRyYV9wZW5hbHR5X3RpY2tzGAogASgNEhsKE3RhcmdldF9yZXJvbGxfbGltaXQYCyABKA0SHgoWbWF0Y2hfcmVzb2x1dGlvbl9saW1pdBgMIAEoDRIeChZhY3Rpb25fdGltZW91dF9zZWNvbmRzGA0gASgNIsEBCgtQbGF5ZXJTdGF0ZRIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0SDgoGYWN0aXZlGAMgASgIEhUKDXBlbmFsdHlfdGlja3MYBCABKA0SDAoEZGljZRgFIAMoDRI1CgpoYW5kX2NsYXNzGAYgASgOMiEuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5IYW5kQ2xhc3MSEAoIZnVsbF9rZXkYByADKAUSDwoHdGllX2tleRgIIAMoBSLTAgoFU3RhdGUSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SLAoFcGhhc2UYAiABKA4yHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBoYXNlEg0KBXJvdW5kGAMgASgNEjQKB3BsYXllcnMYBCADKAsyIy5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBsYXllclN0YXRlEhYKDnRhcmdldF91c2VyX2lkGAUgASgJEhsKE3RhcmdldF9yZXJvbGxfY291bnQYBiABKA0SFQoNdGFyZ2V0X3N0cmVhaxgHIAEoDRIeChZtYXRjaF9yZXNvbHV0aW9uX2NvdW50GAggASgNEiMKG2FjdGlvbl9kZWFkbGluZV91bml4X21pbGxpcxgJIAEoAxIuCgZjb25maWcYCiABKAsyHi5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLkNvbmZpZyIICgZSZXJvbGwiBwoFU3RhbmQiCAoGRmluaXNoIqgBCgdDb21tYW5kEjAKBnJlcm9sbBgBIAEoCzIeLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVyb2xsSAASLgoFc3RhbmQYAiABKAsyHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlN0YW5kSAASMAoGZmluaXNoGAMgASgLMh4uZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5GaW5pc2hIAEIJCgdjb21tYW5kIh0KDFJvdW5kU3RhcnRlZBINCgVyb3VuZBgBIAEoDSJECgxEaWNlUmV2ZWFsZWQSNAoHcGxheWVycxgBIAMoCzIjLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUGxheWVyU3RhdGUiewoOSGFuZENsYXNzaWZpZWQSDwoHdXNlcl9pZBgBIAEoCRI1CgpoYW5kX2NsYXNzGAIgASgOMiEuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5IYW5kQ2xhc3MSEAoIZnVsbF9rZXkYAyADKAUSDwoHdGllX2tleRgEIAMoBSJGCg1NYXRjaFJlc29sdmVkEhAKCHVzZXJfaWRzGAEgAygJEgwKBGtpbmQYAiABKAkSFQoNcGVuYWx0eV90aWNrcxgDIAEoDSI4Cg5UYXJnZXRTZWxlY3RlZBIPCgd1c2VyX2lkGAEgASgJEhUKDXBlbmFsdHlfdGlja3MYAiABKA0iMAoOVGFyZ2V0UmVyb2xsZWQSDwoHdXNlcl9pZBgBIAEoCRINCgVjb3VudBgCIAEoDSJBCg9QZW5hbHR5UmVjb3JkZWQSDwoHdXNlcl9pZBgBIAEoCRINCgV0aWNrcxgCIAEoDRIOCgZyZWFzb24YAyABKAkiJQoSUGFydGljaXBhbnRSZXZva2VkEg8KB3VzZXJfaWQYASABKAkiIQoPU2Vzc2lvbkZpbmlzaGVkEg4KBnJlYXNvbhgBIAEoCSLtBAoFRXZlbnQSPQoNcm91bmRfc3RhcnRlZBgBIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUm91bmRTdGFydGVkSAASPQoNZGljZV9yZXZlYWxlZBgCIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuRGljZVJldmVhbGVkSAASQQoPaGFuZF9jbGFzc2lmaWVkGAMgASgLMiYuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5IYW5kQ2xhc3NpZmllZEgAEj8KDm1hdGNoX3Jlc29sdmVkGAQgASgLMiUuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaFJlc29sdmVkSAASQQoPdGFyZ2V0X3NlbGVjdGVkGAUgASgLMiYuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5UYXJnZXRTZWxlY3RlZEgAEkEKD3RhcmdldF9yZXJvbGxlZBgGIAEoCzImLmdhbWUubWVldF9ieV9jaGFuY2UudjEuVGFyZ2V0UmVyb2xsZWRIABJDChBwZW5hbHR5X3JlY29yZGVkGAcgASgLMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QZW5hbHR5UmVjb3JkZWRIABJJChNwYXJ0aWNpcGFudF9yZXZva2VkGAggASgLMiouZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QYXJ0aWNpcGFudFJldm9rZWRIABJDChBzZXNzaW9uX2ZpbmlzaGVkGAkgASgLMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5TZXNzaW9uRmluaXNoZWRIAEIHCgVldmVudCLgAgoEVmlldxIsCgVwaGFzZRgBIAEoDjIdLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUGhhc2USDQoFcm91bmQYAiABKA0SNAoHcGxheWVycxgDIAMoCzIjLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUGxheWVyU3RhdGUSFgoOdGFyZ2V0X3VzZXJfaWQYBCABKAkSGwoTdGFyZ2V0X3Jlcm9sbF9jb3VudBgFIAEoDRIbChN0YXJnZXRfcmVyb2xsX2xpbWl0GAYgASgNEh4KFm1hdGNoX3Jlc29sdXRpb25fY291bnQYByABKA0SHgoWbWF0Y2hfcmVzb2x1dGlvbl9saW1pdBgIIAEoDRIjChthY3Rpb25fZGVhZGxpbmVfdW5peF9taWxsaXMYCSABKAMSFwoPYWxsb3dlZF9hY3Rpb25zGAogAygJEhUKDWZpbmlzaF9yZWFzb24YCyABKAkqwwEKBVBoYXNlEhUKEVBIQVNFX1VOU1BFQ0lGSUVEEAASEQoNUEhBU0VfUk9MTElORxABEhMKD1BIQVNFX1JFVkVBTElORxACEhkKFVBIQVNFX1JFU09MVklOR19NQVRDSBADEhkKFVBIQVNFX1RBUkdFVF9ERUNJU0lPThAEEhgKFFBIQVNFX1RBUkdFVF9ST0xMSU5HEAUSFwoTUEhBU0VfUk9VTkRfU0VUVExFRBAGEhIKDlBIQVNFX0ZJTklTSEVEEAcqoAEKCUhhbmRDbGFzcxIaChZIQU5EX0NMQVNTX1VOU1BFQ0lGSUVEEAASFQoRSEFORF9DTEFTU19TSU5HTEUQARITCg9IQU5EX0NMQVNTX1BBSVIQAhIXChNIQU5EX0NMQVNTX1NUUkFJR0hUEAMSFgoSSEFORF9DTEFTU19MRU9QQVJEEAQSGgoWSEFORF9DTEFTU19TUEVDSUFMXzIzNRAFQmBaXmdpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvZ2FtZXMvbWVldC1ieS1jaGFuY2UvZ2VuL2dvL2dhbWUvbWVldF9ieV9jaGFuY2UvdjE7bWVldGJ5Y2hhbmNldjFiBnByb3RvMw");
+  fileDesc("CitnYW1lL21lZXRfYnlfY2hhbmNlL3YxL21lZXRfYnlfY2hhbmNlLnByb3RvEhZnYW1lLm1lZXRfYnlfY2hhbmNlLnYxIugCCgZDb25maWcSFAoMc3RyYWlnaHRfMTIzGAEgASgIEhQKDHN0cmFpZ2h0XzIzNBgCIAEoCBIUCgxzdHJhaWdodF8zNDUYAyABKAgSFAoMc3RyYWlnaHRfNDU2GAQgASgIEhsKE3NwZWNpYWxfMjM1X2VuYWJsZWQYBSABKAgSEQoJb25lc193aWxkGAYgASgIEhwKFHRhcmdldF9wZW5hbHR5X3RpY2tzGAcgASgNEhwKFHJlcm9sbF9wZW5hbHR5X3RpY2tzGAggASgNEhsKE21hdGNoX3BlbmFsdHlfdGlja3MYCSABKA0SIAoYd2Vha19leHRyYV9wZW5hbHR5X3RpY2tzGAogASgNEhsKE3RhcmdldF9yZXJvbGxfbGltaXQYCyABKA0SHgoWbWF0Y2hfcmVzb2x1dGlvbl9saW1pdBgMIAEoDRIeChZhY3Rpb25fdGltZW91dF9zZWNvbmRzGA0gASgNIvwCCgtQbGF5ZXJTdGF0ZRIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0SDgoGYWN0aXZlGAMgASgIEhUKDXBlbmFsdHlfdGlja3MYBCABKA0SDAoEZGljZRgFIAMoDRI1CgpoYW5kX2NsYXNzGAYgASgOMiEuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5IYW5kQ2xhc3MSEAoIZnVsbF9rZXkYByADKAUSDwoHdGllX2tleRgIIAMoBRITCgtzcGVjaWFsXzIzNRgJIAEoCBJGChNzcGVjaWFsXzIzNV9vdXRjb21lGAogASgOMikuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5TcGVjaWFsMjM1T3V0Y29tZRIbChN0YXJnZXRlZF90aGlzX3JvdW5kGAsgASgIEhcKD25vcm1hbGl6ZWRfZGljZRgMIAMoDRImCh5pbmNsdWRlZF9pbl9jdXJyZW50X3Jlc29sdXRpb24YDSABKAgisgIKDFB1YmxpY1BsYXllchIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0SDgoGYWN0aXZlGAMgASgIEhUKDXBlbmFsdHlfdGlja3MYBCABKA0SDAoEZGljZRgFIAMoDRIXCg9ub3JtYWxpemVkX2RpY2UYBiADKA0SNQoKaGFuZF9jbGFzcxgHIAEoDjIhLmdhbWUubWVldF9ieV9jaGFuY2UudjEuSGFuZENsYXNzEhMKC3NwZWNpYWxfMjM1GAggASgIEkYKE3NwZWNpYWxfMjM1X291dGNvbWUYCSABKA4yKS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlNwZWNpYWwyMzVPdXRjb21lEhsKE3RhcmdldGVkX3RoaXNfcm91bmQYCiABKAgiPwoKUHVibGljRGljZRIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0SDAoEZGljZRgDIAMoDSKhAQoKTWF0Y2hHcm91cBIvCgRraW5kGAEgASgOMiEuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaEtpbmQSEAoIdXNlcl9pZHMYAiADKAkSFQoNcGVuYWx0eV90aWNrcxgDIAEoDRIXCg93ZWFrZXN0X3VzZXJfaWQYBCABKAkSIAoYd2Vha19leHRyYV9wZW5hbHR5X3RpY2tzGAUgASgNIqkBCgpNYXRjaEJhdGNoEg0KBXJvdW5kGAEgASgNEhMKC2JhdGNoX2luZGV4GAIgASgNEhgKEHJlc29sdXRpb25fY291bnQYAyABKA0SMgoGZ3JvdXBzGAQgAygLMiIuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaEdyb3VwEhkKEXJlcm9sbGVkX3VzZXJfaWRzGAUgAygJEg4KBmNhcHBlZBgGIAEoCCL3AgoMUm91bmRTdW1tYXJ5Eg0KBXJvdW5kGAEgASgNEhYKDnRhcmdldF91c2VyX2lkGAIgASgJEjUKB291dGNvbWUYAyABKA4yJC5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlJvdW5kT3V0Y29tZRI2CgVjYXVzZRgEIAEoDjInLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVzb2x1dGlvbkNhdXNlEhsKE3RhcmdldF9yZXJvbGxfY291bnQYBSABKA0SHgoWbWF0Y2hfcmVzb2x1dGlvbl9jb3VudBgGIAEoDRI7Cg1maW5hbF9wbGF5ZXJzGAcgAygLMiQuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QdWJsaWNQbGF5ZXISHwoXdGFyZ2V0X2hpc3RvcnlfdXNlcl9pZHMYCCADKAkSDgoGcmVhc29uGAkgASgJEg8KB3NldHRsZWQYCiABKAgSFQoNdGFyZ2V0X3N0cmVhaxgLIAEoDSKOBQoFU3RhdGUSFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SLAoFcGhhc2UYAiABKA4yHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBoYXNlEg0KBXJvdW5kGAMgASgNEjQKB3BsYXllcnMYBCADKAsyIy5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBsYXllclN0YXRlEhYKDnRhcmdldF91c2VyX2lkGAUgASgJEhsKE3RhcmdldF9yZXJvbGxfY291bnQYBiABKA0SFQoNdGFyZ2V0X3N0cmVhaxgHIAEoDRIeChZtYXRjaF9yZXNvbHV0aW9uX2NvdW50GAggASgNEiMKG2FjdGlvbl9kZWFkbGluZV91bml4X21pbGxpcxgJIAEoAxIuCgZjb25maWcYCiABKAsyHi5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLkNvbmZpZxIUCgxob3N0X3VzZXJfaWQYCyABKAkSFwoPYWxsb3dlZF9hY3Rpb25zGAwgAygJEhUKDWZpbmlzaF9yZWFzb24YDSABKAkSOwoNcm91bmRfaGlzdG9yeRgOIAMoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUm91bmRTdW1tYXJ5Ej0KD2xhc3Rfc2V0dGxlbWVudBgPIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUm91bmRTdW1tYXJ5EjwKEGxhc3RfbWF0Y2hfYmF0Y2gYECABKAsyIi5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLk1hdGNoQmF0Y2gSOQoNbWF0Y2hfaGlzdG9yeRgRIAMoCzIiLmdhbWUubWVldF9ieV9jaGFuY2UudjEuTWF0Y2hCYXRjaCIICgZSZXJvbGwiBwoFU3RhbmQiMgoGRmluaXNoEg4KBnJlYXNvbhgBIAEoCRIYChBvcGVyYXRvcl91c2VyX2lkGAIgASgJIqgBCgdDb21tYW5kEjAKBnJlcm9sbBgBIAEoCzIeLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVyb2xsSAASLgoFc3RhbmQYAiABKAsyHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlN0YW5kSAASMAoGZmluaXNoGAMgASgLMh4uZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5GaW5pc2hIAEIJCgdjb21tYW5kIjMKDFJlcGxheVBsYXllchIPCgd1c2VyX2lkGAEgASgJEhIKCnNlYXRfaW5kZXgYAiABKA0ikgIKDFJvdW5kU3RhcnRlZBINCgVyb3VuZBgBIAEoDRI2CgVjYXVzZRgCIAEoDjInLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVzb2x1dGlvbkNhdXNlEj4KEHByZXZpb3VzX291dGNvbWUYAyABKA4yJC5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlJvdW5kT3V0Y29tZRIuCgZjb25maWcYBCABKAsyHi5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLkNvbmZpZxI1CgdwbGF5ZXJzGAUgAygLMiQuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5SZXBsYXlQbGF5ZXISFAoMaG9zdF91c2VyX2lkGAYgASgJIvYBCgxEaWNlUmV2ZWFsZWQSOAoHcGxheWVycxgBIAMoCzIjLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUGxheWVyU3RhdGVCAhgBEjcKC3B1YmxpY19kaWNlGAIgAygLMiIuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QdWJsaWNEaWNlEg0KBXJvdW5kGAMgASgNEhMKC2JhdGNoX2luZGV4GAQgASgNEhcKD3JvbGxlZF91c2VyX2lkcxgFIAMoCRI2CgVjYXVzZRgGIAEoDjInLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVzb2x1dGlvbkNhdXNlIqsCCg5IYW5kQ2xhc3NpZmllZBIPCgd1c2VyX2lkGAEgASgJEjUKCmhhbmRfY2xhc3MYAiABKA4yIS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLkhhbmRDbGFzcxIUCghmdWxsX2tleRgDIAMoBUICGAESEwoHdGllX2tleRgEIAMoBUICGAESDQoFcm91bmQYBSABKA0SEwoLYmF0Y2hfaW5kZXgYBiABKA0SDAoEZGljZRgHIAMoDRIXCg9ub3JtYWxpemVkX2RpY2UYCCADKA0SEwoLc3BlY2lhbF8yMzUYCSABKAgSRgoTc3BlY2lhbF8yMzVfb3V0Y29tZRgKIAEoDjIpLmdhbWUubWVldF9ieV9jaGFuY2UudjEuU3BlY2lhbDIzNU91dGNvbWUizAEKDU1hdGNoUmVzb2x2ZWQSFAoIdXNlcl9pZHMYASADKAlCAhgBEhAKBGtpbmQYAiABKAlCAhgBEhkKDXBlbmFsdHlfdGlja3MYAyABKA1CAhgBEg0KBXJvdW5kGAQgASgNEjEKBWJhdGNoGAUgASgLMiIuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaEJhdGNoEjYKBWNhdXNlGAYgASgOMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5SZXNvbHV0aW9uQ2F1c2UikQIKDlRhcmdldFNlbGVjdGVkEg8KB3VzZXJfaWQYASABKAkSFQoNcGVuYWx0eV90aWNrcxgCIAEoDRINCgVyb3VuZBgDIAEoDRIYChBwcmV2aW91c191c2VyX2lkGAQgASgJEiIKGmZpcnN0X3NlbGVjdGlvbl90aGlzX3JvdW5kGAUgASgIEhsKE3RhcmdldF9yZXJvbGxfY291bnQYBiABKA0SFQoNdGFyZ2V0X3N0cmVhaxgHIAEoDRI2CgVjYXVzZRgIIAEoDjInLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVzb2x1dGlvbkNhdXNlEh4KFm1hdGNoX3Jlc29sdXRpb25fY291bnQYCSABKA0ixQEKDlRhcmdldFJlcm9sbGVkEg8KB3VzZXJfaWQYASABKAkSDQoFY291bnQYAiABKA0SDQoFcm91bmQYAyABKA0SFQoNdGFyZ2V0X3N0cmVhaxgEIAEoDRIVCg1wZW5hbHR5X3RpY2tzGAUgASgNEjYKBWNhdXNlGAYgASgOMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5SZXNvbHV0aW9uQ2F1c2USHgoWbWF0Y2hfcmVzb2x1dGlvbl9jb3VudBgHIAEoDSLUAQoPUGVuYWx0eVJlY29yZGVkEg8KB3VzZXJfaWQYASABKAkSDQoFdGlja3MYAiABKA0SDgoGcmVhc29uGAMgASgJEhoKEmJlZm9yZV90b3RhbF90aWNrcxgEIAEoDRIZChFhZnRlcl90b3RhbF90aWNrcxgFIAEoDRINCgVyb3VuZBgGIAEoDRITCgtiYXRjaF9pbmRleBgHIAEoDRI2CgVjYXVzZRgIIAEoDjInLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVzb2x1dGlvbkNhdXNlIscBChJQYXJ0aWNpcGFudFJldm9rZWQSDwoHdXNlcl9pZBgBIAEoCRINCgVyb3VuZBgCIAEoDRIzCgxwaGFzZV9iZWZvcmUYAyABKA4yHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBoYXNlEhIKCndhc190YXJnZXQYBCABKAgSFwoPcm91bmRfY2FuY2VsbGVkGAUgASgIEhIKCm5leHRfcm91bmQYBiABKA0SGwoTYWN0aXZlX3BsYXllcl9jb3VudBgHIAEoDSKCAQoPU2Vzc2lvbkZpbmlzaGVkEg4KBnJlYXNvbhgBIAEoCRINCgVyb3VuZBgCIAEoDRIYChBvcGVyYXRvcl91c2VyX2lkGAMgASgJEjYKBWNhdXNlGAQgASgOMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5SZXNvbHV0aW9uQ2F1c2UitwEKE1NwZWNpYWwyMzVFdmFsdWF0ZWQSDQoFcm91bmQYASABKA0SEwoLYmF0Y2hfaW5kZXgYAiABKA0SGAoQc3BlY2lhbF91c2VyX2lkcxgDIAMoCRImCh5hbGxfb3RoZXJfcGxheWVyc19hcmVfbGVvcGFyZHMYBCABKAgSOgoHb3V0Y29tZRgFIAEoDjIpLmdhbWUubWVldF9ieV9jaGFuY2UudjEuU3BlY2lhbDIzNU91dGNvbWUiRQoMUm91bmRTZXR0bGVkEjUKB3N1bW1hcnkYASABKAsyJC5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlJvdW5kU3VtbWFyeSL6BQoFRXZlbnQSPQoNcm91bmRfc3RhcnRlZBgBIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUm91bmRTdGFydGVkSAASPQoNZGljZV9yZXZlYWxlZBgCIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuRGljZVJldmVhbGVkSAASQQoPaGFuZF9jbGFzc2lmaWVkGAMgASgLMiYuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5IYW5kQ2xhc3NpZmllZEgAEj8KDm1hdGNoX3Jlc29sdmVkGAQgASgLMiUuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaFJlc29sdmVkSAASQQoPdGFyZ2V0X3NlbGVjdGVkGAUgASgLMiYuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5UYXJnZXRTZWxlY3RlZEgAEkEKD3RhcmdldF9yZXJvbGxlZBgGIAEoCzImLmdhbWUubWVldF9ieV9jaGFuY2UudjEuVGFyZ2V0UmVyb2xsZWRIABJDChBwZW5hbHR5X3JlY29yZGVkGAcgASgLMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QZW5hbHR5UmVjb3JkZWRIABJJChNwYXJ0aWNpcGFudF9yZXZva2VkGAggASgLMiouZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QYXJ0aWNpcGFudFJldm9rZWRIABJDChBzZXNzaW9uX2ZpbmlzaGVkGAkgASgLMicuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5TZXNzaW9uRmluaXNoZWRIABJMChVzcGVjaWFsXzIzNV9ldmFsdWF0ZWQYCiABKAsyKy5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlNwZWNpYWwyMzVFdmFsdWF0ZWRIABI9Cg1yb3VuZF9zZXR0bGVkGAsgASgLMiQuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5Sb3VuZFNldHRsZWRIAEIHCgVldmVudCLUAQoLQWN0aW9uVGltZXISDQoFcm91bmQYASABKA0SLAoFcGhhc2UYAiABKA4yHS5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlBoYXNlEhYKDnRhcmdldF91c2VyX2lkGAMgASgJEhsKE3RhcmdldF9yZXJvbGxfY291bnQYBCABKA0SHAoUZGVhZGxpbmVfdW5peF9taWxsaXMYBSABKAMSFQoNdGFyZ2V0X3N0cmVhaxgGIAEoDRIeChZtYXRjaF9yZXNvbHV0aW9uX2NvdW50GAcgASgNIrsFCgRWaWV3EiwKBXBoYXNlGAEgASgOMh0uZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QaGFzZRINCgVyb3VuZBgCIAEoDRI4CgdwbGF5ZXJzGAMgAygLMiMuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5QbGF5ZXJTdGF0ZUICGAESFgoOdGFyZ2V0X3VzZXJfaWQYBCABKAkSGwoTdGFyZ2V0X3Jlcm9sbF9jb3VudBgFIAEoDRIbChN0YXJnZXRfcmVyb2xsX2xpbWl0GAYgASgNEh4KFm1hdGNoX3Jlc29sdXRpb25fY291bnQYByABKA0SHgoWbWF0Y2hfcmVzb2x1dGlvbl9saW1pdBgIIAEoDRIjChthY3Rpb25fZGVhZGxpbmVfdW5peF9taWxsaXMYCSABKAMSFwoPYWxsb3dlZF9hY3Rpb25zGAogAygJEhUKDWZpbmlzaF9yZWFzb24YCyABKAkSPAoOcHVibGljX3BsYXllcnMYDCADKAsyJC5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlB1YmxpY1BsYXllchIVCg10YXJnZXRfc3RyZWFrGA0gASgNEi4KBmNvbmZpZxgOIAEoCzIeLmdhbWUubWVldF9ieV9jaGFuY2UudjEuQ29uZmlnEj0KD2xhc3Rfc2V0dGxlbWVudBgPIAEoCzIkLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUm91bmRTdW1tYXJ5EjsKDXJlY2VudF9yb3VuZHMYECADKAsyJC5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlJvdW5kU3VtbWFyeRI8ChBsYXN0X21hdGNoX2JhdGNoGBEgASgLMiIuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5NYXRjaEJhdGNoEhYKDnZpZXdlcl9pc19ob3N0GBIgASgIIjcKCVZpZXdEZWx0YRIqCgR2aWV3GAEgASgLMhwuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5WaWV3Ik0KC1JlcGxheUVudHJ5EhAKCHNlcXVlbmNlGAEgASgEEiwKBWV2ZW50GAIgASgLMh0uZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5FdmVudCJKCgtSZXBsYXlSb3VuZBI1CgdzdW1tYXJ5GAEgASgLMiQuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5Sb3VuZFN1bW1hcnlKBAgCEAMiiQIKBlJlcGxheRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIuCgZjb25maWcYAiABKAsyHi5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLkNvbmZpZxI1CgdwbGF5ZXJzGAMgAygLMiQuZ2FtZS5tZWV0X2J5X2NoYW5jZS52MS5SZXBsYXlQbGF5ZXISNAoHZW50cmllcxgEIAMoCzIjLmdhbWUubWVldF9ieV9jaGFuY2UudjEuUmVwbGF5RW50cnkSFQoNZmluaXNoX3JlYXNvbhgFIAEoCRIzCgZyb3VuZHMYBiADKAsyIy5nYW1lLm1lZXRfYnlfY2hhbmNlLnYxLlJlcGxheVJvdW5kKscBCgVQaGFzZRIVChFQSEFTRV9VTlNQRUNJRklFRBAAEhEKDVBIQVNFX1JPTExJTkcQARITCg9QSEFTRV9SRVZFQUxJTkcQAhIZChVQSEFTRV9SRVNPTFZJTkdfTUFUQ0gQAxIZChVQSEFTRV9UQVJHRVRfREVDSVNJT04QBBIYChRQSEFTRV9UQVJHRVRfUk9MTElORxAFEhsKE1BIQVNFX1JPVU5EX1NFVFRMRUQQBhoCCAESEgoOUEhBU0VfRklOSVNIRUQQByqkAQoJSGFuZENsYXNzEhoKFkhBTkRfQ0xBU1NfVU5TUEVDSUZJRUQQABIVChFIQU5EX0NMQVNTX1NJTkdMRRABEhMKD0hBTkRfQ0xBU1NfUEFJUhACEhcKE0hBTkRfQ0xBU1NfU1RSQUlHSFQQAxIWChJIQU5EX0NMQVNTX0xFT1BBUkQQBBIeChZIQU5EX0NMQVNTX1NQRUNJQUxfMjM1EAUaAggBKqwBChFTcGVjaWFsMjM1T3V0Y29tZRIiCh5TUEVDSUFMMjM1X09VVENPTUVfVU5TUEVDSUZJRUQQABIlCiFTUEVDSUFMMjM1X09VVENPTUVfTk9UX0FQUExJQ0FCTEUQARIlCiFTUEVDSUFMMjM1X09VVENPTUVfQkVBVFNfTEVPUEFSRFMQAhIlCiFTUEVDSUFMMjM1X09VVENPTUVfTUlOSU1VTV9TSU5HTEUQAypsCglNYXRjaEtpbmQSGgoWTUFUQ0hfS0lORF9VTlNQRUNJRklFRBAAEhQKEE1BVENIX0tJTkRfRVhBQ1QQARIWChJNQVRDSF9LSU5EX0hJR0hFU1QQAhIVChFNQVRDSF9LSU5EX0xPV0VTVBADKqsDCg9SZXNvbHV0aW9uQ2F1c2USIAocUkVTT0xVVElPTl9DQVVTRV9VTlNQRUNJRklFRBAAEiEKHVJFU09MVVRJT05fQ0FVU0VfSU5JVElBTF9ST0xMEAESIQodUkVTT0xVVElPTl9DQVVTRV9NQVRDSF9SRVJPTEwQAhIiCh5SRVNPTFVUSU9OX0NBVVNFX1BMQVlFUl9SRVJPTEwQAxIhCh1SRVNPTFVUSU9OX0NBVVNFX1BMQVlFUl9TVEFORBAEEiIKHlJFU09MVVRJT05fQ0FVU0VfVElNRU9VVF9TVEFORBAFEigKJFJFU09MVVRJT05fQ0FVU0VfUEFSVElDSVBBTlRfUkVWT0tFRBAGEiMKH1JFU09MVVRJT05fQ0FVU0VfVEFSR0VUX1JFVk9LRUQQBxIiCh5SRVNPTFVUSU9OX0NBVVNFX0hPU1RfRklOSVNIRUQQCBIpCiVSRVNPTFVUSU9OX0NBVVNFX0lOU1VGRklDSUVOVF9QTEFZRVJTEAkSJwojUkVTT0xVVElPTl9DQVVTRV9QTEFURk9STV9DQU5DRUxMRUQQCirbAQoMUm91bmRPdXRjb21lEh0KGVJPVU5EX09VVENPTUVfVU5TUEVDSUZJRUQQABIXChNST1VORF9PVVRDT01FX1NUT09EEAESJQohUk9VTkRfT1VUQ09NRV9UQVJHRVRfRVhDRUVERURfQUxMEAISJgoiUk9VTkRfT1VUQ09NRV9SRVJPTExfTElNSVRfUkVBQ0hFRBADEiAKHFJPVU5EX09VVENPTUVfVEFSR0VUX1JFVk9LRUQQBBIiCh5ST1VORF9PVVRDT01FX1NFU1NJT05fRklOSVNIRUQQBUJgWl5naXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2dhbWVzL21lZXQtYnktY2hhbmNlL2dlbi9nby9nYW1lL21lZXRfYnlfY2hhbmNlL3YxO21lZXRieWNoYW5jZXYxYgZwcm90bzM");
 
 /**
  * @generated from message game.meet_by_chance.v1.Config
@@ -90,9 +90,94 @@ export const ConfigSchema: GenMessage<Config> = /*@__PURE__*/
   messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 0);
 
 /**
+ * PlayerState is authoritative and must never be serialized directly into a viewer projection.
+ *
  * @generated from message game.meet_by_chance.v1.PlayerState
  */
 export type PlayerState = Message<"game.meet_by_chance.v1.PlayerState"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: uint32 seat_index = 2;
+   */
+  seatIndex: number;
+
+  /**
+   * @generated from field: bool active = 3;
+   */
+  active: boolean;
+
+  /**
+   * @generated from field: uint32 penalty_ticks = 4;
+   */
+  penaltyTicks: number;
+
+  /**
+   * Dice are the raw revealed faces in roll order.
+   *
+   * @generated from field: repeated uint32 dice = 5;
+   */
+  dice: number[];
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.HandClass hand_class = 6;
+   */
+  handClass: HandClass;
+
+  /**
+   * @generated from field: repeated int32 full_key = 7;
+   */
+  fullKey: number[];
+
+  /**
+   * @generated from field: repeated int32 tie_key = 8;
+   */
+  tieKey: number[];
+
+  /**
+   * @generated from field: bool special_235 = 9;
+   */
+  special235: boolean;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Special235Outcome special_235_outcome = 10;
+   */
+  special235Outcome: Special235Outcome;
+
+  /**
+   * @generated from field: bool targeted_this_round = 11;
+   */
+  targetedThisRound: boolean;
+
+  /**
+   * @generated from field: repeated uint32 normalized_dice = 12;
+   */
+  normalizedDice: number[];
+
+  /**
+   * True when this hand contributed to the most recently completed classification pass.
+   *
+   * @generated from field: bool included_in_current_resolution = 13;
+   */
+  includedInCurrentResolution: boolean;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.PlayerState.
+ * Use `create(PlayerStateSchema)` to create a new message.
+ */
+export const PlayerStateSchema: GenMessage<PlayerState> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 1);
+
+/**
+ * PublicPlayer contains only facts that are safe for players, spectators, deltas, and replay.
+ *
+ * @generated from message game.meet_by_chance.v1.PublicPlayer
+ */
+export type PublicPlayer = Message<"game.meet_by_chance.v1.PublicPlayer"> & {
   /**
    * @generated from field: string user_id = 1;
    */
@@ -119,27 +204,216 @@ export type PlayerState = Message<"game.meet_by_chance.v1.PlayerState"> & {
   dice: number[];
 
   /**
-   * @generated from field: game.meet_by_chance.v1.HandClass hand_class = 6;
+   * @generated from field: repeated uint32 normalized_dice = 6;
+   */
+  normalizedDice: number[];
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.HandClass hand_class = 7;
    */
   handClass: HandClass;
 
   /**
-   * @generated from field: repeated int32 full_key = 7;
+   * @generated from field: bool special_235 = 8;
    */
-  fullKey: number[];
+  special235: boolean;
 
   /**
-   * @generated from field: repeated int32 tie_key = 8;
+   * @generated from field: game.meet_by_chance.v1.Special235Outcome special_235_outcome = 9;
    */
-  tieKey: number[];
+  special235Outcome: Special235Outcome;
+
+  /**
+   * @generated from field: bool targeted_this_round = 10;
+   */
+  targetedThisRound: boolean;
 };
 
 /**
- * Describes the message game.meet_by_chance.v1.PlayerState.
- * Use `create(PlayerStateSchema)` to create a new message.
+ * Describes the message game.meet_by_chance.v1.PublicPlayer.
+ * Use `create(PublicPlayerSchema)` to create a new message.
  */
-export const PlayerStateSchema: GenMessage<PlayerState> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 1);
+export const PublicPlayerSchema: GenMessage<PublicPlayer> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 2);
+
+/**
+ * PublicDice is emitted before classification and therefore carries no derived hand result.
+ *
+ * @generated from message game.meet_by_chance.v1.PublicDice
+ */
+export type PublicDice = Message<"game.meet_by_chance.v1.PublicDice"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: uint32 seat_index = 2;
+   */
+  seatIndex: number;
+
+  /**
+   * @generated from field: repeated uint32 dice = 3;
+   */
+  dice: number[];
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.PublicDice.
+ * Use `create(PublicDiceSchema)` to create a new message.
+ */
+export const PublicDiceSchema: GenMessage<PublicDice> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 3);
+
+/**
+ * @generated from message game.meet_by_chance.v1.MatchGroup
+ */
+export type MatchGroup = Message<"game.meet_by_chance.v1.MatchGroup"> & {
+  /**
+   * @generated from field: game.meet_by_chance.v1.MatchKind kind = 1;
+   */
+  kind: MatchKind;
+
+  /**
+   * @generated from field: repeated string user_ids = 2;
+   */
+  userIds: string[];
+
+  /**
+   * @generated from field: uint32 penalty_ticks = 3;
+   */
+  penaltyTicks: number;
+
+  /**
+   * @generated from field: string weakest_user_id = 4;
+   */
+  weakestUserId: string;
+
+  /**
+   * @generated from field: uint32 weak_extra_penalty_ticks = 5;
+   */
+  weakExtraPenaltyTicks: number;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.MatchGroup.
+ * Use `create(MatchGroupSchema)` to create a new message.
+ */
+export const MatchGroupSchema: GenMessage<MatchGroup> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 4);
+
+/**
+ * MatchBatch represents all disjoint groups handled by one bounded automatic resolution pass.
+ *
+ * @generated from message game.meet_by_chance.v1.MatchBatch
+ */
+export type MatchBatch = Message<"game.meet_by_chance.v1.MatchBatch"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 batch_index = 2;
+   */
+  batchIndex: number;
+
+  /**
+   * @generated from field: uint32 resolution_count = 3;
+   */
+  resolutionCount: number;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.MatchGroup groups = 4;
+   */
+  groups: MatchGroup[];
+
+  /**
+   * @generated from field: repeated string rerolled_user_ids = 5;
+   */
+  rerolledUserIds: string[];
+
+  /**
+   * @generated from field: bool capped = 6;
+   */
+  capped: boolean;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.MatchBatch.
+ * Use `create(MatchBatchSchema)` to create a new message.
+ */
+export const MatchBatchSchema: GenMessage<MatchBatch> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 5);
+
+/**
+ * RoundSummary is the compact public result retained in authoritative snapshots.
+ *
+ * @generated from message game.meet_by_chance.v1.RoundSummary
+ */
+export type RoundSummary = Message<"game.meet_by_chance.v1.RoundSummary"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string target_user_id = 2;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundOutcome outcome = 3;
+   */
+  outcome: RoundOutcome;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 4;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: uint32 target_reroll_count = 5;
+   */
+  targetRerollCount: number;
+
+  /**
+   * @generated from field: uint32 match_resolution_count = 6;
+   */
+  matchResolutionCount: number;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.PublicPlayer final_players = 7;
+   */
+  finalPlayers: PublicPlayer[];
+
+  /**
+   * @generated from field: repeated string target_history_user_ids = 8;
+   */
+  targetHistoryUserIds: string[];
+
+  /**
+   * @generated from field: string reason = 9;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: bool settled = 10;
+   */
+  settled: boolean;
+
+  /**
+   * @generated from field: uint32 target_streak = 11;
+   */
+  targetStreak: number;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.RoundSummary.
+ * Use `create(RoundSummarySchema)` to create a new message.
+ */
+export const RoundSummarySchema: GenMessage<RoundSummary> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 6);
 
 /**
  * @generated from message game.meet_by_chance.v1.State
@@ -194,6 +468,47 @@ export type State = Message<"game.meet_by_chance.v1.State"> & {
    * @generated from field: game.meet_by_chance.v1.Config config = 10;
    */
   config?: Config;
+
+  /**
+   * Host identity is frozen from trusted session start context for audit and system transitions.
+   *
+   * @generated from field: string host_user_id = 11;
+   */
+  hostUserId: string;
+
+  /**
+   * Rule-level actions are recalculated per viewer and are not copied directly into View.
+   *
+   * @generated from field: repeated string allowed_actions = 12;
+   */
+  allowedActions: string[];
+
+  /**
+   * @generated from field: string finish_reason = 13;
+   */
+  finishReason: string;
+
+  /**
+   * The engine retains at most the latest 32 settled rounds.
+   *
+   * @generated from field: repeated game.meet_by_chance.v1.RoundSummary round_history = 14;
+   */
+  roundHistory: RoundSummary[];
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundSummary last_settlement = 15;
+   */
+  lastSettlement?: RoundSummary;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.MatchBatch last_match_batch = 16;
+   */
+  lastMatchBatch?: MatchBatch;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.MatchBatch match_history = 17;
+   */
+  matchHistory: MatchBatch[];
 };
 
 /**
@@ -201,7 +516,7 @@ export type State = Message<"game.meet_by_chance.v1.State"> & {
  * Use `create(StateSchema)` to create a new message.
  */
 export const StateSchema: GenMessage<State> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 2);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 7);
 
 /**
  * @generated from message game.meet_by_chance.v1.Reroll
@@ -214,7 +529,7 @@ export type Reroll = Message<"game.meet_by_chance.v1.Reroll"> & {
  * Use `create(RerollSchema)` to create a new message.
  */
 export const RerollSchema: GenMessage<Reroll> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 3);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 8);
 
 /**
  * @generated from message game.meet_by_chance.v1.Stand
@@ -227,12 +542,25 @@ export type Stand = Message<"game.meet_by_chance.v1.Stand"> & {
  * Use `create(StandSchema)` to create a new message.
  */
 export const StandSchema: GenMessage<Stand> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 4);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 9);
 
 /**
  * @generated from message game.meet_by_chance.v1.Finish
  */
 export type Finish = Message<"game.meet_by_chance.v1.Finish"> & {
+  /**
+   * Empty means a runtime-authorized host finish; platform cancellation is explicit.
+   *
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+
+  /**
+   * Runtime supplies the currently authorized PartyRoom host.
+   *
+   * @generated from field: string operator_user_id = 2;
+   */
+  operatorUserId: string;
 };
 
 /**
@@ -240,7 +568,7 @@ export type Finish = Message<"game.meet_by_chance.v1.Finish"> & {
  * Use `create(FinishSchema)` to create a new message.
  */
 export const FinishSchema: GenMessage<Finish> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 5);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 10);
 
 /**
  * @generated from message game.meet_by_chance.v1.Command
@@ -275,7 +603,29 @@ export type Command = Message<"game.meet_by_chance.v1.Command"> & {
  * Use `create(CommandSchema)` to create a new message.
  */
 export const CommandSchema: GenMessage<Command> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 6);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 11);
+
+/**
+ * @generated from message game.meet_by_chance.v1.ReplayPlayer
+ */
+export type ReplayPlayer = Message<"game.meet_by_chance.v1.ReplayPlayer"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: uint32 seat_index = 2;
+   */
+  seatIndex: number;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.ReplayPlayer.
+ * Use `create(ReplayPlayerSchema)` to create a new message.
+ */
+export const ReplayPlayerSchema: GenMessage<ReplayPlayer> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 12);
 
 /**
  * @generated from message game.meet_by_chance.v1.RoundStarted
@@ -285,6 +635,33 @@ export type RoundStarted = Message<"game.meet_by_chance.v1.RoundStarted"> & {
    * @generated from field: uint32 round = 1;
    */
   round: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 2;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundOutcome previous_outcome = 3;
+   */
+  previousOutcome: RoundOutcome;
+
+  /**
+   * Initialization fields are required on round 1 and absent on later rounds.
+   *
+   * @generated from field: game.meet_by_chance.v1.Config config = 4;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.ReplayPlayer players = 5;
+   */
+  players: ReplayPlayer[];
+
+  /**
+   * @generated from field: string host_user_id = 6;
+   */
+  hostUserId: string;
 };
 
 /**
@@ -292,16 +669,44 @@ export type RoundStarted = Message<"game.meet_by_chance.v1.RoundStarted"> & {
  * Use `create(RoundStartedSchema)` to create a new message.
  */
 export const RoundStartedSchema: GenMessage<RoundStarted> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 7);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 13);
 
 /**
  * @generated from message game.meet_by_chance.v1.DiceRevealed
  */
 export type DiceRevealed = Message<"game.meet_by_chance.v1.DiceRevealed"> & {
   /**
-   * @generated from field: repeated game.meet_by_chance.v1.PlayerState players = 1;
+   * Deprecated because PlayerState contains internal comparison keys. Producers must leave it empty.
+   *
+   * @generated from field: repeated game.meet_by_chance.v1.PlayerState players = 1 [deprecated = true];
+   * @deprecated
    */
   players: PlayerState[];
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.PublicDice public_dice = 2;
+   */
+  publicDice: PublicDice[];
+
+  /**
+   * @generated from field: uint32 round = 3;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 batch_index = 4;
+   */
+  batchIndex: number;
+
+  /**
+   * @generated from field: repeated string rolled_user_ids = 5;
+   */
+  rolledUserIds: string[];
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -309,7 +714,7 @@ export type DiceRevealed = Message<"game.meet_by_chance.v1.DiceRevealed"> & {
  * Use `create(DiceRevealedSchema)` to create a new message.
  */
 export const DiceRevealedSchema: GenMessage<DiceRevealed> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 8);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 14);
 
 /**
  * @generated from message game.meet_by_chance.v1.HandClassified
@@ -326,14 +731,48 @@ export type HandClassified = Message<"game.meet_by_chance.v1.HandClassified"> & 
   handClass: HandClass;
 
   /**
-   * @generated from field: repeated int32 full_key = 3;
+   * Deprecated internal fields. Producers and strict decoders must require them to be empty.
+   *
+   * @generated from field: repeated int32 full_key = 3 [deprecated = true];
+   * @deprecated
    */
   fullKey: number[];
 
   /**
-   * @generated from field: repeated int32 tie_key = 4;
+   * @generated from field: repeated int32 tie_key = 4 [deprecated = true];
+   * @deprecated
    */
   tieKey: number[];
+
+  /**
+   * @generated from field: uint32 round = 5;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 batch_index = 6;
+   */
+  batchIndex: number;
+
+  /**
+   * @generated from field: repeated uint32 dice = 7;
+   */
+  dice: number[];
+
+  /**
+   * @generated from field: repeated uint32 normalized_dice = 8;
+   */
+  normalizedDice: number[];
+
+  /**
+   * @generated from field: bool special_235 = 9;
+   */
+  special235: boolean;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Special235Outcome special_235_outcome = 10;
+   */
+  special235Outcome: Special235Outcome;
 };
 
 /**
@@ -341,26 +780,46 @@ export type HandClassified = Message<"game.meet_by_chance.v1.HandClassified"> & 
  * Use `create(HandClassifiedSchema)` to create a new message.
  */
 export const HandClassifiedSchema: GenMessage<HandClassified> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 9);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 15);
 
 /**
  * @generated from message game.meet_by_chance.v1.MatchResolved
  */
 export type MatchResolved = Message<"game.meet_by_chance.v1.MatchResolved"> & {
   /**
-   * @generated from field: repeated string user_ids = 1;
+   * Legacy summary fields remain available for wire compatibility.
+   *
+   * @generated from field: repeated string user_ids = 1 [deprecated = true];
+   * @deprecated
    */
   userIds: string[];
 
   /**
-   * @generated from field: string kind = 2;
+   * @generated from field: string kind = 2 [deprecated = true];
+   * @deprecated
    */
   kind: string;
 
   /**
-   * @generated from field: uint32 penalty_ticks = 3;
+   * @generated from field: uint32 penalty_ticks = 3 [deprecated = true];
+   * @deprecated
    */
   penaltyTicks: number;
+
+  /**
+   * @generated from field: uint32 round = 4;
+   */
+  round: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.MatchBatch batch = 5;
+   */
+  batch?: MatchBatch;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -368,7 +827,7 @@ export type MatchResolved = Message<"game.meet_by_chance.v1.MatchResolved"> & {
  * Use `create(MatchResolvedSchema)` to create a new message.
  */
 export const MatchResolvedSchema: GenMessage<MatchResolved> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 10);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 16);
 
 /**
  * @generated from message game.meet_by_chance.v1.TargetSelected
@@ -383,6 +842,41 @@ export type TargetSelected = Message<"game.meet_by_chance.v1.TargetSelected"> & 
    * @generated from field: uint32 penalty_ticks = 2;
    */
   penaltyTicks: number;
+
+  /**
+   * @generated from field: uint32 round = 3;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string previous_user_id = 4;
+   */
+  previousUserId: string;
+
+  /**
+   * @generated from field: bool first_selection_this_round = 5;
+   */
+  firstSelectionThisRound: boolean;
+
+  /**
+   * @generated from field: uint32 target_reroll_count = 6;
+   */
+  targetRerollCount: number;
+
+  /**
+   * @generated from field: uint32 target_streak = 7;
+   */
+  targetStreak: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 8;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: uint32 match_resolution_count = 9;
+   */
+  matchResolutionCount: number;
 };
 
 /**
@@ -390,7 +884,7 @@ export type TargetSelected = Message<"game.meet_by_chance.v1.TargetSelected"> & 
  * Use `create(TargetSelectedSchema)` to create a new message.
  */
 export const TargetSelectedSchema: GenMessage<TargetSelected> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 11);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 17);
 
 /**
  * @generated from message game.meet_by_chance.v1.TargetRerolled
@@ -402,9 +896,36 @@ export type TargetRerolled = Message<"game.meet_by_chance.v1.TargetRerolled"> & 
   userId: string;
 
   /**
+   * Count is the round-wide target reroll count and never resets on target transfer.
+   *
    * @generated from field: uint32 count = 2;
    */
   count: number;
+
+  /**
+   * @generated from field: uint32 round = 3;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 target_streak = 4;
+   */
+  targetStreak: number;
+
+  /**
+   * @generated from field: uint32 penalty_ticks = 5;
+   */
+  penaltyTicks: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 6;
+   */
+  cause: ResolutionCause;
+
+  /**
+   * @generated from field: uint32 match_resolution_count = 7;
+   */
+  matchResolutionCount: number;
 };
 
 /**
@@ -412,7 +933,7 @@ export type TargetRerolled = Message<"game.meet_by_chance.v1.TargetRerolled"> & 
  * Use `create(TargetRerolledSchema)` to create a new message.
  */
 export const TargetRerolledSchema: GenMessage<TargetRerolled> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 12);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 18);
 
 /**
  * @generated from message game.meet_by_chance.v1.PenaltyRecorded
@@ -432,6 +953,31 @@ export type PenaltyRecorded = Message<"game.meet_by_chance.v1.PenaltyRecorded"> 
    * @generated from field: string reason = 3;
    */
   reason: string;
+
+  /**
+   * @generated from field: uint32 before_total_ticks = 4;
+   */
+  beforeTotalTicks: number;
+
+  /**
+   * @generated from field: uint32 after_total_ticks = 5;
+   */
+  afterTotalTicks: number;
+
+  /**
+   * @generated from field: uint32 round = 6;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 batch_index = 7;
+   */
+  batchIndex: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 8;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -439,7 +985,7 @@ export type PenaltyRecorded = Message<"game.meet_by_chance.v1.PenaltyRecorded"> 
  * Use `create(PenaltyRecordedSchema)` to create a new message.
  */
 export const PenaltyRecordedSchema: GenMessage<PenaltyRecorded> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 13);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 19);
 
 /**
  * @generated from message game.meet_by_chance.v1.ParticipantRevoked
@@ -449,6 +995,36 @@ export type ParticipantRevoked = Message<"game.meet_by_chance.v1.ParticipantRevo
    * @generated from field: string user_id = 1;
    */
   userId: string;
+
+  /**
+   * @generated from field: uint32 round = 2;
+   */
+  round: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Phase phase_before = 3;
+   */
+  phaseBefore: Phase;
+
+  /**
+   * @generated from field: bool was_target = 4;
+   */
+  wasTarget: boolean;
+
+  /**
+   * @generated from field: bool round_cancelled = 5;
+   */
+  roundCancelled: boolean;
+
+  /**
+   * @generated from field: uint32 next_round = 6;
+   */
+  nextRound: number;
+
+  /**
+   * @generated from field: uint32 active_player_count = 7;
+   */
+  activePlayerCount: number;
 };
 
 /**
@@ -456,7 +1032,7 @@ export type ParticipantRevoked = Message<"game.meet_by_chance.v1.ParticipantRevo
  * Use `create(ParticipantRevokedSchema)` to create a new message.
  */
 export const ParticipantRevokedSchema: GenMessage<ParticipantRevoked> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 14);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 20);
 
 /**
  * @generated from message game.meet_by_chance.v1.SessionFinished
@@ -466,6 +1042,21 @@ export type SessionFinished = Message<"game.meet_by_chance.v1.SessionFinished"> 
    * @generated from field: string reason = 1;
    */
   reason: string;
+
+  /**
+   * @generated from field: uint32 round = 2;
+   */
+  round: number;
+
+  /**
+   * @generated from field: string operator_user_id = 3;
+   */
+  operatorUserId: string;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.ResolutionCause cause = 4;
+   */
+  cause: ResolutionCause;
 };
 
 /**
@@ -473,7 +1064,61 @@ export type SessionFinished = Message<"game.meet_by_chance.v1.SessionFinished"> 
  * Use `create(SessionFinishedSchema)` to create a new message.
  */
 export const SessionFinishedSchema: GenMessage<SessionFinished> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 15);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 21);
+
+/**
+ * @generated from message game.meet_by_chance.v1.Special235Evaluated
+ */
+export type Special235Evaluated = Message<"game.meet_by_chance.v1.Special235Evaluated"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: uint32 batch_index = 2;
+   */
+  batchIndex: number;
+
+  /**
+   * @generated from field: repeated string special_user_ids = 3;
+   */
+  specialUserIds: string[];
+
+  /**
+   * @generated from field: bool all_other_players_are_leopards = 4;
+   */
+  allOtherPlayersAreLeopards: boolean;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Special235Outcome outcome = 5;
+   */
+  outcome: Special235Outcome;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.Special235Evaluated.
+ * Use `create(Special235EvaluatedSchema)` to create a new message.
+ */
+export const Special235EvaluatedSchema: GenMessage<Special235Evaluated> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 22);
+
+/**
+ * @generated from message game.meet_by_chance.v1.RoundSettled
+ */
+export type RoundSettled = Message<"game.meet_by_chance.v1.RoundSettled"> & {
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundSummary summary = 1;
+   */
+  summary?: RoundSummary;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.RoundSettled.
+ * Use `create(RoundSettledSchema)` to create a new message.
+ */
+export const RoundSettledSchema: GenMessage<RoundSettled> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 23);
 
 /**
  * @generated from message game.meet_by_chance.v1.Event
@@ -536,6 +1181,18 @@ export type Event = Message<"game.meet_by_chance.v1.Event"> & {
      */
     value: SessionFinished;
     case: "sessionFinished";
+  } | {
+    /**
+     * @generated from field: game.meet_by_chance.v1.Special235Evaluated special_235_evaluated = 10;
+     */
+    value: Special235Evaluated;
+    case: "special235Evaluated";
+  } | {
+    /**
+     * @generated from field: game.meet_by_chance.v1.RoundSettled round_settled = 11;
+     */
+    value: RoundSettled;
+    case: "roundSettled";
   } | { case: undefined; value?: undefined };
 };
 
@@ -544,7 +1201,56 @@ export type Event = Message<"game.meet_by_chance.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 16);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 24);
+
+/**
+ * ActionTimer binds a timeout to the exact decision it is allowed to settle.
+ *
+ * @generated from message game.meet_by_chance.v1.ActionTimer
+ */
+export type ActionTimer = Message<"game.meet_by_chance.v1.ActionTimer"> & {
+  /**
+   * @generated from field: uint32 round = 1;
+   */
+  round: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Phase phase = 2;
+   */
+  phase: Phase;
+
+  /**
+   * @generated from field: string target_user_id = 3;
+   */
+  targetUserId: string;
+
+  /**
+   * @generated from field: uint32 target_reroll_count = 4;
+   */
+  targetRerollCount: number;
+
+  /**
+   * @generated from field: int64 deadline_unix_millis = 5;
+   */
+  deadlineUnixMillis: bigint;
+
+  /**
+   * @generated from field: uint32 target_streak = 6;
+   */
+  targetStreak: number;
+
+  /**
+   * @generated from field: uint32 match_resolution_count = 7;
+   */
+  matchResolutionCount: number;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.ActionTimer.
+ * Use `create(ActionTimerSchema)` to create a new message.
+ */
+export const ActionTimerSchema: GenMessage<ActionTimer> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 25);
 
 /**
  * @generated from message game.meet_by_chance.v1.View
@@ -561,7 +1267,10 @@ export type View = Message<"game.meet_by_chance.v1.View"> & {
   round: number;
 
   /**
-   * @generated from field: repeated game.meet_by_chance.v1.PlayerState players = 3;
+   * Deprecated because PlayerState contains internal keys. Producers must leave it empty.
+   *
+   * @generated from field: repeated game.meet_by_chance.v1.PlayerState players = 3 [deprecated = true];
+   * @deprecated
    */
   players: PlayerState[];
 
@@ -604,6 +1313,43 @@ export type View = Message<"game.meet_by_chance.v1.View"> & {
    * @generated from field: string finish_reason = 11;
    */
   finishReason: string;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.PublicPlayer public_players = 12;
+   */
+  publicPlayers: PublicPlayer[];
+
+  /**
+   * @generated from field: uint32 target_streak = 13;
+   */
+  targetStreak: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Config config = 14;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundSummary last_settlement = 15;
+   */
+  lastSettlement?: RoundSummary;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.RoundSummary recent_rounds = 16;
+   */
+  recentRounds: RoundSummary[];
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.MatchBatch last_match_batch = 17;
+   */
+  lastMatchBatch?: MatchBatch;
+
+  /**
+   * This viewer-scoped flag never grants actions; allowed_actions remains authoritative.
+   *
+   * @generated from field: bool viewer_is_host = 18;
+   */
+  viewerIsHost: boolean;
 };
 
 /**
@@ -611,7 +1357,111 @@ export type View = Message<"game.meet_by_chance.v1.View"> & {
  * Use `create(ViewSchema)` to create a new message.
  */
 export const ViewSchema: GenMessage<View> = /*@__PURE__*/
-  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 17);
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 26);
+
+/**
+ * ViewDelta replaces the current viewer-safe public view after validated events.
+ *
+ * @generated from message game.meet_by_chance.v1.ViewDelta
+ */
+export type ViewDelta = Message<"game.meet_by_chance.v1.ViewDelta"> & {
+  /**
+   * @generated from field: game.meet_by_chance.v1.View view = 1;
+   */
+  view?: View;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.ViewDelta.
+ * Use `create(ViewDeltaSchema)` to create a new message.
+ */
+export const ViewDeltaSchema: GenMessage<ViewDelta> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 27);
+
+/**
+ * ReplayEntry preserves public event order without exposing snapshots, seeds, or comparison keys.
+ *
+ * @generated from message game.meet_by_chance.v1.ReplayEntry
+ */
+export type ReplayEntry = Message<"game.meet_by_chance.v1.ReplayEntry"> & {
+  /**
+   * @generated from field: uint64 sequence = 1;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Event event = 2;
+   */
+  event?: Event;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.ReplayEntry.
+ * Use `create(ReplayEntrySchema)` to create a new message.
+ */
+export const ReplayEntrySchema: GenMessage<ReplayEntry> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 28);
+
+/**
+ * @generated from message game.meet_by_chance.v1.ReplayRound
+ */
+export type ReplayRound = Message<"game.meet_by_chance.v1.ReplayRound"> & {
+  /**
+   * @generated from field: game.meet_by_chance.v1.RoundSummary summary = 1;
+   */
+  summary?: RoundSummary;
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.ReplayRound.
+ * Use `create(ReplayRoundSchema)` to create a new message.
+ */
+export const ReplayRoundSchema: GenMessage<ReplayRound> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 29);
+
+/**
+ * Replay contains only settled rounds; a pending round is never appended to rounds.
+ *
+ * @generated from message game.meet_by_chance.v1.Replay
+ */
+export type Replay = Message<"game.meet_by_chance.v1.Replay"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: game.meet_by_chance.v1.Config config = 2;
+   */
+  config?: Config;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.ReplayPlayer players = 3;
+   */
+  players: ReplayPlayer[];
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.ReplayEntry entries = 4;
+   */
+  entries: ReplayEntry[];
+
+  /**
+   * @generated from field: string finish_reason = 5;
+   */
+  finishReason: string;
+
+  /**
+   * @generated from field: repeated game.meet_by_chance.v1.ReplayRound rounds = 6;
+   */
+  rounds: ReplayRound[];
+};
+
+/**
+ * Describes the message game.meet_by_chance.v1.Replay.
+ * Use `create(ReplaySchema)` to create a new message.
+ */
+export const ReplaySchema: GenMessage<Replay> = /*@__PURE__*/
+  messageDesc(file_game_meet_by_chance_v1_meet_by_chance, 30);
 
 /**
  * @generated from enum game.meet_by_chance.v1.Phase
@@ -648,7 +1498,10 @@ export enum Phase {
   TARGET_ROLLING = 5,
 
   /**
-   * @generated from enum value: PHASE_ROUND_SETTLED = 6;
+   * Retained as an event boundary; settled rounds immediately advance to the next decision state.
+   *
+   * @generated from enum value: PHASE_ROUND_SETTLED = 6 [deprecated = true];
+   * @deprecated
    */
   ROUND_SETTLED = 6,
 
@@ -694,7 +1547,10 @@ export enum HandClass {
   LEOPARD = 4,
 
   /**
-   * @generated from enum value: HAND_CLASS_SPECIAL_235 = 5;
+   * Retained for wire compatibility. A 235 is ranked by its round-wide context, not as a fixed class.
+   *
+   * @generated from enum value: HAND_CLASS_SPECIAL_235 = 5 [deprecated = true];
+   * @deprecated
    */
   SPECIAL_235 = 5,
 }
@@ -704,3 +1560,178 @@ export enum HandClass {
  */
 export const HandClassSchema: GenEnum<HandClass> = /*@__PURE__*/
   enumDesc(file_game_meet_by_chance_v1_meet_by_chance, 1);
+
+/**
+ * Special235Outcome records the public result of the round-wide 235 context evaluation.
+ *
+ * @generated from enum game.meet_by_chance.v1.Special235Outcome
+ */
+export enum Special235Outcome {
+  /**
+   * @generated from enum value: SPECIAL235_OUTCOME_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SPECIAL235_OUTCOME_NOT_APPLICABLE = 1;
+   */
+  NOT_APPLICABLE = 1,
+
+  /**
+   * @generated from enum value: SPECIAL235_OUTCOME_BEATS_LEOPARDS = 2;
+   */
+  BEATS_LEOPARDS = 2,
+
+  /**
+   * @generated from enum value: SPECIAL235_OUTCOME_MINIMUM_SINGLE = 3;
+   */
+  MINIMUM_SINGLE = 3,
+}
+
+/**
+ * Describes the enum game.meet_by_chance.v1.Special235Outcome.
+ */
+export const Special235OutcomeSchema: GenEnum<Special235Outcome> = /*@__PURE__*/
+  enumDesc(file_game_meet_by_chance_v1_meet_by_chance, 2);
+
+/**
+ * MatchKind identifies one automatically resolved group without exposing internal comparison keys.
+ *
+ * @generated from enum game.meet_by_chance.v1.MatchKind
+ */
+export enum MatchKind {
+  /**
+   * @generated from enum value: MATCH_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MATCH_KIND_EXACT = 1;
+   */
+  EXACT = 1,
+
+  /**
+   * @generated from enum value: MATCH_KIND_HIGHEST = 2;
+   */
+  HIGHEST = 2,
+
+  /**
+   * @generated from enum value: MATCH_KIND_LOWEST = 3;
+   */
+  LOWEST = 3,
+}
+
+/**
+ * Describes the enum game.meet_by_chance.v1.MatchKind.
+ */
+export const MatchKindSchema: GenEnum<MatchKind> = /*@__PURE__*/
+  enumDesc(file_game_meet_by_chance_v1_meet_by_chance, 3);
+
+/**
+ * ResolutionCause records which trusted input initiated an authoritative transition.
+ *
+ * @generated from enum game.meet_by_chance.v1.ResolutionCause
+ */
+export enum ResolutionCause {
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_INITIAL_ROLL = 1;
+   */
+  INITIAL_ROLL = 1,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_MATCH_REROLL = 2;
+   */
+  MATCH_REROLL = 2,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PLAYER_REROLL = 3;
+   */
+  PLAYER_REROLL = 3,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PLAYER_STAND = 4;
+   */
+  PLAYER_STAND = 4,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_TIMEOUT_STAND = 5;
+   */
+  TIMEOUT_STAND = 5,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PARTICIPANT_REVOKED = 6;
+   */
+  PARTICIPANT_REVOKED = 6,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_TARGET_REVOKED = 7;
+   */
+  TARGET_REVOKED = 7,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_HOST_FINISHED = 8;
+   */
+  HOST_FINISHED = 8,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS = 9;
+   */
+  INSUFFICIENT_PLAYERS = 9,
+
+  /**
+   * @generated from enum value: RESOLUTION_CAUSE_PLATFORM_CANCELLED = 10;
+   */
+  PLATFORM_CANCELLED = 10,
+}
+
+/**
+ * Describes the enum game.meet_by_chance.v1.ResolutionCause.
+ */
+export const ResolutionCauseSchema: GenEnum<ResolutionCause> = /*@__PURE__*/
+  enumDesc(file_game_meet_by_chance_v1_meet_by_chance, 4);
+
+/**
+ * @generated from enum game.meet_by_chance.v1.RoundOutcome
+ */
+export enum RoundOutcome {
+  /**
+   * @generated from enum value: ROUND_OUTCOME_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUND_OUTCOME_STOOD = 1;
+   */
+  STOOD = 1,
+
+  /**
+   * @generated from enum value: ROUND_OUTCOME_TARGET_EXCEEDED_ALL = 2;
+   */
+  TARGET_EXCEEDED_ALL = 2,
+
+  /**
+   * @generated from enum value: ROUND_OUTCOME_REROLL_LIMIT_REACHED = 3;
+   */
+  REROLL_LIMIT_REACHED = 3,
+
+  /**
+   * @generated from enum value: ROUND_OUTCOME_TARGET_REVOKED = 4;
+   */
+  TARGET_REVOKED = 4,
+
+  /**
+   * @generated from enum value: ROUND_OUTCOME_SESSION_FINISHED = 5;
+   */
+  SESSION_FINISHED = 5,
+}
+
+/**
+ * Describes the enum game.meet_by_chance.v1.RoundOutcome.
+ */
+export const RoundOutcomeSchema: GenEnum<RoundOutcome> = /*@__PURE__*/
+  enumDesc(file_game_meet_by_chance_v1_meet_by_chance, 5);

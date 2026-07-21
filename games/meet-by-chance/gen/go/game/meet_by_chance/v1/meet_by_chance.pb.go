@@ -30,8 +30,11 @@ const (
 	Phase_PHASE_RESOLVING_MATCH Phase = 3
 	Phase_PHASE_TARGET_DECISION Phase = 4
 	Phase_PHASE_TARGET_ROLLING  Phase = 5
-	Phase_PHASE_ROUND_SETTLED   Phase = 6
-	Phase_PHASE_FINISHED        Phase = 7
+	// Retained as an event boundary; settled rounds immediately advance to the next decision state.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	Phase_PHASE_ROUND_SETTLED Phase = 6
+	Phase_PHASE_FINISHED      Phase = 7
 )
 
 // Enum value maps for Phase.
@@ -93,6 +96,9 @@ const (
 	HandClass_HAND_CLASS_PAIR        HandClass = 2
 	HandClass_HAND_CLASS_STRAIGHT    HandClass = 3
 	HandClass_HAND_CLASS_LEOPARD     HandClass = 4
+	// Retained for wire compatibility. A 235 is ranked by its round-wide context, not as a fixed class.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 	HandClass_HAND_CLASS_SPECIAL_235 HandClass = 5
 )
 
@@ -141,6 +147,244 @@ func (x HandClass) Number() protoreflect.EnumNumber {
 // Deprecated: Use HandClass.Descriptor instead.
 func (HandClass) EnumDescriptor() ([]byte, []int) {
 	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{1}
+}
+
+// Special235Outcome records the public result of the round-wide 235 context evaluation.
+type Special235Outcome int32
+
+const (
+	Special235Outcome_SPECIAL235_OUTCOME_UNSPECIFIED    Special235Outcome = 0
+	Special235Outcome_SPECIAL235_OUTCOME_NOT_APPLICABLE Special235Outcome = 1
+	Special235Outcome_SPECIAL235_OUTCOME_BEATS_LEOPARDS Special235Outcome = 2
+	Special235Outcome_SPECIAL235_OUTCOME_MINIMUM_SINGLE Special235Outcome = 3
+)
+
+// Enum value maps for Special235Outcome.
+var (
+	Special235Outcome_name = map[int32]string{
+		0: "SPECIAL235_OUTCOME_UNSPECIFIED",
+		1: "SPECIAL235_OUTCOME_NOT_APPLICABLE",
+		2: "SPECIAL235_OUTCOME_BEATS_LEOPARDS",
+		3: "SPECIAL235_OUTCOME_MINIMUM_SINGLE",
+	}
+	Special235Outcome_value = map[string]int32{
+		"SPECIAL235_OUTCOME_UNSPECIFIED":    0,
+		"SPECIAL235_OUTCOME_NOT_APPLICABLE": 1,
+		"SPECIAL235_OUTCOME_BEATS_LEOPARDS": 2,
+		"SPECIAL235_OUTCOME_MINIMUM_SINGLE": 3,
+	}
+)
+
+func (x Special235Outcome) Enum() *Special235Outcome {
+	p := new(Special235Outcome)
+	*p = x
+	return p
+}
+
+func (x Special235Outcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Special235Outcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[2].Descriptor()
+}
+
+func (Special235Outcome) Type() protoreflect.EnumType {
+	return &file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[2]
+}
+
+func (x Special235Outcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Special235Outcome.Descriptor instead.
+func (Special235Outcome) EnumDescriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{2}
+}
+
+// MatchKind identifies one automatically resolved group without exposing internal comparison keys.
+type MatchKind int32
+
+const (
+	MatchKind_MATCH_KIND_UNSPECIFIED MatchKind = 0
+	MatchKind_MATCH_KIND_EXACT       MatchKind = 1
+	MatchKind_MATCH_KIND_HIGHEST     MatchKind = 2
+	MatchKind_MATCH_KIND_LOWEST      MatchKind = 3
+)
+
+// Enum value maps for MatchKind.
+var (
+	MatchKind_name = map[int32]string{
+		0: "MATCH_KIND_UNSPECIFIED",
+		1: "MATCH_KIND_EXACT",
+		2: "MATCH_KIND_HIGHEST",
+		3: "MATCH_KIND_LOWEST",
+	}
+	MatchKind_value = map[string]int32{
+		"MATCH_KIND_UNSPECIFIED": 0,
+		"MATCH_KIND_EXACT":       1,
+		"MATCH_KIND_HIGHEST":     2,
+		"MATCH_KIND_LOWEST":      3,
+	}
+)
+
+func (x MatchKind) Enum() *MatchKind {
+	p := new(MatchKind)
+	*p = x
+	return p
+}
+
+func (x MatchKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MatchKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[3].Descriptor()
+}
+
+func (MatchKind) Type() protoreflect.EnumType {
+	return &file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[3]
+}
+
+func (x MatchKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MatchKind.Descriptor instead.
+func (MatchKind) EnumDescriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{3}
+}
+
+// ResolutionCause records which trusted input initiated an authoritative transition.
+type ResolutionCause int32
+
+const (
+	ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED          ResolutionCause = 0
+	ResolutionCause_RESOLUTION_CAUSE_INITIAL_ROLL         ResolutionCause = 1
+	ResolutionCause_RESOLUTION_CAUSE_MATCH_REROLL         ResolutionCause = 2
+	ResolutionCause_RESOLUTION_CAUSE_PLAYER_REROLL        ResolutionCause = 3
+	ResolutionCause_RESOLUTION_CAUSE_PLAYER_STAND         ResolutionCause = 4
+	ResolutionCause_RESOLUTION_CAUSE_TIMEOUT_STAND        ResolutionCause = 5
+	ResolutionCause_RESOLUTION_CAUSE_PARTICIPANT_REVOKED  ResolutionCause = 6
+	ResolutionCause_RESOLUTION_CAUSE_TARGET_REVOKED       ResolutionCause = 7
+	ResolutionCause_RESOLUTION_CAUSE_HOST_FINISHED        ResolutionCause = 8
+	ResolutionCause_RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS ResolutionCause = 9
+	ResolutionCause_RESOLUTION_CAUSE_PLATFORM_CANCELLED   ResolutionCause = 10
+)
+
+// Enum value maps for ResolutionCause.
+var (
+	ResolutionCause_name = map[int32]string{
+		0:  "RESOLUTION_CAUSE_UNSPECIFIED",
+		1:  "RESOLUTION_CAUSE_INITIAL_ROLL",
+		2:  "RESOLUTION_CAUSE_MATCH_REROLL",
+		3:  "RESOLUTION_CAUSE_PLAYER_REROLL",
+		4:  "RESOLUTION_CAUSE_PLAYER_STAND",
+		5:  "RESOLUTION_CAUSE_TIMEOUT_STAND",
+		6:  "RESOLUTION_CAUSE_PARTICIPANT_REVOKED",
+		7:  "RESOLUTION_CAUSE_TARGET_REVOKED",
+		8:  "RESOLUTION_CAUSE_HOST_FINISHED",
+		9:  "RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS",
+		10: "RESOLUTION_CAUSE_PLATFORM_CANCELLED",
+	}
+	ResolutionCause_value = map[string]int32{
+		"RESOLUTION_CAUSE_UNSPECIFIED":          0,
+		"RESOLUTION_CAUSE_INITIAL_ROLL":         1,
+		"RESOLUTION_CAUSE_MATCH_REROLL":         2,
+		"RESOLUTION_CAUSE_PLAYER_REROLL":        3,
+		"RESOLUTION_CAUSE_PLAYER_STAND":         4,
+		"RESOLUTION_CAUSE_TIMEOUT_STAND":        5,
+		"RESOLUTION_CAUSE_PARTICIPANT_REVOKED":  6,
+		"RESOLUTION_CAUSE_TARGET_REVOKED":       7,
+		"RESOLUTION_CAUSE_HOST_FINISHED":        8,
+		"RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS": 9,
+		"RESOLUTION_CAUSE_PLATFORM_CANCELLED":   10,
+	}
+)
+
+func (x ResolutionCause) Enum() *ResolutionCause {
+	p := new(ResolutionCause)
+	*p = x
+	return p
+}
+
+func (x ResolutionCause) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResolutionCause) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[4].Descriptor()
+}
+
+func (ResolutionCause) Type() protoreflect.EnumType {
+	return &file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[4]
+}
+
+func (x ResolutionCause) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResolutionCause.Descriptor instead.
+func (ResolutionCause) EnumDescriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{4}
+}
+
+type RoundOutcome int32
+
+const (
+	RoundOutcome_ROUND_OUTCOME_UNSPECIFIED          RoundOutcome = 0
+	RoundOutcome_ROUND_OUTCOME_STOOD                RoundOutcome = 1
+	RoundOutcome_ROUND_OUTCOME_TARGET_EXCEEDED_ALL  RoundOutcome = 2
+	RoundOutcome_ROUND_OUTCOME_REROLL_LIMIT_REACHED RoundOutcome = 3
+	RoundOutcome_ROUND_OUTCOME_TARGET_REVOKED       RoundOutcome = 4
+	RoundOutcome_ROUND_OUTCOME_SESSION_FINISHED     RoundOutcome = 5
+)
+
+// Enum value maps for RoundOutcome.
+var (
+	RoundOutcome_name = map[int32]string{
+		0: "ROUND_OUTCOME_UNSPECIFIED",
+		1: "ROUND_OUTCOME_STOOD",
+		2: "ROUND_OUTCOME_TARGET_EXCEEDED_ALL",
+		3: "ROUND_OUTCOME_REROLL_LIMIT_REACHED",
+		4: "ROUND_OUTCOME_TARGET_REVOKED",
+		5: "ROUND_OUTCOME_SESSION_FINISHED",
+	}
+	RoundOutcome_value = map[string]int32{
+		"ROUND_OUTCOME_UNSPECIFIED":          0,
+		"ROUND_OUTCOME_STOOD":                1,
+		"ROUND_OUTCOME_TARGET_EXCEEDED_ALL":  2,
+		"ROUND_OUTCOME_REROLL_LIMIT_REACHED": 3,
+		"ROUND_OUTCOME_TARGET_REVOKED":       4,
+		"ROUND_OUTCOME_SESSION_FINISHED":     5,
+	}
+)
+
+func (x RoundOutcome) Enum() *RoundOutcome {
+	p := new(RoundOutcome)
+	*p = x
+	return p
+}
+
+func (x RoundOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RoundOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[5].Descriptor()
+}
+
+func (RoundOutcome) Type() protoreflect.EnumType {
+	return &file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes[5]
+}
+
+func (x RoundOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RoundOutcome.Descriptor instead.
+func (RoundOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{5}
 }
 
 type Config struct {
@@ -283,18 +527,26 @@ func (x *Config) GetActionTimeoutSeconds() uint32 {
 	return 0
 }
 
+// PlayerState is authoritative and must never be serialized directly into a viewer projection.
 type PlayerState struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	SeatIndex     uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
-	Active        bool                   `protobuf:"varint,3,opt,name=active,proto3" json:"active,omitempty"`
-	PenaltyTicks  uint32                 `protobuf:"varint,4,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
-	Dice          []uint32               `protobuf:"varint,5,rep,packed,name=dice,proto3" json:"dice,omitempty"`
-	HandClass     HandClass              `protobuf:"varint,6,opt,name=hand_class,json=handClass,proto3,enum=game.meet_by_chance.v1.HandClass" json:"hand_class,omitempty"`
-	FullKey       []int32                `protobuf:"varint,7,rep,packed,name=full_key,json=fullKey,proto3" json:"full_key,omitempty"`
-	TieKey        []int32                `protobuf:"varint,8,rep,packed,name=tie_key,json=tieKey,proto3" json:"tie_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	UserId       string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeatIndex    uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
+	Active       bool                   `protobuf:"varint,3,opt,name=active,proto3" json:"active,omitempty"`
+	PenaltyTicks uint32                 `protobuf:"varint,4,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	// Dice are the raw revealed faces in roll order.
+	Dice               []uint32          `protobuf:"varint,5,rep,packed,name=dice,proto3" json:"dice,omitempty"`
+	HandClass          HandClass         `protobuf:"varint,6,opt,name=hand_class,json=handClass,proto3,enum=game.meet_by_chance.v1.HandClass" json:"hand_class,omitempty"`
+	FullKey            []int32           `protobuf:"varint,7,rep,packed,name=full_key,json=fullKey,proto3" json:"full_key,omitempty"`
+	TieKey             []int32           `protobuf:"varint,8,rep,packed,name=tie_key,json=tieKey,proto3" json:"tie_key,omitempty"`
+	Special_235        bool              `protobuf:"varint,9,opt,name=special_235,json=special235,proto3" json:"special_235,omitempty"`
+	Special_235Outcome Special235Outcome `protobuf:"varint,10,opt,name=special_235_outcome,json=special235Outcome,proto3,enum=game.meet_by_chance.v1.Special235Outcome" json:"special_235_outcome,omitempty"`
+	TargetedThisRound  bool              `protobuf:"varint,11,opt,name=targeted_this_round,json=targetedThisRound,proto3" json:"targeted_this_round,omitempty"`
+	NormalizedDice     []uint32          `protobuf:"varint,12,rep,packed,name=normalized_dice,json=normalizedDice,proto3" json:"normalized_dice,omitempty"`
+	// True when this hand contributed to the most recently completed classification pass.
+	IncludedInCurrentResolution bool `protobuf:"varint,13,opt,name=included_in_current_resolution,json=includedInCurrentResolution,proto3" json:"included_in_current_resolution,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *PlayerState) Reset() {
@@ -383,6 +635,505 @@ func (x *PlayerState) GetTieKey() []int32 {
 	return nil
 }
 
+func (x *PlayerState) GetSpecial_235() bool {
+	if x != nil {
+		return x.Special_235
+	}
+	return false
+}
+
+func (x *PlayerState) GetSpecial_235Outcome() Special235Outcome {
+	if x != nil {
+		return x.Special_235Outcome
+	}
+	return Special235Outcome_SPECIAL235_OUTCOME_UNSPECIFIED
+}
+
+func (x *PlayerState) GetTargetedThisRound() bool {
+	if x != nil {
+		return x.TargetedThisRound
+	}
+	return false
+}
+
+func (x *PlayerState) GetNormalizedDice() []uint32 {
+	if x != nil {
+		return x.NormalizedDice
+	}
+	return nil
+}
+
+func (x *PlayerState) GetIncludedInCurrentResolution() bool {
+	if x != nil {
+		return x.IncludedInCurrentResolution
+	}
+	return false
+}
+
+// PublicPlayer contains only facts that are safe for players, spectators, deltas, and replay.
+type PublicPlayer struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	UserId             string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeatIndex          uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
+	Active             bool                   `protobuf:"varint,3,opt,name=active,proto3" json:"active,omitempty"`
+	PenaltyTicks       uint32                 `protobuf:"varint,4,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	Dice               []uint32               `protobuf:"varint,5,rep,packed,name=dice,proto3" json:"dice,omitempty"`
+	NormalizedDice     []uint32               `protobuf:"varint,6,rep,packed,name=normalized_dice,json=normalizedDice,proto3" json:"normalized_dice,omitempty"`
+	HandClass          HandClass              `protobuf:"varint,7,opt,name=hand_class,json=handClass,proto3,enum=game.meet_by_chance.v1.HandClass" json:"hand_class,omitempty"`
+	Special_235        bool                   `protobuf:"varint,8,opt,name=special_235,json=special235,proto3" json:"special_235,omitempty"`
+	Special_235Outcome Special235Outcome      `protobuf:"varint,9,opt,name=special_235_outcome,json=special235Outcome,proto3,enum=game.meet_by_chance.v1.Special235Outcome" json:"special_235_outcome,omitempty"`
+	TargetedThisRound  bool                   `protobuf:"varint,10,opt,name=targeted_this_round,json=targetedThisRound,proto3" json:"targeted_this_round,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PublicPlayer) Reset() {
+	*x = PublicPlayer{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicPlayer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicPlayer) ProtoMessage() {}
+
+func (x *PublicPlayer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicPlayer.ProtoReflect.Descriptor instead.
+func (*PublicPlayer) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PublicPlayer) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PublicPlayer) GetSeatIndex() uint32 {
+	if x != nil {
+		return x.SeatIndex
+	}
+	return 0
+}
+
+func (x *PublicPlayer) GetActive() bool {
+	if x != nil {
+		return x.Active
+	}
+	return false
+}
+
+func (x *PublicPlayer) GetPenaltyTicks() uint32 {
+	if x != nil {
+		return x.PenaltyTicks
+	}
+	return 0
+}
+
+func (x *PublicPlayer) GetDice() []uint32 {
+	if x != nil {
+		return x.Dice
+	}
+	return nil
+}
+
+func (x *PublicPlayer) GetNormalizedDice() []uint32 {
+	if x != nil {
+		return x.NormalizedDice
+	}
+	return nil
+}
+
+func (x *PublicPlayer) GetHandClass() HandClass {
+	if x != nil {
+		return x.HandClass
+	}
+	return HandClass_HAND_CLASS_UNSPECIFIED
+}
+
+func (x *PublicPlayer) GetSpecial_235() bool {
+	if x != nil {
+		return x.Special_235
+	}
+	return false
+}
+
+func (x *PublicPlayer) GetSpecial_235Outcome() Special235Outcome {
+	if x != nil {
+		return x.Special_235Outcome
+	}
+	return Special235Outcome_SPECIAL235_OUTCOME_UNSPECIFIED
+}
+
+func (x *PublicPlayer) GetTargetedThisRound() bool {
+	if x != nil {
+		return x.TargetedThisRound
+	}
+	return false
+}
+
+// PublicDice is emitted before classification and therefore carries no derived hand result.
+type PublicDice struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeatIndex     uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
+	Dice          []uint32               `protobuf:"varint,3,rep,packed,name=dice,proto3" json:"dice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicDice) Reset() {
+	*x = PublicDice{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicDice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicDice) ProtoMessage() {}
+
+func (x *PublicDice) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicDice.ProtoReflect.Descriptor instead.
+func (*PublicDice) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PublicDice) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PublicDice) GetSeatIndex() uint32 {
+	if x != nil {
+		return x.SeatIndex
+	}
+	return 0
+}
+
+func (x *PublicDice) GetDice() []uint32 {
+	if x != nil {
+		return x.Dice
+	}
+	return nil
+}
+
+type MatchGroup struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Kind                  MatchKind              `protobuf:"varint,1,opt,name=kind,proto3,enum=game.meet_by_chance.v1.MatchKind" json:"kind,omitempty"`
+	UserIds               []string               `protobuf:"bytes,2,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	PenaltyTicks          uint32                 `protobuf:"varint,3,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	WeakestUserId         string                 `protobuf:"bytes,4,opt,name=weakest_user_id,json=weakestUserId,proto3" json:"weakest_user_id,omitempty"`
+	WeakExtraPenaltyTicks uint32                 `protobuf:"varint,5,opt,name=weak_extra_penalty_ticks,json=weakExtraPenaltyTicks,proto3" json:"weak_extra_penalty_ticks,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *MatchGroup) Reset() {
+	*x = MatchGroup{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MatchGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchGroup) ProtoMessage() {}
+
+func (x *MatchGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchGroup.ProtoReflect.Descriptor instead.
+func (*MatchGroup) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *MatchGroup) GetKind() MatchKind {
+	if x != nil {
+		return x.Kind
+	}
+	return MatchKind_MATCH_KIND_UNSPECIFIED
+}
+
+func (x *MatchGroup) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+func (x *MatchGroup) GetPenaltyTicks() uint32 {
+	if x != nil {
+		return x.PenaltyTicks
+	}
+	return 0
+}
+
+func (x *MatchGroup) GetWeakestUserId() string {
+	if x != nil {
+		return x.WeakestUserId
+	}
+	return ""
+}
+
+func (x *MatchGroup) GetWeakExtraPenaltyTicks() uint32 {
+	if x != nil {
+		return x.WeakExtraPenaltyTicks
+	}
+	return 0
+}
+
+// MatchBatch represents all disjoint groups handled by one bounded automatic resolution pass.
+type MatchBatch struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Round           uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	BatchIndex      uint32                 `protobuf:"varint,2,opt,name=batch_index,json=batchIndex,proto3" json:"batch_index,omitempty"`
+	ResolutionCount uint32                 `protobuf:"varint,3,opt,name=resolution_count,json=resolutionCount,proto3" json:"resolution_count,omitempty"`
+	Groups          []*MatchGroup          `protobuf:"bytes,4,rep,name=groups,proto3" json:"groups,omitempty"`
+	RerolledUserIds []string               `protobuf:"bytes,5,rep,name=rerolled_user_ids,json=rerolledUserIds,proto3" json:"rerolled_user_ids,omitempty"`
+	Capped          bool                   `protobuf:"varint,6,opt,name=capped,proto3" json:"capped,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *MatchBatch) Reset() {
+	*x = MatchBatch{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MatchBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchBatch) ProtoMessage() {}
+
+func (x *MatchBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchBatch.ProtoReflect.Descriptor instead.
+func (*MatchBatch) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MatchBatch) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *MatchBatch) GetBatchIndex() uint32 {
+	if x != nil {
+		return x.BatchIndex
+	}
+	return 0
+}
+
+func (x *MatchBatch) GetResolutionCount() uint32 {
+	if x != nil {
+		return x.ResolutionCount
+	}
+	return 0
+}
+
+func (x *MatchBatch) GetGroups() []*MatchGroup {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *MatchBatch) GetRerolledUserIds() []string {
+	if x != nil {
+		return x.RerolledUserIds
+	}
+	return nil
+}
+
+func (x *MatchBatch) GetCapped() bool {
+	if x != nil {
+		return x.Capped
+	}
+	return false
+}
+
+// RoundSummary is the compact public result retained in authoritative snapshots.
+type RoundSummary struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Round                uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	TargetUserId         string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Outcome              RoundOutcome           `protobuf:"varint,3,opt,name=outcome,proto3,enum=game.meet_by_chance.v1.RoundOutcome" json:"outcome,omitempty"`
+	Cause                ResolutionCause        `protobuf:"varint,4,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	TargetRerollCount    uint32                 `protobuf:"varint,5,opt,name=target_reroll_count,json=targetRerollCount,proto3" json:"target_reroll_count,omitempty"`
+	MatchResolutionCount uint32                 `protobuf:"varint,6,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
+	FinalPlayers         []*PublicPlayer        `protobuf:"bytes,7,rep,name=final_players,json=finalPlayers,proto3" json:"final_players,omitempty"`
+	TargetHistoryUserIds []string               `protobuf:"bytes,8,rep,name=target_history_user_ids,json=targetHistoryUserIds,proto3" json:"target_history_user_ids,omitempty"`
+	Reason               string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	Settled              bool                   `protobuf:"varint,10,opt,name=settled,proto3" json:"settled,omitempty"`
+	TargetStreak         uint32                 `protobuf:"varint,11,opt,name=target_streak,json=targetStreak,proto3" json:"target_streak,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *RoundSummary) Reset() {
+	*x = RoundSummary{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoundSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoundSummary) ProtoMessage() {}
+
+func (x *RoundSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoundSummary.ProtoReflect.Descriptor instead.
+func (*RoundSummary) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RoundSummary) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *RoundSummary) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *RoundSummary) GetOutcome() RoundOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return RoundOutcome_ROUND_OUTCOME_UNSPECIFIED
+}
+
+func (x *RoundSummary) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *RoundSummary) GetTargetRerollCount() uint32 {
+	if x != nil {
+		return x.TargetRerollCount
+	}
+	return 0
+}
+
+func (x *RoundSummary) GetMatchResolutionCount() uint32 {
+	if x != nil {
+		return x.MatchResolutionCount
+	}
+	return 0
+}
+
+func (x *RoundSummary) GetFinalPlayers() []*PublicPlayer {
+	if x != nil {
+		return x.FinalPlayers
+	}
+	return nil
+}
+
+func (x *RoundSummary) GetTargetHistoryUserIds() []string {
+	if x != nil {
+		return x.TargetHistoryUserIds
+	}
+	return nil
+}
+
+func (x *RoundSummary) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RoundSummary) GetSettled() bool {
+	if x != nil {
+		return x.Settled
+	}
+	return false
+}
+
+func (x *RoundSummary) GetTargetStreak() uint32 {
+	if x != nil {
+		return x.TargetStreak
+	}
+	return 0
+}
+
 type State struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	SchemaVersion            uint32                 `protobuf:"varint,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
@@ -395,13 +1146,23 @@ type State struct {
 	MatchResolutionCount     uint32                 `protobuf:"varint,8,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
 	ActionDeadlineUnixMillis int64                  `protobuf:"varint,9,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
 	Config                   *Config                `protobuf:"bytes,10,opt,name=config,proto3" json:"config,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Host identity is frozen from trusted session start context for audit and system transitions.
+	HostUserId string `protobuf:"bytes,11,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`
+	// Rule-level actions are recalculated per viewer and are not copied directly into View.
+	AllowedActions []string `protobuf:"bytes,12,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
+	FinishReason   string   `protobuf:"bytes,13,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	// The engine retains at most the latest 32 settled rounds.
+	RoundHistory   []*RoundSummary `protobuf:"bytes,14,rep,name=round_history,json=roundHistory,proto3" json:"round_history,omitempty"`
+	LastSettlement *RoundSummary   `protobuf:"bytes,15,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	LastMatchBatch *MatchBatch     `protobuf:"bytes,16,opt,name=last_match_batch,json=lastMatchBatch,proto3" json:"last_match_batch,omitempty"`
+	MatchHistory   []*MatchBatch   `protobuf:"bytes,17,rep,name=match_history,json=matchHistory,proto3" json:"match_history,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *State) Reset() {
 	*x = State{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[2]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -413,7 +1174,7 @@ func (x *State) String() string {
 func (*State) ProtoMessage() {}
 
 func (x *State) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[2]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -426,7 +1187,7 @@ func (x *State) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use State.ProtoReflect.Descriptor instead.
 func (*State) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{2}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *State) GetSchemaVersion() uint32 {
@@ -499,6 +1260,55 @@ func (x *State) GetConfig() *Config {
 	return nil
 }
 
+func (x *State) GetHostUserId() string {
+	if x != nil {
+		return x.HostUserId
+	}
+	return ""
+}
+
+func (x *State) GetAllowedActions() []string {
+	if x != nil {
+		return x.AllowedActions
+	}
+	return nil
+}
+
+func (x *State) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
+func (x *State) GetRoundHistory() []*RoundSummary {
+	if x != nil {
+		return x.RoundHistory
+	}
+	return nil
+}
+
+func (x *State) GetLastSettlement() *RoundSummary {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
+func (x *State) GetLastMatchBatch() *MatchBatch {
+	if x != nil {
+		return x.LastMatchBatch
+	}
+	return nil
+}
+
+func (x *State) GetMatchHistory() []*MatchBatch {
+	if x != nil {
+		return x.MatchHistory
+	}
+	return nil
+}
+
 type Reroll struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -507,7 +1317,7 @@ type Reroll struct {
 
 func (x *Reroll) Reset() {
 	*x = Reroll{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[3]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +1329,7 @@ func (x *Reroll) String() string {
 func (*Reroll) ProtoMessage() {}
 
 func (x *Reroll) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[3]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +1342,7 @@ func (x *Reroll) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reroll.ProtoReflect.Descriptor instead.
 func (*Reroll) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{3}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{8}
 }
 
 type Stand struct {
@@ -543,7 +1353,7 @@ type Stand struct {
 
 func (x *Stand) Reset() {
 	*x = Stand{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[4]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -555,7 +1365,7 @@ func (x *Stand) String() string {
 func (*Stand) ProtoMessage() {}
 
 func (x *Stand) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[4]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -568,18 +1378,22 @@ func (x *Stand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stand.ProtoReflect.Descriptor instead.
 func (*Stand) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{4}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{9}
 }
 
 type Finish struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty means a runtime-authorized host finish; platform cancellation is explicit.
+	Reason string `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Runtime supplies the currently authorized PartyRoom host.
+	OperatorUserId string `protobuf:"bytes,2,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Finish) Reset() {
 	*x = Finish{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[5]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +1405,7 @@ func (x *Finish) String() string {
 func (*Finish) ProtoMessage() {}
 
 func (x *Finish) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[5]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +1418,21 @@ func (x *Finish) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Finish.ProtoReflect.Descriptor instead.
 func (*Finish) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{5}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Finish) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Finish) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
 }
 
 type Command struct {
@@ -621,7 +1449,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[6]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -633,7 +1461,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[6]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -646,7 +1474,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{6}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Command) GetCommand() isCommand_Command {
@@ -705,16 +1533,74 @@ func (*Command_Stand) isCommand_Command() {}
 
 func (*Command_Finish) isCommand_Command() {}
 
-type RoundStarted struct {
+type ReplayPlayer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Round         uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeatIndex     uint32                 `protobuf:"varint,2,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayPlayer) Reset() {
+	*x = ReplayPlayer{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayPlayer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayPlayer) ProtoMessage() {}
+
+func (x *ReplayPlayer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayPlayer.ProtoReflect.Descriptor instead.
+func (*ReplayPlayer) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReplayPlayer) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ReplayPlayer) GetSeatIndex() uint32 {
+	if x != nil {
+		return x.SeatIndex
+	}
+	return 0
+}
+
+type RoundStarted struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Round           uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	Cause           ResolutionCause        `protobuf:"varint,2,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	PreviousOutcome RoundOutcome           `protobuf:"varint,3,opt,name=previous_outcome,json=previousOutcome,proto3,enum=game.meet_by_chance.v1.RoundOutcome" json:"previous_outcome,omitempty"`
+	// Initialization fields are required on round 1 and absent on later rounds.
+	Config        *Config         `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
+	Players       []*ReplayPlayer `protobuf:"bytes,5,rep,name=players,proto3" json:"players,omitempty"`
+	HostUserId    string          `protobuf:"bytes,6,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RoundStarted) Reset() {
 	*x = RoundStarted{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[7]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +1612,7 @@ func (x *RoundStarted) String() string {
 func (*RoundStarted) ProtoMessage() {}
 
 func (x *RoundStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[7]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +1625,7 @@ func (x *RoundStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundStarted.ProtoReflect.Descriptor instead.
 func (*RoundStarted) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{7}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RoundStarted) GetRound() uint32 {
@@ -749,16 +1635,59 @@ func (x *RoundStarted) GetRound() uint32 {
 	return 0
 }
 
+func (x *RoundStarted) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *RoundStarted) GetPreviousOutcome() RoundOutcome {
+	if x != nil {
+		return x.PreviousOutcome
+	}
+	return RoundOutcome_ROUND_OUTCOME_UNSPECIFIED
+}
+
+func (x *RoundStarted) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *RoundStarted) GetPlayers() []*ReplayPlayer {
+	if x != nil {
+		return x.Players
+	}
+	return nil
+}
+
+func (x *RoundStarted) GetHostUserId() string {
+	if x != nil {
+		return x.HostUserId
+	}
+	return ""
+}
+
 type DiceRevealed struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Players       []*PlayerState         `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated because PlayerState contains internal comparison keys. Producers must leave it empty.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	Players       []*PlayerState  `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"`
+	PublicDice    []*PublicDice   `protobuf:"bytes,2,rep,name=public_dice,json=publicDice,proto3" json:"public_dice,omitempty"`
+	Round         uint32          `protobuf:"varint,3,opt,name=round,proto3" json:"round,omitempty"`
+	BatchIndex    uint32          `protobuf:"varint,4,opt,name=batch_index,json=batchIndex,proto3" json:"batch_index,omitempty"`
+	RolledUserIds []string        `protobuf:"bytes,5,rep,name=rolled_user_ids,json=rolledUserIds,proto3" json:"rolled_user_ids,omitempty"`
+	Cause         ResolutionCause `protobuf:"varint,6,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DiceRevealed) Reset() {
 	*x = DiceRevealed{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[8]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +1699,7 @@ func (x *DiceRevealed) String() string {
 func (*DiceRevealed) ProtoMessage() {}
 
 func (x *DiceRevealed) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[8]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,9 +1712,10 @@ func (x *DiceRevealed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiceRevealed.ProtoReflect.Descriptor instead.
 func (*DiceRevealed) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{8}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{14}
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *DiceRevealed) GetPlayers() []*PlayerState {
 	if x != nil {
 		return x.Players
@@ -793,19 +1723,64 @@ func (x *DiceRevealed) GetPlayers() []*PlayerState {
 	return nil
 }
 
+func (x *DiceRevealed) GetPublicDice() []*PublicDice {
+	if x != nil {
+		return x.PublicDice
+	}
+	return nil
+}
+
+func (x *DiceRevealed) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *DiceRevealed) GetBatchIndex() uint32 {
+	if x != nil {
+		return x.BatchIndex
+	}
+	return 0
+}
+
+func (x *DiceRevealed) GetRolledUserIds() []string {
+	if x != nil {
+		return x.RolledUserIds
+	}
+	return nil
+}
+
+func (x *DiceRevealed) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type HandClassified struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	HandClass     HandClass              `protobuf:"varint,2,opt,name=hand_class,json=handClass,proto3,enum=game.meet_by_chance.v1.HandClass" json:"hand_class,omitempty"`
-	FullKey       []int32                `protobuf:"varint,3,rep,packed,name=full_key,json=fullKey,proto3" json:"full_key,omitempty"`
-	TieKey        []int32                `protobuf:"varint,4,rep,packed,name=tie_key,json=tieKey,proto3" json:"tie_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	UserId    string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	HandClass HandClass              `protobuf:"varint,2,opt,name=hand_class,json=handClass,proto3,enum=game.meet_by_chance.v1.HandClass" json:"hand_class,omitempty"`
+	// Deprecated internal fields. Producers and strict decoders must require them to be empty.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	FullKey []int32 `protobuf:"varint,3,rep,packed,name=full_key,json=fullKey,proto3" json:"full_key,omitempty"`
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	TieKey             []int32           `protobuf:"varint,4,rep,packed,name=tie_key,json=tieKey,proto3" json:"tie_key,omitempty"`
+	Round              uint32            `protobuf:"varint,5,opt,name=round,proto3" json:"round,omitempty"`
+	BatchIndex         uint32            `protobuf:"varint,6,opt,name=batch_index,json=batchIndex,proto3" json:"batch_index,omitempty"`
+	Dice               []uint32          `protobuf:"varint,7,rep,packed,name=dice,proto3" json:"dice,omitempty"`
+	NormalizedDice     []uint32          `protobuf:"varint,8,rep,packed,name=normalized_dice,json=normalizedDice,proto3" json:"normalized_dice,omitempty"`
+	Special_235        bool              `protobuf:"varint,9,opt,name=special_235,json=special235,proto3" json:"special_235,omitempty"`
+	Special_235Outcome Special235Outcome `protobuf:"varint,10,opt,name=special_235_outcome,json=special235Outcome,proto3,enum=game.meet_by_chance.v1.Special235Outcome" json:"special_235_outcome,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *HandClassified) Reset() {
 	*x = HandClassified{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[9]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -817,7 +1792,7 @@ func (x *HandClassified) String() string {
 func (*HandClassified) ProtoMessage() {}
 
 func (x *HandClassified) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[9]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -830,7 +1805,7 @@ func (x *HandClassified) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandClassified.ProtoReflect.Descriptor instead.
 func (*HandClassified) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{9}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *HandClassified) GetUserId() string {
@@ -847,6 +1822,7 @@ func (x *HandClassified) GetHandClass() HandClass {
 	return HandClass_HAND_CLASS_UNSPECIFIED
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *HandClassified) GetFullKey() []int32 {
 	if x != nil {
 		return x.FullKey
@@ -854,6 +1830,7 @@ func (x *HandClassified) GetFullKey() []int32 {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *HandClassified) GetTieKey() []int32 {
 	if x != nil {
 		return x.TieKey
@@ -861,18 +1838,68 @@ func (x *HandClassified) GetTieKey() []int32 {
 	return nil
 }
 
+func (x *HandClassified) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *HandClassified) GetBatchIndex() uint32 {
+	if x != nil {
+		return x.BatchIndex
+	}
+	return 0
+}
+
+func (x *HandClassified) GetDice() []uint32 {
+	if x != nil {
+		return x.Dice
+	}
+	return nil
+}
+
+func (x *HandClassified) GetNormalizedDice() []uint32 {
+	if x != nil {
+		return x.NormalizedDice
+	}
+	return nil
+}
+
+func (x *HandClassified) GetSpecial_235() bool {
+	if x != nil {
+		return x.Special_235
+	}
+	return false
+}
+
+func (x *HandClassified) GetSpecial_235Outcome() Special235Outcome {
+	if x != nil {
+		return x.Special_235Outcome
+	}
+	return Special235Outcome_SPECIAL235_OUTCOME_UNSPECIFIED
+}
+
 type MatchResolved struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
-	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	PenaltyTicks  uint32                 `protobuf:"varint,3,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Legacy summary fields remain available for wire compatibility.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	UserIds []string `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	Kind string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	PenaltyTicks  uint32          `protobuf:"varint,3,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	Round         uint32          `protobuf:"varint,4,opt,name=round,proto3" json:"round,omitempty"`
+	Batch         *MatchBatch     `protobuf:"bytes,5,opt,name=batch,proto3" json:"batch,omitempty"`
+	Cause         ResolutionCause `protobuf:"varint,6,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MatchResolved) Reset() {
 	*x = MatchResolved{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[10]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +1911,7 @@ func (x *MatchResolved) String() string {
 func (*MatchResolved) ProtoMessage() {}
 
 func (x *MatchResolved) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[10]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,9 +1924,10 @@ func (x *MatchResolved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchResolved.ProtoReflect.Descriptor instead.
 func (*MatchResolved) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{10}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{16}
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *MatchResolved) GetUserIds() []string {
 	if x != nil {
 		return x.UserIds
@@ -907,6 +1935,7 @@ func (x *MatchResolved) GetUserIds() []string {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *MatchResolved) GetKind() string {
 	if x != nil {
 		return x.Kind
@@ -914,6 +1943,7 @@ func (x *MatchResolved) GetKind() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *MatchResolved) GetPenaltyTicks() uint32 {
 	if x != nil {
 		return x.PenaltyTicks
@@ -921,17 +1951,45 @@ func (x *MatchResolved) GetPenaltyTicks() uint32 {
 	return 0
 }
 
+func (x *MatchResolved) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *MatchResolved) GetBatch() *MatchBatch {
+	if x != nil {
+		return x.Batch
+	}
+	return nil
+}
+
+func (x *MatchResolved) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type TargetSelected struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	PenaltyTicks  uint32                 `protobuf:"varint,2,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	UserId                  string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PenaltyTicks            uint32                 `protobuf:"varint,2,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	Round                   uint32                 `protobuf:"varint,3,opt,name=round,proto3" json:"round,omitempty"`
+	PreviousUserId          string                 `protobuf:"bytes,4,opt,name=previous_user_id,json=previousUserId,proto3" json:"previous_user_id,omitempty"`
+	FirstSelectionThisRound bool                   `protobuf:"varint,5,opt,name=first_selection_this_round,json=firstSelectionThisRound,proto3" json:"first_selection_this_round,omitempty"`
+	TargetRerollCount       uint32                 `protobuf:"varint,6,opt,name=target_reroll_count,json=targetRerollCount,proto3" json:"target_reroll_count,omitempty"`
+	TargetStreak            uint32                 `protobuf:"varint,7,opt,name=target_streak,json=targetStreak,proto3" json:"target_streak,omitempty"`
+	Cause                   ResolutionCause        `protobuf:"varint,8,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	MatchResolutionCount    uint32                 `protobuf:"varint,9,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *TargetSelected) Reset() {
 	*x = TargetSelected{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[11]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -943,7 +2001,7 @@ func (x *TargetSelected) String() string {
 func (*TargetSelected) ProtoMessage() {}
 
 func (x *TargetSelected) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[11]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -956,7 +2014,7 @@ func (x *TargetSelected) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetSelected.ProtoReflect.Descriptor instead.
 func (*TargetSelected) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{11}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *TargetSelected) GetUserId() string {
@@ -973,17 +2031,72 @@ func (x *TargetSelected) GetPenaltyTicks() uint32 {
 	return 0
 }
 
+func (x *TargetSelected) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *TargetSelected) GetPreviousUserId() string {
+	if x != nil {
+		return x.PreviousUserId
+	}
+	return ""
+}
+
+func (x *TargetSelected) GetFirstSelectionThisRound() bool {
+	if x != nil {
+		return x.FirstSelectionThisRound
+	}
+	return false
+}
+
+func (x *TargetSelected) GetTargetRerollCount() uint32 {
+	if x != nil {
+		return x.TargetRerollCount
+	}
+	return 0
+}
+
+func (x *TargetSelected) GetTargetStreak() uint32 {
+	if x != nil {
+		return x.TargetStreak
+	}
+	return 0
+}
+
+func (x *TargetSelected) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TargetSelected) GetMatchResolutionCount() uint32 {
+	if x != nil {
+		return x.MatchResolutionCount
+	}
+	return 0
+}
+
 type TargetRerolled struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Count is the round-wide target reroll count and never resets on target transfer.
+	Count                uint32          `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	Round                uint32          `protobuf:"varint,3,opt,name=round,proto3" json:"round,omitempty"`
+	TargetStreak         uint32          `protobuf:"varint,4,opt,name=target_streak,json=targetStreak,proto3" json:"target_streak,omitempty"`
+	PenaltyTicks         uint32          `protobuf:"varint,5,opt,name=penalty_ticks,json=penaltyTicks,proto3" json:"penalty_ticks,omitempty"`
+	Cause                ResolutionCause `protobuf:"varint,6,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	MatchResolutionCount uint32          `protobuf:"varint,7,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *TargetRerolled) Reset() {
 	*x = TargetRerolled{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[12]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -995,7 +2108,7 @@ func (x *TargetRerolled) String() string {
 func (*TargetRerolled) ProtoMessage() {}
 
 func (x *TargetRerolled) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[12]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1008,7 +2121,7 @@ func (x *TargetRerolled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetRerolled.ProtoReflect.Descriptor instead.
 func (*TargetRerolled) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{12}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *TargetRerolled) GetUserId() string {
@@ -1025,18 +2138,58 @@ func (x *TargetRerolled) GetCount() uint32 {
 	return 0
 }
 
+func (x *TargetRerolled) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *TargetRerolled) GetTargetStreak() uint32 {
+	if x != nil {
+		return x.TargetStreak
+	}
+	return 0
+}
+
+func (x *TargetRerolled) GetPenaltyTicks() uint32 {
+	if x != nil {
+		return x.PenaltyTicks
+	}
+	return 0
+}
+
+func (x *TargetRerolled) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+func (x *TargetRerolled) GetMatchResolutionCount() uint32 {
+	if x != nil {
+		return x.MatchResolutionCount
+	}
+	return 0
+}
+
 type PenaltyRecorded struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Ticks         uint32                 `protobuf:"varint,2,opt,name=ticks,proto3" json:"ticks,omitempty"`
-	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Ticks            uint32                 `protobuf:"varint,2,opt,name=ticks,proto3" json:"ticks,omitempty"`
+	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	BeforeTotalTicks uint32                 `protobuf:"varint,4,opt,name=before_total_ticks,json=beforeTotalTicks,proto3" json:"before_total_ticks,omitempty"`
+	AfterTotalTicks  uint32                 `protobuf:"varint,5,opt,name=after_total_ticks,json=afterTotalTicks,proto3" json:"after_total_ticks,omitempty"`
+	Round            uint32                 `protobuf:"varint,6,opt,name=round,proto3" json:"round,omitempty"`
+	BatchIndex       uint32                 `protobuf:"varint,7,opt,name=batch_index,json=batchIndex,proto3" json:"batch_index,omitempty"`
+	Cause            ResolutionCause        `protobuf:"varint,8,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PenaltyRecorded) Reset() {
 	*x = PenaltyRecorded{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[13]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1048,7 +2201,7 @@ func (x *PenaltyRecorded) String() string {
 func (*PenaltyRecorded) ProtoMessage() {}
 
 func (x *PenaltyRecorded) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[13]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1061,7 +2214,7 @@ func (x *PenaltyRecorded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PenaltyRecorded.ProtoReflect.Descriptor instead.
 func (*PenaltyRecorded) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{13}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PenaltyRecorded) GetUserId() string {
@@ -1085,16 +2238,57 @@ func (x *PenaltyRecorded) GetReason() string {
 	return ""
 }
 
+func (x *PenaltyRecorded) GetBeforeTotalTicks() uint32 {
+	if x != nil {
+		return x.BeforeTotalTicks
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetAfterTotalTicks() uint32 {
+	if x != nil {
+		return x.AfterTotalTicks
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetBatchIndex() uint32 {
+	if x != nil {
+		return x.BatchIndex
+	}
+	return 0
+}
+
+func (x *PenaltyRecorded) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
 type ParticipantRevoked struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Round             uint32                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	PhaseBefore       Phase                  `protobuf:"varint,3,opt,name=phase_before,json=phaseBefore,proto3,enum=game.meet_by_chance.v1.Phase" json:"phase_before,omitempty"`
+	WasTarget         bool                   `protobuf:"varint,4,opt,name=was_target,json=wasTarget,proto3" json:"was_target,omitempty"`
+	RoundCancelled    bool                   `protobuf:"varint,5,opt,name=round_cancelled,json=roundCancelled,proto3" json:"round_cancelled,omitempty"`
+	NextRound         uint32                 `protobuf:"varint,6,opt,name=next_round,json=nextRound,proto3" json:"next_round,omitempty"`
+	ActivePlayerCount uint32                 `protobuf:"varint,7,opt,name=active_player_count,json=activePlayerCount,proto3" json:"active_player_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ParticipantRevoked) Reset() {
 	*x = ParticipantRevoked{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[14]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1106,7 +2300,7 @@ func (x *ParticipantRevoked) String() string {
 func (*ParticipantRevoked) ProtoMessage() {}
 
 func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[14]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1119,7 +2313,7 @@ func (x *ParticipantRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantRevoked.ProtoReflect.Descriptor instead.
 func (*ParticipantRevoked) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{14}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ParticipantRevoked) GetUserId() string {
@@ -1129,16 +2323,61 @@ func (x *ParticipantRevoked) GetUserId() string {
 	return ""
 }
 
+func (x *ParticipantRevoked) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *ParticipantRevoked) GetPhaseBefore() Phase {
+	if x != nil {
+		return x.PhaseBefore
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+func (x *ParticipantRevoked) GetWasTarget() bool {
+	if x != nil {
+		return x.WasTarget
+	}
+	return false
+}
+
+func (x *ParticipantRevoked) GetRoundCancelled() bool {
+	if x != nil {
+		return x.RoundCancelled
+	}
+	return false
+}
+
+func (x *ParticipantRevoked) GetNextRound() uint32 {
+	if x != nil {
+		return x.NextRound
+	}
+	return 0
+}
+
+func (x *ParticipantRevoked) GetActivePlayerCount() uint32 {
+	if x != nil {
+		return x.ActivePlayerCount
+	}
+	return 0
+}
+
 type SessionFinished struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Reason         string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Round          uint32                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	OperatorUserId string                 `protobuf:"bytes,3,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	Cause          ResolutionCause        `protobuf:"varint,4,opt,name=cause,proto3,enum=game.meet_by_chance.v1.ResolutionCause" json:"cause,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SessionFinished) Reset() {
 	*x = SessionFinished{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[15]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1150,7 +2389,7 @@ func (x *SessionFinished) String() string {
 func (*SessionFinished) ProtoMessage() {}
 
 func (x *SessionFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[15]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1163,7 +2402,7 @@ func (x *SessionFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFinished.ProtoReflect.Descriptor instead.
 func (*SessionFinished) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{15}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SessionFinished) GetReason() string {
@@ -1171,6 +2410,147 @@ func (x *SessionFinished) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *SessionFinished) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *SessionFinished) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *SessionFinished) GetCause() ResolutionCause {
+	if x != nil {
+		return x.Cause
+	}
+	return ResolutionCause_RESOLUTION_CAUSE_UNSPECIFIED
+}
+
+type Special235Evaluated struct {
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	Round                      uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	BatchIndex                 uint32                 `protobuf:"varint,2,opt,name=batch_index,json=batchIndex,proto3" json:"batch_index,omitempty"`
+	SpecialUserIds             []string               `protobuf:"bytes,3,rep,name=special_user_ids,json=specialUserIds,proto3" json:"special_user_ids,omitempty"`
+	AllOtherPlayersAreLeopards bool                   `protobuf:"varint,4,opt,name=all_other_players_are_leopards,json=allOtherPlayersAreLeopards,proto3" json:"all_other_players_are_leopards,omitempty"`
+	Outcome                    Special235Outcome      `protobuf:"varint,5,opt,name=outcome,proto3,enum=game.meet_by_chance.v1.Special235Outcome" json:"outcome,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
+}
+
+func (x *Special235Evaluated) Reset() {
+	*x = Special235Evaluated{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Special235Evaluated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Special235Evaluated) ProtoMessage() {}
+
+func (x *Special235Evaluated) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Special235Evaluated.ProtoReflect.Descriptor instead.
+func (*Special235Evaluated) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *Special235Evaluated) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *Special235Evaluated) GetBatchIndex() uint32 {
+	if x != nil {
+		return x.BatchIndex
+	}
+	return 0
+}
+
+func (x *Special235Evaluated) GetSpecialUserIds() []string {
+	if x != nil {
+		return x.SpecialUserIds
+	}
+	return nil
+}
+
+func (x *Special235Evaluated) GetAllOtherPlayersAreLeopards() bool {
+	if x != nil {
+		return x.AllOtherPlayersAreLeopards
+	}
+	return false
+}
+
+func (x *Special235Evaluated) GetOutcome() Special235Outcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return Special235Outcome_SPECIAL235_OUTCOME_UNSPECIFIED
+}
+
+type RoundSettled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Summary       *RoundSummary          `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoundSettled) Reset() {
+	*x = RoundSettled{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoundSettled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoundSettled) ProtoMessage() {}
+
+func (x *RoundSettled) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoundSettled.ProtoReflect.Descriptor instead.
+func (*RoundSettled) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RoundSettled) GetSummary() *RoundSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
 }
 
 type Event struct {
@@ -1186,6 +2566,8 @@ type Event struct {
 	//	*Event_PenaltyRecorded
 	//	*Event_ParticipantRevoked
 	//	*Event_SessionFinished
+	//	*Event_Special_235Evaluated
+	//	*Event_RoundSettled
 	Event         isEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1193,7 +2575,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[16]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1205,7 +2587,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[16]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1218,7 +2600,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{16}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Event) GetEvent() isEvent_Event {
@@ -1309,6 +2691,24 @@ func (x *Event) GetSessionFinished() *SessionFinished {
 	return nil
 }
 
+func (x *Event) GetSpecial_235Evaluated() *Special235Evaluated {
+	if x != nil {
+		if x, ok := x.Event.(*Event_Special_235Evaluated); ok {
+			return x.Special_235Evaluated
+		}
+	}
+	return nil
+}
+
+func (x *Event) GetRoundSettled() *RoundSettled {
+	if x != nil {
+		if x, ok := x.Event.(*Event_RoundSettled); ok {
+			return x.RoundSettled
+		}
+	}
+	return nil
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -1349,6 +2749,14 @@ type Event_SessionFinished struct {
 	SessionFinished *SessionFinished `protobuf:"bytes,9,opt,name=session_finished,json=sessionFinished,proto3,oneof"`
 }
 
+type Event_Special_235Evaluated struct {
+	Special_235Evaluated *Special235Evaluated `protobuf:"bytes,10,opt,name=special_235_evaluated,json=special235Evaluated,proto3,oneof"`
+}
+
+type Event_RoundSettled struct {
+	RoundSettled *RoundSettled `protobuf:"bytes,11,opt,name=round_settled,json=roundSettled,proto3,oneof"`
+}
+
 func (*Event_RoundStarted) isEvent_Event() {}
 
 func (*Event_DiceRevealed) isEvent_Event() {}
@@ -1367,26 +2775,134 @@ func (*Event_ParticipantRevoked) isEvent_Event() {}
 
 func (*Event_SessionFinished) isEvent_Event() {}
 
+func (*Event_Special_235Evaluated) isEvent_Event() {}
+
+func (*Event_RoundSettled) isEvent_Event() {}
+
+// ActionTimer binds a timeout to the exact decision it is allowed to settle.
+type ActionTimer struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Round                uint32                 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
+	Phase                Phase                  `protobuf:"varint,2,opt,name=phase,proto3,enum=game.meet_by_chance.v1.Phase" json:"phase,omitempty"`
+	TargetUserId         string                 `protobuf:"bytes,3,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	TargetRerollCount    uint32                 `protobuf:"varint,4,opt,name=target_reroll_count,json=targetRerollCount,proto3" json:"target_reroll_count,omitempty"`
+	DeadlineUnixMillis   int64                  `protobuf:"varint,5,opt,name=deadline_unix_millis,json=deadlineUnixMillis,proto3" json:"deadline_unix_millis,omitempty"`
+	TargetStreak         uint32                 `protobuf:"varint,6,opt,name=target_streak,json=targetStreak,proto3" json:"target_streak,omitempty"`
+	MatchResolutionCount uint32                 `protobuf:"varint,7,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ActionTimer) Reset() {
+	*x = ActionTimer{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionTimer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionTimer) ProtoMessage() {}
+
+func (x *ActionTimer) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionTimer.ProtoReflect.Descriptor instead.
+func (*ActionTimer) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ActionTimer) GetRound() uint32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetPhase() Phase {
+	if x != nil {
+		return x.Phase
+	}
+	return Phase_PHASE_UNSPECIFIED
+}
+
+func (x *ActionTimer) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ActionTimer) GetTargetRerollCount() uint32 {
+	if x != nil {
+		return x.TargetRerollCount
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetDeadlineUnixMillis() int64 {
+	if x != nil {
+		return x.DeadlineUnixMillis
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetTargetStreak() uint32 {
+	if x != nil {
+		return x.TargetStreak
+	}
+	return 0
+}
+
+func (x *ActionTimer) GetMatchResolutionCount() uint32 {
+	if x != nil {
+		return x.MatchResolutionCount
+	}
+	return 0
+}
+
 type View struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Phase                    Phase                  `protobuf:"varint,1,opt,name=phase,proto3,enum=game.meet_by_chance.v1.Phase" json:"phase,omitempty"`
-	Round                    uint32                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
-	Players                  []*PlayerState         `protobuf:"bytes,3,rep,name=players,proto3" json:"players,omitempty"`
-	TargetUserId             string                 `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	TargetRerollCount        uint32                 `protobuf:"varint,5,opt,name=target_reroll_count,json=targetRerollCount,proto3" json:"target_reroll_count,omitempty"`
-	TargetRerollLimit        uint32                 `protobuf:"varint,6,opt,name=target_reroll_limit,json=targetRerollLimit,proto3" json:"target_reroll_limit,omitempty"`
-	MatchResolutionCount     uint32                 `protobuf:"varint,7,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
-	MatchResolutionLimit     uint32                 `protobuf:"varint,8,opt,name=match_resolution_limit,json=matchResolutionLimit,proto3" json:"match_resolution_limit,omitempty"`
-	ActionDeadlineUnixMillis int64                  `protobuf:"varint,9,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
-	AllowedActions           []string               `protobuf:"bytes,10,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
-	FinishReason             string                 `protobuf:"bytes,11,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Phase Phase                  `protobuf:"varint,1,opt,name=phase,proto3,enum=game.meet_by_chance.v1.Phase" json:"phase,omitempty"`
+	Round uint32                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	// Deprecated because PlayerState contains internal keys. Producers must leave it empty.
+	//
+	// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
+	Players                  []*PlayerState  `protobuf:"bytes,3,rep,name=players,proto3" json:"players,omitempty"`
+	TargetUserId             string          `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	TargetRerollCount        uint32          `protobuf:"varint,5,opt,name=target_reroll_count,json=targetRerollCount,proto3" json:"target_reroll_count,omitempty"`
+	TargetRerollLimit        uint32          `protobuf:"varint,6,opt,name=target_reroll_limit,json=targetRerollLimit,proto3" json:"target_reroll_limit,omitempty"`
+	MatchResolutionCount     uint32          `protobuf:"varint,7,opt,name=match_resolution_count,json=matchResolutionCount,proto3" json:"match_resolution_count,omitempty"`
+	MatchResolutionLimit     uint32          `protobuf:"varint,8,opt,name=match_resolution_limit,json=matchResolutionLimit,proto3" json:"match_resolution_limit,omitempty"`
+	ActionDeadlineUnixMillis int64           `protobuf:"varint,9,opt,name=action_deadline_unix_millis,json=actionDeadlineUnixMillis,proto3" json:"action_deadline_unix_millis,omitempty"`
+	AllowedActions           []string        `protobuf:"bytes,10,rep,name=allowed_actions,json=allowedActions,proto3" json:"allowed_actions,omitempty"`
+	FinishReason             string          `protobuf:"bytes,11,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	PublicPlayers            []*PublicPlayer `protobuf:"bytes,12,rep,name=public_players,json=publicPlayers,proto3" json:"public_players,omitempty"`
+	TargetStreak             uint32          `protobuf:"varint,13,opt,name=target_streak,json=targetStreak,proto3" json:"target_streak,omitempty"`
+	Config                   *Config         `protobuf:"bytes,14,opt,name=config,proto3" json:"config,omitempty"`
+	LastSettlement           *RoundSummary   `protobuf:"bytes,15,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	RecentRounds             []*RoundSummary `protobuf:"bytes,16,rep,name=recent_rounds,json=recentRounds,proto3" json:"recent_rounds,omitempty"`
+	LastMatchBatch           *MatchBatch     `protobuf:"bytes,17,opt,name=last_match_batch,json=lastMatchBatch,proto3" json:"last_match_batch,omitempty"`
+	// This viewer-scoped flag never grants actions; allowed_actions remains authoritative.
+	ViewerIsHost  bool `protobuf:"varint,18,opt,name=viewer_is_host,json=viewerIsHost,proto3" json:"viewer_is_host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *View) Reset() {
 	*x = View{}
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[17]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1398,7 +2914,7 @@ func (x *View) String() string {
 func (*View) ProtoMessage() {}
 
 func (x *View) ProtoReflect() protoreflect.Message {
-	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[17]
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1411,7 +2927,7 @@ func (x *View) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use View.ProtoReflect.Descriptor instead.
 func (*View) Descriptor() ([]byte, []int) {
-	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{17}
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *View) GetPhase() Phase {
@@ -1428,6 +2944,7 @@ func (x *View) GetRound() uint32 {
 	return 0
 }
 
+// Deprecated: Marked as deprecated in game/meet_by_chance/v1/meet_by_chance.proto.
 func (x *View) GetPlayers() []*PlayerState {
 	if x != nil {
 		return x.Players
@@ -1491,6 +3008,282 @@ func (x *View) GetFinishReason() string {
 	return ""
 }
 
+func (x *View) GetPublicPlayers() []*PublicPlayer {
+	if x != nil {
+		return x.PublicPlayers
+	}
+	return nil
+}
+
+func (x *View) GetTargetStreak() uint32 {
+	if x != nil {
+		return x.TargetStreak
+	}
+	return 0
+}
+
+func (x *View) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *View) GetLastSettlement() *RoundSummary {
+	if x != nil {
+		return x.LastSettlement
+	}
+	return nil
+}
+
+func (x *View) GetRecentRounds() []*RoundSummary {
+	if x != nil {
+		return x.RecentRounds
+	}
+	return nil
+}
+
+func (x *View) GetLastMatchBatch() *MatchBatch {
+	if x != nil {
+		return x.LastMatchBatch
+	}
+	return nil
+}
+
+func (x *View) GetViewerIsHost() bool {
+	if x != nil {
+		return x.ViewerIsHost
+	}
+	return false
+}
+
+// ViewDelta replaces the current viewer-safe public view after validated events.
+type ViewDelta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	View          *View                  `protobuf:"bytes,1,opt,name=view,proto3" json:"view,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ViewDelta) Reset() {
+	*x = ViewDelta{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ViewDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ViewDelta) ProtoMessage() {}
+
+func (x *ViewDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ViewDelta.ProtoReflect.Descriptor instead.
+func (*ViewDelta) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ViewDelta) GetView() *View {
+	if x != nil {
+		return x.View
+	}
+	return nil
+}
+
+// ReplayEntry preserves public event order without exposing snapshots, seeds, or comparison keys.
+type ReplayEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Event         *Event                 `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayEntry) Reset() {
+	*x = ReplayEntry{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayEntry) ProtoMessage() {}
+
+func (x *ReplayEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayEntry.ProtoReflect.Descriptor instead.
+func (*ReplayEntry) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ReplayEntry) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *ReplayEntry) GetEvent() *Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+type ReplayRound struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Summary       *RoundSummary          `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayRound) Reset() {
+	*x = ReplayRound{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayRound) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayRound) ProtoMessage() {}
+
+func (x *ReplayRound) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayRound.ProtoReflect.Descriptor instead.
+func (*ReplayRound) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ReplayRound) GetSummary() *RoundSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+// Replay contains only settled rounds; a pending round is never appended to rounds.
+type Replay struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SchemaVersion uint32                 `protobuf:"varint,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Config        *Config                `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
+	Players       []*ReplayPlayer        `protobuf:"bytes,3,rep,name=players,proto3" json:"players,omitempty"`
+	Entries       []*ReplayEntry         `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
+	FinishReason  string                 `protobuf:"bytes,5,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	Rounds        []*ReplayRound         `protobuf:"bytes,6,rep,name=rounds,proto3" json:"rounds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Replay) Reset() {
+	*x = Replay{}
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Replay) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Replay) ProtoMessage() {}
+
+func (x *Replay) ProtoReflect() protoreflect.Message {
+	mi := &file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Replay.ProtoReflect.Descriptor instead.
+func (*Replay) Descriptor() ([]byte, []int) {
+	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *Replay) GetSchemaVersion() uint32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *Replay) GetConfig() *Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *Replay) GetPlayers() []*ReplayPlayer {
+	if x != nil {
+		return x.Players
+	}
+	return nil
+}
+
+func (x *Replay) GetEntries() []*ReplayEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *Replay) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
+func (x *Replay) GetRounds() []*ReplayRound {
+	if x != nil {
+		return x.Rounds
+	}
+	return nil
+}
+
 var File_game_meet_by_chance_v1_meet_by_chance_proto protoreflect.FileDescriptor
 
 const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
@@ -1510,7 +3303,7 @@ const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
 	" \x01(\rR\x15weakExtraPenaltyTicks\x12.\n" +
 	"\x13target_reroll_limit\x18\v \x01(\rR\x11targetRerollLimit\x124\n" +
 	"\x16match_resolution_limit\x18\f \x01(\rR\x14matchResolutionLimit\x124\n" +
-	"\x16action_timeout_seconds\x18\r \x01(\rR\x14actionTimeoutSeconds\"\x8c\x02\n" +
+	"\x16action_timeout_seconds\x18\r \x01(\rR\x14actionTimeoutSeconds\"\xa6\x04\n" +
 	"\vPlayerState\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
@@ -1521,7 +3314,64 @@ const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
 	"\n" +
 	"hand_class\x18\x06 \x01(\x0e2!.game.meet_by_chance.v1.HandClassR\thandClass\x12\x19\n" +
 	"\bfull_key\x18\a \x03(\x05R\afullKey\x12\x17\n" +
-	"\atie_key\x18\b \x03(\x05R\x06tieKey\"\xe0\x03\n" +
+	"\atie_key\x18\b \x03(\x05R\x06tieKey\x12\x1f\n" +
+	"\vspecial_235\x18\t \x01(\bR\n" +
+	"special235\x12Y\n" +
+	"\x13special_235_outcome\x18\n" +
+	" \x01(\x0e2).game.meet_by_chance.v1.Special235OutcomeR\x11special235Outcome\x12.\n" +
+	"\x13targeted_this_round\x18\v \x01(\bR\x11targetedThisRound\x12'\n" +
+	"\x0fnormalized_dice\x18\f \x03(\rR\x0enormalizedDice\x12C\n" +
+	"\x1eincluded_in_current_resolution\x18\r \x01(\bR\x1bincludedInCurrentResolution\"\xae\x03\n" +
+	"\fPublicPlayer\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"seat_index\x18\x02 \x01(\rR\tseatIndex\x12\x16\n" +
+	"\x06active\x18\x03 \x01(\bR\x06active\x12#\n" +
+	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\x12\x12\n" +
+	"\x04dice\x18\x05 \x03(\rR\x04dice\x12'\n" +
+	"\x0fnormalized_dice\x18\x06 \x03(\rR\x0enormalizedDice\x12@\n" +
+	"\n" +
+	"hand_class\x18\a \x01(\x0e2!.game.meet_by_chance.v1.HandClassR\thandClass\x12\x1f\n" +
+	"\vspecial_235\x18\b \x01(\bR\n" +
+	"special235\x12Y\n" +
+	"\x13special_235_outcome\x18\t \x01(\x0e2).game.meet_by_chance.v1.Special235OutcomeR\x11special235Outcome\x12.\n" +
+	"\x13targeted_this_round\x18\n" +
+	" \x01(\bR\x11targetedThisRound\"X\n" +
+	"\n" +
+	"PublicDice\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"seat_index\x18\x02 \x01(\rR\tseatIndex\x12\x12\n" +
+	"\x04dice\x18\x03 \x03(\rR\x04dice\"\xe4\x01\n" +
+	"\n" +
+	"MatchGroup\x125\n" +
+	"\x04kind\x18\x01 \x01(\x0e2!.game.meet_by_chance.v1.MatchKindR\x04kind\x12\x19\n" +
+	"\buser_ids\x18\x02 \x03(\tR\auserIds\x12#\n" +
+	"\rpenalty_ticks\x18\x03 \x01(\rR\fpenaltyTicks\x12&\n" +
+	"\x0fweakest_user_id\x18\x04 \x01(\tR\rweakestUserId\x127\n" +
+	"\x18weak_extra_penalty_ticks\x18\x05 \x01(\rR\x15weakExtraPenaltyTicks\"\xee\x01\n" +
+	"\n" +
+	"MatchBatch\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12\x1f\n" +
+	"\vbatch_index\x18\x02 \x01(\rR\n" +
+	"batchIndex\x12)\n" +
+	"\x10resolution_count\x18\x03 \x01(\rR\x0fresolutionCount\x12:\n" +
+	"\x06groups\x18\x04 \x03(\v2\".game.meet_by_chance.v1.MatchGroupR\x06groups\x12*\n" +
+	"\x11rerolled_user_ids\x18\x05 \x03(\tR\x0frerolledUserIds\x12\x16\n" +
+	"\x06capped\x18\x06 \x01(\bR\x06capped\"\x88\x04\n" +
+	"\fRoundSummary\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12$\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12>\n" +
+	"\aoutcome\x18\x03 \x01(\x0e2$.game.meet_by_chance.v1.RoundOutcomeR\aoutcome\x12=\n" +
+	"\x05cause\x18\x04 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\x12.\n" +
+	"\x13target_reroll_count\x18\x05 \x01(\rR\x11targetRerollCount\x124\n" +
+	"\x16match_resolution_count\x18\x06 \x01(\rR\x14matchResolutionCount\x12I\n" +
+	"\rfinal_players\x18\a \x03(\v2$.game.meet_by_chance.v1.PublicPlayerR\ffinalPlayers\x125\n" +
+	"\x17target_history_user_ids\x18\b \x03(\tR\x14targetHistoryUserIds\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x12\x18\n" +
+	"\asettled\x18\n" +
+	" \x01(\bR\asettled\x12#\n" +
+	"\rtarget_streak\x18\v \x01(\rR\ftargetStreak\"\x81\a\n" +
 	"\x05State\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x123\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1d.game.meet_by_chance.v1.PhaseR\x05phase\x12\x14\n" +
@@ -1533,43 +3383,120 @@ const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
 	"\x16match_resolution_count\x18\b \x01(\rR\x14matchResolutionCount\x12=\n" +
 	"\x1baction_deadline_unix_millis\x18\t \x01(\x03R\x18actionDeadlineUnixMillis\x126\n" +
 	"\x06config\x18\n" +
-	" \x01(\v2\x1e.game.meet_by_chance.v1.ConfigR\x06config\"\b\n" +
+	" \x01(\v2\x1e.game.meet_by_chance.v1.ConfigR\x06config\x12 \n" +
+	"\fhost_user_id\x18\v \x01(\tR\n" +
+	"hostUserId\x12'\n" +
+	"\x0fallowed_actions\x18\f \x03(\tR\x0eallowedActions\x12#\n" +
+	"\rfinish_reason\x18\r \x01(\tR\ffinishReason\x12I\n" +
+	"\rround_history\x18\x0e \x03(\v2$.game.meet_by_chance.v1.RoundSummaryR\froundHistory\x12M\n" +
+	"\x0flast_settlement\x18\x0f \x01(\v2$.game.meet_by_chance.v1.RoundSummaryR\x0elastSettlement\x12L\n" +
+	"\x10last_match_batch\x18\x10 \x01(\v2\".game.meet_by_chance.v1.MatchBatchR\x0elastMatchBatch\x12G\n" +
+	"\rmatch_history\x18\x11 \x03(\v2\".game.meet_by_chance.v1.MatchBatchR\fmatchHistory\"\b\n" +
 	"\x06Reroll\"\a\n" +
-	"\x05Stand\"\b\n" +
-	"\x06Finish\"\xbf\x01\n" +
+	"\x05Stand\"J\n" +
+	"\x06Finish\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12(\n" +
+	"\x10operator_user_id\x18\x02 \x01(\tR\x0eoperatorUserId\"\xbf\x01\n" +
 	"\aCommand\x128\n" +
 	"\x06reroll\x18\x01 \x01(\v2\x1e.game.meet_by_chance.v1.RerollH\x00R\x06reroll\x125\n" +
 	"\x05stand\x18\x02 \x01(\v2\x1d.game.meet_by_chance.v1.StandH\x00R\x05stand\x128\n" +
 	"\x06finish\x18\x03 \x01(\v2\x1e.game.meet_by_chance.v1.FinishH\x00R\x06finishB\t\n" +
-	"\acommand\"$\n" +
+	"\acommand\"F\n" +
+	"\fReplayPlayer\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"seat_index\x18\x02 \x01(\rR\tseatIndex\"\xce\x02\n" +
 	"\fRoundStarted\x12\x14\n" +
-	"\x05round\x18\x01 \x01(\rR\x05round\"M\n" +
-	"\fDiceRevealed\x12=\n" +
-	"\aplayers\x18\x01 \x03(\v2#.game.meet_by_chance.v1.PlayerStateR\aplayers\"\x9f\x01\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12=\n" +
+	"\x05cause\x18\x02 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\x12O\n" +
+	"\x10previous_outcome\x18\x03 \x01(\x0e2$.game.meet_by_chance.v1.RoundOutcomeR\x0fpreviousOutcome\x126\n" +
+	"\x06config\x18\x04 \x01(\v2\x1e.game.meet_by_chance.v1.ConfigR\x06config\x12>\n" +
+	"\aplayers\x18\x05 \x03(\v2$.game.meet_by_chance.v1.ReplayPlayerR\aplayers\x12 \n" +
+	"\fhost_user_id\x18\x06 \x01(\tR\n" +
+	"hostUserId\"\xb4\x02\n" +
+	"\fDiceRevealed\x12A\n" +
+	"\aplayers\x18\x01 \x03(\v2#.game.meet_by_chance.v1.PlayerStateB\x02\x18\x01R\aplayers\x12C\n" +
+	"\vpublic_dice\x18\x02 \x03(\v2\".game.meet_by_chance.v1.PublicDiceR\n" +
+	"publicDice\x12\x14\n" +
+	"\x05round\x18\x03 \x01(\rR\x05round\x12\x1f\n" +
+	"\vbatch_index\x18\x04 \x01(\rR\n" +
+	"batchIndex\x12&\n" +
+	"\x0frolled_user_ids\x18\x05 \x03(\tR\rrolledUserIds\x12=\n" +
+	"\x05cause\x18\x06 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\"\x97\x03\n" +
 	"\x0eHandClassified\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12@\n" +
 	"\n" +
-	"hand_class\x18\x02 \x01(\x0e2!.game.meet_by_chance.v1.HandClassR\thandClass\x12\x19\n" +
-	"\bfull_key\x18\x03 \x03(\x05R\afullKey\x12\x17\n" +
-	"\atie_key\x18\x04 \x03(\x05R\x06tieKey\"c\n" +
-	"\rMatchResolved\x12\x19\n" +
-	"\buser_ids\x18\x01 \x03(\tR\auserIds\x12\x12\n" +
-	"\x04kind\x18\x02 \x01(\tR\x04kind\x12#\n" +
-	"\rpenalty_ticks\x18\x03 \x01(\rR\fpenaltyTicks\"N\n" +
+	"hand_class\x18\x02 \x01(\x0e2!.game.meet_by_chance.v1.HandClassR\thandClass\x12\x1d\n" +
+	"\bfull_key\x18\x03 \x03(\x05B\x02\x18\x01R\afullKey\x12\x1b\n" +
+	"\atie_key\x18\x04 \x03(\x05B\x02\x18\x01R\x06tieKey\x12\x14\n" +
+	"\x05round\x18\x05 \x01(\rR\x05round\x12\x1f\n" +
+	"\vbatch_index\x18\x06 \x01(\rR\n" +
+	"batchIndex\x12\x12\n" +
+	"\x04dice\x18\a \x03(\rR\x04dice\x12'\n" +
+	"\x0fnormalized_dice\x18\b \x03(\rR\x0enormalizedDice\x12\x1f\n" +
+	"\vspecial_235\x18\t \x01(\bR\n" +
+	"special235\x12Y\n" +
+	"\x13special_235_outcome\x18\n" +
+	" \x01(\x0e2).game.meet_by_chance.v1.Special235OutcomeR\x11special235Outcome\"\xfe\x01\n" +
+	"\rMatchResolved\x12\x1d\n" +
+	"\buser_ids\x18\x01 \x03(\tB\x02\x18\x01R\auserIds\x12\x16\n" +
+	"\x04kind\x18\x02 \x01(\tB\x02\x18\x01R\x04kind\x12'\n" +
+	"\rpenalty_ticks\x18\x03 \x01(\rB\x02\x18\x01R\fpenaltyTicks\x12\x14\n" +
+	"\x05round\x18\x04 \x01(\rR\x05round\x128\n" +
+	"\x05batch\x18\x05 \x01(\v2\".game.meet_by_chance.v1.MatchBatchR\x05batch\x12=\n" +
+	"\x05cause\x18\x06 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\"\x95\x03\n" +
 	"\x0eTargetSelected\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
-	"\rpenalty_ticks\x18\x02 \x01(\rR\fpenaltyTicks\"?\n" +
+	"\rpenalty_ticks\x18\x02 \x01(\rR\fpenaltyTicks\x12\x14\n" +
+	"\x05round\x18\x03 \x01(\rR\x05round\x12(\n" +
+	"\x10previous_user_id\x18\x04 \x01(\tR\x0epreviousUserId\x12;\n" +
+	"\x1afirst_selection_this_round\x18\x05 \x01(\bR\x17firstSelectionThisRound\x12.\n" +
+	"\x13target_reroll_count\x18\x06 \x01(\rR\x11targetRerollCount\x12#\n" +
+	"\rtarget_streak\x18\a \x01(\rR\ftargetStreak\x12=\n" +
+	"\x05cause\x18\b \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\x124\n" +
+	"\x16match_resolution_count\x18\t \x01(\rR\x14matchResolutionCount\"\x94\x02\n" +
 	"\x0eTargetRerolled\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\rR\x05count\"X\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\x12\x14\n" +
+	"\x05round\x18\x03 \x01(\rR\x05round\x12#\n" +
+	"\rtarget_streak\x18\x04 \x01(\rR\ftargetStreak\x12#\n" +
+	"\rpenalty_ticks\x18\x05 \x01(\rR\fpenaltyTicks\x12=\n" +
+	"\x05cause\x18\x06 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\x124\n" +
+	"\x16match_resolution_count\x18\a \x01(\rR\x14matchResolutionCount\"\xa8\x02\n" +
 	"\x0fPenaltyRecorded\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05ticks\x18\x02 \x01(\rR\x05ticks\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"-\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12,\n" +
+	"\x12before_total_ticks\x18\x04 \x01(\rR\x10beforeTotalTicks\x12*\n" +
+	"\x11after_total_ticks\x18\x05 \x01(\rR\x0fafterTotalTicks\x12\x14\n" +
+	"\x05round\x18\x06 \x01(\rR\x05round\x12\x1f\n" +
+	"\vbatch_index\x18\a \x01(\rR\n" +
+	"batchIndex\x12=\n" +
+	"\x05cause\x18\b \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\"\x9c\x02\n" +
 	"\x12ParticipantRevoked\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\")\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
+	"\x05round\x18\x02 \x01(\rR\x05round\x12@\n" +
+	"\fphase_before\x18\x03 \x01(\x0e2\x1d.game.meet_by_chance.v1.PhaseR\vphaseBefore\x12\x1d\n" +
+	"\n" +
+	"was_target\x18\x04 \x01(\bR\twasTarget\x12'\n" +
+	"\x0fround_cancelled\x18\x05 \x01(\bR\x0eroundCancelled\x12\x1d\n" +
+	"\n" +
+	"next_round\x18\x06 \x01(\rR\tnextRound\x12.\n" +
+	"\x13active_player_count\x18\a \x01(\rR\x11activePlayerCount\"\xa8\x01\n" +
 	"\x0fSessionFinished\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\xfe\x05\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x14\n" +
+	"\x05round\x18\x02 \x01(\rR\x05round\x12(\n" +
+	"\x10operator_user_id\x18\x03 \x01(\tR\x0eoperatorUserId\x12=\n" +
+	"\x05cause\x18\x04 \x01(\x0e2'.game.meet_by_chance.v1.ResolutionCauseR\x05cause\"\xff\x01\n" +
+	"\x13Special235Evaluated\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x12\x1f\n" +
+	"\vbatch_index\x18\x02 \x01(\rR\n" +
+	"batchIndex\x12(\n" +
+	"\x10special_user_ids\x18\x03 \x03(\tR\x0especialUserIds\x12B\n" +
+	"\x1eall_other_players_are_leopards\x18\x04 \x01(\bR\x1aallOtherPlayersAreLeopards\x12C\n" +
+	"\aoutcome\x18\x05 \x01(\x0e2).game.meet_by_chance.v1.Special235OutcomeR\aoutcome\"N\n" +
+	"\fRoundSettled\x12>\n" +
+	"\asummary\x18\x01 \x01(\v2$.game.meet_by_chance.v1.RoundSummaryR\asummary\"\xae\a\n" +
 	"\x05Event\x12K\n" +
 	"\rround_started\x18\x01 \x01(\v2$.game.meet_by_chance.v1.RoundStartedH\x00R\froundStarted\x12K\n" +
 	"\rdice_revealed\x18\x02 \x01(\v2$.game.meet_by_chance.v1.DiceRevealedH\x00R\fdiceRevealed\x12Q\n" +
@@ -1579,12 +3506,23 @@ const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
 	"\x0ftarget_rerolled\x18\x06 \x01(\v2&.game.meet_by_chance.v1.TargetRerolledH\x00R\x0etargetRerolled\x12T\n" +
 	"\x10penalty_recorded\x18\a \x01(\v2'.game.meet_by_chance.v1.PenaltyRecordedH\x00R\x0fpenaltyRecorded\x12]\n" +
 	"\x13participant_revoked\x18\b \x01(\v2*.game.meet_by_chance.v1.ParticipantRevokedH\x00R\x12participantRevoked\x12T\n" +
-	"\x10session_finished\x18\t \x01(\v2'.game.meet_by_chance.v1.SessionFinishedH\x00R\x0fsessionFinishedB\a\n" +
-	"\x05event\"\x8f\x04\n" +
+	"\x10session_finished\x18\t \x01(\v2'.game.meet_by_chance.v1.SessionFinishedH\x00R\x0fsessionFinished\x12a\n" +
+	"\x15special_235_evaluated\x18\n" +
+	" \x01(\v2+.game.meet_by_chance.v1.Special235EvaluatedH\x00R\x13special235Evaluated\x12K\n" +
+	"\rround_settled\x18\v \x01(\v2$.game.meet_by_chance.v1.RoundSettledH\x00R\froundSettledB\a\n" +
+	"\x05event\"\xbb\x02\n" +
+	"\vActionTimer\x12\x14\n" +
+	"\x05round\x18\x01 \x01(\rR\x05round\x123\n" +
+	"\x05phase\x18\x02 \x01(\x0e2\x1d.game.meet_by_chance.v1.PhaseR\x05phase\x12$\n" +
+	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId\x12.\n" +
+	"\x13target_reroll_count\x18\x04 \x01(\rR\x11targetRerollCount\x120\n" +
+	"\x14deadline_unix_millis\x18\x05 \x01(\x03R\x12deadlineUnixMillis\x12#\n" +
+	"\rtarget_streak\x18\x06 \x01(\rR\ftargetStreak\x124\n" +
+	"\x16match_resolution_count\x18\a \x01(\rR\x14matchResolutionCount\"\xcb\a\n" +
 	"\x04View\x123\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1d.game.meet_by_chance.v1.PhaseR\x05phase\x12\x14\n" +
-	"\x05round\x18\x02 \x01(\rR\x05round\x12=\n" +
-	"\aplayers\x18\x03 \x03(\v2#.game.meet_by_chance.v1.PlayerStateR\aplayers\x12$\n" +
+	"\x05round\x18\x02 \x01(\rR\x05round\x12A\n" +
+	"\aplayers\x18\x03 \x03(\v2#.game.meet_by_chance.v1.PlayerStateB\x02\x18\x01R\aplayers\x12$\n" +
 	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_reroll_count\x18\x05 \x01(\rR\x11targetRerollCount\x12.\n" +
 	"\x13target_reroll_limit\x18\x06 \x01(\rR\x11targetRerollLimit\x124\n" +
@@ -1593,23 +3531,74 @@ const file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc = "" +
 	"\x1baction_deadline_unix_millis\x18\t \x01(\x03R\x18actionDeadlineUnixMillis\x12'\n" +
 	"\x0fallowed_actions\x18\n" +
 	" \x03(\tR\x0eallowedActions\x12#\n" +
-	"\rfinish_reason\x18\v \x01(\tR\ffinishReason*\xc3\x01\n" +
+	"\rfinish_reason\x18\v \x01(\tR\ffinishReason\x12K\n" +
+	"\x0epublic_players\x18\f \x03(\v2$.game.meet_by_chance.v1.PublicPlayerR\rpublicPlayers\x12#\n" +
+	"\rtarget_streak\x18\r \x01(\rR\ftargetStreak\x126\n" +
+	"\x06config\x18\x0e \x01(\v2\x1e.game.meet_by_chance.v1.ConfigR\x06config\x12M\n" +
+	"\x0flast_settlement\x18\x0f \x01(\v2$.game.meet_by_chance.v1.RoundSummaryR\x0elastSettlement\x12I\n" +
+	"\rrecent_rounds\x18\x10 \x03(\v2$.game.meet_by_chance.v1.RoundSummaryR\frecentRounds\x12L\n" +
+	"\x10last_match_batch\x18\x11 \x01(\v2\".game.meet_by_chance.v1.MatchBatchR\x0elastMatchBatch\x12$\n" +
+	"\x0eviewer_is_host\x18\x12 \x01(\bR\fviewerIsHost\"=\n" +
+	"\tViewDelta\x120\n" +
+	"\x04view\x18\x01 \x01(\v2\x1c.game.meet_by_chance.v1.ViewR\x04view\"^\n" +
+	"\vReplayEntry\x12\x1a\n" +
+	"\bsequence\x18\x01 \x01(\x04R\bsequence\x123\n" +
+	"\x05event\x18\x02 \x01(\v2\x1d.game.meet_by_chance.v1.EventR\x05event\"S\n" +
+	"\vReplayRound\x12>\n" +
+	"\asummary\x18\x01 \x01(\v2$.game.meet_by_chance.v1.RoundSummaryR\asummaryJ\x04\b\x02\x10\x03\"\xc8\x02\n" +
+	"\x06Replay\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\rR\rschemaVersion\x126\n" +
+	"\x06config\x18\x02 \x01(\v2\x1e.game.meet_by_chance.v1.ConfigR\x06config\x12>\n" +
+	"\aplayers\x18\x03 \x03(\v2$.game.meet_by_chance.v1.ReplayPlayerR\aplayers\x12=\n" +
+	"\aentries\x18\x04 \x03(\v2#.game.meet_by_chance.v1.ReplayEntryR\aentries\x12#\n" +
+	"\rfinish_reason\x18\x05 \x01(\tR\ffinishReason\x12;\n" +
+	"\x06rounds\x18\x06 \x03(\v2#.game.meet_by_chance.v1.ReplayRoundR\x06rounds*\xc7\x01\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rPHASE_ROLLING\x10\x01\x12\x13\n" +
 	"\x0fPHASE_REVEALING\x10\x02\x12\x19\n" +
 	"\x15PHASE_RESOLVING_MATCH\x10\x03\x12\x19\n" +
 	"\x15PHASE_TARGET_DECISION\x10\x04\x12\x18\n" +
-	"\x14PHASE_TARGET_ROLLING\x10\x05\x12\x17\n" +
-	"\x13PHASE_ROUND_SETTLED\x10\x06\x12\x12\n" +
-	"\x0ePHASE_FINISHED\x10\a*\xa0\x01\n" +
+	"\x14PHASE_TARGET_ROLLING\x10\x05\x12\x1b\n" +
+	"\x13PHASE_ROUND_SETTLED\x10\x06\x1a\x02\b\x01\x12\x12\n" +
+	"\x0ePHASE_FINISHED\x10\a*\xa4\x01\n" +
 	"\tHandClass\x12\x1a\n" +
 	"\x16HAND_CLASS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11HAND_CLASS_SINGLE\x10\x01\x12\x13\n" +
 	"\x0fHAND_CLASS_PAIR\x10\x02\x12\x17\n" +
 	"\x13HAND_CLASS_STRAIGHT\x10\x03\x12\x16\n" +
-	"\x12HAND_CLASS_LEOPARD\x10\x04\x12\x1a\n" +
-	"\x16HAND_CLASS_SPECIAL_235\x10\x05B`Z^github.com/iFTY-R/game-night/games/meet-by-chance/gen/go/game/meet_by_chance/v1;meetbychancev1b\x06proto3"
+	"\x12HAND_CLASS_LEOPARD\x10\x04\x12\x1e\n" +
+	"\x16HAND_CLASS_SPECIAL_235\x10\x05\x1a\x02\b\x01*\xac\x01\n" +
+	"\x11Special235Outcome\x12\"\n" +
+	"\x1eSPECIAL235_OUTCOME_UNSPECIFIED\x10\x00\x12%\n" +
+	"!SPECIAL235_OUTCOME_NOT_APPLICABLE\x10\x01\x12%\n" +
+	"!SPECIAL235_OUTCOME_BEATS_LEOPARDS\x10\x02\x12%\n" +
+	"!SPECIAL235_OUTCOME_MINIMUM_SINGLE\x10\x03*l\n" +
+	"\tMatchKind\x12\x1a\n" +
+	"\x16MATCH_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10MATCH_KIND_EXACT\x10\x01\x12\x16\n" +
+	"\x12MATCH_KIND_HIGHEST\x10\x02\x12\x15\n" +
+	"\x11MATCH_KIND_LOWEST\x10\x03*\xab\x03\n" +
+	"\x0fResolutionCause\x12 \n" +
+	"\x1cRESOLUTION_CAUSE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dRESOLUTION_CAUSE_INITIAL_ROLL\x10\x01\x12!\n" +
+	"\x1dRESOLUTION_CAUSE_MATCH_REROLL\x10\x02\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_PLAYER_REROLL\x10\x03\x12!\n" +
+	"\x1dRESOLUTION_CAUSE_PLAYER_STAND\x10\x04\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_TIMEOUT_STAND\x10\x05\x12(\n" +
+	"$RESOLUTION_CAUSE_PARTICIPANT_REVOKED\x10\x06\x12#\n" +
+	"\x1fRESOLUTION_CAUSE_TARGET_REVOKED\x10\a\x12\"\n" +
+	"\x1eRESOLUTION_CAUSE_HOST_FINISHED\x10\b\x12)\n" +
+	"%RESOLUTION_CAUSE_INSUFFICIENT_PLAYERS\x10\t\x12'\n" +
+	"#RESOLUTION_CAUSE_PLATFORM_CANCELLED\x10\n" +
+	"*\xdb\x01\n" +
+	"\fRoundOutcome\x12\x1d\n" +
+	"\x19ROUND_OUTCOME_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13ROUND_OUTCOME_STOOD\x10\x01\x12%\n" +
+	"!ROUND_OUTCOME_TARGET_EXCEEDED_ALL\x10\x02\x12&\n" +
+	"\"ROUND_OUTCOME_REROLL_LIMIT_REACHED\x10\x03\x12 \n" +
+	"\x1cROUND_OUTCOME_TARGET_REVOKED\x10\x04\x12\"\n" +
+	"\x1eROUND_OUTCOME_SESSION_FINISHED\x10\x05B`Z^github.com/iFTY-R/game-night/games/meet-by-chance/gen/go/game/meet_by_chance/v1;meetbychancev1b\x06proto3"
 
 var (
 	file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescOnce sync.Once
@@ -1623,56 +3612,116 @@ func file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescGZIP() []byte {
 	return file_game_meet_by_chance_v1_meet_by_chance_proto_rawDescData
 }
 
-var file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_game_meet_by_chance_v1_meet_by_chance_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_game_meet_by_chance_v1_meet_by_chance_proto_goTypes = []any{
-	(Phase)(0),                 // 0: game.meet_by_chance.v1.Phase
-	(HandClass)(0),             // 1: game.meet_by_chance.v1.HandClass
-	(*Config)(nil),             // 2: game.meet_by_chance.v1.Config
-	(*PlayerState)(nil),        // 3: game.meet_by_chance.v1.PlayerState
-	(*State)(nil),              // 4: game.meet_by_chance.v1.State
-	(*Reroll)(nil),             // 5: game.meet_by_chance.v1.Reroll
-	(*Stand)(nil),              // 6: game.meet_by_chance.v1.Stand
-	(*Finish)(nil),             // 7: game.meet_by_chance.v1.Finish
-	(*Command)(nil),            // 8: game.meet_by_chance.v1.Command
-	(*RoundStarted)(nil),       // 9: game.meet_by_chance.v1.RoundStarted
-	(*DiceRevealed)(nil),       // 10: game.meet_by_chance.v1.DiceRevealed
-	(*HandClassified)(nil),     // 11: game.meet_by_chance.v1.HandClassified
-	(*MatchResolved)(nil),      // 12: game.meet_by_chance.v1.MatchResolved
-	(*TargetSelected)(nil),     // 13: game.meet_by_chance.v1.TargetSelected
-	(*TargetRerolled)(nil),     // 14: game.meet_by_chance.v1.TargetRerolled
-	(*PenaltyRecorded)(nil),    // 15: game.meet_by_chance.v1.PenaltyRecorded
-	(*ParticipantRevoked)(nil), // 16: game.meet_by_chance.v1.ParticipantRevoked
-	(*SessionFinished)(nil),    // 17: game.meet_by_chance.v1.SessionFinished
-	(*Event)(nil),              // 18: game.meet_by_chance.v1.Event
-	(*View)(nil),               // 19: game.meet_by_chance.v1.View
+	(Phase)(0),                  // 0: game.meet_by_chance.v1.Phase
+	(HandClass)(0),              // 1: game.meet_by_chance.v1.HandClass
+	(Special235Outcome)(0),      // 2: game.meet_by_chance.v1.Special235Outcome
+	(MatchKind)(0),              // 3: game.meet_by_chance.v1.MatchKind
+	(ResolutionCause)(0),        // 4: game.meet_by_chance.v1.ResolutionCause
+	(RoundOutcome)(0),           // 5: game.meet_by_chance.v1.RoundOutcome
+	(*Config)(nil),              // 6: game.meet_by_chance.v1.Config
+	(*PlayerState)(nil),         // 7: game.meet_by_chance.v1.PlayerState
+	(*PublicPlayer)(nil),        // 8: game.meet_by_chance.v1.PublicPlayer
+	(*PublicDice)(nil),          // 9: game.meet_by_chance.v1.PublicDice
+	(*MatchGroup)(nil),          // 10: game.meet_by_chance.v1.MatchGroup
+	(*MatchBatch)(nil),          // 11: game.meet_by_chance.v1.MatchBatch
+	(*RoundSummary)(nil),        // 12: game.meet_by_chance.v1.RoundSummary
+	(*State)(nil),               // 13: game.meet_by_chance.v1.State
+	(*Reroll)(nil),              // 14: game.meet_by_chance.v1.Reroll
+	(*Stand)(nil),               // 15: game.meet_by_chance.v1.Stand
+	(*Finish)(nil),              // 16: game.meet_by_chance.v1.Finish
+	(*Command)(nil),             // 17: game.meet_by_chance.v1.Command
+	(*ReplayPlayer)(nil),        // 18: game.meet_by_chance.v1.ReplayPlayer
+	(*RoundStarted)(nil),        // 19: game.meet_by_chance.v1.RoundStarted
+	(*DiceRevealed)(nil),        // 20: game.meet_by_chance.v1.DiceRevealed
+	(*HandClassified)(nil),      // 21: game.meet_by_chance.v1.HandClassified
+	(*MatchResolved)(nil),       // 22: game.meet_by_chance.v1.MatchResolved
+	(*TargetSelected)(nil),      // 23: game.meet_by_chance.v1.TargetSelected
+	(*TargetRerolled)(nil),      // 24: game.meet_by_chance.v1.TargetRerolled
+	(*PenaltyRecorded)(nil),     // 25: game.meet_by_chance.v1.PenaltyRecorded
+	(*ParticipantRevoked)(nil),  // 26: game.meet_by_chance.v1.ParticipantRevoked
+	(*SessionFinished)(nil),     // 27: game.meet_by_chance.v1.SessionFinished
+	(*Special235Evaluated)(nil), // 28: game.meet_by_chance.v1.Special235Evaluated
+	(*RoundSettled)(nil),        // 29: game.meet_by_chance.v1.RoundSettled
+	(*Event)(nil),               // 30: game.meet_by_chance.v1.Event
+	(*ActionTimer)(nil),         // 31: game.meet_by_chance.v1.ActionTimer
+	(*View)(nil),                // 32: game.meet_by_chance.v1.View
+	(*ViewDelta)(nil),           // 33: game.meet_by_chance.v1.ViewDelta
+	(*ReplayEntry)(nil),         // 34: game.meet_by_chance.v1.ReplayEntry
+	(*ReplayRound)(nil),         // 35: game.meet_by_chance.v1.ReplayRound
+	(*Replay)(nil),              // 36: game.meet_by_chance.v1.Replay
 }
 var file_game_meet_by_chance_v1_meet_by_chance_proto_depIdxs = []int32{
 	1,  // 0: game.meet_by_chance.v1.PlayerState.hand_class:type_name -> game.meet_by_chance.v1.HandClass
-	0,  // 1: game.meet_by_chance.v1.State.phase:type_name -> game.meet_by_chance.v1.Phase
-	3,  // 2: game.meet_by_chance.v1.State.players:type_name -> game.meet_by_chance.v1.PlayerState
-	2,  // 3: game.meet_by_chance.v1.State.config:type_name -> game.meet_by_chance.v1.Config
-	5,  // 4: game.meet_by_chance.v1.Command.reroll:type_name -> game.meet_by_chance.v1.Reroll
-	6,  // 5: game.meet_by_chance.v1.Command.stand:type_name -> game.meet_by_chance.v1.Stand
-	7,  // 6: game.meet_by_chance.v1.Command.finish:type_name -> game.meet_by_chance.v1.Finish
-	3,  // 7: game.meet_by_chance.v1.DiceRevealed.players:type_name -> game.meet_by_chance.v1.PlayerState
-	1,  // 8: game.meet_by_chance.v1.HandClassified.hand_class:type_name -> game.meet_by_chance.v1.HandClass
-	9,  // 9: game.meet_by_chance.v1.Event.round_started:type_name -> game.meet_by_chance.v1.RoundStarted
-	10, // 10: game.meet_by_chance.v1.Event.dice_revealed:type_name -> game.meet_by_chance.v1.DiceRevealed
-	11, // 11: game.meet_by_chance.v1.Event.hand_classified:type_name -> game.meet_by_chance.v1.HandClassified
-	12, // 12: game.meet_by_chance.v1.Event.match_resolved:type_name -> game.meet_by_chance.v1.MatchResolved
-	13, // 13: game.meet_by_chance.v1.Event.target_selected:type_name -> game.meet_by_chance.v1.TargetSelected
-	14, // 14: game.meet_by_chance.v1.Event.target_rerolled:type_name -> game.meet_by_chance.v1.TargetRerolled
-	15, // 15: game.meet_by_chance.v1.Event.penalty_recorded:type_name -> game.meet_by_chance.v1.PenaltyRecorded
-	16, // 16: game.meet_by_chance.v1.Event.participant_revoked:type_name -> game.meet_by_chance.v1.ParticipantRevoked
-	17, // 17: game.meet_by_chance.v1.Event.session_finished:type_name -> game.meet_by_chance.v1.SessionFinished
-	0,  // 18: game.meet_by_chance.v1.View.phase:type_name -> game.meet_by_chance.v1.Phase
-	3,  // 19: game.meet_by_chance.v1.View.players:type_name -> game.meet_by_chance.v1.PlayerState
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	2,  // 1: game.meet_by_chance.v1.PlayerState.special_235_outcome:type_name -> game.meet_by_chance.v1.Special235Outcome
+	1,  // 2: game.meet_by_chance.v1.PublicPlayer.hand_class:type_name -> game.meet_by_chance.v1.HandClass
+	2,  // 3: game.meet_by_chance.v1.PublicPlayer.special_235_outcome:type_name -> game.meet_by_chance.v1.Special235Outcome
+	3,  // 4: game.meet_by_chance.v1.MatchGroup.kind:type_name -> game.meet_by_chance.v1.MatchKind
+	10, // 5: game.meet_by_chance.v1.MatchBatch.groups:type_name -> game.meet_by_chance.v1.MatchGroup
+	5,  // 6: game.meet_by_chance.v1.RoundSummary.outcome:type_name -> game.meet_by_chance.v1.RoundOutcome
+	4,  // 7: game.meet_by_chance.v1.RoundSummary.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	8,  // 8: game.meet_by_chance.v1.RoundSummary.final_players:type_name -> game.meet_by_chance.v1.PublicPlayer
+	0,  // 9: game.meet_by_chance.v1.State.phase:type_name -> game.meet_by_chance.v1.Phase
+	7,  // 10: game.meet_by_chance.v1.State.players:type_name -> game.meet_by_chance.v1.PlayerState
+	6,  // 11: game.meet_by_chance.v1.State.config:type_name -> game.meet_by_chance.v1.Config
+	12, // 12: game.meet_by_chance.v1.State.round_history:type_name -> game.meet_by_chance.v1.RoundSummary
+	12, // 13: game.meet_by_chance.v1.State.last_settlement:type_name -> game.meet_by_chance.v1.RoundSummary
+	11, // 14: game.meet_by_chance.v1.State.last_match_batch:type_name -> game.meet_by_chance.v1.MatchBatch
+	11, // 15: game.meet_by_chance.v1.State.match_history:type_name -> game.meet_by_chance.v1.MatchBatch
+	14, // 16: game.meet_by_chance.v1.Command.reroll:type_name -> game.meet_by_chance.v1.Reroll
+	15, // 17: game.meet_by_chance.v1.Command.stand:type_name -> game.meet_by_chance.v1.Stand
+	16, // 18: game.meet_by_chance.v1.Command.finish:type_name -> game.meet_by_chance.v1.Finish
+	4,  // 19: game.meet_by_chance.v1.RoundStarted.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	5,  // 20: game.meet_by_chance.v1.RoundStarted.previous_outcome:type_name -> game.meet_by_chance.v1.RoundOutcome
+	6,  // 21: game.meet_by_chance.v1.RoundStarted.config:type_name -> game.meet_by_chance.v1.Config
+	18, // 22: game.meet_by_chance.v1.RoundStarted.players:type_name -> game.meet_by_chance.v1.ReplayPlayer
+	7,  // 23: game.meet_by_chance.v1.DiceRevealed.players:type_name -> game.meet_by_chance.v1.PlayerState
+	9,  // 24: game.meet_by_chance.v1.DiceRevealed.public_dice:type_name -> game.meet_by_chance.v1.PublicDice
+	4,  // 25: game.meet_by_chance.v1.DiceRevealed.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	1,  // 26: game.meet_by_chance.v1.HandClassified.hand_class:type_name -> game.meet_by_chance.v1.HandClass
+	2,  // 27: game.meet_by_chance.v1.HandClassified.special_235_outcome:type_name -> game.meet_by_chance.v1.Special235Outcome
+	11, // 28: game.meet_by_chance.v1.MatchResolved.batch:type_name -> game.meet_by_chance.v1.MatchBatch
+	4,  // 29: game.meet_by_chance.v1.MatchResolved.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	4,  // 30: game.meet_by_chance.v1.TargetSelected.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	4,  // 31: game.meet_by_chance.v1.TargetRerolled.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	4,  // 32: game.meet_by_chance.v1.PenaltyRecorded.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	0,  // 33: game.meet_by_chance.v1.ParticipantRevoked.phase_before:type_name -> game.meet_by_chance.v1.Phase
+	4,  // 34: game.meet_by_chance.v1.SessionFinished.cause:type_name -> game.meet_by_chance.v1.ResolutionCause
+	2,  // 35: game.meet_by_chance.v1.Special235Evaluated.outcome:type_name -> game.meet_by_chance.v1.Special235Outcome
+	12, // 36: game.meet_by_chance.v1.RoundSettled.summary:type_name -> game.meet_by_chance.v1.RoundSummary
+	19, // 37: game.meet_by_chance.v1.Event.round_started:type_name -> game.meet_by_chance.v1.RoundStarted
+	20, // 38: game.meet_by_chance.v1.Event.dice_revealed:type_name -> game.meet_by_chance.v1.DiceRevealed
+	21, // 39: game.meet_by_chance.v1.Event.hand_classified:type_name -> game.meet_by_chance.v1.HandClassified
+	22, // 40: game.meet_by_chance.v1.Event.match_resolved:type_name -> game.meet_by_chance.v1.MatchResolved
+	23, // 41: game.meet_by_chance.v1.Event.target_selected:type_name -> game.meet_by_chance.v1.TargetSelected
+	24, // 42: game.meet_by_chance.v1.Event.target_rerolled:type_name -> game.meet_by_chance.v1.TargetRerolled
+	25, // 43: game.meet_by_chance.v1.Event.penalty_recorded:type_name -> game.meet_by_chance.v1.PenaltyRecorded
+	26, // 44: game.meet_by_chance.v1.Event.participant_revoked:type_name -> game.meet_by_chance.v1.ParticipantRevoked
+	27, // 45: game.meet_by_chance.v1.Event.session_finished:type_name -> game.meet_by_chance.v1.SessionFinished
+	28, // 46: game.meet_by_chance.v1.Event.special_235_evaluated:type_name -> game.meet_by_chance.v1.Special235Evaluated
+	29, // 47: game.meet_by_chance.v1.Event.round_settled:type_name -> game.meet_by_chance.v1.RoundSettled
+	0,  // 48: game.meet_by_chance.v1.ActionTimer.phase:type_name -> game.meet_by_chance.v1.Phase
+	0,  // 49: game.meet_by_chance.v1.View.phase:type_name -> game.meet_by_chance.v1.Phase
+	7,  // 50: game.meet_by_chance.v1.View.players:type_name -> game.meet_by_chance.v1.PlayerState
+	8,  // 51: game.meet_by_chance.v1.View.public_players:type_name -> game.meet_by_chance.v1.PublicPlayer
+	6,  // 52: game.meet_by_chance.v1.View.config:type_name -> game.meet_by_chance.v1.Config
+	12, // 53: game.meet_by_chance.v1.View.last_settlement:type_name -> game.meet_by_chance.v1.RoundSummary
+	12, // 54: game.meet_by_chance.v1.View.recent_rounds:type_name -> game.meet_by_chance.v1.RoundSummary
+	11, // 55: game.meet_by_chance.v1.View.last_match_batch:type_name -> game.meet_by_chance.v1.MatchBatch
+	32, // 56: game.meet_by_chance.v1.ViewDelta.view:type_name -> game.meet_by_chance.v1.View
+	30, // 57: game.meet_by_chance.v1.ReplayEntry.event:type_name -> game.meet_by_chance.v1.Event
+	12, // 58: game.meet_by_chance.v1.ReplayRound.summary:type_name -> game.meet_by_chance.v1.RoundSummary
+	6,  // 59: game.meet_by_chance.v1.Replay.config:type_name -> game.meet_by_chance.v1.Config
+	18, // 60: game.meet_by_chance.v1.Replay.players:type_name -> game.meet_by_chance.v1.ReplayPlayer
+	34, // 61: game.meet_by_chance.v1.Replay.entries:type_name -> game.meet_by_chance.v1.ReplayEntry
+	35, // 62: game.meet_by_chance.v1.Replay.rounds:type_name -> game.meet_by_chance.v1.ReplayRound
+	63, // [63:63] is the sub-list for method output_type
+	63, // [63:63] is the sub-list for method input_type
+	63, // [63:63] is the sub-list for extension type_name
+	63, // [63:63] is the sub-list for extension extendee
+	0,  // [0:63] is the sub-list for field type_name
 }
 
 func init() { file_game_meet_by_chance_v1_meet_by_chance_proto_init() }
@@ -1680,12 +3729,12 @@ func file_game_meet_by_chance_v1_meet_by_chance_proto_init() {
 	if File_game_meet_by_chance_v1_meet_by_chance_proto != nil {
 		return
 	}
-	file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[6].OneofWrappers = []any{
+	file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[11].OneofWrappers = []any{
 		(*Command_Reroll)(nil),
 		(*Command_Stand)(nil),
 		(*Command_Finish)(nil),
 	}
-	file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[16].OneofWrappers = []any{
+	file_game_meet_by_chance_v1_meet_by_chance_proto_msgTypes[24].OneofWrappers = []any{
 		(*Event_RoundStarted)(nil),
 		(*Event_DiceRevealed)(nil),
 		(*Event_HandClassified)(nil),
@@ -1695,14 +3744,16 @@ func file_game_meet_by_chance_v1_meet_by_chance_proto_init() {
 		(*Event_PenaltyRecorded)(nil),
 		(*Event_ParticipantRevoked)(nil),
 		(*Event_SessionFinished)(nil),
+		(*Event_Special_235Evaluated)(nil),
+		(*Event_RoundSettled)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc), len(file_game_meet_by_chance_v1_meet_by_chance_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   18,
+			NumEnums:      6,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

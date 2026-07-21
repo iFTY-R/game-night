@@ -12,6 +12,7 @@ export const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
   routes: [
     { path: "/", name: "home", component: HomeView, meta: { title: "开始一局" } },
+    { path: "/invite/:roomCode", name: "invite", component: HomeView, props: (route) => ({ inviteCode: String(route.params.roomCode ?? "") }), meta: { title: "加入房间" } },
     { path: "/room/:roomId", name: "room", component: RoomView, props: true, meta: { title: "房间" } },
     { path: "/room/:roomId/game/:sessionId", name: "game", component: GameView, props: true, meta: { title: "游戏桌" } },
     { path: "/fixtures/table", name: "fixture-table", component: GameView, props: { roomId: "fixture-room", sessionId: "fixture-session", fixtureState: "active" }, meta: { title: "桌面预览" } },

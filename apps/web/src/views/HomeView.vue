@@ -1,35 +1,45 @@
 <script setup lang="ts">
 import { ArrowRight, Dices, DoorOpen, ShieldCheck, Spade } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { useRoomStore } from "../stores/room";
 
 const router = useRouter();
 const room = useRoomStore();
+const props = withDefaults(defineProps<{ inviteCode?: string }>(), { inviteCode: "" });
 const displayName = ref(room.displayName);
-const roomCode = ref("");
+const inviteCode = computed(() => props.inviteCode.trim().toUpperCase());
+const roomCode = ref(inviteCode.value);
 const error = ref("");
 const ready = computed(() => room.hasIdentity);
 
-const confirmIdentity = (): void => {
+const saveIdentity = (): boolean => {
   if (!room.setIdentity(displayName.value)) {
     error.value = "用户名需要 1 到 18 个字符";
-    return;
+    return false;
   }
   displayName.value = room.displayName;
   error.value = "";
+  return true;
 };
 
 const enterRoom = async (roomId: string, code: string): Promise<void> => {
-  if (!room.hasIdentity) {
-    confirmIdentity();
-  }
-  if (!room.hasIdentity) {
+  if (!room.hasIdentity && !saveIdentity()) {
     return;
   }
   room.enterRoom(roomId, code);
   await router.push({ name: "room", params: { roomId } });
+};
+
+const confirmIdentity = async (): Promise<void> => {
+  if (!saveIdentity()) {
+    return;
+  }
+  // Completing onboarding from an invite returns directly to that invite's room.
+  if (/^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
+    await enterRoom(inviteCode.value.toLowerCase(), inviteCode.value);
+  }
 };
 
 const joinRoom = async (): Promise<void> => {
@@ -42,6 +52,13 @@ const joinRoom = async (): Promise<void> => {
 };
 
 const createRoom = async (): Promise<void> => enterRoom("night-789", "N789");
+
+onMounted(() => {
+  // A recognized device can follow an invite without an intermediate form submit.
+  if (room.hasIdentity && /^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
+    void enterRoom(inviteCode.value.toLowerCase(), inviteCode.value);
+  }
+});
 </script>
 
 <template>

@@ -179,7 +179,34 @@ func TestGameServiceActionUsesPersistedOwnershipAndPublishesCommittedCursor(t *t
 	}
 }
 
-func TestGameServiceReplayRequiresTerminalSessionAndCurrentMembership(t *testing.T) {
+func TestGameServiceReplayRequiresTerminalSessionAndFrozenParticipation(t *testing.T) {
+	fixture := newGameTransportFixture(t, true)
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
+	})
+	authorizeGameRead(request, "player-device")
+	response, err := client.GetReplayProjection(t.Context(), request)
+	if err != nil || !response.Msg.GetComplete() || fixture.runtime.lastReplayPolicy != gameSDK.ReplayAccessParticipant {
+		t.Fatalf("replay response=%+v policy=%s err=%v", response, fixture.runtime.lastReplayPolicy, err)
+	}
+}
+
+func TestGameServiceReplayRejectsActiveSessionParticipant(t *testing.T) {
+	fixture := newGameTransportFixture(t, false)
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
+	})
+	authorizeGameRead(request, "player-device")
+	if _, err := client.GetReplayProjection(t.Context(), request); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("active session replay error = %v", err)
+	}
+}
+
+func TestGameServiceReplayDoesNotTreatCurrentSpectatorAsHistoricalMember(t *testing.T) {
 	fixture := newGameTransportFixture(t, true)
 	client := fixture.client(t)
 	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
@@ -187,9 +214,64 @@ func TestGameServiceReplayRequiresTerminalSessionAndCurrentMembership(t *testing
 		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
 	})
 	authorizeGameRead(request, "spectator-device")
+	if _, err := client.GetReplayProjection(t.Context(), request); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("current spectator replay error = %v", err)
+	}
+}
+
+func TestGameServiceReplayRetainsFrozenParticipantAccessAfterRemoval(t *testing.T) {
+	fixture := newGameTransportFixture(t, true)
+	now := fixture.room.Snapshot().UpdatedAt.Add(time.Second)
+	removedRoom, err := roomDomain.Restore(roomDomain.RoomSnapshot{
+		ID: fixture.roomID, RoomCode: fixture.room.Snapshot().RoomCode, Visibility: roomDomain.VisibilityPrivate,
+		Status: roomDomain.RoomStatusPostGame, HostUserID: fixture.hostID, ParticipantCapacity: 4,
+		ParticipantAdmission: roomDomain.AdmissionClosed, SpectatorAdmission: roomDomain.AdmissionOpen,
+		Members: []roomDomain.MemberSnapshot{
+			{UserID: fixture.hostID, Role: roomDomain.MemberRoleParticipant, SeatIndex: 0, JoinedAt: now, LastSeenAt: now},
+			{UserID: fixture.spectatorID, Role: roomDomain.MemberRoleSpectator, JoinedAt: now, LastSeenAt: now},
+		},
+		LastFinishedSessionID: fixture.sessionID, LastFinishedGameID: "liars-dice",
+		RoomVersion: 5, MembershipVersion: 4, CreatedAt: fixture.room.Snapshot().CreatedAt, UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.room = removedRoom
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
+	})
+	authorizeGameRead(request, "player-device")
 	response, err := client.GetReplayProjection(t.Context(), request)
-	if err != nil || !response.Msg.GetComplete() || fixture.runtime.lastReplayPolicy != gameSDK.ReplayAccessRoomMember {
-		t.Fatalf("replay response=%+v policy=%s err=%v", response, fixture.runtime.lastReplayPolicy, err)
+	if err != nil || !response.Msg.GetComplete() || fixture.runtime.lastReplayPolicy != gameSDK.ReplayAccessParticipant {
+		t.Fatalf("removed participant replay response=%+v policy=%s err=%v", response, fixture.runtime.lastReplayPolicy, err)
+	}
+}
+
+func TestGameServiceReplayRejectsRemovedNonParticipant(t *testing.T) {
+	fixture := newGameTransportFixture(t, true)
+	now := fixture.room.Snapshot().UpdatedAt.Add(time.Second)
+	removedRoom, err := roomDomain.Restore(roomDomain.RoomSnapshot{
+		ID: fixture.roomID, RoomCode: fixture.room.Snapshot().RoomCode, Visibility: roomDomain.VisibilityPrivate,
+		Status: roomDomain.RoomStatusPostGame, HostUserID: fixture.hostID, ParticipantCapacity: 4,
+		ParticipantAdmission: roomDomain.AdmissionClosed, SpectatorAdmission: roomDomain.AdmissionOpen,
+		Members:               []roomDomain.MemberSnapshot{{UserID: fixture.hostID, Role: roomDomain.MemberRoleParticipant, SeatIndex: 0, JoinedAt: now, LastSeenAt: now}},
+		LastFinishedSessionID: fixture.sessionID, LastFinishedGameID: "liars-dice",
+		RoomVersion: 5, MembershipVersion: 4, CreatedAt: fixture.room.Snapshot().CreatedAt, UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.room = removedRoom
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
+	})
+	authorizeGameRead(request, "spectator-device")
+	if _, err := client.GetReplayProjection(t.Context(), request); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("removed non-participant replay error = %v", err)
 	}
 }
 

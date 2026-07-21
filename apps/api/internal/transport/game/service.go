@@ -437,19 +437,17 @@ func (service *Service) authorizeReplay(
 	if !session.Snapshot().Status.Terminal() {
 		return authorizedViewer{}, "", gameruntime.ErrReplayUnavailable
 	}
-	member, present := room.Member(actor)
-	if !present || member.Role == roomDomain.MemberRoleWaiting {
-		return authorizedViewer{}, "", gameruntime.ErrParticipantNotActive
-	}
-	policy := gameSDK.ReplayAccessRoomMember
+	// A terminal replay keeps the frozen participant grant even after room removal;
+	// removal revokes live authority, but must not erase access to the completed game.
 	for _, participant := range session.Snapshot().Participants {
 		if participant.UserID == actor {
-			policy = gameSDK.ReplayAccessParticipant
-			break
+			viewer := gameSDK.Viewer{Kind: gameSDK.ViewerReplay, UserID: gameSDK.Identifier(actor.String())}
+			return authorizedViewer{room: room, session: session, viewer: viewer}, gameSDK.ReplayAccessParticipant, nil
 		}
 	}
-	viewer := gameSDK.Viewer{Kind: gameSDK.ViewerReplay, UserID: gameSDK.Identifier(actor.String())}
-	return authorizedViewer{room: room, session: session, viewer: viewer}, policy, nil
+	// Current membership is not a historical grant: spectators and users who join
+	// after this session ended need an explicit snapshot/public policy.
+	return authorizedViewer{}, "", gameruntime.ErrParticipantNotActive
 }
 
 func (service *Service) loadRoomSession(

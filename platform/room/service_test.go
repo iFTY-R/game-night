@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/clock"
+	"github.com/iFTY-R/game-night/platform/outbox"
 )
 
 func TestServiceCreatesRoomWithExplicitAdmissionAndRetriesCodeConflict(t *testing.T) {
@@ -152,6 +153,56 @@ func TestServicePersistsSpectatorRequestingParticipantWhilePlaying(t *testing.T)
 	}
 }
 
+func TestServiceCommitsDurableRevocationForPlayingParticipant(t *testing.T) {
+	now := time.Date(2026, time.July, 21, 14, 0, 0, 0, time.UTC)
+	host, participant := uuid.New(), uuid.New()
+	repository := newMemoryRoomRepository()
+	playing, err := New(uuid.New(), host, "REVOKE", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.Join(participant, JoinIntentParticipant, playing.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionID := uuid.New()
+	playing, _, err = playing.StartSession(host, sessionID, "liars-dice", 2, 9, playing.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(t.Context(), playing); err != nil {
+		t.Fatal(err)
+	}
+	removedAt := now.Add(3 * time.Second)
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE4"}}, clock.NewFake(removedAt))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stored, result, err := service.RemoveMember(t.Context(), RemoveMemberCommand{
+		ActorUserID: host, RoomID: playing.Snapshot().ID, UserID: participant,
+		Reason: RemovalReasonHostRemoved, Expected: playing.Version(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.ParticipantRevoked || result.SourceEventID == uuid.Nil || result.SessionID != sessionID || len(repository.removals) != 1 {
+		t.Fatalf("result=%+v removals=%d", result, len(repository.removals))
+	}
+	if _, found := stored.Member(participant); found {
+		t.Fatalf("removed participant remains in room: %+v", stored.Snapshot())
+	}
+	fact, err := ParseParticipantRevokedEvent(repository.removals[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fact.EventID != result.SourceEventID || fact.RoomID != playing.Snapshot().ID || fact.SessionID != sessionID ||
+		fact.UserID != participant || fact.ActorKind != RemovalActorHost || fact.ActorID != host ||
+		fact.Reason != RemovalReasonHostRemoved || fact.MembershipVersion != stored.Version().Membership || !fact.OccurredAt.Equal(removedAt) {
+		t.Fatalf("revocation fact=%+v", fact)
+	}
+}
+
 type sequenceRoomCodeGenerator struct {
 	mu    sync.Mutex
 	codes []string
@@ -174,6 +225,7 @@ type memoryRoomRepository struct {
 	byCode      map[string]uuid.UUID
 	publicRooms []PublicRoomCard
 	lastList    PublicRoomListRequest
+	removals    []outbox.Event
 }
 
 func newMemoryRoomRepository() *memoryRoomRepository {
@@ -223,6 +275,18 @@ func (repository *memoryRoomRepository) UpdateCAS(_ context.Context, current, ne
 		return Room{}, ErrRoomVersionConflict
 	}
 	repository.byID[current.Snapshot().ID] = next
+	return next, nil
+}
+
+func (repository *memoryRoomRepository) CommitRemoval(_ context.Context, current, next Room, event outbox.Event) (Room, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	stored, exists := repository.byID[current.Snapshot().ID]
+	if !exists || stored.Version() != current.Version() {
+		return Room{}, ErrRoomVersionConflict
+	}
+	repository.byID[current.Snapshot().ID] = next
+	repository.removals = append(repository.removals, event)
 	return next, nil
 }
 

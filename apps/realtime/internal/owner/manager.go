@@ -251,9 +251,24 @@ func (manager *Manager) HandleTimer(ctx context.Context, due gameruntime.DueTime
 
 // HandleSystem fences room-outbox, platform, and host lifecycle work with the held owner epoch.
 func (manager *Manager) HandleSystem(ctx context.Context, command gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error) {
+	if manager == nil || ctx == nil || command.SessionID == uuid.Nil {
+		return gameruntime.SystemCommitResult{}, ErrOwnershipUnavailable
+	}
 	state, err := manager.owned(command.SessionID)
 	if err != nil {
-		return gameruntime.SystemCommitResult{}, err
+		if !errors.Is(err, ErrOwnershipUnavailable) {
+			return gameruntime.SystemCommitResult{}, err
+		}
+		// A cancelled or legacy terminal session cannot be claimed, but its durable source still needs a no-op receipt.
+		current, getErr := manager.sessions.Get(ctx, command.SessionID)
+		if getErr != nil {
+			return gameruntime.SystemCommitResult{}, getErr
+		}
+		if !current.Snapshot().Status.Terminal() {
+			return gameruntime.SystemCommitResult{}, err
+		}
+		command.OwnershipEpoch = current.Snapshot().OwnershipEpoch
+		return manager.runtime.HandleSystem(ctx, command)
 	}
 	command.OwnershipEpoch = state.epoch
 	ownedCtx, cancel := commandContext(ctx, state.ctx)

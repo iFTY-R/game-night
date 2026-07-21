@@ -703,6 +703,7 @@ func mapRoomGameSessionStartError(ctx context.Context, err error) error {
 		gameruntime.ErrSessionSuspended,
 		gameruntime.ErrSessionTerminal,
 		gameruntime.ErrParticipantNotActive,
+		gameruntime.ErrSystemOperationPending,
 		gameruntime.ErrInvalidActionCommit,
 		gameruntime.ErrInvalidTimerCommit,
 		gameruntime.ErrInvalidSystemCommit,

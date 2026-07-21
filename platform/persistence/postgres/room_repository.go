@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"math"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	"github.com/jackc/pgx/v5"
@@ -148,6 +150,73 @@ func (repository *RoomRepository) UpdateCAS(ctx context.Context, current, next r
 		return roomDomain.Room{}, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomVersionConflict)
 	}
 	return stored, nil
+}
+
+// CommitRemoval atomically applies the membership fence, durable room event, and neutral runtime inbox entry.
+func (repository *RoomRepository) CommitRemoval(
+	ctx context.Context,
+	current roomDomain.Room,
+	next roomDomain.Room,
+	event outbox.Event,
+) (roomDomain.Room, error) {
+	if repository == nil || repository.runner == nil || ctx == nil {
+		return roomDomain.Room{}, roomDomain.ErrInvalidRoomInput
+	}
+	before, after := current.Snapshot(), next.Snapshot()
+	if err := validateRoomTransition(before, after); err != nil {
+		return roomDomain.Room{}, err
+	}
+	fact, err := roomDomain.ParseParticipantRevokedEvent(event)
+	if err != nil || fact.RoomID != before.ID || fact.SessionID != before.ActiveSessionID ||
+		fact.ActorKind != roomDomain.RemovalActorHost || fact.ActorID != before.HostUserID ||
+		fact.MembershipVersion != after.MembershipVersion || !fact.OccurredAt.Equal(after.UpdatedAt) ||
+		!removedParticipantTransition(before, after, fact.UserID) {
+		return roomDomain.Room{}, roomDomain.ErrInvalidRoomInput
+	}
+	digest := sha256.Sum256(event.Snapshot().Payload)
+	var stored roomDomain.Room
+	err = repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		updated, updateErr := updateRoomAggregateCAS(ctx, queries, before, after)
+		if updateErr != nil {
+			return updateErr
+		}
+		if _, insertErr := newOutboxEventRepository(queries).Insert(ctx, event); insertErr != nil {
+			return insertErr
+		}
+		if _, inboxErr := queries.CreateGameSystemInboxPending(ctx, sqlcgen.CreateGameSystemInboxPendingParams{
+			SessionID: uuidToPG(fact.SessionID), SourceEventID: uuidToPG(fact.EventID),
+			EventType: string(roomDomain.ParticipantRevokedEventType), PayloadDigest: digest[:], CreatedAt: timeToPG(fact.OccurredAt),
+		}); inboxErr != nil {
+			return inboxErr
+		}
+		stored = updated
+		return nil
+	})
+	if err != nil {
+		return roomDomain.Room{}, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomVersionConflict)
+	}
+	return stored, nil
+}
+
+// removedParticipantTransition prevents callers from using the atomic path for unrelated room mutations or non-player roles.
+func removedParticipantTransition(before, after roomDomain.RoomSnapshot, userID uuid.UUID) bool {
+	if before.Status != roomDomain.RoomStatusPlaying || before.ActiveSessionID == uuid.Nil ||
+		after.RoomVersion != before.RoomVersion+1 || after.MembershipVersion != before.MembershipVersion+1 {
+		return false
+	}
+	beforeParticipant := false
+	for _, member := range before.Members {
+		beforeParticipant = beforeParticipant || member.UserID == userID && member.Role == roomDomain.MemberRoleParticipant
+	}
+	if !beforeParticipant {
+		return false
+	}
+	for _, member := range after.Members {
+		if member.UserID == userID {
+			return false
+		}
+	}
+	return true
 }
 
 func (repository *RoomRepository) get(ctx context.Context, read func(QueryHandle) (sqlcgen.PartyRoom, error)) (roomDomain.Room, error) {

@@ -140,6 +140,67 @@ func TestCloseCancelsCommandsAndReleasesExactLeaseOnce(t *testing.T) {
 	}
 }
 
+func TestHandleSystemForTerminalSessionUsesPersistedEpochWithoutClaim(t *testing.T) {
+	t.Parallel()
+	fixture := newOwnerFixture(t)
+	snapshot := fixture.sessions.session.Snapshot()
+	endedAt := snapshot.UpdatedAt.Add(time.Second)
+	snapshot.Status = gameruntime.StatusFinished
+	snapshot.OwnershipEpoch = 7
+	snapshot.Timers = nil
+	snapshot.NextDeadlineAt = time.Time{}
+	snapshot.UpdatedAt = endedAt
+	snapshot.EndedAt = endedAt
+	terminal, err := gameruntime.RestoreSession(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.sessions.session = terminal
+	fixture.runtime.session = terminal
+
+	result, err := fixture.manager.HandleSystem(t.Context(), gameruntime.SystemCommand{
+		SessionID: fixture.sessionID, OwnershipEpoch: 999,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Session.Snapshot().Status != gameruntime.StatusFinished || fixture.runtime.systemCalls != 1 ||
+		fixture.runtime.systemEpoch != 7 || fixture.coordinator.acquireCalls != 0 || len(fixture.publisher.events) != 0 {
+		t.Fatalf(
+			"result=%+v system calls=%d epoch=%d acquire calls=%d fanout=%+v",
+			result, fixture.runtime.systemCalls, fixture.runtime.systemEpoch, fixture.coordinator.acquireCalls, fixture.publisher.events,
+		)
+	}
+}
+
+func TestHandleSystemDoesNotBypassClosedManagerForTerminalSession(t *testing.T) {
+	t.Parallel()
+	fixture := newOwnerFixture(t)
+	snapshot := fixture.sessions.session.Snapshot()
+	endedAt := snapshot.UpdatedAt.Add(time.Second)
+	snapshot.Status = gameruntime.StatusFinished
+	snapshot.Timers = nil
+	snapshot.NextDeadlineAt = time.Time{}
+	snapshot.UpdatedAt = endedAt
+	snapshot.EndedAt = endedAt
+	terminal, err := gameruntime.RestoreSession(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.sessions.session = terminal
+	fixture.runtime.session = terminal
+	if err := fixture.manager.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := fixture.manager.HandleSystem(t.Context(), gameruntime.SystemCommand{SessionID: fixture.sessionID}); !errors.Is(err, ErrClosed) {
+		t.Fatalf("closed manager error=%v", err)
+	}
+	if fixture.runtime.systemCalls != 0 {
+		t.Fatalf("runtime system calls=%d, want 0", fixture.runtime.systemCalls)
+	}
+}
+
 type ownerFixture struct {
 	sessionID   uuid.UUID
 	order       *callOrder
@@ -306,6 +367,8 @@ type fakeRuntime struct {
 	mu            sync.Mutex
 	session       gameruntime.Session
 	actionEpoch   uint64
+	systemEpoch   uint64
+	systemCalls   int
 	blockAction   bool
 	actionStarted chan struct{}
 }
@@ -330,7 +393,11 @@ func (runtime *fakeRuntime) HandleTimer(context.Context, gameruntime.DueTimer, u
 	return gameruntime.TimerCommitResult{Session: runtime.session}, nil
 }
 
-func (runtime *fakeRuntime) HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error) {
+func (runtime *fakeRuntime) HandleSystem(_ context.Context, command gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error) {
+	runtime.mu.Lock()
+	runtime.systemEpoch = command.OwnershipEpoch
+	runtime.systemCalls++
+	runtime.mu.Unlock()
 	return gameruntime.SystemCommitResult{Session: runtime.session}, nil
 }
 

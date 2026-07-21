@@ -14,6 +14,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/realtime/internal/config"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/fanout"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/owner"
+	"github.com/iFTY-R/game-night/apps/realtime/internal/revocation"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/subscription"
 	timerscheduler "github.com/iFTY-R/game-night/apps/realtime/internal/timer"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/transport/gamewebsocket"
@@ -42,6 +43,7 @@ var (
 	errInitializeTimer      = errors.New("initialize realtime timer scheduler")
 	errInitializeSubscriber = errors.New("initialize realtime subscription runtime")
 	errInitializeFanout     = errors.New("initialize realtime durable fanout")
+	errInitializeRevocation = errors.New("initialize realtime participant revocation")
 	errInitializeTransport  = errors.New("initialize realtime transport")
 	errFanoutClosed         = errors.New("realtime fanout subscription closed")
 )
@@ -54,17 +56,18 @@ type Options struct {
 
 // Application owns both HTTP servers, the lease manager, and all external clients.
 type Application struct {
-	config         config.Config
-	logger         *slog.Logger
-	publicServer   *http.Server
-	internalServer *http.Server
-	owner          *owner.Manager
-	timer          *timerscheduler.Scheduler
-	hub            *subscription.Hub
-	fanout         *redisstore.SessionFanoutSubscription
-	durableFanout  *fanout.Dispatcher
-	redis          *goredis.Client
-	pool           *pgxpool.Pool
+	config             config.Config
+	logger             *slog.Logger
+	publicServer       *http.Server
+	internalServer     *http.Server
+	owner              *owner.Manager
+	timer              *timerscheduler.Scheduler
+	hub                *subscription.Hub
+	fanout             *redisstore.SessionFanoutSubscription
+	durableFanout      *fanout.Dispatcher
+	durableRevocations *revocation.Dispatcher
+	redis              *goredis.Client
+	pool               *pgxpool.Pool
 
 	closeOnce sync.Once
 	closeErr  error
@@ -124,6 +127,17 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	})
 	if err != nil {
 		return nil, errInitializeRuntime
+	}
+	systemInbox, err := gameruntime.NewSystemInbox(options.Registry, sessions, application.owner)
+	if err != nil {
+		return nil, errInitializeRevocation
+	}
+	application.durableRevocations, err = revocation.NewDispatcher(revocation.Config{
+		Owner: outbox.LeaseOwner(cfg.Ownership.InstanceID), LeaseDuration: cfg.Fanout.LeaseDuration,
+		PollInterval: cfg.Fanout.PollInterval, BatchSize: cfg.Fanout.BatchSize,
+	}, postgres.NewOutboxUnitOfWork(pool), systemInbox, source, options.Logger)
+	if err != nil {
+		return nil, errInitializeRevocation
 	}
 	application.timer, err = timerscheduler.NewScheduler(sessions, application.owner, source, options.Logger, timerscheduler.Config{
 		ScanInterval: cfg.Timer.ScanInterval, OperationTimeout: cfg.Timer.OperationTimeout, BatchSize: cfg.Timer.BatchSize,
@@ -201,7 +215,7 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 func (application *Application) ListenAndServe(ctx context.Context) error {
 	if application == nil || ctx == nil || application.publicServer == nil || application.internalServer == nil ||
 		application.owner == nil || application.timer == nil || application.hub == nil || application.fanout == nil ||
-		application.durableFanout == nil {
+		application.durableFanout == nil || application.durableRevocations == nil {
 		return errInvalidOptions
 	}
 	publicListener, err := net.Listen("tcp", application.publicServer.Addr)
@@ -215,7 +229,7 @@ func (application *Application) ListenAndServe(ctx context.Context) error {
 	}
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
-	errorsChannel := make(chan error, 7)
+	errorsChannel := make(chan error, 8)
 	go func() { errorsChannel <- normalizeServeError(application.publicServer.Serve(publicListener)) }()
 	go func() { errorsChannel <- normalizeServeError(application.internalServer.Serve(internalListener)) }()
 	go func() { errorsChannel <- application.owner.Run(runCtx) }()
@@ -223,6 +237,7 @@ func (application *Application) ListenAndServe(ctx context.Context) error {
 	go func() { errorsChannel <- application.hub.Run(runCtx) }()
 	go func() { errorsChannel <- application.runFanout(runCtx) }()
 	go func() { errorsChannel <- application.durableFanout.Run(runCtx) }()
+	go func() { errorsChannel <- application.durableRevocations.Run(runCtx) }()
 
 	select {
 	case <-ctx.Done():

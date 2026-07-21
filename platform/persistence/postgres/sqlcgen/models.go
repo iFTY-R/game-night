@@ -271,6 +271,17 @@ type GameSessionTimer struct {
 	Payload              []byte             `json:"payload"`
 }
 
+type GameSystemInbox struct {
+	SessionID             pgtype.UUID        `json:"session_id"`
+	SourceEventID         pgtype.UUID        `json:"source_event_id"`
+	EventType             string             `json:"event_type"`
+	PayloadDigest         []byte             `json:"payload_digest"`
+	Status                string             `json:"status"`
+	CommittedStateVersion pgtype.Int8        `json:"committed_state_version"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+}
+
 type GameSystemOperation struct {
 	SessionID             pgtype.UUID        `json:"session_id"`
 	OperationID           string             `json:"operation_id"`

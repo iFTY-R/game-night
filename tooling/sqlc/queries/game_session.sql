@@ -48,6 +48,47 @@ FROM game_sessions
 WHERE session_id = sqlc.arg(session_id)
 FOR SHARE;
 
+-- name: CreateGameSystemInboxPending :one
+INSERT INTO game_system_inbox (
+    session_id, source_event_id, event_type, payload_digest, status, created_at
+) VALUES (
+    sqlc.arg(session_id), sqlc.arg(source_event_id), sqlc.arg(event_type), sqlc.arg(payload_digest), 'pending', sqlc.arg(created_at)
+)
+RETURNING session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at;
+
+-- name: GetGameSystemInboxForUpdate :one
+SELECT session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at
+FROM game_system_inbox
+WHERE session_id = sqlc.arg(session_id)
+  AND source_event_id = sqlc.arg(source_event_id)
+FOR UPDATE;
+
+-- name: CompleteGameSystemInboxCAS :one
+UPDATE game_system_inbox
+SET status = 'completed',
+    committed_state_version = sqlc.arg(committed_state_version),
+    completed_at = sqlc.arg(completed_at)
+WHERE session_id = sqlc.arg(session_id)
+  AND source_event_id = sqlc.arg(source_event_id)
+  AND payload_digest = sqlc.arg(payload_digest)
+  AND status = 'pending'
+RETURNING session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at;
+
+-- name: HasPendingGameSystemInbox :one
+SELECT EXISTS (
+    SELECT 1
+    FROM game_system_inbox
+    WHERE session_id = sqlc.arg(session_id)
+      AND status = 'pending'
+      AND (
+          sqlc.narg(excluded_source_event_id)::uuid IS NULL
+          OR source_event_id <> sqlc.narg(excluded_source_event_id)::uuid
+      )
+);
+
 -- name: GetGameSessionRoomID :one
 SELECT room_id
 FROM game_sessions

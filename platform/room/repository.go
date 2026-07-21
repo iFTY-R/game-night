@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/outbox"
 )
 
 // Repository persists a complete room aggregate and owns atomic membership replacement under CAS.
@@ -12,6 +13,7 @@ type Repository interface {
 	GetByID(context.Context, uuid.UUID) (Room, error)
 	GetByCode(context.Context, string) (Room, error)
 	UpdateCAS(context.Context, Room, Room) (Room, error)
+	CommitRemoval(context.Context, Room, Room, outbox.Event) (Room, error)
 }
 
 // Store keeps authoritative aggregate writes and public lobby projections as explicit ports on one adapter.

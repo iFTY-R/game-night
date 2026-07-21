@@ -26,6 +26,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/idempotency"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
@@ -160,6 +161,57 @@ func TestRoomConnectListsPublicCardsWithoutWriteHeaders(t *testing.T) {
 		card.GetParticipantCount() != 1 || card.GetPrimaryAction() != roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_JOIN ||
 		listed.Msg.GetPage().GetNextPageToken() != "" {
 		t.Fatalf("public card = %+v", card)
+	}
+}
+
+func TestRoomConnectRemovalReturnsDurableSourceForPlayingParticipant(t *testing.T) {
+	host, guest := uuid.New(), uuid.New()
+	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
+	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 3,
+		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+	})
+	authorizeRoomWrite(createRequest, "host-device")
+	created, err := client.CreateRoom(t.Context(), createRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joinRequest := connect.NewRequest(&roomv1.JoinRoomRequest{
+		RoomCode: created.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
+	})
+	authorizeRoomWrite(joinRequest, "guest-device")
+	joined, err := client.JoinRoom(t.Context(), joinRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
+		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "liars-dice", ExpectedVersion: joined.Msg.GetRoom().GetVersion(),
+		Config: &gamev1.GameConfig{
+			GameId: "liars-dice", SchemaVersion: 1, MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: roomTransportOperationID(t, 11).Value(), RequestDigest: roomTransportDigest("remove-start")[:],
+	})
+	authorizeRoomWrite(startRequest, "host-device")
+	started, err := client.StartGame(t.Context(), startRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeRequest := connect.NewRequest(&roomv1.RemoveMemberRequest{
+		RoomId: started.Msg.GetRoom().GetRoomId(), UserId: guest.String(), ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(removeRequest, "host-device")
+
+	removed, err := client.RemoveMember(t.Context(), removeRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !removed.Msg.GetParticipantRevoked() || removed.Msg.GetActiveSessionId() != started.Msg.GetSessionId() ||
+		len(removed.Msg.GetRoom().GetMembers()) != 1 {
+		t.Fatalf("remove response=%+v", removed.Msg)
+	}
+	if sourceEventID, err := uuid.Parse(removed.Msg.GetSourceEventId()); err != nil || sourceEventID == uuid.Nil {
+		t.Fatalf("source event id=%q error=%v", removed.Msg.GetSourceEventId(), err)
 	}
 }
 
@@ -480,6 +532,12 @@ func (repository *transportRoomRepository) UpdateCAS(_ context.Context, current,
 	}
 	repository.byID[current.Snapshot().ID] = next
 	return next, nil
+}
+
+func (repository *transportRoomRepository) CommitRemoval(
+	ctx context.Context, current, next roomDomain.Room, _ outbox.Event,
+) (roomDomain.Room, error) {
+	return repository.UpdateCAS(ctx, current, next)
 }
 
 func (repository *transportRoomRepository) ListPublicRooms(_ context.Context, request roomDomain.PublicRoomListRequest) ([]roomDomain.PublicRoomCard, error) {

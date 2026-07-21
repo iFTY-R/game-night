@@ -238,6 +238,19 @@ type Querier interface {
 	//    AND username_claims.reserved_until <= $4
 	//  RETURNING username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 	ClaimUsername(ctx context.Context, arg ClaimUsernameParams) (UsernameClaim, error)
+	//CompleteGameSystemInboxCAS
+	//
+	//  UPDATE game_system_inbox
+	//  SET status = 'completed',
+	//      committed_state_version = $1,
+	//      completed_at = $2
+	//  WHERE session_id = $3
+	//    AND source_event_id = $4
+	//    AND payload_digest = $5
+	//    AND status = 'pending'
+	//  RETURNING session_id, source_event_id, event_type, payload_digest, status,
+	//      committed_state_version, created_at, completed_at
+	CompleteGameSystemInboxCAS(ctx context.Context, arg CompleteGameSystemInboxCASParams) (GameSystemInbox, error)
 	//CompleteGameSystemOperationCAS
 	//
 	//  UPDATE game_system_operations
@@ -798,6 +811,16 @@ type Querier interface {
 	//      $5, $6, $7
 	//  )
 	CreateGameSessionTimer(ctx context.Context, arg CreateGameSessionTimerParams) error
+	//CreateGameSystemInboxPending
+	//
+	//  INSERT INTO game_system_inbox (
+	//      session_id, source_event_id, event_type, payload_digest, status, created_at
+	//  ) VALUES (
+	//      $1, $2, $3, $4, 'pending', $5
+	//  )
+	//  RETURNING session_id, source_event_id, event_type, payload_digest, status,
+	//      committed_state_version, created_at, completed_at
+	CreateGameSystemInboxPending(ctx context.Context, arg CreateGameSystemInboxPendingParams) (GameSystemInbox, error)
 	//CreateGameTimerReceipt
 	//
 	//  INSERT INTO game_timer_receipts (
@@ -1461,6 +1484,15 @@ type Querier interface {
 	//    AND timer_id = $2
 	//  FOR UPDATE
 	GetGameSessionTimerForUpdate(ctx context.Context, arg GetGameSessionTimerForUpdateParams) (GameSessionTimer, error)
+	//GetGameSystemInboxForUpdate
+	//
+	//  SELECT session_id, source_event_id, event_type, payload_digest, status,
+	//      committed_state_version, created_at, completed_at
+	//  FROM game_system_inbox
+	//  WHERE session_id = $1
+	//    AND source_event_id = $2
+	//  FOR UPDATE
+	GetGameSystemInboxForUpdate(ctx context.Context, arg GetGameSystemInboxForUpdateParams) (GameSystemInbox, error)
 	//GetGameSystemOperationBySourceForUpdate
 	//
 	//  SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
@@ -1714,6 +1746,19 @@ type Querier interface {
 	//  WHERE username_key = $1
 	//  FOR UPDATE
 	GetUsernameClaimForUpdate(ctx context.Context, arg GetUsernameClaimForUpdateParams) (UsernameClaim, error)
+	//HasPendingGameSystemInbox
+	//
+	//  SELECT EXISTS (
+	//      SELECT 1
+	//      FROM game_system_inbox
+	//      WHERE session_id = $1
+	//        AND status = 'pending'
+	//        AND (
+	//            $2::uuid IS NULL
+	//            OR source_event_id <> $2::uuid
+	//        )
+	//  )
+	HasPendingGameSystemInbox(ctx context.Context, arg HasPendingGameSystemInboxParams) (bool, error)
 	//InsertGameSystemOperationPending
 	//
 	//  INSERT INTO game_system_operations (

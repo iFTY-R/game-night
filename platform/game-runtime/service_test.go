@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/idempotency"
+	"github.com/iFTY-R/game-night/platform/outbox"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
@@ -791,6 +792,10 @@ func (module *runtimeServiceModule) HandleSystem(snapshot game.Snapshot, request
 	return runtimeServiceTransition(snapshot.StateVersion+1, request.System.MessageType == "session.finish", request.Context.Now), nil
 }
 
+func (*runtimeServiceModule) EncodeParticipantRevoked(fact game.ParticipantRevocationFact) (game.Message, error) {
+	return runtimeServiceMessage("participant.revoked", []byte(fact.UserID)), nil
+}
+
 func (*runtimeServiceModule) Project(snapshot game.Snapshot, _ game.Viewer) (game.Projection, error) {
 	return game.Projection{View: runtimeServiceMessage("player.view", []byte{byte(snapshot.StateVersion)}), AllowedActions: []game.Identifier{"roll"}}, nil
 }
@@ -937,9 +942,22 @@ func (authority *runtimeServiceAuthority) CommitSystem(_ context.Context, commit
 }
 
 func (authority *runtimeServiceAuthority) CompleteSystemNoop(
-	context.Context, SystemKey, idempotency.Digest, time.Time,
+	_ context.Context, key SystemKey, digest idempotency.Digest, at time.Time,
 ) (SystemCommitResult, error) {
-	return SystemCommitResult{Session: authority.session}, nil
+	if receipt, ok := authority.systemReceipts[key]; ok {
+		replayed, err := receipt.Replay(digest)
+		return SystemCommitResult{Session: authority.session, Receipt: replayed, Replayed: true}, err
+	}
+	receipt, err := NewSystemReceipt(SystemReceiptSnapshot{
+		Key: key, RequestDigest: digest, ResultCode: ResultCodeAccepted,
+		ResultDigest: transitionResultDigest(key.SessionID, authority.session.Snapshot().State.StateVersion, ResultCodeAccepted),
+		StateVersion: authority.session.Snapshot().State.StateVersion, CommittedAt: at,
+	})
+	if err != nil {
+		return SystemCommitResult{}, err
+	}
+	authority.systemReceipts[key] = receipt
+	return SystemCommitResult{Session: authority.session, Receipt: receipt}, nil
 }
 
 func (authority *runtimeServiceAuthority) CommitLifecycle(_ context.Context, commit LifecycleCommit) (Session, error) {
@@ -1041,6 +1059,13 @@ func (*runtimeServiceRooms) GetByCode(context.Context, string) (roomDomain.Room,
 }
 
 func (rooms *runtimeServiceRooms) UpdateCAS(_ context.Context, _ roomDomain.Room, after roomDomain.Room) (roomDomain.Room, error) {
+	rooms.authority.room = after
+	return after, nil
+}
+
+func (rooms *runtimeServiceRooms) CommitRemoval(
+	_ context.Context, _ roomDomain.Room, after roomDomain.Room, _ outbox.Event,
+) (roomDomain.Room, error) {
 	rooms.authority.room = after
 	return after, nil
 }

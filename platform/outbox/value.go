@@ -116,6 +116,8 @@ const (
 	ConsumerIDAuditCheckpoint ConsumerID = "audit.checkpoint"
 	// ConsumerIDGameSessionFanout republishes committed game cursors to non-authoritative Redis wake-up channels.
 	ConsumerIDGameSessionFanout ConsumerID = "realtime.game_fanout"
+	// ConsumerIDRoomParticipantRevocation applies durable room membership fences to frozen game sessions.
+	ConsumerIDRoomParticipantRevocation ConsumerID = "realtime.room_participant_revocation"
 )
 
 // ParseConsumerID validates a stable namespace-qualified consumer identity.

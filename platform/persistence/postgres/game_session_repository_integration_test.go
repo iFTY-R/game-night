@@ -964,6 +964,174 @@ func TestGameSessionRepositoryActionLockedBeforeTimerCommitsOneVersion(t *testin
 	assertGameSessionCounts(t, ctx, fixture, owner.Snapshot().ID, 2, actionReceipts, 2, 2)
 }
 
+func TestRoomRepositoryCommitRemovalPersistsVerifiableSystemInbox(t *testing.T) {
+	fixture, repository, session, now := openGameSessionFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+	defer cancel()
+	_, event, _ := commitParticipantRemovalForTest(t, ctx, fixture, session, now.Add(time.Second))
+	snapshot := event.Snapshot()
+	digest := idempotency.Digest(sha256.Sum256(snapshot.Payload))
+	key := gameruntime.SystemInboxKey{SessionID: session.Snapshot().ID, SourceEventID: snapshot.ID}
+
+	record, err := repository.GetSystemInbox(ctx, key, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Snapshot().Status != gameruntime.SystemInboxPending || record.Snapshot().EventType != roomDomain.ParticipantRevokedEventType ||
+		record.Snapshot().PayloadDigest != digest || !record.Snapshot().CreatedAt.Equal(snapshot.CreatedAt) {
+		t.Fatalf("inbox=%+v", record.Snapshot())
+	}
+	if _, err := repository.GetSystemInbox(ctx, key, digestForGameTest("different-revocation")); !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("digest conflict error=%v", err)
+	}
+	completed, err := repository.CompleteSystemInbox(ctx, key, digest, 2, now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := repository.CompleteSystemInbox(ctx, key, digest, 2, now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Snapshot() != replayed.Snapshot() || replayed.Snapshot().Status != gameruntime.SystemInboxCompleted {
+		t.Fatalf("completed=%+v replayed=%+v", completed.Snapshot(), replayed.Snapshot())
+	}
+	if _, err := repository.CompleteSystemInbox(ctx, key, digest, 3, now.Add(3*time.Second)); !errors.Is(err, gameruntime.ErrGameSessionIntegrity) {
+		t.Fatalf("completed state conflict error=%v", err)
+	}
+}
+
+func TestRoomRepositoryCommitRemovalRollsBackEveryAtomicWriteOnFailure(t *testing.T) {
+	t.Run("outbox insert", func(t *testing.T) {
+		fixture, _, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		roomRepository := NewRoomRepository(fixture.Pool)
+		room, next, event, removedUserID := prepareParticipantRemovalForTest(t, ctx, fixture, session, now.Add(time.Second))
+		snapshot := event.Snapshot()
+		if _, err := fixture.Pool.Exec(ctx, `
+			INSERT INTO outbox_events (event_id, event_type, aggregate_type, aggregate_id, payload, created_at, available_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $6)
+		`, snapshot.ID, snapshot.Type.Value(), snapshot.AggregateType.Value(), snapshot.AggregateID, []byte("conflict"), snapshot.CreatedAt); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := roomRepository.CommitRemoval(ctx, room, next, event); err == nil {
+			t.Fatal("expected outbox insert failure")
+		}
+		assertParticipantRemovalRolledBack(t, ctx, fixture, room, removedUserID, snapshot.ID, 1)
+	})
+
+	t.Run("system inbox insert", func(t *testing.T) {
+		fixture, _, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		roomRepository := NewRoomRepository(fixture.Pool)
+		room, next, event, removedUserID := prepareParticipantRemovalForTest(t, ctx, fixture, session, now.Add(time.Second))
+		if _, err := fixture.Pool.Exec(ctx, `
+			CREATE FUNCTION reject_game_system_inbox_test_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+			BEGIN
+				RAISE EXCEPTION 'injected game system inbox failure';
+			END;
+			$$;
+			CREATE TRIGGER reject_game_system_inbox_test_insert
+			BEFORE INSERT ON game_system_inbox
+			FOR EACH ROW EXECUTE FUNCTION reject_game_system_inbox_test_insert();
+		`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := roomRepository.CommitRemoval(ctx, room, next, event); err == nil {
+			t.Fatal("expected system inbox insert failure")
+		}
+		assertParticipantRemovalRolledBack(t, ctx, fixture, room, removedUserID, event.Snapshot().ID, 0)
+	})
+}
+
+func TestPendingParticipantRevocationFencesOnlyTerminalTransitions(t *testing.T) {
+	t.Run("action", func(t *testing.T) {
+		fixture, repository, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		owner := acquireGameSessionForTest(t, ctx, repository, session, now.Add(time.Second))
+		removedRoom, _, _ := commitParticipantRemovalForTest(t, ctx, fixture, owner, now.Add(2*time.Second))
+
+		ordinary := buildGameActionCommit(t, owner, now.Add(3*time.Second), 51, []byte("host-continues"))
+		ordinaryResult, err := repository.CommitAction(ctx, ordinary)
+		if err != nil {
+			t.Fatalf("non-terminal action: %v", err)
+		}
+		finish := buildGameFinishedActionCommit(t, ordinaryResult.Session, now.Add(4*time.Second))
+		nextRoom, err := removedRoom.FinishSession(owner.Snapshot().ID, removedRoom.Version(), now.Add(4*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := NewRoomGameSessionRepository(fixture.Pool).FinishAction(ctx, removedRoom, nextRoom, finish); !errors.Is(err, gameruntime.ErrSystemOperationPending) {
+			t.Fatalf("terminal action error=%v", err)
+		}
+		assertRoomAndSessionRemainPlaying(t, ctx, fixture, owner.Snapshot().RoomID, owner.Snapshot().ID, 2)
+	})
+
+	t.Run("timer", func(t *testing.T) {
+		fixture, repository, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		owner := acquireGameSessionForTest(t, ctx, repository, session, now.Add(time.Second))
+		removedRoom, _, _ := commitParticipantRemovalForTest(t, ctx, fixture, owner, now.Add(2*time.Second))
+		finish := buildGameFinishedTimerCommit(t, owner, now.Add(31*time.Second))
+		nextRoom, err := removedRoom.FinishSession(owner.Snapshot().ID, removedRoom.Version(), now.Add(31*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := NewRoomGameSessionRepository(fixture.Pool).FinishTimer(ctx, removedRoom, nextRoom, finish); !errors.Is(err, gameruntime.ErrSystemOperationPending) {
+			t.Fatalf("terminal timer error=%v", err)
+		}
+		assertRoomAndSessionRemainPlaying(t, ctx, fixture, owner.Snapshot().RoomID, owner.Snapshot().ID, 1)
+	})
+
+	t.Run("different system source", func(t *testing.T) {
+		fixture, repository, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		owner := acquireGameSessionForTest(t, ctx, repository, session, now.Add(time.Second))
+		removedRoom, _, _ := commitParticipantRemovalForTest(t, ctx, fixture, owner, now.Add(2*time.Second))
+		source := gameruntime.SystemSource{Kind: gameruntime.SystemSourceRoomOutbox, EventID: uuid.New()}
+		finish := buildGameFinishedSystemCommit(
+			t, owner, gameSessionOperationID(t, 52), source, digestForGameTest("different-system-source"), now.Add(3*time.Second),
+		)
+		nextRoom, err := removedRoom.FinishSession(owner.Snapshot().ID, removedRoom.Version(), now.Add(3*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := NewRoomGameSessionRepository(fixture.Pool).FinishSystem(ctx, removedRoom, nextRoom, uuid.Nil, finish); !errors.Is(err, gameruntime.ErrSystemOperationPending) {
+			t.Fatalf("terminal system error=%v", err)
+		}
+		assertRoomAndSessionRemainPlaying(t, ctx, fixture, owner.Snapshot().RoomID, owner.Snapshot().ID, 1)
+	})
+
+	t.Run("matching revocation source", func(t *testing.T) {
+		fixture, repository, session, now := openGameSessionFixture(t)
+		ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+		defer cancel()
+		owner := acquireGameSessionForTest(t, ctx, repository, session, now.Add(time.Second))
+		removedRoom, event, _ := commitParticipantRemovalForTest(t, ctx, fixture, owner, now.Add(2*time.Second))
+		source := gameruntime.SystemSource{Kind: gameruntime.SystemSourceRoomOutbox, EventID: event.Snapshot().ID}
+		finish := buildGameFinishedSystemCommit(
+			t, owner, gameSessionOperationID(t, 53), source, digestForGameTest("matching-revocation-source"), now.Add(3*time.Second),
+		)
+		nextRoom, err := removedRoom.FinishSession(owner.Snapshot().ID, removedRoom.Version(), now.Add(3*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		storedRoom, result, err := NewRoomGameSessionRepository(fixture.Pool).FinishSystem(
+			ctx, removedRoom, nextRoom, uuid.Nil, finish,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if storedRoom.Snapshot().Status != roomDomain.RoomStatusPostGame || result.Session.Snapshot().Status != gameruntime.StatusFinished {
+			t.Fatalf("room=%+v result=%+v", storedRoom.Snapshot(), result)
+		}
+	})
+}
+
 func openGameSessionFixture(t *testing.T) (*integrationtest.PostgresSchema, *GameSessionRepository, gameruntime.Session, time.Time) {
 	t.Helper()
 	fixture := integrationtest.OpenPostgresSchema(t)
@@ -1010,6 +1178,129 @@ func openGameSessionFixture(t *testing.T) (*integrationtest.PostgresSchema, *Gam
 		t.Fatal(err)
 	}
 	return fixture, NewGameSessionRepository(fixture.Pool), session, start.StartedAt
+}
+
+func acquireGameSessionForTest(
+	t testing.TB,
+	ctx context.Context,
+	repository *GameSessionRepository,
+	session gameruntime.Session,
+	at time.Time,
+) gameruntime.Session {
+	t.Helper()
+	owned, err := session.AcquireOwnership(session.Snapshot().OwnershipEpoch, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err = repository.AcquireOwnershipCAS(ctx, session, owned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return owned
+}
+
+func prepareParticipantRemovalForTest(
+	t testing.TB,
+	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
+	session gameruntime.Session,
+	at time.Time,
+) (roomDomain.Room, roomDomain.Room, outbox.Event, uuid.UUID) {
+	t.Helper()
+	roomRepository := NewRoomRepository(fixture.Pool)
+	room, err := roomRepository.GetByID(ctx, session.Snapshot().RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostID, removedUserID := session.Snapshot().Participants[0].UserID, session.Snapshot().Participants[1].UserID
+	next, result, err := room.RemoveMember(hostID, removedUserID, room.Version(), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := roomDomain.NewParticipantRevokedEvent(roomDomain.ParticipantRevocationFact{
+		EventID: uuid.New(), RoomID: room.Snapshot().ID, SessionID: result.SessionID, UserID: removedUserID,
+		ActorKind: roomDomain.RemovalActorHost, ActorID: hostID, Reason: roomDomain.RemovalReasonHostRemoved,
+		MembershipVersion: next.Version().Membership, OccurredAt: next.Snapshot().UpdatedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return room, next, event, removedUserID
+}
+
+func commitParticipantRemovalForTest(
+	t testing.TB,
+	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
+	session gameruntime.Session,
+	at time.Time,
+) (roomDomain.Room, outbox.Event, uuid.UUID) {
+	t.Helper()
+	room, next, event, removedUserID := prepareParticipantRemovalForTest(t, ctx, fixture, session, at)
+	stored, err := NewRoomRepository(fixture.Pool).CommitRemoval(ctx, room, next, event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return stored, event, removedUserID
+}
+
+func assertParticipantRemovalRolledBack(
+	t testing.TB,
+	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
+	before roomDomain.Room,
+	removedUserID uuid.UUID,
+	eventID uuid.UUID,
+	wantOutboxCount int,
+) {
+	t.Helper()
+	stored, err := NewRoomRepository(fixture.Pool).GetByID(ctx, before.Snapshot().ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Version() != before.Version() {
+		t.Fatalf("stored version=%+v want=%+v", stored.Version(), before.Version())
+	}
+	if _, found := stored.Member(removedUserID); !found {
+		t.Fatalf("participant %s was removed despite rollback", removedUserID)
+	}
+	var inboxCount int
+	if err := fixture.Pool.QueryRow(ctx, "SELECT count(*) FROM game_system_inbox WHERE source_event_id = $1", eventID).Scan(&inboxCount); err != nil {
+		t.Fatal(err)
+	}
+	if inboxCount != 0 {
+		t.Fatalf("system inbox rows=%d, want 0", inboxCount)
+	}
+	var outboxCount int
+	if err := fixture.Pool.QueryRow(ctx, "SELECT count(*) FROM outbox_events WHERE event_id = $1", eventID).Scan(&outboxCount); err != nil {
+		t.Fatal(err)
+	}
+	if outboxCount != wantOutboxCount {
+		t.Fatalf("outbox rows=%d, want %d", outboxCount, wantOutboxCount)
+	}
+}
+
+func assertRoomAndSessionRemainPlaying(
+	t testing.TB,
+	ctx context.Context,
+	fixture *integrationtest.PostgresSchema,
+	roomID uuid.UUID,
+	sessionID uuid.UUID,
+	stateVersion uint64,
+) {
+	t.Helper()
+	room, err := NewRoomRepository(fixture.Pool).GetByID(ctx, roomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := NewGameSessionRepository(fixture.Pool).Get(ctx, sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if room.Snapshot().Status != roomDomain.RoomStatusPlaying || room.Snapshot().ActiveSessionID != sessionID ||
+		session.Snapshot().Status != gameruntime.StatusActive || session.Snapshot().State.StateVersion != stateVersion {
+		t.Fatalf("room=%+v session=%+v", room.Snapshot(), session.Snapshot())
+	}
 }
 
 func gameSessionCreateRequest(sessionID, roomID, firstUser, secondUser uuid.UUID, now time.Time) gameruntime.CreateRequest {

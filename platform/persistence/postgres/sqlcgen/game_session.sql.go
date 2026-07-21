@@ -73,6 +73,61 @@ func (q *Queries) AcquireGameSessionOwnershipCAS(ctx context.Context, arg Acquir
 	return i, err
 }
 
+const completeGameSystemInboxCAS = `-- name: CompleteGameSystemInboxCAS :one
+UPDATE game_system_inbox
+SET status = 'completed',
+    committed_state_version = $1,
+    completed_at = $2
+WHERE session_id = $3
+  AND source_event_id = $4
+  AND payload_digest = $5
+  AND status = 'pending'
+RETURNING session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at
+`
+
+type CompleteGameSystemInboxCASParams struct {
+	CommittedStateVersion pgtype.Int8        `json:"committed_state_version"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+	SessionID             pgtype.UUID        `json:"session_id"`
+	SourceEventID         pgtype.UUID        `json:"source_event_id"`
+	PayloadDigest         []byte             `json:"payload_digest"`
+}
+
+// CompleteGameSystemInboxCAS
+//
+//	UPDATE game_system_inbox
+//	SET status = 'completed',
+//	    committed_state_version = $1,
+//	    completed_at = $2
+//	WHERE session_id = $3
+//	  AND source_event_id = $4
+//	  AND payload_digest = $5
+//	  AND status = 'pending'
+//	RETURNING session_id, source_event_id, event_type, payload_digest, status,
+//	    committed_state_version, created_at, completed_at
+func (q *Queries) CompleteGameSystemInboxCAS(ctx context.Context, arg CompleteGameSystemInboxCASParams) (GameSystemInbox, error) {
+	row := q.db.QueryRow(ctx, completeGameSystemInboxCAS,
+		arg.CommittedStateVersion,
+		arg.CompletedAt,
+		arg.SessionID,
+		arg.SourceEventID,
+		arg.PayloadDigest,
+	)
+	var i GameSystemInbox
+	err := row.Scan(
+		&i.SessionID,
+		&i.SourceEventID,
+		&i.EventType,
+		&i.PayloadDigest,
+		&i.Status,
+		&i.CommittedStateVersion,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const completeGameSystemOperationCAS = `-- name: CompleteGameSystemOperationCAS :one
 UPDATE game_system_operations
 SET status = 'completed',
@@ -725,6 +780,55 @@ func (q *Queries) CreateGameSessionTimer(ctx context.Context, arg CreateGameSess
 	return err
 }
 
+const createGameSystemInboxPending = `-- name: CreateGameSystemInboxPending :one
+INSERT INTO game_system_inbox (
+    session_id, source_event_id, event_type, payload_digest, status, created_at
+) VALUES (
+    $1, $2, $3, $4, 'pending', $5
+)
+RETURNING session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at
+`
+
+type CreateGameSystemInboxPendingParams struct {
+	SessionID     pgtype.UUID        `json:"session_id"`
+	SourceEventID pgtype.UUID        `json:"source_event_id"`
+	EventType     string             `json:"event_type"`
+	PayloadDigest []byte             `json:"payload_digest"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+// CreateGameSystemInboxPending
+//
+//	INSERT INTO game_system_inbox (
+//	    session_id, source_event_id, event_type, payload_digest, status, created_at
+//	) VALUES (
+//	    $1, $2, $3, $4, 'pending', $5
+//	)
+//	RETURNING session_id, source_event_id, event_type, payload_digest, status,
+//	    committed_state_version, created_at, completed_at
+func (q *Queries) CreateGameSystemInboxPending(ctx context.Context, arg CreateGameSystemInboxPendingParams) (GameSystemInbox, error) {
+	row := q.db.QueryRow(ctx, createGameSystemInboxPending,
+		arg.SessionID,
+		arg.SourceEventID,
+		arg.EventType,
+		arg.PayloadDigest,
+		arg.CreatedAt,
+	)
+	var i GameSystemInbox
+	err := row.Scan(
+		&i.SessionID,
+		&i.SourceEventID,
+		&i.EventType,
+		&i.PayloadDigest,
+		&i.Status,
+		&i.CommittedStateVersion,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const createGameTimerReceipt = `-- name: CreateGameTimerReceipt :one
 INSERT INTO game_timer_receipts (
     session_id, timer_id, expected_state_version, result_code, result_digest,
@@ -1064,6 +1168,44 @@ func (q *Queries) GetGameSessionTimerForUpdate(ctx context.Context, arg GetGameS
 	return i, err
 }
 
+const getGameSystemInboxForUpdate = `-- name: GetGameSystemInboxForUpdate :one
+SELECT session_id, source_event_id, event_type, payload_digest, status,
+    committed_state_version, created_at, completed_at
+FROM game_system_inbox
+WHERE session_id = $1
+  AND source_event_id = $2
+FOR UPDATE
+`
+
+type GetGameSystemInboxForUpdateParams struct {
+	SessionID     pgtype.UUID `json:"session_id"`
+	SourceEventID pgtype.UUID `json:"source_event_id"`
+}
+
+// GetGameSystemInboxForUpdate
+//
+//	SELECT session_id, source_event_id, event_type, payload_digest, status,
+//	    committed_state_version, created_at, completed_at
+//	FROM game_system_inbox
+//	WHERE session_id = $1
+//	  AND source_event_id = $2
+//	FOR UPDATE
+func (q *Queries) GetGameSystemInboxForUpdate(ctx context.Context, arg GetGameSystemInboxForUpdateParams) (GameSystemInbox, error) {
+	row := q.db.QueryRow(ctx, getGameSystemInboxForUpdate, arg.SessionID, arg.SourceEventID)
+	var i GameSystemInbox
+	err := row.Scan(
+		&i.SessionID,
+		&i.SourceEventID,
+		&i.EventType,
+		&i.PayloadDigest,
+		&i.Status,
+		&i.CommittedStateVersion,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const getGameSystemOperationBySourceForUpdate = `-- name: GetGameSystemOperationBySourceForUpdate :one
 SELECT session_id, operation_id, source_kind, source_event_id, requested_by_user_id,
     logical_digest, status, result_code, result_digest, committed_state_version,
@@ -1191,6 +1333,43 @@ func (q *Queries) GetGameTimerReceipt(ctx context.Context, arg GetGameTimerRecei
 		&i.CommittedAt,
 	)
 	return i, err
+}
+
+const hasPendingGameSystemInbox = `-- name: HasPendingGameSystemInbox :one
+SELECT EXISTS (
+    SELECT 1
+    FROM game_system_inbox
+    WHERE session_id = $1
+      AND status = 'pending'
+      AND (
+          $2::uuid IS NULL
+          OR source_event_id <> $2::uuid
+      )
+)
+`
+
+type HasPendingGameSystemInboxParams struct {
+	SessionID             pgtype.UUID `json:"session_id"`
+	ExcludedSourceEventID pgtype.UUID `json:"excluded_source_event_id"`
+}
+
+// HasPendingGameSystemInbox
+//
+//	SELECT EXISTS (
+//	    SELECT 1
+//	    FROM game_system_inbox
+//	    WHERE session_id = $1
+//	      AND status = 'pending'
+//	      AND (
+//	          $2::uuid IS NULL
+//	          OR source_event_id <> $2::uuid
+//	      )
+//	)
+func (q *Queries) HasPendingGameSystemInbox(ctx context.Context, arg HasPendingGameSystemInboxParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPendingGameSystemInbox, arg.SessionID, arg.ExcludedSourceEventID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const insertGameSystemOperationPending = `-- name: InsertGameSystemOperationPending :one

@@ -803,6 +803,7 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"game_session_start_receipts",
 		"game_session_timers",
 		"game_sessions",
+		"game_system_inbox",
 		"game_system_operations",
 		"game_timer_receipts",
 		"key_rotation_jobs",

@@ -73,6 +73,7 @@ type RemoveMemberCommand struct {
 	ActorUserID uuid.UUID
 	RoomID      uuid.UUID
 	UserID      uuid.UUID
+	Reason      RemovalReason
 	Expected    Version
 }
 
@@ -251,7 +252,8 @@ func (service *Service) SetAdmission(ctx context.Context, command SetAdmissionCo
 
 // RemoveMember commits membership removal before returning any active-session revocation signal.
 func (service *Service) RemoveMember(ctx context.Context, command RemoveMemberCommand) (Room, RemovalResult, error) {
-	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || command.UserID == uuid.Nil {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || command.UserID == uuid.Nil ||
+		command.Reason != RemovalReasonHostRemoved {
 		return Room{}, RemovalResult{}, ErrInvalidRoomInput
 	}
 	if !requiredVersion(command.Expected) {
@@ -265,7 +267,25 @@ func (service *Service) RemoveMember(ctx context.Context, command RemoveMemberCo
 	if err != nil {
 		return Room{}, RemovalResult{}, err
 	}
-	stored, err := service.repository.UpdateCAS(ctx, room, next)
+	var stored Room
+	if result.ParticipantRevoked {
+		eventID, idErr := uuid.NewV7()
+		if idErr != nil {
+			return Room{}, RemovalResult{}, ErrInvalidRoomInput
+		}
+		event, eventErr := NewParticipantRevokedEvent(ParticipantRevocationFact{
+			EventID: eventID, RoomID: room.Snapshot().ID, SessionID: result.SessionID, UserID: result.Removed.UserID,
+			ActorKind: RemovalActorHost, ActorID: command.ActorUserID, Reason: command.Reason,
+			MembershipVersion: next.Version().Membership, OccurredAt: next.Snapshot().UpdatedAt,
+		})
+		if eventErr != nil {
+			return Room{}, RemovalResult{}, eventErr
+		}
+		stored, err = service.repository.CommitRemoval(ctx, room, next, event)
+		result.SourceEventID = eventID
+	} else {
+		stored, err = service.repository.UpdateCAS(ctx, room, next)
+	}
 	if err != nil {
 		return Room{}, RemovalResult{}, err
 	}

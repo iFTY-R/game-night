@@ -326,7 +326,8 @@ func (service *Service) RemoveMember(ctx context.Context, request *connect.Reque
 		return nil, err
 	}
 	updated, result, err := service.domain.RemoveMember(ctx, roomDomain.RemoveMemberCommand{
-		ActorUserID: actor, RoomID: roomID, UserID: userID, Expected: versionDomain(request.Msg.GetExpectedVersion()),
+		ActorUserID: actor, RoomID: roomID, UserID: userID, Reason: roomDomain.RemovalReasonHostRemoved,
+		Expected: versionDomain(request.Msg.GetExpectedVersion()),
 	})
 	if err != nil {
 		return nil, err
@@ -337,7 +338,7 @@ func (service *Service) RemoveMember(ctx context.Context, request *connect.Reque
 	}
 	return connect.NewResponse(&roomv1.RemoveMemberResponse{
 		Room: roomWire(updated), Removed: memberWire(result.Removed), ParticipantRevoked: result.ParticipantRevoked,
-		ActiveSessionId: activeSessionID,
+		ActiveSessionId: activeSessionID, SourceEventId: optionalUUIDString(result.SourceEventID),
 	}), nil
 }
 
@@ -646,6 +647,13 @@ func memberRoleWire(value roomDomain.MemberRole) roomv1.MemberRole {
 	default:
 		return roomv1.MemberRole_MEMBER_ROLE_UNSPECIFIED
 	}
+}
+
+func optionalUUIDString(value uuid.UUID) string {
+	if value == uuid.Nil {
+		return ""
+	}
+	return value.String()
 }
 
 func requestHTTP[T any](request *connect.Request[T]) *http.Request {

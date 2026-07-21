@@ -126,6 +126,7 @@ type RemovalResult struct {
 	Removed            MemberSnapshot
 	ParticipantRevoked bool
 	SessionID          uuid.UUID
+	SourceEventID      uuid.UUID
 	Version            Version
 }
 

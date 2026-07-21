@@ -240,6 +240,7 @@ message RemoveMemberResponse {
   RoomMember removed = 2;
   bool participant_revoked = 3;
   string active_session_id = 4;
+  string source_event_id = 5;
 }
 
 message CloseRoomRequest {

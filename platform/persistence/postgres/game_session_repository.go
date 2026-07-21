@@ -268,6 +268,9 @@ func commitActionAfterRoomLock(
 	if err := validateCurrentTransition(current, before); err != nil {
 		return gameruntime.ActionCommitResult{}, err
 	}
+	if err := rejectTerminalWithPendingSystemInbox(ctx, queries, commit.After().Snapshot(), uuid.Nil); err != nil {
+		return gameruntime.ActionCommitResult{}, err
+	}
 	updatedRow, err := queries.UpdateGameSessionStateCAS(ctx, updateGameSessionStateParams(before, after))
 	if err != nil {
 		return gameruntime.ActionCommitResult{}, err
@@ -362,6 +365,9 @@ func commitTimerAfterSessionLock(
 		return gameruntime.TimerCommitResult{}, receiptErr
 	}
 	if err := validateCurrentTransition(current, before); err != nil {
+		return gameruntime.TimerCommitResult{}, err
+	}
+	if err := rejectTerminalWithPendingSystemInbox(ctx, queries, commit.After().Snapshot(), uuid.Nil); err != nil {
 		return gameruntime.TimerCommitResult{}, err
 	}
 	timerRow, err := queries.GetGameSessionTimerForUpdate(ctx, sqlcgen.GetGameSessionTimerForUpdateParams{
@@ -475,6 +481,11 @@ func commitSystemAfterSessionLock(
 	}
 	if current.Snapshot().Status == gameruntime.StatusSuspended {
 		return gameruntime.SystemCommitResult{}, gameruntime.ErrSessionSuspended
+	}
+	if err := rejectTerminalWithPendingSystemInbox(
+		ctx, queries, commit.After().Snapshot(), receiptSnapshot.Key.Source.EventID,
+	); err != nil {
+		return gameruntime.SystemCommitResult{}, err
 	}
 	stored, err := persistSystemTransition(ctx, queries, commit)
 	if err != nil {
@@ -1038,6 +1049,28 @@ func lockActionParticipantFence(
 		return gameruntime.ErrParticipantNotActive
 	}
 	return err
+}
+
+// rejectTerminalWithPendingSystemInbox prevents normal finish from overtaking a committed membership revocation.
+func rejectTerminalWithPendingSystemInbox(
+	ctx context.Context,
+	queries QueryHandle,
+	after gameruntime.SessionSnapshot,
+	excludedSourceEventID uuid.UUID,
+) error {
+	if !after.Status.Terminal() {
+		return nil
+	}
+	pending, err := queries.HasPendingGameSystemInbox(ctx, sqlcgen.HasPendingGameSystemInboxParams{
+		SessionID: uuidToPG(after.ID), ExcludedSourceEventID: optionalUUIDToPG(excludedSourceEventID),
+	})
+	if err != nil {
+		return err
+	}
+	if pending {
+		return gameruntime.ErrSystemOperationPending
+	}
+	return nil
 }
 
 func createGameSessionParams(snapshot gameruntime.SessionSnapshot) sqlcgen.CreateGameSessionParams {

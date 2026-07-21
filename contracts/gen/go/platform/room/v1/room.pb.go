@@ -1945,6 +1945,7 @@ type RemoveMemberResponse struct {
 	Removed            *RoomMember            `protobuf:"bytes,2,opt,name=removed,proto3" json:"removed,omitempty"`
 	ParticipantRevoked bool                   `protobuf:"varint,3,opt,name=participant_revoked,json=participantRevoked,proto3" json:"participant_revoked,omitempty"`
 	ActiveSessionId    string                 `protobuf:"bytes,4,opt,name=active_session_id,json=activeSessionId,proto3" json:"active_session_id,omitempty"`
+	SourceEventId      string                 `protobuf:"bytes,5,opt,name=source_event_id,json=sourceEventId,proto3" json:"source_event_id,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -2003,6 +2004,13 @@ func (x *RemoveMemberResponse) GetParticipantRevoked() bool {
 func (x *RemoveMemberResponse) GetActiveSessionId() string {
 	if x != nil {
 		return x.ActiveSessionId
+	}
+	return ""
+}
+
+func (x *RemoveMemberResponse) GetSourceEventId() string {
+	if x != nil {
+		return x.SourceEventId
 	}
 	return ""
 }
@@ -2242,12 +2250,13 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x13RemoveMemberRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12H\n" +
-	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"\xd7\x01\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"\xff\x01\n" +
 	"\x14RemoveMemberResponse\x12*\n" +
 	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\x126\n" +
 	"\aremoved\x18\x02 \x01(\v2\x1c.platform.room.v1.RoomMemberR\aremoved\x12/\n" +
 	"\x13participant_revoked\x18\x03 \x01(\bR\x12participantRevoked\x12*\n" +
-	"\x11active_session_id\x18\x04 \x01(\tR\x0factiveSessionId\"u\n" +
+	"\x11active_session_id\x18\x04 \x01(\tR\x0factiveSessionId\x12&\n" +
+	"\x0fsource_event_id\x18\x05 \x01(\tR\rsourceEventId\"u\n" +
 	"\x10CloseRoomRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12H\n" +
 	"\x10expected_version\x18\x02 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"?\n" +

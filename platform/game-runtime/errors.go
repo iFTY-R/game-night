@@ -33,6 +33,8 @@ var (
 	ErrSystemReceiptNotFound = errors.New("game system receipt not found")
 	// ErrSystemOperationPending asks the runtime to reload state and recompute the same logical system operation.
 	ErrSystemOperationPending = errors.New("game system operation is pending")
+	// ErrSystemInboxNotFound reports a room event that was not registered with its membership fence.
+	ErrSystemInboxNotFound = errors.New("game system inbox record not found")
 	// ErrInvalidActionCommit rejects a receipt, batch, state, or outbox combination that is not one transition.
 	ErrInvalidActionCommit = errors.New("invalid game action commit")
 	// ErrInvalidTimerCommit rejects a timer receipt, batch, state, or outbox combination that is not one transition.

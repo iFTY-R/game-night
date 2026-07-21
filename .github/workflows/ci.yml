@@ -49,6 +49,20 @@ jobs:
           fi
       - name: Test Go packages
         run: go test ./...
+      - name: Race Go packages
+        run: go test -race ./...
+      - name: Run bounded game fuzz smoke
+        run: |
+          set -euo pipefail
+          for package in \
+            ./games/liars-dice/engine \
+            ./games/liars-dice/module \
+            ./games/dice-789/engine \
+            ./games/dice-789/module \
+            ./games/meet-by-chance/engine \
+            ./games/meet-by-chance/module; do
+            go test "$package" -run '^$' -fuzz=Fuzz -fuzztime=10s
+          done
       - name: Vet Go packages
         run: go vet ./...
       - name: Run repository checks

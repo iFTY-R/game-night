@@ -398,7 +398,7 @@ func (repository *RoomGameSessionRepository) Cancel(
 		if err != nil {
 			return err
 		}
-		storedRoom, err = finishPartyRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
+		storedRoom, err = updateRoomAggregateCAS(ctx, queries, before.Snapshot(), after.Snapshot())
 		return err
 	})
 	if err != nil {
@@ -579,10 +579,17 @@ func validateRoomGameSessionTermination(
 	roomBefore, roomAfter := before.Snapshot(), after.Snapshot()
 	sessionBefore, sessionAfter := beforeSession.Snapshot(), afterSession.Snapshot()
 	expectedRoom := roomBefore
-	expectedRoom.Status = roomDomain.RoomStatusLobby
+	expectedRoom.Status = roomDomain.RoomStatusPostGame
 	expectedRoom.ParticipantAdmission = roomDomain.AdmissionClosed
 	expectedRoom.ActiveSessionID = uuid.Nil
 	expectedRoom.ActiveGameID = ""
+	expectedRoom.LastFinishedSessionID = roomBefore.ActiveSessionID
+	expectedRoom.LastFinishedGameID = roomBefore.ActiveGameID
+	if wantStatus == gameruntime.StatusCancelled {
+		expectedRoom.Status = roomDomain.RoomStatusLobby
+		expectedRoom.LastFinishedSessionID = uuid.Nil
+		expectedRoom.LastFinishedGameID = ""
+	}
 	expectedRoom.RoomVersion++
 	expectedRoom.UpdatedAt = roomAfter.UpdatedAt
 	if roomBefore.Status != roomDomain.RoomStatusPlaying || roomBefore.ActiveSessionID == uuid.Nil ||
@@ -604,13 +611,14 @@ func sameTerminatingSessionIdentity(left, right gameruntime.SessionSnapshot) boo
 		reflect.DeepEqual(left.Participants, right.Participants)
 }
 
-// validateRoomGameSessionStart accepts only the exact lobby-to-playing transition and its matching frozen runtime state.
+// validateRoomGameSessionStart accepts only an idle-to-playing transition and its matching frozen runtime state.
 func validateRoomGameSessionStart(before, after roomDomain.Room, commit gameruntime.CreationCommit) error {
 	beforeSnapshot, afterSnapshot := before.Snapshot(), after.Snapshot()
 	sessionSnapshot := commit.Session.Snapshot()
-	if beforeSnapshot.Status != roomDomain.RoomStatusLobby || beforeSnapshot.ActiveSessionID != uuid.Nil || beforeSnapshot.ActiveGameID != "" ||
+	if (beforeSnapshot.Status != roomDomain.RoomStatusLobby && beforeSnapshot.Status != roomDomain.RoomStatusPostGame) ||
+		beforeSnapshot.ActiveSessionID != uuid.Nil || beforeSnapshot.ActiveGameID != "" ||
 		afterSnapshot.Status != roomDomain.RoomStatusPlaying || afterSnapshot.ActiveSessionID == uuid.Nil || afterSnapshot.ActiveGameID == "" ||
-		afterSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed ||
+		afterSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed || afterSnapshot.LastFinishedSessionID != uuid.Nil || afterSnapshot.LastFinishedGameID != "" ||
 		beforeSnapshot.ID != afterSnapshot.ID || beforeSnapshot.RoomCode != afterSnapshot.RoomCode ||
 		beforeSnapshot.Visibility != afterSnapshot.Visibility || beforeSnapshot.HostUserID != afterSnapshot.HostUserID ||
 		beforeSnapshot.ParticipantCapacity != afterSnapshot.ParticipantCapacity ||

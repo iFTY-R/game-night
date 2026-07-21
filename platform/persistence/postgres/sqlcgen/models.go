@@ -343,20 +343,22 @@ type OutboxEvent struct {
 }
 
 type PartyRoom struct {
-	RoomID               pgtype.UUID        `json:"room_id"`
-	RoomCode             string             `json:"room_code"`
-	Visibility           string             `json:"visibility"`
-	Status               string             `json:"status"`
-	HostUserID           pgtype.UUID        `json:"host_user_id"`
-	ParticipantCapacity  int32              `json:"participant_capacity"`
-	ParticipantAdmission string             `json:"participant_admission"`
-	SpectatorAdmission   string             `json:"spectator_admission"`
-	ActiveSessionID      pgtype.UUID        `json:"active_session_id"`
-	ActiveGameID         pgtype.Text        `json:"active_game_id"`
-	RoomVersion          int64              `json:"room_version"`
-	MembershipVersion    int64              `json:"membership_version"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	RoomID                pgtype.UUID        `json:"room_id"`
+	RoomCode              string             `json:"room_code"`
+	Visibility            string             `json:"visibility"`
+	Status                string             `json:"status"`
+	HostUserID            pgtype.UUID        `json:"host_user_id"`
+	ParticipantCapacity   int32              `json:"participant_capacity"`
+	ParticipantAdmission  string             `json:"participant_admission"`
+	SpectatorAdmission    string             `json:"spectator_admission"`
+	ActiveSessionID       pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID          pgtype.Text        `json:"active_game_id"`
+	RoomVersion           int64              `json:"room_version"`
+	MembershipVersion     int64              `json:"membership_version"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	LastFinishedSessionID pgtype.UUID        `json:"last_finished_session_id"`
+	LastFinishedGameID    pgtype.Text        `json:"last_finished_game_id"`
 }
 
 type ProfileExportContext struct {

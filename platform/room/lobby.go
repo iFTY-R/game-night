@@ -143,7 +143,7 @@ func (request PublicRoomListRequest) Valid() bool {
 func RestorePublicRoomCard(snapshot PublicRoomCardSnapshot) (PublicRoomCard, error) {
 	snapshot.UpdatedAt = canonicalRoomTime(snapshot.UpdatedAt)
 	if snapshot.RoomID == uuid.Nil || snapshot.HostUsername == "" || strings.TrimSpace(snapshot.HostUsername) != snapshot.HostUsername ||
-		(snapshot.Status != RoomStatusLobby && snapshot.Status != RoomStatusPlaying) || snapshot.ParticipantCapacity == 0 ||
+		(snapshot.Status != RoomStatusLobby && snapshot.Status != RoomStatusPlaying && snapshot.Status != RoomStatusPostGame) || snapshot.ParticipantCapacity == 0 ||
 		snapshot.ParticipantCount == 0 || snapshot.ParticipantCount > snapshot.ParticipantCapacity ||
 		!snapshot.ParticipantAdmission.Valid() || !snapshot.SpectatorAdmission.Valid() || snapshot.UpdatedAt.IsZero() {
 		return PublicRoomCard{}, ErrRoomIntegrity
@@ -217,13 +217,13 @@ func (card PublicRoomCard) PrimaryAction() PublicRoomPrimaryAction {
 
 func normalizePublicRoomFilter(filter PublicRoomFilter) (PublicRoomFilter, error) {
 	filter.GameID = strings.TrimSpace(filter.GameID)
-	if len(filter.GameID) > maximumPublicRoomGameIDBytes || len(filter.Statuses) > 2 {
+	if len(filter.GameID) > maximumPublicRoomGameIDBytes || len(filter.Statuses) > 3 {
 		return PublicRoomFilter{}, ErrInvalidRoomInput
 	}
 	statuses := make([]RoomStatus, 0, len(filter.Statuses))
 	seen := make(map[RoomStatus]struct{}, len(filter.Statuses))
 	for _, status := range filter.Statuses {
-		if status != RoomStatusLobby && status != RoomStatusPlaying {
+		if status != RoomStatusLobby && status != RoomStatusPlaying && status != RoomStatusPostGame {
 			return PublicRoomFilter{}, ErrInvalidRoomInput
 		}
 		if _, duplicate := seen[status]; duplicate {

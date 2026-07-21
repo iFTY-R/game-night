@@ -25,6 +25,7 @@ func TestPublicRoomPrimaryActionFollowsMembershipAdmissionAndCapacity(t *testing
 			card.SpectatorAdmission = AdmissionClosed
 		}, want: PublicRoomPrimaryActionFull},
 		{name: "postgame waits for host", mutate: func(card *PublicRoomCardSnapshot) {
+			card.Status = RoomStatusPostGame
 			card.ParticipantAdmission = AdmissionClosed
 			card.SpectatorAdmission = AdmissionClosed
 		}, want: PublicRoomPrimaryActionWaitForHost},

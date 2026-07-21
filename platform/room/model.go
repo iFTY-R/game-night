@@ -28,9 +28,10 @@ const (
 type RoomStatus string
 
 const (
-	RoomStatusLobby   RoomStatus = "lobby"
-	RoomStatusPlaying RoomStatus = "playing"
-	RoomStatusClosed  RoomStatus = "closed"
+	RoomStatusLobby    RoomStatus = "lobby"
+	RoomStatusPlaying  RoomStatus = "playing"
+	RoomStatusPostGame RoomStatus = "post_game"
+	RoomStatusClosed   RoomStatus = "closed"
 )
 
 // MemberRole is the access level held by a persistent room member.
@@ -74,21 +75,23 @@ type FrozenParticipant struct {
 
 // RoomSnapshot is the persistence-neutral authoritative state of one continuous room.
 type RoomSnapshot struct {
-	ID                   uuid.UUID
-	RoomCode             string
-	Visibility           Visibility
-	Status               RoomStatus
-	HostUserID           uuid.UUID
-	ParticipantCapacity  uint32
-	ParticipantAdmission AdmissionMode
-	SpectatorAdmission   AdmissionMode
-	Members              []MemberSnapshot
-	ActiveSessionID      uuid.UUID
-	ActiveGameID         string
-	RoomVersion          uint64
-	MembershipVersion    uint64
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                    uuid.UUID
+	RoomCode              string
+	Visibility            Visibility
+	Status                RoomStatus
+	HostUserID            uuid.UUID
+	ParticipantCapacity   uint32
+	ParticipantAdmission  AdmissionMode
+	SpectatorAdmission    AdmissionMode
+	Members               []MemberSnapshot
+	ActiveSessionID       uuid.UUID
+	ActiveGameID          string
+	LastFinishedSessionID uuid.UUID
+	LastFinishedGameID    string
+	RoomVersion           uint64
+	MembershipVersion     uint64
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // Room is an immutable aggregate. Commands return a new value so repositories can CAS the exact snapshot version.
@@ -96,10 +99,11 @@ type Room struct {
 	snapshot RoomSnapshot
 }
 
-// JoinResult describes whether a request created a participant, spectator, or approval-waiting member.
+// JoinResult describes whether a request created or changed a participant, spectator, or approval-waiting member.
 type JoinResult struct {
 	Member  MemberSnapshot
 	Created bool
+	Changed bool
 }
 
 // ApprovalResult contains the promoted member and the versions committed by the approval command.
@@ -174,11 +178,21 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 		snapshot.MembershipVersion == 0 || snapshot.CreatedAt.IsZero() || snapshot.UpdatedAt.Before(snapshot.CreatedAt) {
 		return Room{}, ErrInvalidRoomInput
 	}
+	lastFinishedSet := snapshot.LastFinishedSessionID != uuid.Nil || snapshot.LastFinishedGameID != ""
+	if (snapshot.LastFinishedSessionID == uuid.Nil) != (snapshot.LastFinishedGameID == "") {
+		return Room{}, ErrInvalidRoomInput
+	}
 	if snapshot.Status == RoomStatusPlaying {
 		if snapshot.ActiveSessionID == uuid.Nil || snapshot.ActiveGameID == "" || snapshot.ParticipantAdmission != AdmissionClosed {
 			return Room{}, ErrInvalidRoomInput
 		}
 	} else if snapshot.ActiveSessionID != uuid.Nil || snapshot.ActiveGameID != "" {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if (snapshot.Status == RoomStatusLobby || snapshot.Status == RoomStatusPlaying) && lastFinishedSet {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if snapshot.Status == RoomStatusPostGame && !lastFinishedSet {
 		return Room{}, ErrInvalidRoomInput
 	}
 	if snapshot.Status == RoomStatusClosed &&
@@ -274,6 +288,27 @@ func (room Room) Join(userID uuid.UUID, intent JoinIntent, expected Version, at 
 		return Room{}, JoinResult{}, err
 	}
 	if existing, ok := room.Member(userID); ok {
+		// A current participant reconnects idempotently. A spectator may give up live viewing to queue for the next game.
+		if room.snapshot.Status == RoomStatusPlaying && intent == JoinIntentParticipant && existing.Role == MemberRoleSpectator {
+			next := room.snapshot
+			for index := range next.Members {
+				if next.Members[index].UserID == userID {
+					next.Members[index].Role = MemberRoleWaiting
+					next.Members[index].RequestedRole = MemberRoleParticipant
+					next.Members[index].SeatIndex = 0
+					existing = next.Members[index]
+					break
+				}
+			}
+			if err := bumpVersions(&next, true, at); err != nil {
+				return Room{}, JoinResult{}, err
+			}
+			updated, err := Restore(next)
+			if err != nil {
+				return Room{}, JoinResult{}, err
+			}
+			return updated, JoinResult{Member: existing, Changed: true}, nil
+		}
 		return room, JoinResult{Member: existing}, nil
 	}
 	if room.snapshot.Status == RoomStatusClosed {
@@ -283,27 +318,29 @@ func (room Room) Join(userID uuid.UUID, intent JoinIntent, expected Version, at 
 	if intent == JoinIntentSpectator {
 		mode = room.snapshot.SpectatorAdmission
 	}
-	if room.snapshot.Status == RoomStatusPlaying && intent == JoinIntentParticipant {
-		mode = AdmissionClosed
-	}
 	member := MemberSnapshot{UserID: userID, JoinedAt: at, LastSeenAt: at}
-	switch mode {
-	case AdmissionOpen:
-		if intent == JoinIntentParticipant {
-			seat, ok := room.nextSeat()
-			if !ok {
-				return Room{}, JoinResult{}, ErrRoomFull
+	if room.snapshot.Status == RoomStatusPlaying && intent == JoinIntentParticipant {
+		// Frozen seats cannot change mid-game, so every new participant request joins the next-game queue.
+		member.Role, member.RequestedRole = MemberRoleWaiting, MemberRoleParticipant
+	} else {
+		switch mode {
+		case AdmissionOpen:
+			if intent == JoinIntentParticipant {
+				seat, ok := room.nextSeat()
+				if !ok {
+					return Room{}, JoinResult{}, ErrRoomFull
+				}
+				member.Role, member.SeatIndex = MemberRoleParticipant, seat
+			} else {
+				member.Role = MemberRoleSpectator
 			}
-			member.Role, member.SeatIndex = MemberRoleParticipant, seat
-		} else {
-			member.Role = MemberRoleSpectator
+		case AdmissionApproval:
+			member.Role, member.RequestedRole = MemberRoleWaiting, MemberRole(intent)
+		case AdmissionClosed:
+			return Room{}, JoinResult{}, ErrAdmissionClosed
+		default:
+			return Room{}, JoinResult{}, ErrInvalidRoomInput
 		}
-	case AdmissionApproval:
-		member.Role, member.RequestedRole = MemberRoleWaiting, MemberRole(intent)
-	case AdmissionClosed:
-		return Room{}, JoinResult{}, ErrAdmissionClosed
-	default:
-		return Room{}, JoinResult{}, ErrInvalidRoomInput
 	}
 	next := room.snapshot
 	next.Members = append(append([]MemberSnapshot(nil), room.snapshot.Members...), member)
@@ -315,7 +352,7 @@ func (room Room) Join(userID uuid.UUID, intent JoinIntent, expected Version, at 
 	if err != nil {
 		return Room{}, JoinResult{}, err
 	}
-	return updated, JoinResult{Member: member, Created: true}, nil
+	return updated, JoinResult{Member: member, Created: true, Changed: true}, nil
 }
 
 // SetAdmission changes a host-controlled admission mode in the pre/post-game lobby.
@@ -330,7 +367,7 @@ func (room Room) SetAdmission(hostUserID uuid.UUID, participant, spectator Admis
 	if err := room.checkVersion(expected); err != nil {
 		return Room{}, err
 	}
-	if room.snapshot.Status != RoomStatusLobby {
+	if !room.snapshot.Status.admissionMutable() {
 		return Room{}, ErrRoomStatus
 	}
 	next := room.snapshot
@@ -353,7 +390,7 @@ func (room Room) ApproveWaiting(hostUserID, userID uuid.UUID, expected Version, 
 	if err := room.checkVersion(expected); err != nil {
 		return Room{}, ApprovalResult{}, err
 	}
-	if room.snapshot.Status != RoomStatusLobby {
+	if !room.snapshot.Status.admissionMutable() {
 		return Room{}, ApprovalResult{}, ErrRoomStatus
 	}
 	next := room.snapshot
@@ -413,7 +450,7 @@ func (room Room) StartSession(
 	if room.snapshot.Status == RoomStatusClosed {
 		return Room{}, SessionStart{}, ErrRoomClosed
 	}
-	if room.snapshot.Status != RoomStatusLobby {
+	if room.snapshot.Status != RoomStatusLobby && room.snapshot.Status != RoomStatusPostGame {
 		return Room{}, SessionStart{}, ErrRoomStatus
 	}
 	if room.snapshot.ActiveSessionID != uuid.Nil {
@@ -433,6 +470,7 @@ func (room Room) StartSession(
 	}
 	next := room.snapshot
 	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusPlaying, sessionID, strings.TrimSpace(gameID), AdmissionClosed
+	next.LastFinishedSessionID, next.LastFinishedGameID = uuid.Nil, ""
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, SessionStart{}, err
 	}
@@ -459,7 +497,32 @@ func (room Room) FinishSession(sessionID uuid.UUID, expected Version, at time.Ti
 		return Room{}, ErrSessionNotFound
 	}
 	next := room.snapshot
+	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusPostGame, uuid.Nil, "", AdmissionClosed
+	next.LastFinishedSessionID, next.LastFinishedGameID = sessionID, room.snapshot.ActiveGameID
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// CancelSession returns a room to its initial lobby without advertising a cancelled session as replayable.
+func (room Room) CancelSession(sessionID uuid.UUID, expected Version, at time.Time) (Room, error) {
+	at = canonicalRoomTime(at)
+	if sessionID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.Status != RoomStatusPlaying {
+		return Room{}, ErrRoomStatus
+	}
+	if room.snapshot.ActiveSessionID != sessionID {
+		return Room{}, ErrSessionNotFound
+	}
+	next := room.snapshot
 	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusLobby, uuid.Nil, "", AdmissionClosed
+	next.LastFinishedSessionID, next.LastFinishedGameID = uuid.Nil, ""
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}
@@ -542,7 +605,11 @@ func (mode AdmissionMode) Valid() bool {
 }
 
 func (status RoomStatus) Valid() bool {
-	return status == RoomStatusLobby || status == RoomStatusPlaying || status == RoomStatusClosed
+	return status == RoomStatusLobby || status == RoomStatusPlaying || status == RoomStatusPostGame || status == RoomStatusClosed
+}
+
+func (status RoomStatus) admissionMutable() bool {
+	return status == RoomStatusLobby || status == RoomStatusPostGame
 }
 
 func (role MemberRole) Valid() bool {

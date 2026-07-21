@@ -191,7 +191,7 @@ func (service *Service) JoinRoom(ctx context.Context, command JoinRoomCommand) (
 	if err != nil {
 		return Room{}, JoinResult{}, err
 	}
-	if !result.Created {
+	if !result.Changed {
 		return room, result, nil
 	}
 	stored, err := service.repository.UpdateCAS(ctx, room, next)

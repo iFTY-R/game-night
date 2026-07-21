@@ -901,6 +901,8 @@ type Querier interface {
 	//      spectator_admission,
 	//      active_session_id,
 	//      active_game_id,
+	//      last_finished_session_id,
+	//      last_finished_game_id,
 	//      room_version,
 	//      membership_version,
 	//      created_at,
@@ -919,11 +921,14 @@ type Querier interface {
 	//      $11,
 	//      $12,
 	//      $13,
-	//      $14
+	//      $14,
+	//      $15,
+	//      $16
 	//  )
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error)
 	//CreatePendingAdminTotpEnrollment
 	//
@@ -1227,8 +1232,10 @@ type Querier interface {
 	//FinishPartyRoomCAS
 	//
 	//  UPDATE party_rooms
-	//  SET status = 'lobby',
+	//  SET status = 'post_game',
 	//      participant_admission = 'closed',
+	//      last_finished_session_id = active_session_id,
+	//      last_finished_game_id = active_game_id,
 	//      active_session_id = NULL,
 	//      active_game_id = NULL,
 	//      room_version = $1,
@@ -1241,7 +1248,8 @@ type Querier interface {
 	//    AND membership_version = $7
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error)
 	//GetActiveAdminTotpEnrollmentForUpdate
 	//
@@ -1521,7 +1529,8 @@ type Querier interface {
 	//
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	//  FROM party_rooms
 	//  WHERE room_code = $1
 	//  FOR SHARE
@@ -1530,7 +1539,8 @@ type Querier interface {
 	//
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR SHARE
@@ -1539,7 +1549,8 @@ type Querier interface {
 	//
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR UPDATE
@@ -1898,25 +1909,26 @@ type Querier interface {
 	//  WHERE room.visibility = 'public'
 	//    AND room.status <> 'closed'
 	//    AND (
-	//        (NOT $2::boolean AND NOT $3::boolean)
+	//        (NOT $2::boolean AND NOT $3::boolean AND NOT $4::boolean)
 	//        OR ($2::boolean AND room.status = 'lobby')
 	//        OR ($3::boolean AND room.status = 'playing')
+	//        OR ($4::boolean AND room.status = 'post_game')
 	//    )
-	//    AND ($4::text = '' OR room.active_game_id = $4::text)
+	//    AND ($5::text = '' OR room.active_game_id = $5::text)
 	//    AND (
-	//        NOT $5::boolean
+	//        NOT $6::boolean
 	//        OR (
-	//            room.status = 'lobby'
+	//            room.status IN ('lobby', 'post_game')
 	//            AND room.participant_admission IN ('open', 'approval')
 	//            AND counts.participant_count < room.participant_capacity
 	//        )
 	//    )
 	//    AND (
-	//        NOT $6::boolean
-	//        OR (room.updated_at, room.room_id) < ($7::timestamptz, $8::uuid)
+	//        NOT $7::boolean
+	//        OR (room.updated_at, room.room_id) < ($8::timestamptz, $9::uuid)
 	//    )
 	//  ORDER BY room.updated_at DESC, room.room_id DESC
-	//  LIMIT $9
+	//  LIMIT $10
 	ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCardsParams) ([]ListPublicRoomCardsRow, error)
 	//ListRoomMembers
 	//
@@ -2451,16 +2463,19 @@ type Querier interface {
 	//      spectator_admission = $6,
 	//      active_session_id = $7,
 	//      active_game_id = $8,
-	//      room_version = $9,
-	//      membership_version = $10,
-	//      updated_at = $11
-	//  WHERE room_id = $12
-	//    AND room_code = $13
-	//    AND room_version = $14
-	//    AND membership_version = $15
+	//      last_finished_session_id = $9,
+	//      last_finished_game_id = $10,
+	//      room_version = $11,
+	//      membership_version = $12,
+	//      updated_at = $13
+	//  WHERE room_id = $14
+	//    AND room_code = $15
+	//    AND room_version = $16
+	//    AND membership_version = $17
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
-	//      room_version, membership_version, created_at, updated_at
+	//      room_version, membership_version, created_at, updated_at,
+	//      last_finished_session_id, last_finished_game_id
 	UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error)
 	//UpdateUserProfileCAS
 	//

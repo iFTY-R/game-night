@@ -172,7 +172,7 @@ func (service *Service) JoinRoom(ctx context.Context, request *connect.Request[r
 		return nil, err
 	}
 	return connect.NewResponse(&roomv1.JoinRoomResponse{
-		Room: roomWire(joined), Member: memberWire(result.Member), Created: result.Created,
+		Room: roomWire(joined), Member: memberWire(result.Member), Created: result.Created, Changed: result.Changed,
 	}), nil
 }
 
@@ -309,7 +309,7 @@ func (service *Service) FinishGame(ctx context.Context, request *connect.Request
 		return nil, err
 	}
 	updatedSnapshot := updated.Snapshot()
-	if updatedSnapshot.Status != roomDomain.RoomStatusLobby || updatedSnapshot.ActiveSessionID != uuid.Nil {
+	if updatedSnapshot.Status != roomDomain.RoomStatusPostGame || updatedSnapshot.ActiveSessionID != uuid.Nil {
 		return nil, gameruntime.ErrGameSessionIntegrity
 	}
 	return connect.NewResponse(&roomv1.FinishGameResponse{Room: roomWire(updated)}), nil
@@ -478,12 +478,17 @@ func roomWire(room roomDomain.Room) *roomv1.Room {
 	if snapshot.ActiveSessionID != uuid.Nil {
 		activeSessionID = snapshot.ActiveSessionID.String()
 	}
+	lastFinishedSessionID := ""
+	if snapshot.LastFinishedSessionID != uuid.Nil {
+		lastFinishedSessionID = snapshot.LastFinishedSessionID.String()
+	}
 	return &roomv1.Room{
 		RoomId: snapshot.ID.String(), RoomCode: snapshot.RoomCode, Visibility: visibilityWire(snapshot.Visibility),
 		Status: statusWire(snapshot.Status), HostUserId: snapshot.HostUserID.String(),
 		ParticipantCapacity: snapshot.ParticipantCapacity, ParticipantAdmission: admissionWire(snapshot.ParticipantAdmission),
 		SpectatorAdmission: admissionWire(snapshot.SpectatorAdmission), Members: members,
 		ActiveSessionId: activeSessionID, ActiveGameId: snapshot.ActiveGameID,
+		LastFinishedSessionId: lastFinishedSessionID, LastFinishedGameId: snapshot.LastFinishedGameID,
 		Version:   &roomv1.RoomVersion{RoomVersion: snapshot.RoomVersion, MembershipVersion: snapshot.MembershipVersion},
 		CreatedAt: timestamppb.New(snapshot.CreatedAt), UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
 	}
@@ -559,6 +564,8 @@ func statusWire(value roomDomain.RoomStatus) roomv1.RoomStatus {
 		return roomv1.RoomStatus_ROOM_STATUS_LOBBY
 	case roomDomain.RoomStatusPlaying:
 		return roomv1.RoomStatus_ROOM_STATUS_PLAYING
+	case roomDomain.RoomStatusPostGame:
+		return roomv1.RoomStatus_ROOM_STATUS_POST_GAME
 	case roomDomain.RoomStatusClosed:
 		return roomv1.RoomStatus_ROOM_STATUS_CLOSED
 	default:
@@ -572,6 +579,8 @@ func statusDomain(value roomv1.RoomStatus) roomDomain.RoomStatus {
 		return roomDomain.RoomStatusLobby
 	case roomv1.RoomStatus_ROOM_STATUS_PLAYING:
 		return roomDomain.RoomStatusPlaying
+	case roomv1.RoomStatus_ROOM_STATUS_POST_GAME:
+		return roomDomain.RoomStatusPostGame
 	case roomv1.RoomStatus_ROOM_STATUS_CLOSED:
 		return roomDomain.RoomStatusClosed
 	default:

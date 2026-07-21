@@ -93,10 +93,11 @@ func (repository *RoomRepository) ListPublicRooms(
 	if repository == nil || repository.runner == nil || ctx == nil || !request.Valid() {
 		return nil, roomDomain.ErrInvalidRoomInput
 	}
-	includeLobby, includePlaying := false, false
+	includeLobby, includePlaying, includePostGame := false, false, false
 	for _, status := range request.Filter.Statuses {
 		includeLobby = includeLobby || status == roomDomain.RoomStatusLobby
 		includePlaying = includePlaying || status == roomDomain.RoomStatusPlaying
+		includePostGame = includePostGame || status == roomDomain.RoomStatusPostGame
 	}
 	afterUpdatedAt, afterRoomID := timeToPG(roomLobbyCursorFloor()), uuidToPG(uuid.Nil)
 	if !request.After.UpdatedAt.IsZero() {
@@ -107,7 +108,8 @@ func (repository *RoomRepository) ListPublicRooms(
 		var err error
 		rows, err = queries.ListPublicRoomCards(ctx, sqlcgen.ListPublicRoomCardsParams{
 			ActorUserID: uuidToPG(request.ActorUserID), IncludeLobby: includeLobby, IncludePlaying: includePlaying,
-			GameID: request.Filter.GameID, ParticipantJoinableOnly: request.Filter.ParticipantJoinableOnly,
+			IncludePostGame: includePostGame,
+			GameID:          request.Filter.GameID, ParticipantJoinableOnly: request.Filter.ParticipantJoinableOnly,
 			HasAfter: !request.After.UpdatedAt.IsZero(), AfterUpdatedAt: afterUpdatedAt, AfterRoomID: afterRoomID,
 			PageLimit: int32(request.Limit),
 		})
@@ -174,7 +176,8 @@ func createPartyRoomParams(snapshot roomDomain.RoomSnapshot) sqlcgen.CreateParty
 		Status: string(snapshot.Status), HostUserID: uuidToPG(snapshot.HostUserID),
 		ParticipantCapacity: int32(snapshot.ParticipantCapacity), ParticipantAdmission: string(snapshot.ParticipantAdmission),
 		SpectatorAdmission: string(snapshot.SpectatorAdmission), ActiveSessionID: optionalUUIDToPG(snapshot.ActiveSessionID),
-		ActiveGameID: textToPG(snapshot.ActiveGameID), RoomVersion: int64(snapshot.RoomVersion),
+		ActiveGameID: textToPG(snapshot.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(snapshot.LastFinishedSessionID),
+		LastFinishedGameID: textToPG(snapshot.LastFinishedGameID), RoomVersion: int64(snapshot.RoomVersion),
 		MembershipVersion: int64(snapshot.MembershipVersion), CreatedAt: timeToPG(snapshot.CreatedAt), UpdatedAt: timeToPG(snapshot.UpdatedAt),
 	}
 }
@@ -184,7 +187,8 @@ func updatePartyRoomParams(before, after roomDomain.RoomSnapshot) sqlcgen.Update
 		Visibility: string(after.Visibility), Status: string(after.Status), HostUserID: uuidToPG(after.HostUserID),
 		ParticipantCapacity: int32(after.ParticipantCapacity), ParticipantAdmission: string(after.ParticipantAdmission),
 		SpectatorAdmission: string(after.SpectatorAdmission), ActiveSessionID: optionalUUIDToPG(after.ActiveSessionID),
-		ActiveGameID: textToPG(after.ActiveGameID), RoomVersion: int64(after.RoomVersion),
+		ActiveGameID: textToPG(after.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(after.LastFinishedSessionID),
+		LastFinishedGameID: textToPG(after.LastFinishedGameID), RoomVersion: int64(after.RoomVersion),
 		MembershipVersion: int64(after.MembershipVersion), UpdatedAt: timeToPG(after.UpdatedAt),
 		RoomID: uuidToPG(before.ID), RoomCode: before.RoomCode, ExpectedRoomVersion: int64(before.RoomVersion),
 		ExpectedMembershipVersion: int64(before.MembershipVersion),
@@ -233,6 +237,7 @@ func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDoma
 		SpectatorAdmission: roomDomain.AdmissionMode(row.SpectatorAdmission), RoomVersion: uint64(row.RoomVersion),
 		MembershipVersion: uint64(row.MembershipVersion), CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
 		ActiveSessionID: optionalUUIDFromPG(row.ActiveSessionID), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
+		LastFinishedSessionID: optionalUUIDFromPG(row.LastFinishedSessionID), LastFinishedGameID: optionalTextFromPG(row.LastFinishedGameID),
 		Members: make([]roomDomain.MemberSnapshot, 0, len(members)),
 	}
 	for _, member := range members {

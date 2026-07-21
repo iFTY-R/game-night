@@ -690,7 +690,7 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}
-	nextRoom, err := room.FinishSession(command.SessionID, room.Version(), at)
+	nextRoom, err := room.CancelSession(command.SessionID, room.Version(), at)
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}

@@ -106,6 +106,52 @@ func TestServiceRequiresExactVersionForHostCommands(t *testing.T) {
 	}
 }
 
+func TestServicePersistsSpectatorRequestingParticipantWhilePlaying(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 17, 30, 0, 0, time.UTC)
+	host, participant, spectator := uuid.New(), uuid.New(), uuid.New()
+	repository := newMemoryRoomRepository()
+	playing, err := New(uuid.New(), host, "QUEUE2", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.Join(participant, JoinIntentParticipant, playing.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.Join(spectator, JoinIntentSpectator, playing.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.StartSession(host, uuid.New(), "dice", 2, 9, playing.Version(), now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(t.Context(), playing); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE3"}}, clock.NewFake(now.Add(4*time.Second)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated, result, err := service.JoinRoom(t.Context(), JoinRoomCommand{
+		ActorUserID: spectator, Selector: RoomSelector{ID: playing.Snapshot().ID}, Intent: JoinIntentParticipant,
+		Expected: playing.Version(),
+	})
+	if err != nil || result.Created || result.Member.Role != MemberRoleWaiting ||
+		updated.Version().Membership != playing.Version().Membership+1 {
+		t.Fatalf("participant request: result=%+v room=%+v err=%v", result, updated.Snapshot(), err)
+	}
+	persisted, err := repository.GetByID(t.Context(), playing.Snapshot().ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, present := persisted.Member(spectator)
+	if !present || member.Role != MemberRoleWaiting || member.RequestedRole != MemberRoleParticipant {
+		t.Fatalf("persisted member=%+v present=%v", member, present)
+	}
+}
+
 type sequenceRoomCodeGenerator struct {
 	mu    sync.Mutex
 	codes []string

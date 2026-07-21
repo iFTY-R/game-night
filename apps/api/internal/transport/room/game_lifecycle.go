@@ -132,7 +132,7 @@ func (service *Service) authorizeFinish(
 		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrParticipantNotActive
 	}
 	if sessionSnapshot.Status.Terminal() {
-		if roomSnapshot.Status != roomDomain.RoomStatusLobby || roomSnapshot.ActiveSessionID != uuid.Nil {
+		if roomSnapshot.Status != roomDomain.RoomStatusPostGame || roomSnapshot.ActiveSessionID != uuid.Nil {
 			return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
 		}
 		return room, session, nil

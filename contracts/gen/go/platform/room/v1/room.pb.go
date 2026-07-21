@@ -80,6 +80,7 @@ const (
 	RoomStatus_ROOM_STATUS_LOBBY       RoomStatus = 1
 	RoomStatus_ROOM_STATUS_PLAYING     RoomStatus = 2
 	RoomStatus_ROOM_STATUS_CLOSED      RoomStatus = 3
+	RoomStatus_ROOM_STATUS_POST_GAME   RoomStatus = 4
 )
 
 // Enum value maps for RoomStatus.
@@ -89,12 +90,14 @@ var (
 		1: "ROOM_STATUS_LOBBY",
 		2: "ROOM_STATUS_PLAYING",
 		3: "ROOM_STATUS_CLOSED",
+		4: "ROOM_STATUS_POST_GAME",
 	}
 	RoomStatus_value = map[string]int32{
 		"ROOM_STATUS_UNSPECIFIED": 0,
 		"ROOM_STATUS_LOBBY":       1,
 		"ROOM_STATUS_PLAYING":     2,
 		"ROOM_STATUS_CLOSED":      3,
+		"ROOM_STATUS_POST_GAME":   4,
 	}
 )
 
@@ -483,23 +486,25 @@ func (x *RoomMember) GetLastSeenAt() *timestamppb.Timestamp {
 }
 
 type Room struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	RoomId               string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	RoomCode             string                 `protobuf:"bytes,2,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
-	Visibility           RoomVisibility         `protobuf:"varint,3,opt,name=visibility,proto3,enum=platform.room.v1.RoomVisibility" json:"visibility,omitempty"`
-	Status               RoomStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=platform.room.v1.RoomStatus" json:"status,omitempty"`
-	HostUserId           string                 `protobuf:"bytes,5,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`
-	ParticipantCapacity  uint32                 `protobuf:"varint,6,opt,name=participant_capacity,json=participantCapacity,proto3" json:"participant_capacity,omitempty"`
-	ParticipantAdmission AdmissionMode          `protobuf:"varint,7,opt,name=participant_admission,json=participantAdmission,proto3,enum=platform.room.v1.AdmissionMode" json:"participant_admission,omitempty"`
-	SpectatorAdmission   AdmissionMode          `protobuf:"varint,8,opt,name=spectator_admission,json=spectatorAdmission,proto3,enum=platform.room.v1.AdmissionMode" json:"spectator_admission,omitempty"`
-	Members              []*RoomMember          `protobuf:"bytes,9,rep,name=members,proto3" json:"members,omitempty"`
-	ActiveSessionId      string                 `protobuf:"bytes,10,opt,name=active_session_id,json=activeSessionId,proto3" json:"active_session_id,omitempty"`
-	ActiveGameId         string                 `protobuf:"bytes,11,opt,name=active_game_id,json=activeGameId,proto3" json:"active_game_id,omitempty"`
-	Version              *RoomVersion           `protobuf:"bytes,12,opt,name=version,proto3" json:"version,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	RoomId                string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	RoomCode              string                 `protobuf:"bytes,2,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
+	Visibility            RoomVisibility         `protobuf:"varint,3,opt,name=visibility,proto3,enum=platform.room.v1.RoomVisibility" json:"visibility,omitempty"`
+	Status                RoomStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=platform.room.v1.RoomStatus" json:"status,omitempty"`
+	HostUserId            string                 `protobuf:"bytes,5,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`
+	ParticipantCapacity   uint32                 `protobuf:"varint,6,opt,name=participant_capacity,json=participantCapacity,proto3" json:"participant_capacity,omitempty"`
+	ParticipantAdmission  AdmissionMode          `protobuf:"varint,7,opt,name=participant_admission,json=participantAdmission,proto3,enum=platform.room.v1.AdmissionMode" json:"participant_admission,omitempty"`
+	SpectatorAdmission    AdmissionMode          `protobuf:"varint,8,opt,name=spectator_admission,json=spectatorAdmission,proto3,enum=platform.room.v1.AdmissionMode" json:"spectator_admission,omitempty"`
+	Members               []*RoomMember          `protobuf:"bytes,9,rep,name=members,proto3" json:"members,omitempty"`
+	ActiveSessionId       string                 `protobuf:"bytes,10,opt,name=active_session_id,json=activeSessionId,proto3" json:"active_session_id,omitempty"`
+	ActiveGameId          string                 `protobuf:"bytes,11,opt,name=active_game_id,json=activeGameId,proto3" json:"active_game_id,omitempty"`
+	Version               *RoomVersion           `protobuf:"bytes,12,opt,name=version,proto3" json:"version,omitempty"`
+	CreatedAt             *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt             *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	LastFinishedSessionId string                 `protobuf:"bytes,15,opt,name=last_finished_session_id,json=lastFinishedSessionId,proto3" json:"last_finished_session_id,omitempty"`
+	LastFinishedGameId    string                 `protobuf:"bytes,16,opt,name=last_finished_game_id,json=lastFinishedGameId,proto3" json:"last_finished_game_id,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *Room) Reset() {
@@ -628,6 +633,20 @@ func (x *Room) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Room) GetLastFinishedSessionId() string {
+	if x != nil {
+		return x.LastFinishedSessionId
+	}
+	return ""
+}
+
+func (x *Room) GetLastFinishedGameId() string {
+	if x != nil {
+		return x.LastFinishedGameId
+	}
+	return ""
 }
 
 type CreateRoomRequest struct {
@@ -1225,6 +1244,7 @@ type JoinRoomResponse struct {
 	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
 	Member        *RoomMember            `protobuf:"bytes,2,opt,name=member,proto3" json:"member,omitempty"`
 	Created       bool                   `protobuf:"varint,3,opt,name=created,proto3" json:"created,omitempty"`
+	Changed       bool                   `protobuf:"varint,4,opt,name=changed,proto3" json:"changed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1276,6 +1296,13 @@ func (x *JoinRoomResponse) GetMember() *RoomMember {
 func (x *JoinRoomResponse) GetCreated() bool {
 	if x != nil {
 		return x.Created
+	}
+	return false
+}
+
+func (x *JoinRoomResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
 	}
 	return false
 }
@@ -2093,7 +2120,7 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"seat_index\x18\x04 \x01(\rR\tseatIndex\x127\n" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12<\n" +
 	"\flast_seen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSeenAt\"\xea\x05\n" +
+	"lastSeenAt\"\xd6\x06\n" +
 	"\x04Room\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\troom_code\x18\x02 \x01(\tR\broomCode\x12@\n" +
@@ -2114,7 +2141,9 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xb0\x02\n" +
+	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x127\n" +
+	"\x18last_finished_session_id\x18\x0f \x01(\tR\x15lastFinishedSessionId\x121\n" +
+	"\x15last_finished_game_id\x18\x10 \x01(\tR\x12lastFinishedGameId\"\xb0\x02\n" +
 	"\x11CreateRoomRequest\x12@\n" +
 	"\n" +
 	"visibility\x18\x01 \x01(\x0e2 .platform.room.v1.RoomVisibilityR\n" +
@@ -2161,11 +2190,12 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x124\n" +
 	"\x06intent\x18\x02 \x01(\x0e2\x1c.platform.room.v1.JoinIntentR\x06intent\x12H\n" +
 	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12\x1b\n" +
-	"\troom_code\x18\x04 \x01(\tR\broomCode\"\x8e\x01\n" +
+	"\troom_code\x18\x04 \x01(\tR\broomCode\"\xa8\x01\n" +
 	"\x10JoinRoomResponse\x12*\n" +
 	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\x124\n" +
 	"\x06member\x18\x02 \x01(\v2\x1c.platform.room.v1.RoomMemberR\x06member\x12\x18\n" +
-	"\acreated\x18\x03 \x01(\bR\acreated\"\x92\x01\n" +
+	"\acreated\x18\x03 \x01(\bR\acreated\x12\x18\n" +
+	"\achanged\x18\x04 \x01(\bR\achanged\"\x92\x01\n" +
 	"\x14ApproveMemberRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12H\n" +
@@ -2226,13 +2256,14 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x0eRoomVisibility\x12\x1f\n" +
 	"\x1bROOM_VISIBILITY_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17ROOM_VISIBILITY_PRIVATE\x10\x01\x12\x1a\n" +
-	"\x16ROOM_VISIBILITY_PUBLIC\x10\x02*q\n" +
+	"\x16ROOM_VISIBILITY_PUBLIC\x10\x02*\x8c\x01\n" +
 	"\n" +
 	"RoomStatus\x12\x1b\n" +
 	"\x17ROOM_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ROOM_STATUS_LOBBY\x10\x01\x12\x17\n" +
 	"\x13ROOM_STATUS_PLAYING\x10\x02\x12\x16\n" +
-	"\x12ROOM_STATUS_CLOSED\x10\x03*\x80\x01\n" +
+	"\x12ROOM_STATUS_CLOSED\x10\x03\x12\x19\n" +
+	"\x15ROOM_STATUS_POST_GAME\x10\x04*\x80\x01\n" +
 	"\rAdmissionMode\x12\x1e\n" +
 	"\x1aADMISSION_MODE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ADMISSION_MODE_OPEN\x10\x01\x12\x1b\n" +

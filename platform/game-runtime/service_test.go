@@ -315,8 +315,10 @@ func TestRuntimeServiceTimerAndSystemReplayBeforeCallingModule(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		room := fixture.authority.room.Snapshot()
 		if first.Replayed || !second.Replayed || first.Receipt.Snapshot() != second.Receipt.Snapshot() ||
-			fixture.module.timerCalls != 1 || fixture.authority.room.Snapshot().Status != roomDomain.RoomStatusLobby {
+			fixture.module.timerCalls != 1 || room.Status != roomDomain.RoomStatusPostGame ||
+			room.LastFinishedSessionID != session.Snapshot().ID || room.LastFinishedGameID != string(session.Snapshot().VersionKey.GameID) {
 			t.Fatalf("first=%+v second=%+v timerCalls=%d room=%+v", first, second, fixture.module.timerCalls, fixture.authority.room.Snapshot())
 		}
 	})

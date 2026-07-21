@@ -24,15 +24,19 @@ func TestRoomLifecycleKeepsPostGameAdmissionClosed(t *testing.T) {
 	if err != nil || len(started.Participants) != 2 || room.Snapshot().ParticipantAdmission != AdmissionClosed {
 		t.Fatalf("start session: started=%+v room=%+v err=%v", started, room.Snapshot(), err)
 	}
-	if _, _, err := room.Join(late, JoinIntentParticipant, room.Version(), now.Add(3*time.Second)); !errors.Is(err, ErrAdmissionClosed) {
-		t.Fatalf("new participant during game error=%v", err)
+	room, queued, err := room.Join(late, JoinIntentParticipant, room.Version(), now.Add(3*time.Second))
+	if err != nil || !queued.Created || queued.Member.Role != MemberRoleWaiting || queued.Member.RequestedRole != MemberRoleParticipant {
+		t.Fatalf("queue participant during game: result=%+v err=%v", queued, err)
 	}
-	room, _, err = room.Join(late, JoinIntentSpectator, room.Version(), now.Add(3*time.Second))
+	spectator := uuid.New()
+	room, _, err = room.Join(spectator, JoinIntentSpectator, room.Version(), now.Add(3*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
 	room, err = room.FinishSession(started.SessionID, room.Version(), now.Add(4*time.Second))
-	if err != nil || room.Snapshot().Status != RoomStatusLobby || room.Snapshot().ParticipantAdmission != AdmissionClosed {
+	finished := room.Snapshot()
+	if err != nil || finished.Status != RoomStatusPostGame || finished.ParticipantAdmission != AdmissionClosed ||
+		finished.LastFinishedSessionID != started.SessionID || finished.LastFinishedGameID != "dice" {
 		t.Fatalf("finish session: snapshot=%+v err=%v", room.Snapshot(), err)
 	}
 	if _, _, err := room.Join(uuid.New(), JoinIntentParticipant, room.Version(), now.Add(5*time.Second)); !errors.Is(err, ErrAdmissionClosed) {
@@ -44,6 +48,65 @@ func TestRoomLifecycleKeepsPostGameAdmissionClosed(t *testing.T) {
 	}
 	if _, _, err := room.Join(uuid.New(), JoinIntentParticipant, room.Version(), now.Add(7*time.Second)); err != nil {
 		t.Fatalf("reopened participant admission: %v", err)
+	}
+	restarted, nextSession, err := room.StartSession(host, uuid.New(), "dice-789", 2, 9, room.Version(), now.Add(8*time.Second))
+	if err != nil || restarted.Snapshot().LastFinishedSessionID != uuid.Nil || restarted.Snapshot().LastFinishedGameID != "" ||
+		nextSession.GameID != "dice-789" {
+		t.Fatalf("restart from post-game: room=%+v session=%+v err=%v", restarted.Snapshot(), nextSession, err)
+	}
+}
+
+func TestPlayingSpectatorCanRequestParticipantWaitingRole(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 10, 30, 0, 0, time.UTC)
+	host, participant, spectator := uuid.New(), uuid.New(), uuid.New()
+	room, err := New(uuid.New(), host, "QUEUE1", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(participant, JoinIntentParticipant, room.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(spectator, JoinIntentSpectator, room.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.StartSession(host, uuid.New(), "dice", 2, 9, room.Version(), now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	queued, result, err := room.Join(spectator, JoinIntentParticipant, room.Version(), now.Add(4*time.Second))
+	if err != nil || result.Created || !result.Changed || result.Member.Role != MemberRoleWaiting ||
+		result.Member.RequestedRole != MemberRoleParticipant || queued.Version().Membership != room.Version().Membership+1 {
+		t.Fatalf("spectator participant request: result=%+v room=%+v err=%v", result, queued.Snapshot(), err)
+	}
+	if _, _, err := queued.ApproveWaiting(host, spectator, queued.Version(), now.Add(5*time.Second)); !errors.Is(err, ErrRoomStatus) {
+		t.Fatalf("playing approval error=%v", err)
+	}
+}
+
+func TestCancelledSessionReturnsToLobbyWithoutReplayPointer(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 11, 0, 0, 0, time.UTC)
+	host, participant, sessionID := uuid.New(), uuid.New(), uuid.New()
+	room, err := New(uuid.New(), host, "CANCEL1", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(participant, JoinIntentParticipant, room.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.StartSession(host, sessionID, "dice", 2, 9, room.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cancelled, err := room.CancelSession(sessionID, room.Version(), now.Add(3*time.Second))
+	snapshot := cancelled.Snapshot()
+	if err != nil || snapshot.Status != RoomStatusLobby || snapshot.ActiveSessionID != uuid.Nil ||
+		snapshot.LastFinishedSessionID != uuid.Nil || snapshot.LastFinishedGameID != "" {
+		t.Fatalf("cancelled room=%+v err=%v", snapshot, err)
 	}
 }
 

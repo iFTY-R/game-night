@@ -336,7 +336,8 @@ func TestRoomGameSessionRepositoryFinishesActionAndRoomAtomically(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if storedRoom.Snapshot().Status != roomDomain.RoomStatusLobby || storedRoom.Snapshot().ActiveSessionID != uuid.Nil ||
+	if storedRoom.Snapshot().Status != roomDomain.RoomStatusPostGame || storedRoom.Snapshot().ActiveSessionID != uuid.Nil ||
+		storedRoom.Snapshot().LastFinishedSessionID != owner.Snapshot().ID ||
 		result.Session.Snapshot().Status != gameruntime.StatusFinished {
 		t.Fatalf("room=%+v result=%+v", storedRoom.Snapshot(), result)
 	}
@@ -405,7 +406,7 @@ func TestRoomGameSessionRepositoryConcurrentTerminalActionReplaysCommittedResult
 	if err != nil {
 		t.Fatal(err)
 	}
-	if storedRoom.Snapshot().RoomVersion != room.Snapshot().RoomVersion+1 || storedRoom.Snapshot().Status != roomDomain.RoomStatusLobby {
+	if storedRoom.Snapshot().RoomVersion != room.Snapshot().RoomVersion+1 || storedRoom.Snapshot().Status != roomDomain.RoomStatusPostGame {
 		t.Fatalf("stored room = %+v", storedRoom.Snapshot())
 	}
 	assertGameSessionCounts(t, ctx, fixture, owner.Snapshot().ID, 2, 1, 2, 2)
@@ -757,7 +758,7 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nextRoom, err := room.FinishSession(owner.Snapshot().ID, room.Version(), now.Add(5*time.Second))
+	nextRoom, err := room.CancelSession(owner.Snapshot().ID, room.Version(), now.Add(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -803,7 +804,7 @@ func TestRoomGameSessionRepositoryRollsBackTerminalSessionWhenRoomFinishFails(t 
 		$$;
 		CREATE TRIGGER reject_game_test_room_finish
 		BEFORE UPDATE ON party_rooms
-		FOR EACH ROW WHEN (OLD.status = 'playing' AND NEW.status = 'lobby')
+		FOR EACH ROW WHEN (OLD.status = 'playing' AND NEW.status = 'post_game')
 		EXECUTE FUNCTION reject_game_test_room_finish();
 	`); err != nil {
 		t.Fatal(err)

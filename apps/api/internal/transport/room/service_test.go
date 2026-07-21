@@ -73,18 +73,20 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 		started.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
 		t.Fatalf("start game: response=%+v err=%v", started, err)
 	}
-	blockedJoin := connect.NewRequest(&roomv1.JoinRoomRequest{
+	waitingJoin := connect.NewRequest(&roomv1.JoinRoomRequest{
 		RoomCode: started.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
 		ExpectedVersion: started.Msg.GetRoom().GetVersion(),
 	})
-	authorizeRoomWrite(blockedJoin, "newcomer-device")
-	if _, err := client.JoinRoom(t.Context(), blockedJoin); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("join while playing error = %v", err)
+	authorizeRoomWrite(waitingJoin, "newcomer-device")
+	waiting, err := client.JoinRoom(t.Context(), waitingJoin)
+	if err != nil || !waiting.Msg.GetCreated() || waiting.Msg.GetMember().GetRole() != roomv1.MemberRole_MEMBER_ROLE_WAITING ||
+		waiting.Msg.GetMember().GetRequestedRole() != roomv1.MemberRole_MEMBER_ROLE_PARTICIPANT {
+		t.Fatalf("join while playing: response=%+v err=%v", waiting, err)
 	}
 
 	finishRequest := connect.NewRequest(&roomv1.FinishGameRequest{
 		RoomId: started.Msg.GetRoom().GetRoomId(), SessionId: started.Msg.GetSessionId(),
-		ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+		ExpectedVersion: waiting.Msg.GetRoom().GetVersion(),
 		OperationId:     roomTransportOperationID(t, 2).Value(), SourceEventId: uuid.NewString(), ExpectedStateVersion: 1,
 		Command: &gamev1.GameEnvelope{
 			GameId: "liars-dice", Version: &gamev1.VersionTuple{Engine: "1.0.0", Protocol: "1.0.0", Client: "1.0.0"},
@@ -94,8 +96,10 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	})
 	authorizeRoomWrite(finishRequest, "host-device")
 	finished, err := client.FinishGame(t.Context(), finishRequest)
-	if err != nil || finished.Msg.GetRoom().GetStatus() != roomv1.RoomStatus_ROOM_STATUS_LOBBY ||
-		finished.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
+	if err != nil || finished.Msg.GetRoom().GetStatus() != roomv1.RoomStatus_ROOM_STATUS_POST_GAME ||
+		finished.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED ||
+		finished.Msg.GetRoom().GetLastFinishedSessionId() != started.Msg.GetSessionId() ||
+		finished.Msg.GetRoom().GetLastFinishedGameId() != "liars-dice" {
 		t.Fatalf("finish game: response=%+v err=%v", finished, err)
 	}
 	reopenRequest := connect.NewRequest(&roomv1.SetAdmissionRequest{
@@ -107,14 +111,27 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	if err != nil || reopened.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_OPEN {
 		t.Fatalf("reopen room: response=%+v err=%v", reopened, err)
 	}
-	joinAfterReopen := connect.NewRequest(&roomv1.JoinRoomRequest{
-		RoomCode: reopened.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
-		ExpectedVersion: reopened.Msg.GetRoom().GetVersion(),
+	approveRequest := connect.NewRequest(&roomv1.ApproveMemberRequest{
+		RoomId: reopened.Msg.GetRoom().GetRoomId(), UserId: newcomer.String(), ExpectedVersion: reopened.Msg.GetRoom().GetVersion(),
 	})
-	authorizeRoomWrite(joinAfterReopen, "newcomer-device")
-	joinedAfterReopen, err := client.JoinRoom(t.Context(), joinAfterReopen)
-	if err != nil || !joinedAfterReopen.Msg.GetCreated() || len(joinedAfterReopen.Msg.GetRoom().GetMembers()) != 3 {
-		t.Fatalf("join after reopen: response=%+v err=%v", joinedAfterReopen, err)
+	authorizeRoomWrite(approveRequest, "host-device")
+	approved, err := client.ApproveMember(t.Context(), approveRequest)
+	if err != nil || approved.Msg.GetMember().GetRole() != roomv1.MemberRole_MEMBER_ROLE_PARTICIPANT ||
+		len(approved.Msg.GetRoom().GetMembers()) != 3 {
+		t.Fatalf("approve after reopen: response=%+v err=%v", approved, err)
+	}
+	restartRequest := connect.NewRequest(&roomv1.StartGameRequest{
+		RoomId: approved.Msg.GetRoom().GetRoomId(), GameId: "dice-789", ExpectedVersion: approved.Msg.GetRoom().GetVersion(),
+		Config: &gamev1.GameConfig{
+			GameId: "dice-789", SchemaVersion: 1, MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: roomTransportOperationID(t, 3).Value(), RequestDigest: roomTransportDigest("restart")[:],
+	})
+	authorizeRoomWrite(restartRequest, "host-device")
+	restarted, err := client.StartGame(t.Context(), restartRequest)
+	if err != nil || restarted.Msg.GetRoom().GetLastFinishedSessionId() != "" ||
+		restarted.Msg.GetRoom().GetLastFinishedGameId() != "" {
+		t.Fatalf("restart game: response=%+v err=%v", restarted, err)
 	}
 }
 
@@ -538,7 +555,8 @@ func transportRoomMatchesFilter(snapshot roomDomain.RoomSnapshot, filter roomDom
 			participants++
 		}
 	}
-	return snapshot.Status == roomDomain.RoomStatusLobby && snapshot.ParticipantAdmission != roomDomain.AdmissionClosed &&
+	return (snapshot.Status == roomDomain.RoomStatusLobby || snapshot.Status == roomDomain.RoomStatusPostGame) &&
+		snapshot.ParticipantAdmission != roomDomain.AdmissionClosed &&
 		participants < snapshot.ParticipantCapacity
 }
 

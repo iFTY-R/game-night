@@ -150,6 +150,17 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	}
 }
 
+func TestParticipantRevocationFactRequiresCanonicalUserID(t *testing.T) {
+	if !(ParticipantRevocationFact{UserID: "user-1"}).Valid() {
+		t.Fatal("valid participant revocation fact rejected")
+	}
+	for _, userID := range []Identifier{"", "User-1", "user 1", "user/1"} {
+		if (ParticipantRevocationFact{UserID: userID}).Valid() {
+			t.Fatalf("invalid participant revocation user ID %q accepted", userID)
+		}
+	}
+}
+
 func TestEventProjectionContainsOnlyBoundedViewerSafeMessages(t *testing.T) {
 	versioned := VersionedEvent{StateVersion: 4, Event: Event{Message: Message{MessageType: "dice_revealed", SchemaVersion: 1}}}
 	if !versioned.Valid() {

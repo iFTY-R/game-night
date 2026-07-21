@@ -198,6 +198,18 @@ func (request SystemRequest) Valid() bool {
 		request.ExpectedStateVersion > 0 && request.System.Valid()
 }
 
+// ParticipantRevocationFact is the game-neutral authority fact emitted after room membership is revoked.
+// Modules encode this fact into their own protocol instead of relying on compatible protobuf wire layouts.
+type ParticipantRevocationFact struct {
+	UserID Identifier
+}
+
+// Valid requires the revoked user to use the same canonical identity grammar as participants and viewers.
+func (fact ParticipantRevocationFact) Valid() bool {
+	_, err := ParseIdentifier(string(fact.UserID))
+	return err == nil
+}
+
 // Event is one engine fact; the runtime owns persistent batch sequence numbers and preserves this slice order.
 type Event struct {
 	Message Message
@@ -361,6 +373,12 @@ type ServerGameModule interface {
 // SystemGameModule extends a registered module with runtime-originated commands such as participant revocation.
 type SystemGameModule interface {
 	HandleSystem(Snapshot, SystemRequest) (Transition, error)
+}
+
+// ParticipantRevocationGameModule adapts a neutral room revocation into one module-owned opaque command.
+// The runtime invokes this capability before HandleSystem and persists only the returned versioned envelope.
+type ParticipantRevocationGameModule interface {
+	EncodeParticipantRevoked(ParticipantRevocationFact) (Message, error)
 }
 
 // EventProjectingGameModule converts raw committed facts into one viewer-safe subscription delta.

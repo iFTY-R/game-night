@@ -51,7 +51,10 @@ type Module struct{}
 func New() *Module       { return &Module{} }
 func NewModule() *Module { return New() }
 
-var _ game.RuntimeServerGameModule = (*Module)(nil)
+var (
+	_ game.RuntimeServerGameModule         = (*Module)(nil)
+	_ game.ParticipantRevocationGameModule = (*Module)(nil)
+)
 
 // Manifest declares the exact retained release and public projection capabilities.
 func (m *Module) Manifest() game.Manifest {
@@ -195,6 +198,18 @@ func (m *Module) HandleTimer(snapshot game.Snapshot, request game.TimerRequest) 
 		return game.Transition{}, err
 	}
 	return m.transition(snapshot.StateVersion+1, next, facts, request.Context.Now)
+}
+
+// EncodeParticipantRevoked converts the room-owned fact into this module's canonical protobuf command.
+func (*Module) EncodeParticipantRevoked(fact game.ParticipantRevocationFact) (game.Message, error) {
+	if !fact.Valid() {
+		return game.Message{}, malformed("participant revocation fact is invalid")
+	}
+	payload, err := marshalDeterministic(&dice789v1.ParticipantRevoked{UserId: string(fact.UserID)})
+	if err != nil {
+		return game.Message{}, malformed("participant revocation encoding failed")
+	}
+	return game.Message{MessageType: EventParticipantRevokedMessage, SchemaVersion: ProtocolSchemaVersion, Payload: payload}, nil
 }
 
 // HandleSystem accepts durable participant revocation and runtime-authorized finish operations.

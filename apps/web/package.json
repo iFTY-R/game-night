@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@game-night/game-ui-kit": "workspace:*",
+    "@game-night/liars-dice-client": "workspace:*",
+    "@game-night/liars-dice-themes": "workspace:*",
     "@game-night/theme-system": "workspace:*",
     "lucide-vue-next": "catalog:",
     "pinia": "catalog:",

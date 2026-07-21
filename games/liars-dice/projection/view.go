@@ -36,6 +36,7 @@ func BuildView(state engine.State, viewer game.Viewer) (*liarsdicev1.View, []gam
 		ActionDeadlineUnixMillis: state.ActionDeadlineUnixMillis,
 		FinishReason:             state.FinishReason,
 		LastSettlement:           settlementToProto(state.LastSettlement),
+		Config:                   configToProto(state.Config),
 	}
 	if state.CurrentBid != nil {
 		view.CurrentBid = bidToProto(state.CurrentBid)
@@ -61,6 +62,15 @@ func BuildView(state engine.State, viewer game.Viewer) (*liarsdicev1.View, []gam
 		view.AllowedActions = append(view.AllowedActions, string(action))
 	}
 	return view, actions, nil
+}
+
+func configToProto(value engine.Config) *liarsdicev1.Config {
+	return &liarsdicev1.Config{
+		DicePerPlayer: value.DicePerPlayer, OnesWild: value.OnesWild,
+		StrictEnabled: value.StrictEnabled, FlyingEnabled: value.FlyingEnabled,
+		FirstBidMinimum: value.FirstBidMinimum, PenaltyTicks: uint32(value.PenaltyTicks),
+		ActionTimeoutSeconds: value.ActionTimeoutSeconds,
+	}
 }
 
 func publicPlayers(state engine.State) []*liarsdicev1.PublicPlayer {

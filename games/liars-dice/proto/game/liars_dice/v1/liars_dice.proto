@@ -151,6 +151,7 @@ message View {
   repeated PrivateDice revealed_dice = 10;
   string finish_reason = 11;
   RoundSettled last_settlement = 12;
+  Config config = 13;
 }
 
 // ViewDelta is generated from the latest authoritative snapshot for one viewer only.

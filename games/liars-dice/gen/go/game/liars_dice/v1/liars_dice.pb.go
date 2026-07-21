@@ -1395,6 +1395,7 @@ type View struct {
 	RevealedDice             []*PrivateDice         `protobuf:"bytes,10,rep,name=revealed_dice,json=revealedDice,proto3" json:"revealed_dice,omitempty"`
 	FinishReason             string                 `protobuf:"bytes,11,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
 	LastSettlement           *RoundSettled          `protobuf:"bytes,12,opt,name=last_settlement,json=lastSettlement,proto3" json:"last_settlement,omitempty"`
+	Config                   *Config                `protobuf:"bytes,13,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -1509,6 +1510,13 @@ func (x *View) GetFinishReason() string {
 func (x *View) GetLastSettlement() *RoundSettled {
 	if x != nil {
 		return x.LastSettlement
+	}
+	return nil
+}
+
+func (x *View) GetConfig() *Config {
+	if x != nil {
+		return x.Config
 	}
 	return nil
 }
@@ -1889,7 +1897,7 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"seat_index\x18\x02 \x01(\rR\tseatIndex\x12\x16\n" +
 	"\x06active\x18\x03 \x01(\bR\x06active\x12#\n" +
 	"\rpenalty_ticks\x18\x04 \x01(\rR\fpenaltyTicks\x12(\n" +
-	"\x10has_private_dice\x18\x05 \x01(\bR\x0ehasPrivateDice\"\xd7\x04\n" +
+	"\x10has_private_dice\x18\x05 \x01(\bR\x0ehasPrivateDice\"\x8b\x05\n" +
 	"\x04View\x12/\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x19.game.liars_dice.v1.PhaseR\x05phase\x12\x14\n" +
 	"\x05round\x18\x02 \x01(\rR\x05round\x12:\n" +
@@ -1904,7 +1912,8 @@ const file_game_liars_dice_v1_liars_dice_proto_rawDesc = "" +
 	"\rrevealed_dice\x18\n" +
 	" \x03(\v2\x1f.game.liars_dice.v1.PrivateDiceR\frevealedDice\x12#\n" +
 	"\rfinish_reason\x18\v \x01(\tR\ffinishReason\x12I\n" +
-	"\x0flast_settlement\x18\f \x01(\v2 .game.liars_dice.v1.RoundSettledR\x0elastSettlement\"9\n" +
+	"\x0flast_settlement\x18\f \x01(\v2 .game.liars_dice.v1.RoundSettledR\x0elastSettlement\x122\n" +
+	"\x06config\x18\r \x01(\v2\x1a.game.liars_dice.v1.ConfigR\x06config\"9\n" +
 	"\tViewDelta\x12,\n" +
 	"\x04view\x18\x01 \x01(\v2\x18.game.liars_dice.v1.ViewR\x04view\"O\n" +
 	"\tReplayBid\x12\x17\n" +
@@ -2007,17 +2016,18 @@ var file_game_liars_dice_v1_liars_dice_proto_depIdxs = []int32{
 	3,  // 23: game.liars_dice.v1.View.current_bid:type_name -> game.liars_dice.v1.Bid
 	5,  // 24: game.liars_dice.v1.View.revealed_dice:type_name -> game.liars_dice.v1.PrivateDice
 	14, // 25: game.liars_dice.v1.View.last_settlement:type_name -> game.liars_dice.v1.RoundSettled
-	20, // 26: game.liars_dice.v1.ViewDelta.view:type_name -> game.liars_dice.v1.View
-	3,  // 27: game.liars_dice.v1.ReplayBid.bid:type_name -> game.liars_dice.v1.Bid
-	22, // 28: game.liars_dice.v1.ReplayRound.bids:type_name -> game.liars_dice.v1.ReplayBid
-	5,  // 29: game.liars_dice.v1.ReplayRound.dice:type_name -> game.liars_dice.v1.PrivateDice
-	3,  // 30: game.liars_dice.v1.ReplayRound.bid:type_name -> game.liars_dice.v1.Bid
-	23, // 31: game.liars_dice.v1.Replay.rounds:type_name -> game.liars_dice.v1.ReplayRound
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	2,  // 26: game.liars_dice.v1.View.config:type_name -> game.liars_dice.v1.Config
+	20, // 27: game.liars_dice.v1.ViewDelta.view:type_name -> game.liars_dice.v1.View
+	3,  // 28: game.liars_dice.v1.ReplayBid.bid:type_name -> game.liars_dice.v1.Bid
+	22, // 29: game.liars_dice.v1.ReplayRound.bids:type_name -> game.liars_dice.v1.ReplayBid
+	5,  // 30: game.liars_dice.v1.ReplayRound.dice:type_name -> game.liars_dice.v1.PrivateDice
+	3,  // 31: game.liars_dice.v1.ReplayRound.bid:type_name -> game.liars_dice.v1.Bid
+	23, // 32: game.liars_dice.v1.Replay.rounds:type_name -> game.liars_dice.v1.ReplayRound
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_game_liars_dice_v1_liars_dice_proto_init() }

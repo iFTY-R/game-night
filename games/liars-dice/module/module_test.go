@@ -42,6 +42,11 @@ func TestCreateAndProjectKeepPrivateDiceViewerScoped(t *testing.T) {
 	if len(playerView.GetOwnDice()) != int(state.Config.DicePerPlayer) || len(playerView.GetRevealedDice()) != 0 {
 		t.Fatalf("player view leaked/omitted dice: %+v", &playerView)
 	}
+	if playerView.GetConfig().GetDicePerPlayer() != state.Config.DicePerPlayer ||
+		playerView.GetConfig().GetOnesWild() != state.Config.OnesWild ||
+		playerView.GetConfig().GetStrictEnabled() != state.Config.StrictEnabled {
+		t.Fatalf("player view omitted frozen config: %+v", playerView.GetConfig())
+	}
 	for _, player := range state.Players {
 		projected, projectErr := m.Project(transition.Snapshot, game.Viewer{
 			Kind: game.ViewerPlayer, UserID: game.Identifier(player.UserID), SeatIndex: player.SeatIndex,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/iFTY-R/game-night/apps/realtime/internal/application"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/config"
+	gameregistry "github.com/iFTY-R/game-night/tooling/game-registry"
 )
 
 func main() {
@@ -30,7 +31,11 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	app, err := application.New(ctx, cfg, application.Options{Logger: logger})
+	registry, err := gameregistry.New()
+	if err != nil {
+		return err
+	}
+	app, err := application.New(ctx, cfg, application.Options{Logger: logger, Registry: registry})
 	if err != nil {
 		return err
 	}

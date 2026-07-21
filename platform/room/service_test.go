@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/clock"
-	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
 func TestServiceCreatesRoomWithExplicitAdmissionAndRetriesCodeConflict(t *testing.T) {
@@ -23,7 +22,7 @@ func TestServiceCreatesRoomWithExplicitAdmissionAndRetriesCodeConflict(t *testin
 	if _, err := repository.Create(t.Context(), existing); err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"TAKEN1", "FRESH2"}}, testGameCatalog{}, clock.NewFake(now))
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"TAKEN1", "FRESH2"}}, clock.NewFake(now))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +52,7 @@ func TestServiceJoinsPrivateRoomByInviteCodeAndProtectsVisibility(t *testing.T) 
 	if _, err := repository.Create(t.Context(), room); err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE1"}}, testGameCatalog{}, clock.NewFake(now.Add(time.Second)))
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE1"}}, clock.NewFake(now.Add(time.Second)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +82,7 @@ func TestServiceRequiresExactVersionForHostCommands(t *testing.T) {
 	if _, err := repository.Create(t.Context(), room); err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE2"}}, testGameCatalog{}, clock.NewFake(now.Add(time.Second)))
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE2"}}, clock.NewFake(now.Add(time.Second)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,12 +109,6 @@ func TestServiceRequiresExactVersionForHostCommands(t *testing.T) {
 type sequenceRoomCodeGenerator struct {
 	mu    sync.Mutex
 	codes []string
-}
-
-type testGameCatalog struct{}
-
-func (testGameCatalog) ParticipantLimits(context.Context, string) (gameSDK.ParticipantLimits, error) {
-	return gameSDK.ParticipantLimits{Minimum: 2, Maximum: 9}, nil
 }
 
 func (generator *sequenceRoomCodeGenerator) Generate() (string, error) {

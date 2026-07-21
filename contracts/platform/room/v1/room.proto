@@ -4,6 +4,7 @@ package platform.room.v1;
 
 import "google/protobuf/timestamp.proto";
 import "platform/common/v1/common.proto";
+import "platform/game/v1/game.proto";
 
 option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1;roomv1";
 
@@ -191,8 +192,10 @@ message SetAdmissionResponse {
 message StartGameRequest {
   string room_id = 1;
   string game_id = 2;
-  reserved 3;
+  platform.game.v1.GameConfig config = 3;
   RoomVersion expected_version = 4;
+  string operation_id = 5;
+  bytes request_digest = 6;
 }
 
 message FrozenParticipant {
@@ -211,6 +214,11 @@ message FinishGameRequest {
   string room_id = 1;
   string session_id = 2;
   RoomVersion expected_version = 3;
+  string operation_id = 4;
+  string source_event_id = 5;
+  uint64 expected_state_version = 6;
+  platform.game.v1.GameEnvelope command = 7;
+  bytes request_digest = 8;
 }
 
 message FinishGameResponse {

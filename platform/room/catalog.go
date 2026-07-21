@@ -54,14 +54,13 @@ func (catalog *RegisteredGameCatalog) ParticipantLimits(ctx context.Context, gam
 	return validated.Participants, nil
 }
 
-// DisabledGameCatalog is the production placeholder until concrete modules and atomic GameSession creation are delivered.
-// It prevents clients from choosing their own minimum participant count during the room stage.
+// DisabledGameCatalog is an explicit fail-closed catalog for tests and maintenance tools.
 type DisabledGameCatalog struct{}
 
-// NewDisabledGameCatalog keeps StartGame fail-closed while the session runtime remains unavailable.
+// NewDisabledGameCatalog keeps every game unavailable when callers deliberately opt into it.
 func NewDisabledGameCatalog() *DisabledGameCatalog { return &DisabledGameCatalog{} }
 
-// ParticipantLimits rejects every game until GameSession creation and an exact module registry are wired atomically.
+// ParticipantLimits rejects every game for callers explicitly testing unavailable catalog behavior.
 func (*DisabledGameCatalog) ParticipantLimits(context.Context, string) (gameSDK.ParticipantLimits, error) {
 	return gameSDK.ParticipantLimits{}, ErrGameUnavailable
 }

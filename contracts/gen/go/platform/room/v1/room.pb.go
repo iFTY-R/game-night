@@ -8,6 +8,7 @@ package roomv1
 
 import (
 	v1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
+	v11 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1507,7 +1508,10 @@ type StartGameRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	GameId          string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
+	Config          *v11.GameConfig        `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
 	ExpectedVersion *RoomVersion           `protobuf:"bytes,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	OperationId     string                 `protobuf:"bytes,5,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	RequestDigest   []byte                 `protobuf:"bytes,6,opt,name=request_digest,json=requestDigest,proto3" json:"request_digest,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1556,9 +1560,30 @@ func (x *StartGameRequest) GetGameId() string {
 	return ""
 }
 
+func (x *StartGameRequest) GetConfig() *v11.GameConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
 func (x *StartGameRequest) GetExpectedVersion() *RoomVersion {
 	if x != nil {
 		return x.ExpectedVersion
+	}
+	return nil
+}
+
+func (x *StartGameRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *StartGameRequest) GetRequestDigest() []byte {
+	if x != nil {
+		return x.RequestDigest
 	}
 	return nil
 }
@@ -1684,12 +1709,17 @@ func (x *StartGameResponse) GetParticipants() []*FrozenParticipant {
 }
 
 type FinishGameRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	SessionId       string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	RoomId               string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SessionId            string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ExpectedVersion      *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	OperationId          string                 `protobuf:"bytes,4,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	SourceEventId        string                 `protobuf:"bytes,5,opt,name=source_event_id,json=sourceEventId,proto3" json:"source_event_id,omitempty"`
+	ExpectedStateVersion uint64                 `protobuf:"varint,6,opt,name=expected_state_version,json=expectedStateVersion,proto3" json:"expected_state_version,omitempty"`
+	Command              *v11.GameEnvelope      `protobuf:"bytes,7,opt,name=command,proto3" json:"command,omitempty"`
+	RequestDigest        []byte                 `protobuf:"bytes,8,opt,name=request_digest,json=requestDigest,proto3" json:"request_digest,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *FinishGameRequest) Reset() {
@@ -1739,6 +1769,41 @@ func (x *FinishGameRequest) GetSessionId() string {
 func (x *FinishGameRequest) GetExpectedVersion() *RoomVersion {
 	if x != nil {
 		return x.ExpectedVersion
+	}
+	return nil
+}
+
+func (x *FinishGameRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *FinishGameRequest) GetSourceEventId() string {
+	if x != nil {
+		return x.SourceEventId
+	}
+	return ""
+}
+
+func (x *FinishGameRequest) GetExpectedStateVersion() uint64 {
+	if x != nil {
+		return x.ExpectedStateVersion
+	}
+	return 0
+}
+
+func (x *FinishGameRequest) GetCommand() *v11.GameEnvelope {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *FinishGameRequest) GetRequestDigest() []byte {
+	if x != nil {
+		return x.RequestDigest
 	}
 	return nil
 }
@@ -2015,7 +2080,7 @@ var File_platform_room_v1_room_proto protoreflect.FileDescriptor
 
 const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\n" +
-	"\x1bplatform/room/v1/room.proto\x12\x10platform.room.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/common.proto\"_\n" +
+	"\x1bplatform/room/v1/room.proto\x12\x10platform.room.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/common.proto\x1a\x1bplatform/game/v1/game.proto\"_\n" +
 	"\vRoomVersion\x12!\n" +
 	"\froom_version\x18\x01 \x01(\x04R\vroomVersion\x12-\n" +
 	"\x12membership_version\x18\x02 \x01(\x04R\x11membershipVersion\"\xb2\x02\n" +
@@ -2114,11 +2179,14 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x13spectator_admission\x18\x03 \x01(\x0e2\x1f.platform.room.v1.AdmissionModeR\x12spectatorAdmission\x12H\n" +
 	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"B\n" +
 	"\x14SetAdmissionResponse\x12*\n" +
-	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\x94\x01\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\x8e\x02\n" +
 	"\x10StartGameRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
-	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12H\n" +
-	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersionJ\x04\b\x03\x10\x04\"K\n" +
+	"\agame_id\x18\x02 \x01(\tR\x06gameId\x124\n" +
+	"\x06config\x18\x03 \x01(\v2\x1c.platform.game.v1.GameConfigR\x06config\x12H\n" +
+	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12!\n" +
+	"\foperation_id\x18\x05 \x01(\tR\voperationId\x12%\n" +
+	"\x0erequest_digest\x18\x06 \x01(\fR\rrequestDigest\"K\n" +
 	"\x11FrozenParticipant\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
@@ -2128,12 +2196,17 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x17\n" +
 	"\agame_id\x18\x03 \x01(\tR\x06gameId\x12G\n" +
-	"\fparticipants\x18\x04 \x03(\v2#.platform.room.v1.FrozenParticipantR\fparticipants\"\x95\x01\n" +
+	"\fparticipants\x18\x04 \x03(\v2#.platform.room.v1.FrozenParticipantR\fparticipants\"\xf7\x02\n" +
 	"\x11FinishGameRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12H\n" +
-	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"@\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12!\n" +
+	"\foperation_id\x18\x04 \x01(\tR\voperationId\x12&\n" +
+	"\x0fsource_event_id\x18\x05 \x01(\tR\rsourceEventId\x124\n" +
+	"\x16expected_state_version\x18\x06 \x01(\x04R\x14expectedStateVersion\x128\n" +
+	"\acommand\x18\a \x01(\v2\x1e.platform.game.v1.GameEnvelopeR\acommand\x12%\n" +
+	"\x0erequest_digest\x18\b \x01(\fR\rrequestDigest\"@\n" +
 	"\x12FinishGameResponse\x12*\n" +
 	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\x91\x01\n" +
 	"\x13RemoveMemberRequest\x12\x17\n" +
@@ -2250,6 +2323,8 @@ var file_platform_room_v1_room_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),   // 32: google.protobuf.Timestamp
 	(*v1.PageRequest)(nil),          // 33: platform.common.v1.PageRequest
 	(*v1.PageInfo)(nil),             // 34: platform.common.v1.PageInfo
+	(*v11.GameConfig)(nil),          // 35: platform.game.v1.GameConfig
+	(*v11.GameEnvelope)(nil),        // 36: platform.game.v1.GameEnvelope
 }
 var file_platform_room_v1_room_proto_depIdxs = []int32{
 	3,  // 0: platform.room.v1.RoomMember.role:type_name -> platform.room.v1.MemberRole
@@ -2292,41 +2367,43 @@ var file_platform_room_v1_room_proto_depIdxs = []int32{
 	2,  // 37: platform.room.v1.SetAdmissionRequest.spectator_admission:type_name -> platform.room.v1.AdmissionMode
 	6,  // 38: platform.room.v1.SetAdmissionRequest.expected_version:type_name -> platform.room.v1.RoomVersion
 	8,  // 39: platform.room.v1.SetAdmissionResponse.room:type_name -> platform.room.v1.Room
-	6,  // 40: platform.room.v1.StartGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	8,  // 41: platform.room.v1.StartGameResponse.room:type_name -> platform.room.v1.Room
-	24, // 42: platform.room.v1.StartGameResponse.participants:type_name -> platform.room.v1.FrozenParticipant
-	6,  // 43: platform.room.v1.FinishGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	8,  // 44: platform.room.v1.FinishGameResponse.room:type_name -> platform.room.v1.Room
-	6,  // 45: platform.room.v1.RemoveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	8,  // 46: platform.room.v1.RemoveMemberResponse.room:type_name -> platform.room.v1.Room
-	7,  // 47: platform.room.v1.RemoveMemberResponse.removed:type_name -> platform.room.v1.RoomMember
-	6,  // 48: platform.room.v1.CloseRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	8,  // 49: platform.room.v1.CloseRoomResponse.room:type_name -> platform.room.v1.Room
-	9,  // 50: platform.room.v1.RoomService.CreateRoom:input_type -> platform.room.v1.CreateRoomRequest
-	11, // 51: platform.room.v1.RoomService.GetRoom:input_type -> platform.room.v1.GetRoomRequest
-	15, // 52: platform.room.v1.RoomService.ListPublicRooms:input_type -> platform.room.v1.ListPublicRoomsRequest
-	17, // 53: platform.room.v1.RoomService.JoinRoom:input_type -> platform.room.v1.JoinRoomRequest
-	19, // 54: platform.room.v1.RoomService.ApproveMember:input_type -> platform.room.v1.ApproveMemberRequest
-	21, // 55: platform.room.v1.RoomService.SetAdmission:input_type -> platform.room.v1.SetAdmissionRequest
-	23, // 56: platform.room.v1.RoomService.StartGame:input_type -> platform.room.v1.StartGameRequest
-	26, // 57: platform.room.v1.RoomService.FinishGame:input_type -> platform.room.v1.FinishGameRequest
-	28, // 58: platform.room.v1.RoomService.RemoveMember:input_type -> platform.room.v1.RemoveMemberRequest
-	30, // 59: platform.room.v1.RoomService.CloseRoom:input_type -> platform.room.v1.CloseRoomRequest
-	10, // 60: platform.room.v1.RoomService.CreateRoom:output_type -> platform.room.v1.CreateRoomResponse
-	12, // 61: platform.room.v1.RoomService.GetRoom:output_type -> platform.room.v1.GetRoomResponse
-	16, // 62: platform.room.v1.RoomService.ListPublicRooms:output_type -> platform.room.v1.ListPublicRoomsResponse
-	18, // 63: platform.room.v1.RoomService.JoinRoom:output_type -> platform.room.v1.JoinRoomResponse
-	20, // 64: platform.room.v1.RoomService.ApproveMember:output_type -> platform.room.v1.ApproveMemberResponse
-	22, // 65: platform.room.v1.RoomService.SetAdmission:output_type -> platform.room.v1.SetAdmissionResponse
-	25, // 66: platform.room.v1.RoomService.StartGame:output_type -> platform.room.v1.StartGameResponse
-	27, // 67: platform.room.v1.RoomService.FinishGame:output_type -> platform.room.v1.FinishGameResponse
-	29, // 68: platform.room.v1.RoomService.RemoveMember:output_type -> platform.room.v1.RemoveMemberResponse
-	31, // 69: platform.room.v1.RoomService.CloseRoom:output_type -> platform.room.v1.CloseRoomResponse
-	60, // [60:70] is the sub-list for method output_type
-	50, // [50:60] is the sub-list for method input_type
-	50, // [50:50] is the sub-list for extension type_name
-	50, // [50:50] is the sub-list for extension extendee
-	0,  // [0:50] is the sub-list for field type_name
+	35, // 40: platform.room.v1.StartGameRequest.config:type_name -> platform.game.v1.GameConfig
+	6,  // 41: platform.room.v1.StartGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	8,  // 42: platform.room.v1.StartGameResponse.room:type_name -> platform.room.v1.Room
+	24, // 43: platform.room.v1.StartGameResponse.participants:type_name -> platform.room.v1.FrozenParticipant
+	6,  // 44: platform.room.v1.FinishGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	36, // 45: platform.room.v1.FinishGameRequest.command:type_name -> platform.game.v1.GameEnvelope
+	8,  // 46: platform.room.v1.FinishGameResponse.room:type_name -> platform.room.v1.Room
+	6,  // 47: platform.room.v1.RemoveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	8,  // 48: platform.room.v1.RemoveMemberResponse.room:type_name -> platform.room.v1.Room
+	7,  // 49: platform.room.v1.RemoveMemberResponse.removed:type_name -> platform.room.v1.RoomMember
+	6,  // 50: platform.room.v1.CloseRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	8,  // 51: platform.room.v1.CloseRoomResponse.room:type_name -> platform.room.v1.Room
+	9,  // 52: platform.room.v1.RoomService.CreateRoom:input_type -> platform.room.v1.CreateRoomRequest
+	11, // 53: platform.room.v1.RoomService.GetRoom:input_type -> platform.room.v1.GetRoomRequest
+	15, // 54: platform.room.v1.RoomService.ListPublicRooms:input_type -> platform.room.v1.ListPublicRoomsRequest
+	17, // 55: platform.room.v1.RoomService.JoinRoom:input_type -> platform.room.v1.JoinRoomRequest
+	19, // 56: platform.room.v1.RoomService.ApproveMember:input_type -> platform.room.v1.ApproveMemberRequest
+	21, // 57: platform.room.v1.RoomService.SetAdmission:input_type -> platform.room.v1.SetAdmissionRequest
+	23, // 58: platform.room.v1.RoomService.StartGame:input_type -> platform.room.v1.StartGameRequest
+	26, // 59: platform.room.v1.RoomService.FinishGame:input_type -> platform.room.v1.FinishGameRequest
+	28, // 60: platform.room.v1.RoomService.RemoveMember:input_type -> platform.room.v1.RemoveMemberRequest
+	30, // 61: platform.room.v1.RoomService.CloseRoom:input_type -> platform.room.v1.CloseRoomRequest
+	10, // 62: platform.room.v1.RoomService.CreateRoom:output_type -> platform.room.v1.CreateRoomResponse
+	12, // 63: platform.room.v1.RoomService.GetRoom:output_type -> platform.room.v1.GetRoomResponse
+	16, // 64: platform.room.v1.RoomService.ListPublicRooms:output_type -> platform.room.v1.ListPublicRoomsResponse
+	18, // 65: platform.room.v1.RoomService.JoinRoom:output_type -> platform.room.v1.JoinRoomResponse
+	20, // 66: platform.room.v1.RoomService.ApproveMember:output_type -> platform.room.v1.ApproveMemberResponse
+	22, // 67: platform.room.v1.RoomService.SetAdmission:output_type -> platform.room.v1.SetAdmissionResponse
+	25, // 68: platform.room.v1.RoomService.StartGame:output_type -> platform.room.v1.StartGameResponse
+	27, // 69: platform.room.v1.RoomService.FinishGame:output_type -> platform.room.v1.FinishGameResponse
+	29, // 70: platform.room.v1.RoomService.RemoveMember:output_type -> platform.room.v1.RemoveMemberResponse
+	31, // 71: platform.room.v1.RoomService.CloseRoom:output_type -> platform.room.v1.CloseRoomResponse
+	62, // [62:72] is the sub-list for method output_type
+	52, // [52:62] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_platform_room_v1_room_proto_init() }

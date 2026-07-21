@@ -3,6 +3,7 @@ package room
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"net/http"
@@ -19,9 +20,13 @@ import (
 	transporterrors "github.com/iFTY-R/game-night/apps/api/internal/transport/errors"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	"github.com/iFTY-R/game-night/platform/clock"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/idempotency"
+	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
@@ -29,11 +34,13 @@ import (
 const roomTransportOrigin = "https://play.example.test"
 
 func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
-	host, guest := uuid.New(), uuid.New()
-	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
+	host, guest, newcomer := uuid.New(), uuid.New(), uuid.New()
+	client := newRoomTransportClient(t, map[string]uuid.UUID{
+		"host-device": host, "guest-device": guest, "newcomer-device": newcomer,
+	})
 
 	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
-		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 2,
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 3,
 		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
 		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
 	})
@@ -53,8 +60,12 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	}
 
 	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
-		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "dice",
+		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "liars-dice",
 		ExpectedVersion: joined.Msg.GetRoom().GetVersion(),
+		Config: &gamev1.GameConfig{
+			GameId: "liars-dice", SchemaVersion: 1, MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: roomTransportOperationID(t, 1).Value(), RequestDigest: roomTransportDigest("start")[:],
 	})
 	authorizeRoomWrite(startRequest, "host-device")
 	started, err := client.StartGame(t.Context(), startRequest)
@@ -62,16 +73,48 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 		started.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
 		t.Fatalf("start game: response=%+v err=%v", started, err)
 	}
+	blockedJoin := connect.NewRequest(&roomv1.JoinRoomRequest{
+		RoomCode: started.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
+		ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(blockedJoin, "newcomer-device")
+	if _, err := client.JoinRoom(t.Context(), blockedJoin); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("join while playing error = %v", err)
+	}
 
 	finishRequest := connect.NewRequest(&roomv1.FinishGameRequest{
 		RoomId: started.Msg.GetRoom().GetRoomId(), SessionId: started.Msg.GetSessionId(),
 		ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+		OperationId:     roomTransportOperationID(t, 2).Value(), SourceEventId: uuid.NewString(), ExpectedStateVersion: 1,
+		Command: &gamev1.GameEnvelope{
+			GameId: "liars-dice", Version: &gamev1.VersionTuple{Engine: "1.0.0", Protocol: "1.0.0", Client: "1.0.0"},
+			SchemaVersion: 1, MessageType: string(finishAction), Payload: []byte("finished"),
+		},
+		RequestDigest: roomTransportDigest("finish")[:],
 	})
 	authorizeRoomWrite(finishRequest, "host-device")
 	finished, err := client.FinishGame(t.Context(), finishRequest)
 	if err != nil || finished.Msg.GetRoom().GetStatus() != roomv1.RoomStatus_ROOM_STATUS_LOBBY ||
 		finished.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
 		t.Fatalf("finish game: response=%+v err=%v", finished, err)
+	}
+	reopenRequest := connect.NewRequest(&roomv1.SetAdmissionRequest{
+		RoomId: finished.Msg.GetRoom().GetRoomId(), ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN, ExpectedVersion: finished.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(reopenRequest, "host-device")
+	reopened, err := client.SetAdmission(t.Context(), reopenRequest)
+	if err != nil || reopened.Msg.GetRoom().GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_OPEN {
+		t.Fatalf("reopen room: response=%+v err=%v", reopened, err)
+	}
+	joinAfterReopen := connect.NewRequest(&roomv1.JoinRoomRequest{
+		RoomCode: reopened.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
+		ExpectedVersion: reopened.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(joinAfterReopen, "newcomer-device")
+	joinedAfterReopen, err := client.JoinRoom(t.Context(), joinAfterReopen)
+	if err != nil || !joinedAfterReopen.Msg.GetCreated() || len(joinedAfterReopen.Msg.GetRoom().GetMembers()) != 3 {
+		t.Fatalf("join after reopen: response=%+v err=%v", joinedAfterReopen, err)
 	}
 }
 
@@ -175,7 +218,7 @@ func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1con
 	t.Helper()
 	repository := newTransportRoomRepository()
 	source := clock.NewFake(time.Date(2026, time.July, 19, 18, 0, 0, 0, time.UTC))
-	domainService, err := roomDomain.NewService(repository, &transportCodeGenerator{}, transportGameCatalog{}, source)
+	domainService, err := roomDomain.NewService(repository, &transportCodeGenerator{}, source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +226,11 @@ func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1con
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewService(domainService, &transportAuthenticator{actors: actors}, origins, csrf.NewUserValidator())
+	runtime := newTransportGameRuntime(repository)
+	service, err := NewService(
+		domainService, transportGameCatalog{}, runtime, runtime, repository, &transportFanout{},
+		&transportAuthenticator{actors: actors}, origins, csrf.NewUserValidator(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,6 +275,142 @@ type transportGameCatalog struct{}
 
 func (transportGameCatalog) ParticipantLimits(context.Context, string) (gameSDK.ParticipantLimits, error) {
 	return gameSDK.ParticipantLimits{Minimum: 2, Maximum: 9}, nil
+}
+
+// transportGameRuntime models the room/session atomic boundary without replacing production module tests.
+type transportGameRuntime struct {
+	mu       sync.Mutex
+	rooms    *transportRoomRepository
+	sessions map[uuid.UUID]gameruntime.Session
+}
+
+func newTransportGameRuntime(rooms *transportRoomRepository) *transportGameRuntime {
+	return &transportGameRuntime{rooms: rooms, sessions: make(map[uuid.UUID]gameruntime.Session)}
+}
+
+func (runtime *transportGameRuntime) Start(
+	ctx context.Context,
+	command gameruntime.StartCommand,
+) (roomDomain.Room, gameruntime.Session, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	before, err := runtime.rooms.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	sessionID := uuid.New()
+	startedAt := before.Snapshot().UpdatedAt.Add(time.Microsecond)
+	after, start, err := before.StartSession(
+		command.ActorUserID, sessionID, string(command.GameID), 2, 8, command.Expected, startedAt,
+	)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	storedRoom, err := runtime.rooms.UpdateCAS(ctx, before, after)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	participants := make([]gameruntime.Participant, len(start.Participants))
+	for index, participant := range start.Participants {
+		participants[index] = gameruntime.Participant{UserID: participant.UserID, SeatIndex: participant.SeatIndex}
+	}
+	key := gameSDK.VersionKey{GameID: command.GameID, Engine: "1.0.0", Protocol: "1.0.0", Client: "1.0.0"}
+	session, err := gameruntime.RestoreSession(gameruntime.SessionSnapshot{
+		ID: sessionID, RoomID: command.RoomID, VersionKey: key, OwnershipEpoch: 1, Participants: participants,
+		State: gameSDK.Snapshot{
+			SnapshotVersion: 1, StateVersion: 1,
+			State: gameSDK.Message{MessageType: "test.state", SchemaVersion: 1, Payload: []byte("active")},
+		},
+		Status: gameruntime.StatusActive, StartedAt: startedAt, UpdatedAt: startedAt,
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	runtime.sessions[sessionID] = session
+	return storedRoom, session, nil
+}
+
+func (runtime *transportGameRuntime) HandleSystem(
+	ctx context.Context,
+	command gameruntime.SystemCommand,
+) (gameruntime.SystemCommitResult, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	before, exists := runtime.sessions[command.SessionID]
+	if !exists {
+		return gameruntime.SystemCommitResult{}, gameruntime.ErrSessionNotFound
+	}
+	beforeSnapshot := before.Snapshot()
+	if beforeSnapshot.Status.Terminal() {
+		return gameruntime.SystemCommitResult{Session: before, Replayed: true}, nil
+	}
+	if command.Source.Kind != gameruntime.SystemSourceHostAPI || command.Message.MessageType != finishAction ||
+		command.VersionKey != beforeSnapshot.VersionKey || command.ExpectedStateVersion != beforeSnapshot.State.StateVersion {
+		return gameruntime.SystemCommitResult{}, gameruntime.ErrInvalidSystemCommit
+	}
+	roomBefore, err := runtime.rooms.GetByID(ctx, beforeSnapshot.RoomID)
+	if err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	finishedAt := beforeSnapshot.UpdatedAt.Add(time.Microsecond)
+	roomAfter, err := roomBefore.FinishSession(command.SessionID, roomBefore.Version(), finishedAt)
+	if err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	if _, err := runtime.rooms.UpdateCAS(ctx, roomBefore, roomAfter); err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	finished, err := gameruntime.RestoreSession(gameruntime.SessionSnapshot{
+		ID: beforeSnapshot.ID, RoomID: beforeSnapshot.RoomID, VersionKey: beforeSnapshot.VersionKey,
+		OwnershipEpoch: beforeSnapshot.OwnershipEpoch, Participants: beforeSnapshot.Participants,
+		State: gameSDK.Snapshot{
+			SnapshotVersion: 1, StateVersion: beforeSnapshot.State.StateVersion + 1,
+			State: gameSDK.Message{MessageType: "test.state", SchemaVersion: 1, Payload: []byte("finished")},
+		},
+		Status: gameruntime.StatusFinished, StartedAt: beforeSnapshot.StartedAt,
+		UpdatedAt: finishedAt, EndedAt: finishedAt,
+	})
+	if err != nil {
+		return gameruntime.SystemCommitResult{}, err
+	}
+	runtime.sessions[command.SessionID] = finished
+	return gameruntime.SystemCommitResult{Session: finished}, nil
+}
+
+func (runtime *transportGameRuntime) Get(_ context.Context, sessionID uuid.UUID) (gameruntime.Session, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	session, exists := runtime.sessions[sessionID]
+	if !exists {
+		return gameruntime.Session{}, gameruntime.ErrSessionNotFound
+	}
+	return session, nil
+}
+
+type transportFanout struct {
+	mu     sync.Mutex
+	events []redisstore.SessionFanoutEvent
+}
+
+func (fanout *transportFanout) PublishSessionFanout(_ context.Context, event redisstore.SessionFanoutEvent) error {
+	fanout.mu.Lock()
+	defer fanout.mu.Unlock()
+	fanout.events = append(fanout.events, event)
+	return nil
+}
+
+func roomTransportOperationID(t testing.TB, marker byte) idempotency.OperationID {
+	t.Helper()
+	operationID, err := idempotency.NewOperationID(bytes.Repeat([]byte{marker}, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return operationID
+}
+
+func roomTransportDigest(value string) []byte {
+	digest := sha256.Sum256([]byte(value))
+	return digest[:]
 }
 
 type transportRoomRepository struct {

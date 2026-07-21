@@ -63,11 +63,13 @@ const (
 	gameSessionLeaseTTL = 15 * time.Second
 )
 
-// Options supplies process-owned observers and the current durable checkpoint sink probe.
+// Options supplies process-owned observers, the durable checkpoint probe, and the immutable game registry.
 type Options struct {
 	Logger         *slog.Logger
 	Metrics        *prometheus.Registry
 	CheckpointSink audit.SinkReadiness
+	// Registry is the startup-validated manifest source shared with the realtime runtime.
+	Registry roomdomain.ManifestRegistry
 }
 
 // Application owns the listener and every closeable dependency created for it.
@@ -83,7 +85,7 @@ type Application struct {
 
 // New builds the complete API graph before opening the listener. Partial failures release every acquired resource.
 func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Application, returnedErr error) {
-	if ctx == nil || options.Logger == nil || options.Metrics == nil || options.CheckpointSink == nil {
+	if ctx == nil || options.Logger == nil || options.Metrics == nil || options.CheckpointSink == nil || options.Registry == nil {
 		return nil, errInvalidOptions
 	}
 	var source clock.Clock = clock.System{}
@@ -165,9 +167,11 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
-	roomService, err := roomdomain.NewService(
-		roomRepository, roomdomain.NewSecureCodeGenerator(), roomdomain.NewDisabledGameCatalog(), source,
-	)
+	gameCatalog, err := roomdomain.NewRegisteredGameCatalog(options.Registry)
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	roomService, err := roomdomain.NewService(roomRepository, roomdomain.NewSecureCodeGenerator(), source)
 	if err != nil {
 		return nil, errInitializeServices
 	}
@@ -200,7 +204,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 		return nil, errInitializeTransport
 	}
 	handler, err := transportHandler(
-		config.Shared, source, userService, roomService, gameRuntime, gameSessionRepository, roomRepository,
+		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameSessionRepository, roomRepository,
 		gameCoordinator, adminService, adminIdentityService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
@@ -414,6 +418,7 @@ func transportHandler(
 	source clock.Clock,
 	userService *identitydomain.Service,
 	roomService *roomdomain.Service,
+	gameCatalog roomdomain.GameCatalog,
 	gameRuntime gametransport.Runtime,
 	gameSessions *postgres.GameSessionRepository,
 	rooms *postgres.RoomRepository,
@@ -454,15 +459,18 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	gameAuthenticator, err := gametransport.NewIdentityAuthenticator(userService)
+	if err != nil {
+		return nil, err
+	}
 	roomAuthenticator, err := roomtransport.NewIdentityAuthenticator(userService)
 	if err != nil {
 		return nil, err
 	}
-	roomHandler, err := roomtransport.NewService(roomService, roomAuthenticator, userOrigins, userCSRF)
-	if err != nil {
-		return nil, err
-	}
-	gameAuthenticator, err := gametransport.NewIdentityAuthenticator(userService)
+	roomHandler, err := roomtransport.NewService(
+		roomService, gameCatalog, gameRuntime, gameSessions, rooms, gameCoordinator,
+		roomAuthenticator, userOrigins, userCSRF,
+	)
 	if err != nil {
 		return nil, err
 	}

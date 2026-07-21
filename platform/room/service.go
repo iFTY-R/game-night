@@ -68,22 +68,6 @@ type SetAdmissionCommand struct {
 	Expected    Version
 }
 
-// StartGameCommand freezes current participants for the requested game session.
-type StartGameCommand struct {
-	ActorUserID uuid.UUID
-	RoomID      uuid.UUID
-	GameID      string
-	Expected    Version
-}
-
-// FinishGameCommand returns an authoritative active session to the post-game lobby.
-type FinishGameCommand struct {
-	ActorUserID uuid.UUID
-	RoomID      uuid.UUID
-	SessionID   uuid.UUID
-	Expected    Version
-}
-
 // RemoveMemberCommand removes a non-host member and returns any required runtime revocation signal.
 type RemoveMemberCommand struct {
 	ActorUserID uuid.UUID
@@ -104,16 +88,15 @@ type Service struct {
 	repository Repository
 	lobby      PublicRoomRepository
 	codes      CodeGenerator
-	games      GameCatalog
 	clock      clock.Clock
 }
 
 // NewService requires all dependencies so room creation and mutation fail closed when wiring is incomplete.
-func NewService(store Store, codes CodeGenerator, games GameCatalog, source clock.Clock) (*Service, error) {
-	if store == nil || codes == nil || games == nil || source == nil {
+func NewService(store Store, codes CodeGenerator, source clock.Clock) (*Service, error) {
+	if store == nil || codes == nil || source == nil {
 		return nil, ErrInvalidRoomInput
 	}
-	return &Service{repository: store, lobby: store, codes: codes, games: games, clock: source}, nil
+	return &Service{repository: store, lobby: store, codes: codes, clock: source}, nil
 }
 
 // CreateRoom generates server-owned identifiers and retries only invitation-code uniqueness races.
@@ -260,66 +243,6 @@ func (service *Service) SetAdmission(ctx context.Context, command SetAdmissionCo
 		return Room{}, err
 	}
 	next, err := room.SetAdmission(command.ActorUserID, command.Participant, command.Spectator, command.Expected, service.clock.Now())
-	if err != nil {
-		return Room{}, err
-	}
-	return service.repository.UpdateCAS(ctx, room, next)
-}
-
-// StartGame creates a server-owned session ID and persists the frozen participant handoff.
-func (service *Service) StartGame(ctx context.Context, command StartGameCommand) (Room, SessionStart, error) {
-	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil {
-		return Room{}, SessionStart{}, ErrInvalidRoomInput
-	}
-	if !requiredVersion(command.Expected) {
-		return Room{}, SessionStart{}, ErrRoomVersionConflict
-	}
-	sessionID, err := uuid.NewV7()
-	if err != nil {
-		return Room{}, SessionStart{}, ErrInvalidRoomInput
-	}
-	room, err := service.repository.GetByID(ctx, command.RoomID)
-	if err != nil {
-		return Room{}, SessionStart{}, err
-	}
-	participantLimits, err := service.games.ParticipantLimits(ctx, strings.TrimSpace(command.GameID))
-	if err != nil {
-		return Room{}, SessionStart{}, err
-	}
-	if !participantLimits.Valid() {
-		return Room{}, SessionStart{}, ErrGameUnavailable
-	}
-	next, start, err := room.StartSession(
-		command.ActorUserID, sessionID, strings.TrimSpace(command.GameID), participantLimits.Minimum, participantLimits.Maximum,
-		command.Expected, service.clock.Now(),
-	)
-	if err != nil {
-		return Room{}, SessionStart{}, err
-	}
-	stored, err := service.repository.UpdateCAS(ctx, room, next)
-	if err != nil {
-		return Room{}, SessionStart{}, err
-	}
-	start.Version = stored.Version()
-	return stored, start, nil
-}
-
-// FinishGame requires host authority before clearing the matching active session.
-func (service *Service) FinishGame(ctx context.Context, command FinishGameCommand) (Room, error) {
-	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || command.SessionID == uuid.Nil {
-		return Room{}, ErrInvalidRoomInput
-	}
-	if !requiredVersion(command.Expected) {
-		return Room{}, ErrRoomVersionConflict
-	}
-	room, err := service.repository.GetByID(ctx, command.RoomID)
-	if err != nil {
-		return Room{}, err
-	}
-	if room.Snapshot().HostUserID != command.ActorUserID {
-		return Room{}, ErrHostRequired
-	}
-	next, err := room.FinishSession(command.SessionID, command.Expected, service.clock.Now())
 	if err != nil {
 		return Room{}, err
 	}

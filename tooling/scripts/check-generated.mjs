@@ -8,6 +8,8 @@ const generatedPaths = [
   'games/dice-789/client/src/generated',
   'games/meet-by-chance/gen/go',
   'games/meet-by-chance/client/src/generated',
+  'tooling/game-registry/registry.gen.go',
+  'tooling/game-registry/manifests.gen.ts',
   'platform/persistence/postgres/sqlcgen',
 ]
 

@@ -46,7 +46,7 @@ var (
 	errFanoutClosed         = errors.New("realtime fanout subscription closed")
 )
 
-// Options supplies process-owned observers and permits the game registry to be installed by Task 9.
+// Options supplies process-owned observers and the startup-validated immutable game registry.
 type Options struct {
 	Logger   *slog.Logger
 	Registry gameruntime.Registry
@@ -72,7 +72,7 @@ type Application struct {
 
 // New validates and connects the complete realtime graph before either listener is opened.
 func New(ctx context.Context, cfg config.Config, options Options) (_ *Application, returnedErr error) {
-	if ctx == nil || options.Logger == nil {
+	if ctx == nil || options.Logger == nil || options.Registry == nil {
 		return nil, errInvalidOptions
 	}
 	pool, err := postgres.OpenPool(ctx, postgres.PoolConfig{
@@ -110,14 +110,10 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	if err != nil {
 		return nil, errInitializeRedis
 	}
-	registry := options.Registry
-	if registry == nil {
-		registry = gameruntime.NewDisabledRegistry()
-	}
 	sessions := postgres.NewGameSessionRepository(pool)
 	rooms := postgres.NewRoomRepository(pool)
 	runtime, err := gameruntime.NewService(
-		registry, sessions, rooms, postgres.NewRoomGameSessionRepository(pool), source, gameruntime.SecureGenerator{},
+		options.Registry, sessions, rooms, postgres.NewRoomGameSessionRepository(pool), source, gameruntime.SecureGenerator{},
 	)
 	if err != nil {
 		return nil, errInitializeRuntime

@@ -17,8 +17,11 @@ import (
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
+	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
+	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -27,11 +30,39 @@ const (
 	publicRoomCursorVersion byte = 1
 	// publicRoomCursorBytes stores one version byte, Unix nanoseconds, and a UUID.
 	publicRoomCursorBytes = 1 + 8 + 16
+	// finishAction is the platform-owned system command that every registered module must implement.
+	finishAction gameSDK.Identifier = "session.finish"
 )
+
+// GameRuntime is the authoritative cross-aggregate lifecycle surface shared with GameService.
+type GameRuntime interface {
+	Start(context.Context, gameruntime.StartCommand) (roomDomain.Room, gameruntime.Session, error)
+	HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error)
+}
+
+// GameSessionReader supplies exact version and ownership data needed by a host finish command.
+type GameSessionReader interface {
+	Get(context.Context, uuid.UUID) (gameruntime.Session, error)
+}
+
+// RoomReader reloads the atomically committed post-game room returned to RoomService clients.
+type RoomReader interface {
+	GetByID(context.Context, uuid.UUID) (roomDomain.Room, error)
+}
+
+// FanoutPublisher publishes only committed session cursors; PostgreSQL remains authoritative.
+type FanoutPublisher interface {
+	PublishSessionFanout(context.Context, redisstore.SessionFanoutEvent) error
+}
 
 // Service keeps Cookie, Origin, CSRF, and wire mapping outside the room domain.
 type Service struct {
 	domain        *roomDomain.Service
+	catalog       roomDomain.GameCatalog
+	runtime       GameRuntime
+	sessions      GameSessionReader
+	rooms         RoomReader
+	fanout        FanoutPublisher
 	authenticator PrincipalAuthenticator
 	origins       *origin.UserValidator
 	csrf          *csrf.UserValidator
@@ -40,14 +71,23 @@ type Service struct {
 // NewService validates complete room transport wiring before the generated handler is mounted.
 func NewService(
 	domainService *roomDomain.Service,
+	catalog roomDomain.GameCatalog,
+	runtime GameRuntime,
+	sessions GameSessionReader,
+	rooms RoomReader,
+	fanout FanoutPublisher,
 	authenticator PrincipalAuthenticator,
 	originValidator *origin.UserValidator,
 	csrfValidator *csrf.UserValidator,
 ) (*Service, error) {
-	if domainService == nil || authenticator == nil || originValidator == nil || csrfValidator == nil {
+	if domainService == nil || catalog == nil || runtime == nil || sessions == nil || rooms == nil || fanout == nil ||
+		authenticator == nil || originValidator == nil || csrfValidator == nil {
 		return nil, roomDomain.ErrInvalidRoomInput
 	}
-	return &Service{domain: domainService, authenticator: authenticator, origins: originValidator, csrf: csrfValidator}, nil
+	return &Service{
+		domain: domainService, catalog: catalog, runtime: runtime, sessions: sessions, rooms: rooms, fanout: fanout,
+		authenticator: authenticator, origins: originValidator, csrf: csrfValidator,
+	}, nil
 }
 
 // CreateRoom creates a server-owned room ID/code after write authorization.
@@ -175,47 +215,102 @@ func (service *Service) SetAdmission(ctx context.Context, request *connect.Reque
 	return connect.NewResponse(&roomv1.SetAdmissionResponse{Room: roomWire(updated)}), nil
 }
 
-// StartGame creates the server-owned session identifier and returns the frozen seats.
+// StartGame validates the opaque config and publishes PartyRoom plus GameSession atomically.
 func (service *Service) StartGame(ctx context.Context, request *connect.Request[roomv1.StartGameRequest]) (*connect.Response[roomv1.StartGameResponse], error) {
 	actor, err := service.authenticateWrite(ctx, requestHTTP(request))
 	if err != nil {
 		return nil, err
 	}
+	if request == nil || request.Msg == nil || request.Msg.GetExpectedVersion() == nil {
+		return nil, gameruntime.ErrInvalidSessionInput
+	}
 	roomID, err := parseUUID(request.Msg.GetRoomId())
 	if err != nil {
 		return nil, err
 	}
-	updated, start, err := service.domain.StartGame(ctx, roomDomain.StartGameCommand{
-		ActorUserID: actor, RoomID: roomID, GameID: request.Msg.GetGameId(),
-		Expected: versionDomain(request.Msg.GetExpectedVersion()),
+	gameID, config, operationID, requestDigest, err := startGameInput(request.Msg)
+	if err != nil {
+		return nil, err
+	}
+	participantLimits, err := service.catalog.ParticipantLimits(ctx, string(gameID))
+	if err != nil {
+		return nil, err
+	}
+	updated, session, err := service.runtime.Start(ctx, gameruntime.StartCommand{
+		ActorUserID: actor, RoomID: roomID, GameID: gameID,
+		Expected: versionDomain(request.Msg.GetExpectedVersion()), Config: config,
+		OperationID: operationID, RequestDigest: &requestDigest,
 	})
 	if err != nil {
 		return nil, err
 	}
-	participants := make([]*roomv1.FrozenParticipant, len(start.Participants))
-	for index, participant := range start.Participants {
+	snapshot := session.Snapshot()
+	roomSnapshot := updated.Snapshot()
+	participantCount := uint32(len(snapshot.Participants))
+	if snapshot.RoomID != roomID || snapshot.VersionKey.GameID != gameID || roomSnapshot.ActiveSessionID != snapshot.ID ||
+		participantCount < participantLimits.Minimum || participantCount > participantLimits.Maximum {
+		return nil, gameruntime.ErrGameSessionIntegrity
+	}
+	if err := service.publish(ctx, session); err != nil {
+		return nil, err
+	}
+	participants := make([]*roomv1.FrozenParticipant, len(snapshot.Participants))
+	for index, participant := range snapshot.Participants {
 		participants[index] = &roomv1.FrozenParticipant{UserId: participant.UserID.String(), SeatIndex: participant.SeatIndex}
 	}
 	return connect.NewResponse(&roomv1.StartGameResponse{
-		Room: roomWire(updated), SessionId: start.SessionID.String(), GameId: start.GameID, Participants: participants,
+		Room: roomWire(updated), SessionId: snapshot.ID.String(), GameId: string(snapshot.VersionKey.GameID), Participants: participants,
 	}), nil
 }
 
-// FinishGame clears only the matching active session and leaves participant admission closed.
+// FinishGame submits the module-owned terminal transition and clears the room pointer in the same transaction.
 func (service *Service) FinishGame(ctx context.Context, request *connect.Request[roomv1.FinishGameRequest]) (*connect.Response[roomv1.FinishGameResponse], error) {
 	actor, err := service.authenticateWrite(ctx, requestHTTP(request))
 	if err != nil {
 		return nil, err
 	}
+	if request == nil || request.Msg == nil || request.Msg.GetExpectedVersion() == nil || request.Msg.GetExpectedStateVersion() == 0 {
+		return nil, gameruntime.ErrInvalidSessionInput
+	}
 	roomID, sessionID, err := twoUUIDs(request.Msg.GetRoomId(), request.Msg.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
-	updated, err := service.domain.FinishGame(ctx, roomDomain.FinishGameCommand{
-		ActorUserID: actor, RoomID: roomID, SessionID: sessionID, Expected: versionDomain(request.Msg.GetExpectedVersion()),
+	operationID, sourceEventID, versionKey, command, requestDigest, err := finishGameInput(request.Msg)
+	if err != nil {
+		return nil, err
+	}
+	roomBefore, sessionBefore, err := service.authorizeFinish(ctx, actor, roomID, sessionID, request.Msg)
+	if err != nil {
+		return nil, err
+	}
+	if sessionBefore.Snapshot().VersionKey != versionKey {
+		return nil, gameruntime.ErrStateVersionConflict
+	}
+	result, err := service.runtime.HandleSystem(ctx, gameruntime.SystemCommand{
+		SessionID: sessionID, OperationID: operationID,
+		Source: gameruntime.SystemSource{
+			Kind: gameruntime.SystemSourceHostAPI, EventID: sourceEventID, RequestedByUserID: actor,
+		},
+		ExpectedStateVersion: request.Msg.GetExpectedStateVersion(), OwnershipEpoch: sessionBefore.Snapshot().OwnershipEpoch,
+		VersionKey: versionKey, Message: command, RequestDigest: &requestDigest,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if result.Session.Snapshot().Status != gameruntime.StatusFinished {
+		return nil, gameruntime.ErrInvalidSystemCommit
+	}
+	if err := service.publish(ctx, result.Session); err != nil {
+		return nil, err
+	}
+	updated, err := service.rooms.GetByID(ctx, roomBefore.Snapshot().ID)
+	if err != nil {
+		return nil, err
+	}
+	updatedSnapshot := updated.Snapshot()
+	if updatedSnapshot.Status != roomDomain.RoomStatusLobby || updatedSnapshot.ActiveSessionID != uuid.Nil {
+		return nil, gameruntime.ErrGameSessionIntegrity
 	}
 	return connect.NewResponse(&roomv1.FinishGameResponse{Room: roomWire(updated)}), nil
 }

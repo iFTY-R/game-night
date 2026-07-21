@@ -15,6 +15,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	"github.com/iFTY-R/game-night/platform/audit"
+	gameregistry "github.com/iFTY-R/game-night/tooling/game-registry"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -51,8 +52,12 @@ func run(ctx context.Context, lookup sharedconfig.LookupEnv, logger *slog.Logger
 		return errBuildApplication
 	}
 	metricsRegistry := prometheus.NewRegistry()
+	registry, err := gameregistry.New()
+	if err != nil {
+		return errBuildApplication
+	}
 	app, err := application.New(ctx, config, application.Options{
-		Logger: logger, Metrics: metricsRegistry, CheckpointSink: checkpointSink,
+		Logger: logger, Metrics: metricsRegistry, CheckpointSink: checkpointSink, Registry: registry,
 	})
 	if err != nil {
 		return errBuildApplication

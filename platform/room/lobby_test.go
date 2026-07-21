@@ -73,7 +73,7 @@ func TestServiceListsPublicRoomsWithLookaheadCursor(t *testing.T) {
 		}
 		repository.publicRooms = append(repository.publicRooms, card)
 	}
-	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"UNUSED1"}}, testGameCatalog{}, clock.NewFake(now))
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"UNUSED1"}}, clock.NewFake(now))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -53,6 +53,7 @@ import (
 	"github.com/iFTY-R/game-night/internal/integrationtest"
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
+	gameregistry "github.com/iFTY-R/game-night/tooling/game-registry"
 	"github.com/pressly/goose/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -77,7 +78,7 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 	identityClient := identityv1connect.NewIdentityServiceClient(runtime.client, runtime.baseURL)
 	identity := onboardAndRecoverIdentity(t, ctx, runtime, identityClient)
 	exerciseRoomLifecycle(t, ctx, runtime, roomv1connect.NewRoomServiceClient(runtime.client, runtime.baseURL))
-	exerciseDisabledGameSurface(t, ctx, runtime, gamev1connect.NewGameServiceClient(runtime.client, runtime.baseURL))
+	exerciseUnavailableRealtimeSurface(t, ctx, runtime, gamev1connect.NewGameServiceClient(runtime.client, runtime.baseURL))
 
 	authClient := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
 	adminIdentityClient := adminv1connect.NewAdminIdentityServiceClient(runtime.client, runtime.baseURL)
@@ -142,8 +143,8 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 	}
 }
 
-// exerciseDisabledGameSurface proves the complete GameService is mounted while module registration remains fail closed.
-func exerciseDisabledGameSurface(
+// exerciseUnavailableRealtimeSurface proves registry-enabled GameService fails closed when its private owner service is unavailable.
+func exerciseUnavailableRealtimeSurface(
 	t testing.TB,
 	ctx context.Context,
 	runtime *applicationIntegrationRuntime,
@@ -159,11 +160,11 @@ func exerciseDisabledGameSurface(
 	runtime.authorizeUserWrite(t, request)
 	_, err := client.StartSession(ctx, request)
 	if connect.CodeOf(err) != connect.CodeUnavailable {
-		t.Fatalf("disabled game service error = %v", err)
+		t.Fatalf("unavailable realtime game service error = %v", err)
 	}
 	var connectError *connect.Error
 	if !errors.As(err, &connectError) || connectError.Meta().Get("Cache-Control") != "no-store" {
-		t.Fatalf("disabled game service cache metadata = %v", err)
+		t.Fatalf("unavailable realtime game service cache metadata = %v", err)
 	}
 }
 
@@ -210,11 +211,15 @@ func exerciseRoomLifecycle(
 		t.Fatalf("get integrated room: room=%+v", loaded.Msg.GetRoom())
 	}
 	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
-		RoomId: created.Msg.GetRoom().GetRoomId(), GameId: "dice", ExpectedVersion: created.Msg.GetRoom().GetVersion(),
+		RoomId: created.Msg.GetRoom().GetRoomId(), GameId: "liars-dice", ExpectedVersion: created.Msg.GetRoom().GetVersion(),
+		Config: &gamev1.GameConfig{
+			GameId: "liars-dice", SchemaVersion: 1, MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: applicationOperationID(t), RequestDigest: bytes.Repeat([]byte{2}, 32),
 	})
 	runtime.authorizeUserWrite(t, startRequest)
-	if _, err := client.StartGame(ctx, startRequest); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("start room without GameSession runtime: %v", err)
+	if _, err := client.StartGame(ctx, startRequest); connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("start registered game with unavailable realtime runtime: %v", err)
 	}
 	setRequest := connect.NewRequest(&roomv1.SetAdmissionRequest{
 		RoomId: created.Msg.GetRoom().GetRoomId(), ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_CLOSED,
@@ -575,9 +580,14 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 		},
 	}
 	logs := &bytes.Buffer{}
+	registry, err := gameregistry.New()
+	if err != nil {
+		t.Fatalf("build integrated game registry: %v", err)
+	}
 	application, err := New(ctx, config, Options{
 		Logger: slog.New(logging.NewJSONHandler(logs, slog.LevelDebug)), Metrics: prometheus.NewRegistry(),
 		CheckpointSink: audit.SinkReadinessFunc(func(context.Context) bool { return true }),
+		Registry:       registry,
 	})
 	if err != nil {
 		var status string

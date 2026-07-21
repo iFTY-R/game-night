@@ -71,6 +71,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@game-night/dice-789-client':
+        specifier: workspace:*
+        version: link:../../games/dice-789/client
+      '@game-night/dice-789-themes':
+        specifier: workspace:*
+        version: link:../../games/dice-789/themes
       '@game-night/game-ui-kit':
         specifier: workspace:*
         version: link:../../packages/game-ui-kit
@@ -126,6 +132,62 @@ importers:
       vue-tsc:
         specifier: 'catalog:'
         version: 3.3.7(typescript@5.9.3)
+
+  games/dice-789/client:
+    dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.6.2
+        version: 2.6.2
+      '@game-night/game-client':
+        specifier: workspace:*
+        version: link:../../../sdk/ts/game-client
+      '@game-night/game-ui-kit':
+        specifier: workspace:*
+        version: link:../../../packages/game-ui-kit
+      lucide-vue-next:
+        specifier: 'catalog:'
+        version: 1.0.0(vue@3.5.40(typescript@5.9.3))
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.8(vite@8.1.5(terser@5.49.0))(vue@3.5.40(typescript@5.9.3))
+      '@vue/compiler-sfc':
+        specifier: 'catalog:'
+        version: 3.5.40
+      '@vue/test-utils':
+        specifier: 'catalog:'
+        version: 2.4.11(@vue/compiler-dom@3.5.40)(@vue/server-renderer@3.5.40)(vue@3.5.40(typescript@5.9.3))
+      jsdom:
+        specifier: 'catalog:'
+        version: 29.1.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.1.5(terser@5.49.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(jsdom@29.1.1)(vite@8.1.5(terser@5.49.0))
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.40(typescript@5.9.3)
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.7(typescript@5.9.3)
+
+  games/dice-789/themes:
+    dependencies:
+      '@game-night/theme-system':
+        specifier: workspace:*
+        version: link:../../../packages/theme-system
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(jsdom@29.1.1)(vite@8.1.5(terser@5.49.0))
 
   games/liars-dice/client:
     dependencies:

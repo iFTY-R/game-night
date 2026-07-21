@@ -73,6 +73,62 @@ func (q *Queries) AcquireGameSessionOwnershipCAS(ctx context.Context, arg Acquir
 	return i, err
 }
 
+const captureGameSessionReplayMembers = `-- name: CaptureGameSessionReplayMembers :exec
+INSERT INTO game_session_replay_members (session_id, user_id, role)
+SELECT $1, member.user_id, member.role
+FROM room_members AS member
+WHERE member.room_id = $2
+ORDER BY member.user_id
+`
+
+type CaptureGameSessionReplayMembersParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
+	RoomID    pgtype.UUID `json:"room_id"`
+}
+
+// CaptureGameSessionReplayMembers
+//
+//	INSERT INTO game_session_replay_members (session_id, user_id, role)
+//	SELECT $1, member.user_id, member.role
+//	FROM room_members AS member
+//	WHERE member.room_id = $2
+//	ORDER BY member.user_id
+func (q *Queries) CaptureGameSessionReplayMembers(ctx context.Context, arg CaptureGameSessionReplayMembersParams) error {
+	_, err := q.db.Exec(ctx, captureGameSessionReplayMembers, arg.SessionID, arg.RoomID)
+	return err
+}
+
+const completeGameSessionReplayMemberSnapshot = `-- name: CompleteGameSessionReplayMemberSnapshot :execrows
+UPDATE game_session_replay_access
+SET member_snapshot_completed_at = $1,
+    updated_at = $1
+WHERE session_id = $2
+  AND room_id = $3
+  AND member_snapshot_completed_at IS NULL
+`
+
+type CompleteGameSessionReplayMemberSnapshotParams struct {
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	SessionID   pgtype.UUID        `json:"session_id"`
+	RoomID      pgtype.UUID        `json:"room_id"`
+}
+
+// CompleteGameSessionReplayMemberSnapshot
+//
+//	UPDATE game_session_replay_access
+//	SET member_snapshot_completed_at = $1,
+//	    updated_at = $1
+//	WHERE session_id = $2
+//	  AND room_id = $3
+//	  AND member_snapshot_completed_at IS NULL
+func (q *Queries) CompleteGameSessionReplayMemberSnapshot(ctx context.Context, arg CompleteGameSessionReplayMemberSnapshotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeGameSessionReplayMemberSnapshot, arg.CompletedAt, arg.SessionID, arg.RoomID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const completeGameSystemInboxCAS = `-- name: CompleteGameSystemInboxCAS :one
 UPDATE game_system_inbox
 SET status = 'completed',
@@ -689,6 +745,38 @@ func (q *Queries) CreateGameSessionParticipant(ctx context.Context, arg CreateGa
 	return err
 }
 
+const createGameSessionReplayAccess = `-- name: CreateGameSessionReplayAccess :exec
+INSERT INTO game_session_replay_access (
+    session_id, room_id, policy, policy_version, created_at, updated_at
+) VALUES (
+    $1, $2, 'participant', 1, $3, $4
+)
+`
+
+type CreateGameSessionReplayAccessParams struct {
+	SessionID pgtype.UUID        `json:"session_id"`
+	RoomID    pgtype.UUID        `json:"room_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// CreateGameSessionReplayAccess
+//
+//	INSERT INTO game_session_replay_access (
+//	    session_id, room_id, policy, policy_version, created_at, updated_at
+//	) VALUES (
+//	    $1, $2, 'participant', 1, $3, $4
+//	)
+func (q *Queries) CreateGameSessionReplayAccess(ctx context.Context, arg CreateGameSessionReplayAccessParams) error {
+	_, err := q.db.Exec(ctx, createGameSessionReplayAccess,
+		arg.SessionID,
+		arg.RoomID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const createGameSessionStartReceipt = `-- name: CreateGameSessionStartReceipt :one
 INSERT INTO game_session_start_receipts (
     actor_user_id, room_id, operation_id, request_digest, session_id, committed_at
@@ -1035,6 +1123,92 @@ func (q *Queries) GetGameSessionForUpdate(ctx context.Context, arg GetGameSessio
 		&i.StartedAt,
 		&i.UpdatedAt,
 		&i.EndedAt,
+	)
+	return i, err
+}
+
+const getGameSessionReplayAccess = `-- name: GetGameSessionReplayAccess :one
+SELECT access.session_id, access.room_id, access.policy, access.policy_version,
+    access.member_snapshot_completed_at, access.created_at, access.updated_at,
+    session.status AS session_status, room.visibility AS room_visibility, room.host_user_id,
+    EXISTS (
+        SELECT 1
+        FROM game_session_participants AS participant
+        WHERE participant.session_id = access.session_id
+          AND participant.user_id = $1
+    ) AS actor_participated,
+    EXISTS (
+        SELECT 1
+        FROM game_session_replay_members AS member
+        WHERE member.session_id = access.session_id
+          AND member.user_id = $1
+    ) AS actor_was_room_member
+FROM game_session_replay_access AS access
+JOIN game_sessions AS session ON session.session_id = access.session_id
+JOIN party_rooms AS room ON room.room_id = access.room_id
+WHERE access.session_id = $2
+  AND access.room_id = $3
+`
+
+type GetGameSessionReplayAccessParams struct {
+	ActorUserID pgtype.UUID `json:"actor_user_id"`
+	SessionID   pgtype.UUID `json:"session_id"`
+	RoomID      pgtype.UUID `json:"room_id"`
+}
+
+type GetGameSessionReplayAccessRow struct {
+	SessionID                 pgtype.UUID        `json:"session_id"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	Policy                    string             `json:"policy"`
+	PolicyVersion             int64              `json:"policy_version"`
+	MemberSnapshotCompletedAt pgtype.Timestamptz `json:"member_snapshot_completed_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	SessionStatus             string             `json:"session_status"`
+	RoomVisibility            string             `json:"room_visibility"`
+	HostUserID                pgtype.UUID        `json:"host_user_id"`
+	ActorParticipated         bool               `json:"actor_participated"`
+	ActorWasRoomMember        bool               `json:"actor_was_room_member"`
+}
+
+// GetGameSessionReplayAccess
+//
+//	SELECT access.session_id, access.room_id, access.policy, access.policy_version,
+//	    access.member_snapshot_completed_at, access.created_at, access.updated_at,
+//	    session.status AS session_status, room.visibility AS room_visibility, room.host_user_id,
+//	    EXISTS (
+//	        SELECT 1
+//	        FROM game_session_participants AS participant
+//	        WHERE participant.session_id = access.session_id
+//	          AND participant.user_id = $1
+//	    ) AS actor_participated,
+//	    EXISTS (
+//	        SELECT 1
+//	        FROM game_session_replay_members AS member
+//	        WHERE member.session_id = access.session_id
+//	          AND member.user_id = $1
+//	    ) AS actor_was_room_member
+//	FROM game_session_replay_access AS access
+//	JOIN game_sessions AS session ON session.session_id = access.session_id
+//	JOIN party_rooms AS room ON room.room_id = access.room_id
+//	WHERE access.session_id = $2
+//	  AND access.room_id = $3
+func (q *Queries) GetGameSessionReplayAccess(ctx context.Context, arg GetGameSessionReplayAccessParams) (GetGameSessionReplayAccessRow, error) {
+	row := q.db.QueryRow(ctx, getGameSessionReplayAccess, arg.ActorUserID, arg.SessionID, arg.RoomID)
+	var i GetGameSessionReplayAccessRow
+	err := row.Scan(
+		&i.SessionID,
+		&i.RoomID,
+		&i.Policy,
+		&i.PolicyVersion,
+		&i.MemberSnapshotCompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SessionStatus,
+		&i.RoomVisibility,
+		&i.HostUserID,
+		&i.ActorParticipated,
+		&i.ActorWasRoomMember,
 	)
 	return i, err
 }
@@ -1712,6 +1886,76 @@ func (q *Queries) ListGameSessionTimers(ctx context.Context, arg ListGameSession
 		return nil, err
 	}
 	return items, nil
+}
+
+const setGameSessionReplayPolicyCAS = `-- name: SetGameSessionReplayPolicyCAS :one
+UPDATE game_session_replay_access AS access
+SET policy = $1,
+    policy_version = access.policy_version + 1,
+    updated_at = $2
+FROM game_sessions AS session, party_rooms AS room
+WHERE access.session_id = $3
+  AND access.room_id = $4
+  AND access.policy_version = $5
+  AND $2 > access.updated_at
+  AND access.member_snapshot_completed_at IS NOT NULL
+  AND session.session_id = access.session_id
+  AND session.status = 'finished'
+  AND room.room_id = access.room_id
+  AND room.host_user_id = $6
+  AND ($1::text <> 'public' OR room.visibility = 'public')
+RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
+    access.member_snapshot_completed_at, access.created_at, access.updated_at
+`
+
+type SetGameSessionReplayPolicyCASParams struct {
+	Policy                string             `json:"policy"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	SessionID             pgtype.UUID        `json:"session_id"`
+	RoomID                pgtype.UUID        `json:"room_id"`
+	ExpectedPolicyVersion int64              `json:"expected_policy_version"`
+	ActorUserID           pgtype.UUID        `json:"actor_user_id"`
+}
+
+// SetGameSessionReplayPolicyCAS
+//
+//	UPDATE game_session_replay_access AS access
+//	SET policy = $1,
+//	    policy_version = access.policy_version + 1,
+//	    updated_at = $2
+//	FROM game_sessions AS session, party_rooms AS room
+//	WHERE access.session_id = $3
+//	  AND access.room_id = $4
+//	  AND access.policy_version = $5
+//	  AND $2 > access.updated_at
+//	  AND access.member_snapshot_completed_at IS NOT NULL
+//	  AND session.session_id = access.session_id
+//	  AND session.status = 'finished'
+//	  AND room.room_id = access.room_id
+//	  AND room.host_user_id = $6
+//	  AND ($1::text <> 'public' OR room.visibility = 'public')
+//	RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
+//	    access.member_snapshot_completed_at, access.created_at, access.updated_at
+func (q *Queries) SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGameSessionReplayPolicyCASParams) (GameSessionReplayAccess, error) {
+	row := q.db.QueryRow(ctx, setGameSessionReplayPolicyCAS,
+		arg.Policy,
+		arg.UpdatedAt,
+		arg.SessionID,
+		arg.RoomID,
+		arg.ExpectedPolicyVersion,
+		arg.ActorUserID,
+	)
+	var i GameSessionReplayAccess
+	err := row.Scan(
+		&i.SessionID,
+		&i.RoomID,
+		&i.Policy,
+		&i.PolicyVersion,
+		&i.MemberSnapshotCompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateGameSessionLifecycleCAS = `-- name: UpdateGameSessionLifecycleCAS :one

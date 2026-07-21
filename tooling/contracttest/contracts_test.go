@@ -123,6 +123,8 @@ func TestBusinessErrorCodesMatchApprovedContract(t *testing.T) {
 		"BUSINESS_ERROR_CODE_GAME_REQUEST_DIGEST_INVALID",
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN",
 		"BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE",
+		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT",
+		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE",
 	}
 	if enum.Values().Len() != len(want) {
 		t.Fatalf("expected %d business error codes, got %d", len(want), enum.Values().Len())

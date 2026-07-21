@@ -176,6 +176,69 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
 INSERT INTO game_session_participants (session_id, user_id, seat_index)
 VALUES (sqlc.arg(session_id), sqlc.arg(user_id), sqlc.arg(seat_index));
 
+-- name: CreateGameSessionReplayAccess :exec
+INSERT INTO game_session_replay_access (
+    session_id, room_id, policy, policy_version, created_at, updated_at
+) VALUES (
+    sqlc.arg(session_id), sqlc.arg(room_id), 'participant', 1, sqlc.arg(created_at), sqlc.arg(updated_at)
+);
+
+-- name: CaptureGameSessionReplayMembers :exec
+INSERT INTO game_session_replay_members (session_id, user_id, role)
+SELECT sqlc.arg(session_id), member.user_id, member.role
+FROM room_members AS member
+WHERE member.room_id = sqlc.arg(room_id)
+ORDER BY member.user_id;
+
+-- name: CompleteGameSessionReplayMemberSnapshot :execrows
+UPDATE game_session_replay_access
+SET member_snapshot_completed_at = sqlc.arg(completed_at),
+    updated_at = sqlc.arg(completed_at)
+WHERE session_id = sqlc.arg(session_id)
+  AND room_id = sqlc.arg(room_id)
+  AND member_snapshot_completed_at IS NULL;
+
+-- name: GetGameSessionReplayAccess :one
+SELECT access.session_id, access.room_id, access.policy, access.policy_version,
+    access.member_snapshot_completed_at, access.created_at, access.updated_at,
+    session.status AS session_status, room.visibility AS room_visibility, room.host_user_id,
+    EXISTS (
+        SELECT 1
+        FROM game_session_participants AS participant
+        WHERE participant.session_id = access.session_id
+          AND participant.user_id = sqlc.arg(actor_user_id)
+    ) AS actor_participated,
+    EXISTS (
+        SELECT 1
+        FROM game_session_replay_members AS member
+        WHERE member.session_id = access.session_id
+          AND member.user_id = sqlc.arg(actor_user_id)
+    ) AS actor_was_room_member
+FROM game_session_replay_access AS access
+JOIN game_sessions AS session ON session.session_id = access.session_id
+JOIN party_rooms AS room ON room.room_id = access.room_id
+WHERE access.session_id = sqlc.arg(session_id)
+  AND access.room_id = sqlc.arg(room_id);
+
+-- name: SetGameSessionReplayPolicyCAS :one
+UPDATE game_session_replay_access AS access
+SET policy = sqlc.arg(policy),
+    policy_version = access.policy_version + 1,
+    updated_at = sqlc.arg(updated_at)
+FROM game_sessions AS session, party_rooms AS room
+WHERE access.session_id = sqlc.arg(session_id)
+  AND access.room_id = sqlc.arg(room_id)
+  AND access.policy_version = sqlc.arg(expected_policy_version)
+  AND sqlc.arg(updated_at) > access.updated_at
+  AND access.member_snapshot_completed_at IS NOT NULL
+  AND session.session_id = access.session_id
+  AND session.status = 'finished'
+  AND room.room_id = access.room_id
+  AND room.host_user_id = sqlc.arg(actor_user_id)
+  AND (sqlc.arg(policy)::text <> 'public' OR room.visibility = 'public')
+RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
+    access.member_snapshot_completed_at, access.created_at, access.updated_at;
+
 -- name: ListGameSessionParticipants :many
 SELECT session_id, user_id, seat_index
 FROM game_session_participants

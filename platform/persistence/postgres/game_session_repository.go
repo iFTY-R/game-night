@@ -68,6 +68,13 @@ func createGameSessionAggregate(ctx context.Context, queries QueryHandle, commit
 			return gameruntime.Session{}, err
 		}
 	}
+	// Replay authorization begins fail-closed at participant-only and is committed with the immutable session identity.
+	if err := queries.CreateGameSessionReplayAccess(ctx, sqlcgen.CreateGameSessionReplayAccessParams{
+		SessionID: uuidToPG(snapshot.ID), RoomID: uuidToPG(snapshot.RoomID),
+		CreatedAt: timeToPG(snapshot.StartedAt), UpdatedAt: timeToPG(snapshot.StartedAt),
+	}); err != nil {
+		return gameruntime.Session{}, err
+	}
 	if err := replaceGameSessionTimers(ctx, queries, snapshot.ID, snapshot.Timers); err != nil {
 		return gameruntime.Session{}, err
 	}

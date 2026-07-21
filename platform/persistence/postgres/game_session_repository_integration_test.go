@@ -14,6 +14,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/outbox"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
+	"github.com/iFTY-R/game-night/platform/replay"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
@@ -328,6 +329,16 @@ func TestRoomGameSessionRepositoryFinishesActionAndRoomAtomically(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	spectatorID := uuid.New()
+	createRoomTestUser(t, ctx, fixture, spectatorID, "ReplayViewer3", now)
+	roomWithSpectator, _, err := room.Join(spectatorID, roomDomain.JoinIntentSpectator, room.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, err = NewRoomRepository(fixture.Pool).UpdateCAS(ctx, room, roomWithSpectator)
+	if err != nil {
+		t.Fatal(err)
+	}
 	nextRoom, err := room.FinishSession(owner.Snapshot().ID, room.Version(), finishedAt)
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +351,92 @@ func TestRoomGameSessionRepositoryFinishesActionAndRoomAtomically(t *testing.T) 
 		storedRoom.Snapshot().LastFinishedSessionID != owner.Snapshot().ID ||
 		result.Session.Snapshot().Status != gameruntime.StatusFinished {
 		t.Fatalf("room=%+v result=%+v", storedRoom.Snapshot(), result)
+	}
+	var storedPolicy string
+	var policyVersion int64
+	var memberSnapshotAt time.Time
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT policy, policy_version, member_snapshot_completed_at
+		FROM game_session_replay_access WHERE session_id = $1
+	`, owner.Snapshot().ID).Scan(&storedPolicy, &policyVersion, &memberSnapshotAt); err != nil {
+		t.Fatal(err)
+	}
+	if storedPolicy != "participant" || policyVersion != 1 || memberSnapshotAt.IsZero() {
+		t.Fatalf("replay access policy=%q version=%d snapshot_at=%v", storedPolicy, policyVersion, memberSnapshotAt)
+	}
+	var memberCount int
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT count(*) FROM game_session_replay_members WHERE session_id = $1
+	`, owner.Snapshot().ID).Scan(&memberCount); err != nil {
+		t.Fatal(err)
+	}
+	if memberCount != len(owner.Snapshot().Participants)+1 {
+		t.Fatalf("replay member count=%d participants=%d", memberCount, len(owner.Snapshot().Participants))
+	}
+	replayRepository := NewReplayAccessRepository(fixture.Pool)
+	participant := owner.Snapshot().Participants[0].UserID
+	projectionPolicy, err := replayRepository.Authorize(ctx, participant, owner.Snapshot().RoomID, owner.Snapshot().ID)
+	if err != nil || projectionPolicy != game.ReplayAccessParticipant {
+		t.Fatalf("participant replay policy=%q err=%v", projectionPolicy, err)
+	}
+	if _, err := replayRepository.Authorize(ctx, spectatorID, owner.Snapshot().RoomID, owner.Snapshot().ID); !errors.Is(err, replay.ErrAccessDenied) {
+		t.Fatalf("default spectator replay error=%v", err)
+	}
+	access, err := replayRepository.SetPolicy(ctx, replay.SetPolicyCommand{
+		ActorUserID: participant, RoomID: owner.Snapshot().RoomID, SessionID: owner.Snapshot().ID,
+		Policy: replay.PolicyRoomMember, ExpectedVersion: 1, UpdatedAt: finishedAt.Add(time.Second),
+	})
+	if err != nil || access.Policy != replay.PolicyRoomMember || access.Version != 2 {
+		t.Fatalf("updated replay access=%+v err=%v", access, err)
+	}
+	projectionPolicy, err = replayRepository.Authorize(ctx, spectatorID, owner.Snapshot().RoomID, owner.Snapshot().ID)
+	if err != nil || projectionPolicy != game.ReplayAccessRoomMember {
+		t.Fatalf("historical member replay policy=%q err=%v", projectionPolicy, err)
+	}
+	if _, err := replayRepository.SetPolicy(ctx, replay.SetPolicyCommand{
+		ActorUserID: participant, RoomID: owner.Snapshot().RoomID, SessionID: owner.Snapshot().ID,
+		Policy: replay.PolicyPublic, ExpectedVersion: 2, UpdatedAt: finishedAt.Add(time.Second),
+	}); !errors.Is(err, replay.ErrPolicyUnavailable) {
+		t.Fatalf("private public replay policy error=%v", err)
+	}
+}
+
+func TestReplayAccessRepositoryAllowsPublicPolicyOnlyForPublicRoom(t *testing.T) {
+	fixture, repository, session, now := openGameSessionFixtureWithVisibility(t, roomDomain.VisibilityPublic)
+	ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+	defer cancel()
+	owner := acquireGameSessionForTest(t, ctx, repository, session, now.Add(time.Second))
+	finishedAt := now.Add(2 * time.Second)
+	room, err := NewRoomRepository(fixture.Pool).GetByID(ctx, owner.Snapshot().RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextRoom, err := room.FinishSession(owner.Snapshot().ID, room.Version(), finishedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := NewRoomGameSessionRepository(fixture.Pool).FinishAction(
+		ctx, room, nextRoom, buildGameFinishedActionCommit(t, owner, finishedAt),
+	); err != nil {
+		t.Fatal(err)
+	}
+	outsiderID := uuid.New()
+	createRoomTestUser(t, ctx, fixture, outsiderID, "ReplayPublic4", now)
+	replayRepository := NewReplayAccessRepository(fixture.Pool)
+	if _, err := replayRepository.Authorize(ctx, outsiderID, owner.Snapshot().RoomID, owner.Snapshot().ID); !errors.Is(err, replay.ErrAccessDenied) {
+		t.Fatalf("default public-room outsider replay error=%v", err)
+	}
+	hostID := owner.Snapshot().Participants[0].UserID
+	access, err := replayRepository.SetPolicy(ctx, replay.SetPolicyCommand{
+		ActorUserID: hostID, RoomID: owner.Snapshot().RoomID, SessionID: owner.Snapshot().ID,
+		Policy: replay.PolicyPublic, ExpectedVersion: 1, UpdatedAt: finishedAt.Add(time.Second),
+	})
+	if err != nil || access.Policy != replay.PolicyPublic {
+		t.Fatalf("public replay access=%+v err=%v", access, err)
+	}
+	policy, err := replayRepository.Authorize(ctx, outsiderID, owner.Snapshot().RoomID, owner.Snapshot().ID)
+	if err != nil || policy != game.ReplayAccessPublic {
+		t.Fatalf("public replay policy=%q err=%v", policy, err)
 	}
 }
 
@@ -1133,6 +1230,13 @@ func TestPendingParticipantRevocationFencesOnlyTerminalTransitions(t *testing.T)
 }
 
 func openGameSessionFixture(t *testing.T) (*integrationtest.PostgresSchema, *GameSessionRepository, gameruntime.Session, time.Time) {
+	return openGameSessionFixtureWithVisibility(t, roomDomain.VisibilityPrivate)
+}
+
+func openGameSessionFixtureWithVisibility(
+	t *testing.T,
+	visibility roomDomain.Visibility,
+) (*integrationtest.PostgresSchema, *GameSessionRepository, gameruntime.Session, time.Time) {
 	t.Helper()
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
@@ -1142,7 +1246,7 @@ func openGameSessionFixture(t *testing.T) (*integrationtest.PostgresSchema, *Gam
 	hostID, playerID := uuid.New(), uuid.New()
 	createRoomTestUser(t, ctx, fixture, hostID, "GameHost1", now)
 	createRoomTestUser(t, ctx, fixture, playerID, "GamePlayer2", now)
-	room, err := roomDomain.New(uuid.New(), hostID, "GAMEROOM1", roomDomain.VisibilityPrivate, 3, now)
+	room, err := roomDomain.New(uuid.New(), hostID, "GAMEROOM1", visibility, 3, now)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -689,6 +689,29 @@ func TestRuntimeServiceProjectsOnlyBoundedTerminalReplay(t *testing.T) {
 	}
 }
 
+func TestRuntimeServiceRejectsCancelledSessionReplay(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 2), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	_, cancelled, err := fixture.service.Cancel(t.Context(), CancelCommand{
+		RoomID: fixture.room.Snapshot().ID, SessionID: session.Snapshot().ID, ExpectedRoom: startedRoom.Version(),
+		OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewer := game.Viewer{Kind: game.ViewerReplay, UserID: game.Identifier(fixture.hostID.String())}
+	if _, err := fixture.service.ProjectReplay(t.Context(), cancelled.Snapshot().ID, viewer, game.ReplayAccessParticipant); !errors.Is(err, ErrReplayUnavailable) {
+		t.Fatalf("cancelled replay error=%v", err)
+	}
+}
+
 type runtimeServiceFixture struct {
 	service   *Service
 	authority *runtimeServiceAuthority

@@ -160,6 +160,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	roomRepository := postgres.NewRoomRepository(pool)
 	gameSessionRepository := postgres.NewGameSessionRepository(pool)
+	replayAccessRepository := postgres.NewReplayAccessRepository(pool)
 	gameRuntime, err := gametransport.NewRemoteRuntime(&http.Client{Timeout: 30 * time.Second}, gametransport.RemoteRuntimeConfig{
 		BootstrapURL: config.Realtime.BootstrapURL, PeerURLs: config.Realtime.PeerURLs,
 		InternalToken: config.Realtime.InternalToken,
@@ -205,7 +206,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	handler, err := transportHandler(
 		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameSessionRepository, roomRepository,
-		gameCoordinator, adminService, adminIdentityService,
+		replayAccessRepository, gameCoordinator, adminService, adminIdentityService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -422,6 +423,7 @@ func transportHandler(
 	gameRuntime gametransport.Runtime,
 	gameSessions *postgres.GameSessionRepository,
 	rooms *postgres.RoomRepository,
+	replays *postgres.ReplayAccessRepository,
 	gameCoordinator *redisstore.GameCoordinator,
 	adminService *admin.Service,
 	adminIdentityService *admin.IdentityService,
@@ -475,7 +477,7 @@ func transportHandler(
 		return nil, err
 	}
 	gameHandler, err := gametransport.NewService(
-		gameRuntime, gameSessions, rooms, gameAuthenticator, userOrigins, userCSRF,
+		gameRuntime, gameSessions, rooms, replays, gameAuthenticator, userOrigins, userCSRF,
 		gameCoordinator, gameCoordinator, source, gameConnectionTicketTTL,
 	)
 	if err != nil {

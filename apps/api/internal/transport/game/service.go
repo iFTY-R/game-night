@@ -17,6 +17,7 @@ import (
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	"github.com/iFTY-R/game-night/platform/replay"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/proto"
@@ -57,6 +58,7 @@ type Service struct {
 	runtime       Runtime
 	sessions      SessionReader
 	rooms         RoomReader
+	replays       replay.Repository
 	authenticator PrincipalAuthenticator
 	origins       *origin.UserValidator
 	csrf          *csrf.UserValidator
@@ -71,6 +73,7 @@ func NewService(
 	runtime Runtime,
 	sessions SessionReader,
 	rooms RoomReader,
+	replays replay.Repository,
 	authenticator PrincipalAuthenticator,
 	originValidator *origin.UserValidator,
 	csrfValidator *csrf.UserValidator,
@@ -79,13 +82,13 @@ func NewService(
 	source clock.Clock,
 	ticketTTL time.Duration,
 ) (*Service, error) {
-	if runtime == nil || sessions == nil || rooms == nil || authenticator == nil || originValidator == nil ||
+	if runtime == nil || sessions == nil || rooms == nil || replays == nil || authenticator == nil || originValidator == nil ||
 		csrfValidator == nil || tickets == nil || fanout == nil || source == nil ||
 		ticketTTL < redisstore.MinimumTicketTTL || ticketTTL > redisstore.MaximumTicketTTL {
 		return nil, gameruntime.ErrInvalidSessionInput
 	}
 	return &Service{
-		runtime: runtime, sessions: sessions, rooms: rooms, authenticator: authenticator,
+		runtime: runtime, sessions: sessions, rooms: rooms, replays: replays, authenticator: authenticator,
 		origins: originValidator, csrf: csrfValidator, tickets: tickets, fanout: fanout,
 		clock: source, ticketTTL: ticketTTL,
 	}, nil
@@ -238,7 +241,7 @@ func (service *Service) GetProjection(ctx context.Context, request *connect.Requ
 	}), nil
 }
 
-// GetReplayProjection derives replay scope from current membership and delegates all game disclosure to the module.
+// GetReplayProjection resolves persisted resource authorization before delegating field disclosure to the module.
 func (service *Service) GetReplayProjection(ctx context.Context, request *connect.Request[gamev1.GetReplayProjectionRequest]) (*connect.Response[gamev1.GetReplayProjectionResponse], error) {
 	actor, err := service.authenticate(ctx, requestHTTP(request))
 	if err != nil {
@@ -270,6 +273,53 @@ func (service *Service) GetReplayProjection(ctx context.Context, request *connec
 		Projection: projectionWire(projectedSession, authorized.viewer.Kind, projection, false),
 		Session:    sessionWire(projectedSession), Complete: true,
 	}), nil
+}
+
+// GetReplayAccess returns one terminal session's host-controlled resource policy to the current room host.
+func (service *Service) GetReplayAccess(ctx context.Context, request *connect.Request[gamev1.GetReplayAccessRequest]) (*connect.Response[gamev1.GetReplayAccessResponse], error) {
+	actor, err := service.authenticate(ctx, requestHTTP(request))
+	if err != nil {
+		return nil, err
+	}
+	if request == nil || request.Msg == nil {
+		return nil, replay.ErrInvalidInput
+	}
+	roomID, sessionID, err := parseRoomSession(request.Msg.GetRoomId(), request.Msg.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	access, err := service.replays.Get(ctx, actor, roomID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&gamev1.GetReplayAccessResponse{Access: replayAccessWire(access)}), nil
+}
+
+// SetReplayAccess updates one finished session's policy under Origin, CSRF, host, and policy-version authority.
+func (service *Service) SetReplayAccess(ctx context.Context, request *connect.Request[gamev1.SetReplayAccessRequest]) (*connect.Response[gamev1.SetReplayAccessResponse], error) {
+	actor, _, err := service.authenticateWrite(ctx, requestHTTP(request))
+	if err != nil {
+		return nil, err
+	}
+	if request == nil || request.Msg == nil || request.Msg.GetExpectedPolicyVersion() == 0 {
+		return nil, replay.ErrInvalidInput
+	}
+	roomID, sessionID, err := parseRoomSession(request.Msg.GetRoomId(), request.Msg.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	policy := replayPolicyDomain(request.Msg.GetPolicy())
+	if !policy.Valid() {
+		return nil, replay.ErrInvalidInput
+	}
+	access, err := service.replays.SetPolicy(ctx, replay.SetPolicyCommand{
+		ActorUserID: actor, RoomID: roomID, SessionID: sessionID, Policy: policy,
+		ExpectedVersion: request.Msg.GetExpectedPolicyVersion(), UpdatedAt: service.clock.Now().Round(0).UTC(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&gamev1.SetReplayAccessResponse{Access: replayAccessWire(access)}), nil
 }
 
 // FinishSession executes the module's host finish command under current PartyRoom host and exact-version authority.
@@ -434,20 +484,52 @@ func (service *Service) authorizeReplay(
 	if err != nil {
 		return authorizedViewer{}, "", err
 	}
-	if !session.Snapshot().Status.Terminal() {
+	if session.Snapshot().Status != gameruntime.StatusFinished {
 		return authorizedViewer{}, "", gameruntime.ErrReplayUnavailable
 	}
-	// A terminal replay keeps the frozen participant grant even after room removal;
-	// removal revokes live authority, but must not erase access to the completed game.
-	for _, participant := range session.Snapshot().Participants {
-		if participant.UserID == actor {
-			viewer := gameSDK.Viewer{Kind: gameSDK.ViewerReplay, UserID: gameSDK.Identifier(actor.String())}
-			return authorizedViewer{room: room, session: session, viewer: viewer}, gameSDK.ReplayAccessParticipant, nil
-		}
+	policy, err := service.replays.Authorize(ctx, actor, roomID, sessionID)
+	if err != nil {
+		return authorizedViewer{}, "", err
 	}
-	// Current membership is not a historical grant: spectators and users who join
-	// after this session ended need an explicit snapshot/public policy.
-	return authorizedViewer{}, "", gameruntime.ErrParticipantNotActive
+	viewer := gameSDK.Viewer{Kind: gameSDK.ViewerReplay, UserID: gameSDK.Identifier(actor.String())}
+	return authorizedViewer{room: room, session: session, viewer: viewer}, policy, nil
+}
+
+func replayPolicyDomain(value gamev1.ReplayAccessPolicy) replay.Policy {
+	switch value {
+	case gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_PARTICIPANT:
+		return replay.PolicyParticipant
+	case gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_ROOM_MEMBER:
+		return replay.PolicyRoomMember
+	case gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_PUBLIC:
+		return replay.PolicyPublic
+	default:
+		return ""
+	}
+}
+
+func replayPolicyWire(value replay.Policy) gamev1.ReplayAccessPolicy {
+	switch value {
+	case replay.PolicyParticipant:
+		return gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_PARTICIPANT
+	case replay.PolicyRoomMember:
+		return gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_ROOM_MEMBER
+	case replay.PolicyPublic:
+		return gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_PUBLIC
+	default:
+		return gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_UNSPECIFIED
+	}
+}
+
+func replayAccessWire(value replay.Access) *gamev1.ReplayAccess {
+	wire := &gamev1.ReplayAccess{
+		SessionId: value.SessionID.String(), RoomId: value.RoomID.String(), Policy: replayPolicyWire(value.Policy),
+		PolicyVersion: value.Version, UpdatedAt: timestamppb.New(value.UpdatedAt),
+	}
+	if !value.MemberSnapshotCompletedAt.IsZero() {
+		wire.MemberSnapshotCompletedAt = timestamppb.New(value.MemberSnapshotCompletedAt)
+	}
+	return wire
 }
 
 func (service *Service) loadRoomSession(

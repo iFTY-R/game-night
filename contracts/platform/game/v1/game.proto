@@ -12,6 +12,8 @@ service GameService {
   rpc GameAction(GameActionRequest) returns (GameActionResponse);
   rpc GetProjection(GetProjectionRequest) returns (GetProjectionResponse);
   rpc GetReplayProjection(GetReplayProjectionRequest) returns (GetReplayProjectionResponse);
+  rpc GetReplayAccess(GetReplayAccessRequest) returns (GetReplayAccessResponse);
+  rpc SetReplayAccess(SetReplayAccessRequest) returns (SetReplayAccessResponse);
   rpc FinishSession(FinishSessionRequest) returns (FinishSessionResponse);
   rpc OpenSubscription(OpenSubscriptionRequest) returns (OpenSubscriptionResponse);
 }
@@ -124,6 +126,43 @@ message GetReplayProjectionResponse {
   GameProjection projection = 1;
   GameSessionSummary session = 2;
   bool complete = 3;
+}
+
+// ReplayAccessPolicy controls resource authorization; game modules still decide which fields may be revealed.
+enum ReplayAccessPolicy {
+  REPLAY_ACCESS_POLICY_UNSPECIFIED = 0;
+  REPLAY_ACCESS_POLICY_PARTICIPANT = 1;
+  REPLAY_ACCESS_POLICY_ROOM_MEMBER = 2;
+  REPLAY_ACCESS_POLICY_PUBLIC = 3;
+}
+
+message ReplayAccess {
+  string session_id = 1;
+  string room_id = 2;
+  ReplayAccessPolicy policy = 3;
+  uint64 policy_version = 4;
+  google.protobuf.Timestamp member_snapshot_completed_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message GetReplayAccessRequest {
+  string room_id = 1;
+  string session_id = 2;
+}
+
+message GetReplayAccessResponse {
+  ReplayAccess access = 1;
+}
+
+message SetReplayAccessRequest {
+  string room_id = 1;
+  string session_id = 2;
+  ReplayAccessPolicy policy = 3;
+  uint64 expected_policy_version = 4;
+}
+
+message SetReplayAccessResponse {
+  ReplayAccess access = 1;
 }
 
 message FinishSessionRequest {

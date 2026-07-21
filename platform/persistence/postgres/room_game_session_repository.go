@@ -541,6 +541,21 @@ func finishPartyRoomAggregateCAS(
 	before roomDomain.RoomSnapshot,
 	after roomDomain.RoomSnapshot,
 ) (roomDomain.Room, error) {
+	// Freeze the exact terminal room membership before the PartyRoom pointer is cleared.
+	if err := queries.CaptureGameSessionReplayMembers(ctx, sqlcgen.CaptureGameSessionReplayMembersParams{
+		SessionID: uuidToPG(before.ActiveSessionID), RoomID: uuidToPG(before.ID),
+	}); err != nil {
+		return roomDomain.Room{}, err
+	}
+	completed, err := queries.CompleteGameSessionReplayMemberSnapshot(ctx, sqlcgen.CompleteGameSessionReplayMemberSnapshotParams{
+		CompletedAt: timeToPG(after.UpdatedAt), SessionID: uuidToPG(before.ActiveSessionID), RoomID: uuidToPG(before.ID),
+	})
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	if completed != 1 {
+		return roomDomain.Room{}, gameruntime.ErrGameSessionIntegrity
+	}
 	row, err := queries.FinishPartyRoomCAS(ctx, sqlcgen.FinishPartyRoomCASParams{
 		RoomVersion: int64(after.RoomVersion), UpdatedAt: timeToPG(after.UpdatedAt), RoomID: uuidToPG(before.ID),
 		ActiveSessionID: uuidToPG(before.ActiveSessionID), ActiveGameID: pgtype.Text{String: before.ActiveGameID, Valid: true},

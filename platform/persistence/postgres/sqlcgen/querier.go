@@ -193,6 +193,14 @@ type Querier interface {
 	//    AND admin_version = $5
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	BootstrapAdminPasswordCAS(ctx context.Context, arg BootstrapAdminPasswordCASParams) (BootstrapAdminPasswordCASRow, error)
+	//CaptureGameSessionReplayMembers
+	//
+	//  INSERT INTO game_session_replay_members (session_id, user_id, role)
+	//  SELECT $1, member.user_id, member.role
+	//  FROM room_members AS member
+	//  WHERE member.room_id = $2
+	//  ORDER BY member.user_id
+	CaptureGameSessionReplayMembers(ctx context.Context, arg CaptureGameSessionReplayMembersParams) error
 	//ChangeCurrentUsernameCAS
 	//
 	//  UPDATE users
@@ -238,6 +246,15 @@ type Querier interface {
 	//    AND username_claims.reserved_until <= $4
 	//  RETURNING username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 	ClaimUsername(ctx context.Context, arg ClaimUsernameParams) (UsernameClaim, error)
+	//CompleteGameSessionReplayMemberSnapshot
+	//
+	//  UPDATE game_session_replay_access
+	//  SET member_snapshot_completed_at = $1,
+	//      updated_at = $1
+	//  WHERE session_id = $2
+	//    AND room_id = $3
+	//    AND member_snapshot_completed_at IS NULL
+	CompleteGameSessionReplayMemberSnapshot(ctx context.Context, arg CompleteGameSessionReplayMemberSnapshotParams) (int64, error)
 	//CompleteGameSystemInboxCAS
 	//
 	//  UPDATE game_system_inbox
@@ -791,6 +808,14 @@ type Querier interface {
 	//  INSERT INTO game_session_participants (session_id, user_id, seat_index)
 	//  VALUES ($1, $2, $3)
 	CreateGameSessionParticipant(ctx context.Context, arg CreateGameSessionParticipantParams) error
+	//CreateGameSessionReplayAccess
+	//
+	//  INSERT INTO game_session_replay_access (
+	//      session_id, room_id, policy, policy_version, created_at, updated_at
+	//  ) VALUES (
+	//      $1, $2, 'participant', 1, $3, $4
+	//  )
+	CreateGameSessionReplayAccess(ctx context.Context, arg CreateGameSessionReplayAccessParams) error
 	//CreateGameSessionStartReceipt
 	//
 	//  INSERT INTO game_session_start_receipts (
@@ -1453,6 +1478,29 @@ type Querier interface {
 	//  WHERE session_id = $1
 	//  FOR UPDATE
 	GetGameSessionForUpdate(ctx context.Context, arg GetGameSessionForUpdateParams) (GameSession, error)
+	//GetGameSessionReplayAccess
+	//
+	//  SELECT access.session_id, access.room_id, access.policy, access.policy_version,
+	//      access.member_snapshot_completed_at, access.created_at, access.updated_at,
+	//      session.status AS session_status, room.visibility AS room_visibility, room.host_user_id,
+	//      EXISTS (
+	//          SELECT 1
+	//          FROM game_session_participants AS participant
+	//          WHERE participant.session_id = access.session_id
+	//            AND participant.user_id = $1
+	//      ) AS actor_participated,
+	//      EXISTS (
+	//          SELECT 1
+	//          FROM game_session_replay_members AS member
+	//          WHERE member.session_id = access.session_id
+	//            AND member.user_id = $1
+	//      ) AS actor_was_room_member
+	//  FROM game_session_replay_access AS access
+	//  JOIN game_sessions AS session ON session.session_id = access.session_id
+	//  JOIN party_rooms AS room ON room.room_id = access.room_id
+	//  WHERE access.session_id = $2
+	//    AND access.room_id = $3
+	GetGameSessionReplayAccess(ctx context.Context, arg GetGameSessionReplayAccessParams) (GetGameSessionReplayAccessRow, error)
 	//GetGameSessionRoomID
 	//
 	//  SELECT room_id
@@ -2386,6 +2434,26 @@ type Querier interface {
 	//    AND updated_at = $8
 	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 	SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsernameCASParams) (User, error)
+	//SetGameSessionReplayPolicyCAS
+	//
+	//  UPDATE game_session_replay_access AS access
+	//  SET policy = $1,
+	//      policy_version = access.policy_version + 1,
+	//      updated_at = $2
+	//  FROM game_sessions AS session, party_rooms AS room
+	//  WHERE access.session_id = $3
+	//    AND access.room_id = $4
+	//    AND access.policy_version = $5
+	//    AND $2 > access.updated_at
+	//    AND access.member_snapshot_completed_at IS NOT NULL
+	//    AND session.session_id = access.session_id
+	//    AND session.status = 'finished'
+	//    AND room.room_id = access.room_id
+	//    AND room.host_user_id = $6
+	//    AND ($1::text <> 'public' OR room.visibility = 'public')
+	//  RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
+	//      access.member_snapshot_completed_at, access.created_at, access.updated_at
+	SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGameSessionReplayPolicyCASParams) (GameSessionReplayAccess, error)
 	//TouchAdminSessionCAS
 	//
 	//  UPDATE admin_sessions

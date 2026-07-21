@@ -24,6 +24,7 @@ import (
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	"github.com/iFTY-R/game-night/platform/replay"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/proto"
@@ -219,6 +220,36 @@ func TestGameServiceReplayDoesNotTreatCurrentSpectatorAsHistoricalMember(t *test
 	}
 }
 
+func TestGameServiceHostCanReadAndUpdateReplayAccessPolicy(t *testing.T) {
+	fixture := newGameTransportFixture(t, true)
+	client := fixture.client(t)
+	getRequest := connect.NewRequest(&gamev1.GetReplayAccessRequest{RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String()})
+	authorizeGameRead(getRequest, "host-device")
+	access, err := client.GetReplayAccess(t.Context(), getRequest)
+	if err != nil || access.Msg.GetAccess().GetPolicy() != gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_PARTICIPANT || access.Msg.GetAccess().GetPolicyVersion() != 1 {
+		t.Fatalf("access=%+v err=%v", access, err)
+	}
+	setRequest := connect.NewRequest(&gamev1.SetReplayAccessRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		Policy: gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_ROOM_MEMBER, ExpectedPolicyVersion: 1,
+	})
+	authorizeGameWrite(setRequest, "host-device")
+	updated, err := client.SetReplayAccess(t.Context(), setRequest)
+	if err != nil || updated.Msg.GetAccess().GetPolicy() != gamev1.ReplayAccessPolicy_REPLAY_ACCESS_POLICY_ROOM_MEMBER || updated.Msg.GetAccess().GetPolicyVersion() != 2 {
+		t.Fatalf("updated access=%+v err=%v", updated, err)
+	}
+}
+
+func TestGameServiceReplayAccessRequiresCurrentHost(t *testing.T) {
+	fixture := newGameTransportFixture(t, true)
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayAccessRequest{RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String()})
+	authorizeGameRead(request, "player-device")
+	if _, err := client.GetReplayAccess(t.Context(), request); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("non-host replay access error = %v", err)
+	}
+}
+
 func TestGameServiceReplayRetainsFrozenParticipantAccessAfterRemoval(t *testing.T) {
 	fixture := newGameTransportFixture(t, true)
 	now := fixture.room.Snapshot().UpdatedAt.Add(time.Second)
@@ -285,6 +316,7 @@ type gameTransportFixture struct {
 	fanout                        *gameTransportFanout
 	authenticator                 *gameTransportAuthenticator
 	clock                         *clock.Fake
+	replays                       *gameTransportReplayRepository
 }
 
 func newGameTransportFixture(t testing.TB, terminal bool) *gameTransportFixture {
@@ -328,6 +360,14 @@ func newGameTransportFixture(t testing.TB, terminal bool) *gameTransportFixture 
 		AllowedActions: []gameSDK.Identifier{"round.roll", finishAction},
 	}
 	runtime := &gameTransportRuntime{room: room, session: session, projection: projection}
+	replays := &gameTransportReplayRepository{
+		hostID: hostID,
+		access: replay.Access{
+			SessionID: sessionID, RoomID: roomID, Policy: replay.PolicyParticipant, Version: 1,
+			MemberSnapshotCompletedAt: endedAt, CreatedAt: now, UpdatedAt: now.Add(time.Second),
+		},
+		policies: map[uuid.UUID]gameSDK.ReplayAccessPolicy{hostID: gameSDK.ReplayAccessParticipant, playerID: gameSDK.ReplayAccessParticipant},
+	}
 	return &gameTransportFixture{
 		hostID: hostID, playerID: playerID, spectatorID: spectatorID,
 		roomID: roomID, sessionID: sessionID, room: room, session: session, runtime: runtime,
@@ -335,7 +375,7 @@ func newGameTransportFixture(t testing.TB, terminal bool) *gameTransportFixture 
 		authenticator: &gameTransportAuthenticator{actors: map[string]uuid.UUID{
 			"host-device": hostID, "player-device": playerID, "spectator-device": spectatorID,
 		}},
-		clock: clock.NewFake(now.Add(2 * time.Second)),
+		clock: clock.NewFake(now.Add(2 * time.Second)), replays: replays,
 	}
 }
 
@@ -347,7 +387,7 @@ func (fixture *gameTransportFixture) client(t testing.TB) gamev1connect.GameServ
 	}
 	service, err := NewService(
 		fixture.runtime, gameTransportSessionReader{session: fixture.session}, gameTransportRoomReader{room: fixture.room},
-		fixture.authenticator, origins, csrf.NewUserValidator(), fixture.tickets, fixture.fanout,
+		fixture.replays, fixture.authenticator, origins, csrf.NewUserValidator(), fixture.tickets, fixture.fanout,
 		fixture.clock, 30*time.Second,
 	)
 	if err != nil {
@@ -422,6 +462,40 @@ type gameTransportRoomReader struct{ room roomDomain.Room }
 
 func (reader gameTransportRoomReader) GetByID(context.Context, uuid.UUID) (roomDomain.Room, error) {
 	return reader.room, nil
+}
+
+type gameTransportReplayRepository struct {
+	hostID   uuid.UUID
+	access   replay.Access
+	policies map[uuid.UUID]gameSDK.ReplayAccessPolicy
+}
+
+func (repository *gameTransportReplayRepository) Authorize(_ context.Context, actorID, roomID, sessionID uuid.UUID) (gameSDK.ReplayAccessPolicy, error) {
+	if roomID != repository.access.RoomID || sessionID != repository.access.SessionID || repository.access.MemberSnapshotCompletedAt.IsZero() {
+		return "", replay.ErrPolicyUnavailable
+	}
+	policy, allowed := repository.policies[actorID]
+	if !allowed {
+		return "", replay.ErrAccessDenied
+	}
+	return policy, nil
+}
+
+func (repository *gameTransportReplayRepository) Get(_ context.Context, actorID, roomID, sessionID uuid.UUID) (replay.Access, error) {
+	if actorID == uuid.Nil || actorID != repository.hostID || roomID != repository.access.RoomID || sessionID != repository.access.SessionID {
+		return replay.Access{}, replay.ErrAccessDenied
+	}
+	return repository.access, nil
+}
+
+func (repository *gameTransportReplayRepository) SetPolicy(_ context.Context, command replay.SetPolicyCommand) (replay.Access, error) {
+	if command.ActorUserID != repository.hostID || command.ExpectedVersion != repository.access.Version {
+		return replay.Access{}, replay.ErrPolicyConflict
+	}
+	repository.access.Policy = command.Policy
+	repository.access.Version++
+	repository.access.UpdatedAt = command.UpdatedAt
+	return repository.access, nil
 }
 
 type gameTransportTickets struct{ grant []byte }

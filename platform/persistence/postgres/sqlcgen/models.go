@@ -252,6 +252,22 @@ type GameSessionParticipant struct {
 	SeatIndex int32       `json:"seat_index"`
 }
 
+type GameSessionReplayAccess struct {
+	SessionID                 pgtype.UUID        `json:"session_id"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	Policy                    string             `json:"policy"`
+	PolicyVersion             int64              `json:"policy_version"`
+	MemberSnapshotCompletedAt pgtype.Timestamptz `json:"member_snapshot_completed_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GameSessionReplayMember struct {
+	SessionID pgtype.UUID `json:"session_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Role      string      `json:"role"`
+}
+
 type GameSessionStartReceipt struct {
 	ActorUserID   pgtype.UUID        `json:"actor_user_id"`
 	RoomID        pgtype.UUID        `json:"room_id"`

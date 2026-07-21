@@ -19,6 +19,7 @@ import (
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
+	"github.com/iFTY-R/game-night/platform/replay"
 	"github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
@@ -110,6 +111,12 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_MODULE_UNAVAILABLE, "game.module.unavailable"}
 	case stderrors.Is(err, gameruntime.ErrReplayUnavailable):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, "game.replay.unavailable"}
+	case stderrors.Is(err, replay.ErrAccessDenied):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, "game.replay.forbidden"}
+	case stderrors.Is(err, replay.ErrPolicyConflict):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT, "game.replay.access_conflict"}
+	case stderrors.Is(err, replay.ErrPolicyUnavailable):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE, "game.replay.access_unavailable"}
 	case stderrors.Is(err, gameruntime.ErrProjectionUnsafe):
 		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PROJECTION_UNSAFE, "game.projection.unsafe"}
 	case stderrors.Is(err, room.ErrRoomCodeUnavailable):

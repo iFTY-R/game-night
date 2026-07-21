@@ -44,6 +44,12 @@ const (
 	// GameServiceGetReplayProjectionProcedure is the fully-qualified name of the GameService's
 	// GetReplayProjection RPC.
 	GameServiceGetReplayProjectionProcedure = "/platform.game.v1.GameService/GetReplayProjection"
+	// GameServiceGetReplayAccessProcedure is the fully-qualified name of the GameService's
+	// GetReplayAccess RPC.
+	GameServiceGetReplayAccessProcedure = "/platform.game.v1.GameService/GetReplayAccess"
+	// GameServiceSetReplayAccessProcedure is the fully-qualified name of the GameService's
+	// SetReplayAccess RPC.
+	GameServiceSetReplayAccessProcedure = "/platform.game.v1.GameService/SetReplayAccess"
 	// GameServiceFinishSessionProcedure is the fully-qualified name of the GameService's FinishSession
 	// RPC.
 	GameServiceFinishSessionProcedure = "/platform.game.v1.GameService/FinishSession"
@@ -58,6 +64,8 @@ type GameServiceClient interface {
 	GameAction(context.Context, *connect.Request[v1.GameActionRequest]) (*connect.Response[v1.GameActionResponse], error)
 	GetProjection(context.Context, *connect.Request[v1.GetProjectionRequest]) (*connect.Response[v1.GetProjectionResponse], error)
 	GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error)
+	GetReplayAccess(context.Context, *connect.Request[v1.GetReplayAccessRequest]) (*connect.Response[v1.GetReplayAccessResponse], error)
+	SetReplayAccess(context.Context, *connect.Request[v1.SetReplayAccessRequest]) (*connect.Response[v1.SetReplayAccessResponse], error)
 	FinishSession(context.Context, *connect.Request[v1.FinishSessionRequest]) (*connect.Response[v1.FinishSessionResponse], error)
 	OpenSubscription(context.Context, *connect.Request[v1.OpenSubscriptionRequest]) (*connect.Response[v1.OpenSubscriptionResponse], error)
 }
@@ -97,6 +105,18 @@ func NewGameServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(gameServiceMethods.ByName("GetReplayProjection")),
 			connect.WithClientOptions(opts...),
 		),
+		getReplayAccess: connect.NewClient[v1.GetReplayAccessRequest, v1.GetReplayAccessResponse](
+			httpClient,
+			baseURL+GameServiceGetReplayAccessProcedure,
+			connect.WithSchema(gameServiceMethods.ByName("GetReplayAccess")),
+			connect.WithClientOptions(opts...),
+		),
+		setReplayAccess: connect.NewClient[v1.SetReplayAccessRequest, v1.SetReplayAccessResponse](
+			httpClient,
+			baseURL+GameServiceSetReplayAccessProcedure,
+			connect.WithSchema(gameServiceMethods.ByName("SetReplayAccess")),
+			connect.WithClientOptions(opts...),
+		),
 		finishSession: connect.NewClient[v1.FinishSessionRequest, v1.FinishSessionResponse](
 			httpClient,
 			baseURL+GameServiceFinishSessionProcedure,
@@ -118,6 +138,8 @@ type gameServiceClient struct {
 	gameAction          *connect.Client[v1.GameActionRequest, v1.GameActionResponse]
 	getProjection       *connect.Client[v1.GetProjectionRequest, v1.GetProjectionResponse]
 	getReplayProjection *connect.Client[v1.GetReplayProjectionRequest, v1.GetReplayProjectionResponse]
+	getReplayAccess     *connect.Client[v1.GetReplayAccessRequest, v1.GetReplayAccessResponse]
+	setReplayAccess     *connect.Client[v1.SetReplayAccessRequest, v1.SetReplayAccessResponse]
 	finishSession       *connect.Client[v1.FinishSessionRequest, v1.FinishSessionResponse]
 	openSubscription    *connect.Client[v1.OpenSubscriptionRequest, v1.OpenSubscriptionResponse]
 }
@@ -142,6 +164,16 @@ func (c *gameServiceClient) GetReplayProjection(ctx context.Context, req *connec
 	return c.getReplayProjection.CallUnary(ctx, req)
 }
 
+// GetReplayAccess calls platform.game.v1.GameService.GetReplayAccess.
+func (c *gameServiceClient) GetReplayAccess(ctx context.Context, req *connect.Request[v1.GetReplayAccessRequest]) (*connect.Response[v1.GetReplayAccessResponse], error) {
+	return c.getReplayAccess.CallUnary(ctx, req)
+}
+
+// SetReplayAccess calls platform.game.v1.GameService.SetReplayAccess.
+func (c *gameServiceClient) SetReplayAccess(ctx context.Context, req *connect.Request[v1.SetReplayAccessRequest]) (*connect.Response[v1.SetReplayAccessResponse], error) {
+	return c.setReplayAccess.CallUnary(ctx, req)
+}
+
 // FinishSession calls platform.game.v1.GameService.FinishSession.
 func (c *gameServiceClient) FinishSession(ctx context.Context, req *connect.Request[v1.FinishSessionRequest]) (*connect.Response[v1.FinishSessionResponse], error) {
 	return c.finishSession.CallUnary(ctx, req)
@@ -158,6 +190,8 @@ type GameServiceHandler interface {
 	GameAction(context.Context, *connect.Request[v1.GameActionRequest]) (*connect.Response[v1.GameActionResponse], error)
 	GetProjection(context.Context, *connect.Request[v1.GetProjectionRequest]) (*connect.Response[v1.GetProjectionResponse], error)
 	GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error)
+	GetReplayAccess(context.Context, *connect.Request[v1.GetReplayAccessRequest]) (*connect.Response[v1.GetReplayAccessResponse], error)
+	SetReplayAccess(context.Context, *connect.Request[v1.SetReplayAccessRequest]) (*connect.Response[v1.SetReplayAccessResponse], error)
 	FinishSession(context.Context, *connect.Request[v1.FinishSessionRequest]) (*connect.Response[v1.FinishSessionResponse], error)
 	OpenSubscription(context.Context, *connect.Request[v1.OpenSubscriptionRequest]) (*connect.Response[v1.OpenSubscriptionResponse], error)
 }
@@ -193,6 +227,18 @@ func NewGameServiceHandler(svc GameServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(gameServiceMethods.ByName("GetReplayProjection")),
 		connect.WithHandlerOptions(opts...),
 	)
+	gameServiceGetReplayAccessHandler := connect.NewUnaryHandler(
+		GameServiceGetReplayAccessProcedure,
+		svc.GetReplayAccess,
+		connect.WithSchema(gameServiceMethods.ByName("GetReplayAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
+	gameServiceSetReplayAccessHandler := connect.NewUnaryHandler(
+		GameServiceSetReplayAccessProcedure,
+		svc.SetReplayAccess,
+		connect.WithSchema(gameServiceMethods.ByName("SetReplayAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
 	gameServiceFinishSessionHandler := connect.NewUnaryHandler(
 		GameServiceFinishSessionProcedure,
 		svc.FinishSession,
@@ -215,6 +261,10 @@ func NewGameServiceHandler(svc GameServiceHandler, opts ...connect.HandlerOption
 			gameServiceGetProjectionHandler.ServeHTTP(w, r)
 		case GameServiceGetReplayProjectionProcedure:
 			gameServiceGetReplayProjectionHandler.ServeHTTP(w, r)
+		case GameServiceGetReplayAccessProcedure:
+			gameServiceGetReplayAccessHandler.ServeHTTP(w, r)
+		case GameServiceSetReplayAccessProcedure:
+			gameServiceSetReplayAccessHandler.ServeHTTP(w, r)
 		case GameServiceFinishSessionProcedure:
 			gameServiceFinishSessionHandler.ServeHTTP(w, r)
 		case GameServiceOpenSubscriptionProcedure:
@@ -242,6 +292,14 @@ func (UnimplementedGameServiceHandler) GetProjection(context.Context, *connect.R
 
 func (UnimplementedGameServiceHandler) GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.game.v1.GameService.GetReplayProjection is not implemented"))
+}
+
+func (UnimplementedGameServiceHandler) GetReplayAccess(context.Context, *connect.Request[v1.GetReplayAccessRequest]) (*connect.Response[v1.GetReplayAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.game.v1.GameService.GetReplayAccess is not implemented"))
+}
+
+func (UnimplementedGameServiceHandler) SetReplayAccess(context.Context, *connect.Request[v1.SetReplayAccessRequest]) (*connect.Response[v1.SetReplayAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.game.v1.GameService.SetReplayAccess is not implemented"))
 }
 
 func (UnimplementedGameServiceHandler) FinishSession(context.Context, *connect.Request[v1.FinishSessionRequest]) (*connect.Response[v1.FinishSessionResponse], error) {

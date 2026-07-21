@@ -849,7 +849,8 @@ func (service *Service) ProjectReplayCurrent(
 		return Session{}, game.Projection{}, err
 	}
 	snapshot := session.Snapshot()
-	if !snapshot.Status.Terminal() {
+	// Cancellation is a governance terminal state, not a completed game result.
+	if snapshot.Status != StatusFinished {
 		return Session{}, game.Projection{}, ErrReplayUnavailable
 	}
 	module, err := service.registry.Resolve(snapshot.VersionKey)

@@ -50,6 +50,74 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	assertExpectedTables(t, ctx, fixture.Pool)
 }
 
+func TestReplayAccessMigrationBackfillsExistingSessionsWithoutInventingMemberSnapshot(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 21); err != nil {
+		t.Fatal(err)
+	}
+	userID, roomID, sessionID := "10000000-0000-4000-8000-000000000001", "20000000-0000-4000-8000-000000000001", "30000000-0000-4000-8000-000000000001"
+	tx, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	statements := []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO users (user_id, status, created_at, updated_at)
+			VALUES ($1, 'onboarding', now() - interval '2 hours', now() - interval '2 hours')`, []any{userID}},
+		{`INSERT INTO party_rooms (
+			room_id, room_code, visibility, status, host_user_id, participant_capacity,
+			participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
+		) VALUES ($1, 'REPLAY22', 'private', 'lobby', $2, 4, 'closed', 'closed', 1, 1, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO room_members (room_id, user_id, role, seat_index, joined_at, last_seen_at)
+			VALUES ($1, $2, 'participant', 0, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO game_sessions (
+			session_id, room_id, game_id, engine_version, protocol_version, client_version,
+			state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+			state_payload, status, started_at, updated_at, ended_at
+		) VALUES (
+			$1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0', 1, 1, 1,
+			'session.finished', 1, decode('00', 'hex'), 'finished', now() - interval '1 hour', now(), now()
+		)`, []any{sessionID, roomID}},
+		{`INSERT INTO game_session_participants (session_id, user_id, seat_index) VALUES ($1, $2, 0)`, []any{sessionID, userID}},
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(ctx, statement.sql, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 22); err != nil {
+		t.Fatal(err)
+	}
+	var policy string
+	var version int64
+	var snapshotAt sql.NullTime
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT policy, policy_version, member_snapshot_completed_at
+		FROM game_session_replay_access WHERE session_id = $1
+	`, sessionID).Scan(&policy, &version, &snapshotAt); err != nil {
+		t.Fatal(err)
+	}
+	if policy != "participant" || version != 1 || snapshotAt.Valid {
+		t.Fatalf("backfilled replay access policy=%q version=%d snapshot=%v", policy, version, snapshotAt)
+	}
+}
+
 func TestIdentityInvariantMigrationAcceptsValidVersionEightRows(t *testing.T) {
 	ctx, fixture, database, migrationsDir := openMigrationEightTest(t)
 	_, err := fixture.Pool.Exec(ctx, `
@@ -800,6 +868,8 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"game_session_event_batches",
 		"game_session_events",
 		"game_session_participants",
+		"game_session_replay_access",
+		"game_session_replay_members",
 		"game_session_start_receipts",
 		"game_session_timers",
 		"game_sessions",

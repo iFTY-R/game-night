@@ -68,6 +68,8 @@ const (
 	BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REQUEST_DIGEST_INVALID       BusinessErrorCode = 39
 	BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN             BusinessErrorCode = 40
 	BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE     BusinessErrorCode = 41
+	BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT       BusinessErrorCode = 42
+	BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE    BusinessErrorCode = 43
 )
 
 // Enum value maps for BusinessErrorCode.
@@ -115,6 +117,8 @@ var (
 		39: "BUSINESS_ERROR_CODE_GAME_REQUEST_DIGEST_INVALID",
 		40: "BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN",
 		41: "BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE",
+		42: "BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT",
+		43: "BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE",
 	}
 	BusinessErrorCode_value = map[string]int32{
 		"BUSINESS_ERROR_CODE_UNSPECIFIED":                       0,
@@ -159,6 +163,8 @@ var (
 		"BUSINESS_ERROR_CODE_GAME_REQUEST_DIGEST_INVALID":       39,
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN":             40,
 		"BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE":     41,
+		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT":       42,
+		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE":    43,
 	}
 )
 
@@ -268,7 +274,7 @@ const file_platform_common_v1_error_proto_rawDesc = "" +
 	"\vmessage_key\x18\x02 \x01(\tR\n" +
 	"messageKey\x125\n" +
 	"\bretry_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aretryAt\x12M\n" +
-	"\x10field_violations\x18\x04 \x03(\v2\".platform.common.v1.FieldViolationR\x0ffieldViolations*\x97\x0f\n" +
+	"\x10field_violations\x18\x04 \x03(\v2\".platform.common.v1.FieldViolationR\x0ffieldViolations*\x84\x10\n" +
 	"\x11BusinessErrorCode\x12#\n" +
 	"\x1fBUSINESS_ERROR_CODE_UNSPECIFIED\x10\x00\x124\n" +
 	"0BUSINESS_ERROR_CODE_IDENTITY_ONBOARDING_REQUIRED\x10\x01\x12(\n" +
@@ -312,7 +318,9 @@ const file_platform_common_v1_error_proto_rawDesc = "" +
 	"*BUSINESS_ERROR_CODE_GAME_PROJECTION_UNSAFE\x10&\x123\n" +
 	"/BUSINESS_ERROR_CODE_GAME_REQUEST_DIGEST_INVALID\x10'\x12-\n" +
 	")BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN\x10(\x125\n" +
-	"1BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE\x10)BKZIgithub.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1b\x06proto3"
+	"1BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE\x10)\x123\n" +
+	"/BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT\x10*\x126\n" +
+	"2BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE\x10+BKZIgithub.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1;commonv1b\x06proto3"
 
 var (
 	file_platform_common_v1_error_proto_rawDescOnce sync.Once

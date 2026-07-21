@@ -53,6 +53,8 @@ var GameOperations = []string{
 	gamev1connect.GameServiceGameActionProcedure,
 	gamev1connect.GameServiceGetProjectionProcedure,
 	gamev1connect.GameServiceGetReplayProjectionProcedure,
+	gamev1connect.GameServiceGetReplayAccessProcedure,
+	gamev1connect.GameServiceSetReplayAccessProcedure,
 	gamev1connect.GameServiceFinishSessionProcedure,
 	gamev1connect.GameServiceOpenSubscriptionProcedure,
 }

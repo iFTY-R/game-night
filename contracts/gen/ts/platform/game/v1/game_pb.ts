@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/game/v1/game.proto.
  */
 export const file_platform_game_v1_game: GenFile = /*@__PURE__*/
-  fileDesc("ChtwbGF0Zm9ybS9nYW1lL3YxL2dhbWUucHJvdG8SEHBsYXRmb3JtLmdhbWUudjEiQAoMVmVyc2lvblR1cGxlEg4KBmVuZ2luZRgBIAEoCRIQCghwcm90b2NvbBgCIAEoCRIOCgZjbGllbnQYAyABKAkijwEKDEdhbWVFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEi8KB3ZlcnNpb24YAiABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLlZlcnNpb25UdXBsZRIWCg5zY2hlbWFfdmVyc2lvbhgDIAEoDRIUCgxtZXNzYWdlX3R5cGUYBCABKAkSDwoHcGF5bG9hZBgFIAEoDCJcCgpHYW1lQ29uZmlnEg8KB2dhbWVfaWQYASABKAkSFgoOc2NoZW1hX3ZlcnNpb24YAiABKA0SFAoMbWVzc2FnZV90eXBlGAMgASgJEg8KB3BheWxvYWQYBCABKAwi4AEKEkdhbWVTZXNzaW9uU3VtbWFyeRISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSDwoHZ2FtZV9pZBgDIAEoCRIvCgd2ZXJzaW9uGAQgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5WZXJzaW9uVHVwbGUSFQoNc3RhdGVfdmVyc2lvbhgFIAEoBBIXCg9vd25lcnNoaXBfZXBvY2gYBiABKAQSMwoGc3RhdHVzGAcgASgOMiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN0YXR1cyLXAQoTU3RhcnRTZXNzaW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSHQoVZXhwZWN0ZWRfcm9vbV92ZXJzaW9uGAMgASgEEiMKG2V4cGVjdGVkX21lbWJlcnNoaXBfdmVyc2lvbhgEIAEoBBIsCgZjb25maWcYBSABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVDb25maWcSFAoMb3BlcmF0aW9uX2lkGAYgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAcgASgMIoMBChRTdGFydFNlc3Npb25SZXNwb25zZRI1CgdzZXNzaW9uGAEgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSNAoKcHJvamVjdGlvbhgCIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb24itAEKEUdhbWVBY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIRCglhY3Rpb25faWQYAyABKAkSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgEIAEoBBIvCgdjb21tYW5kGAUgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYBiABKAwi4wEKEkdhbWVBY3Rpb25SZXNwb25zZRISCgpzZXNzaW9uX2lkGAEgASgJEhUKDXN0YXRlX3ZlcnNpb24YAiABKAQSEwoLcmVzdWx0X2NvZGUYAyABKAkSFQoNcmVzdWx0X2RpZ2VzdBgEIAEoDBI0Cgpwcm9qZWN0aW9uGAUgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhIQCghyZXBsYXllZBgGIAEoCBIuCgdyZWNlaXB0GAcgASgLMh0ucGxhdGZvcm0uZ2FtZS52MS5HYW1lUmVjZWlwdCJuChRHZXRQcm9qZWN0aW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQihAEKFUdldFByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkikwEKGkdldFJlcGxheVByb2plY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIdChV0aHJvdWdoX3N0YXRlX3ZlcnNpb24YBCABKAQinAEKG0dldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSEAoIY29tcGxldGUYAyABKAgilwIKFEZpbmlzaFNlc3Npb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIUCgxvcGVyYXRpb25faWQYAyABKAkSFwoPc291cmNlX2V2ZW50X2lkGAQgASgJEh0KFWV4cGVjdGVkX3Jvb21fdmVyc2lvbhgFIAEoBBIjChtleHBlY3RlZF9tZW1iZXJzaGlwX3ZlcnNpb24YBiABKAQSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgHIAEoBBIvCgdjb21tYW5kGAggASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYCSABKAwixgEKFUZpbmlzaFNlc3Npb25SZXNwb25zZRI1CgdzZXNzaW9uGAEgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSLgoHcmVjZWlwdBgCIAEoCzIdLnBsYXRmb3JtLmdhbWUudjEuR2FtZVJlY2VpcHQSNAoKcHJvamVjdGlvbhgDIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb24SEAoIcmVwbGF5ZWQYBCABKAgipgEKFEdhbWVTdWJzY3JpYmVSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIaChJsYXN0X3N0YXRlX3ZlcnNpb24YBCABKAQSGgoSbGFzdF9ldmVudF9vcmRpbmFsGAUgASgNIrUBCg5HYW1lUHJvamVjdGlvbhISCgpzZXNzaW9uX2lkGAEgASgJEhUKDXN0YXRlX3ZlcnNpb24YAiABKAQSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSLAoEdmlldxgEIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhcKD2FsbG93ZWRfYWN0aW9ucxgFIAMoCSKLAgoJR2FtZURlbHRhEhIKCnNlc3Npb25faWQYASABKAkSGgoSZnJvbV9zdGF0ZV92ZXJzaW9uGAIgASgEEhgKEHRvX3N0YXRlX3ZlcnNpb24YAyABKAQSMQoLdmlld2VyX2tpbmQYBCABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSMAoIbWVzc2FnZXMYBSADKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIaChJmcm9tX2V2ZW50X29yZGluYWwYBiABKA0SGAoQdG9fZXZlbnRfb3JkaW5hbBgHIAEoDRIZChFzbmFwc2hvdF9mYWxsYmFjaxgIIAEoCCKpAQoXT3BlblN1YnNjcmlwdGlvblJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEjEKC3ZpZXdlcl9raW5kGAMgASgOMhwucGxhdGZvcm0uZ2FtZS52MS5WaWV3ZXJLaW5kEhoKEmxhc3Rfc3RhdGVfdmVyc2lvbhgEIAEoBBIaChJsYXN0X2V2ZW50X29yZGluYWwYBSABKA0i1gEKGE9wZW5TdWJzY3JpcHRpb25SZXNwb25zZRIOCgZ0aWNrZXQYASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoHc2Vzc2lvbhgDIAEoCzIkLnBsYXRmb3JtLmdhbWUudjEuR2FtZVNlc3Npb25TdW1tYXJ5EjQKCnByb2plY3Rpb24YBCABKAsyIC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVQcm9qZWN0aW9uEg0KBWdyYW50GAUgASgMIogCChFTdWJzY3JpcHRpb25HcmFudBIPCgd1c2VyX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSEgoKc2Vzc2lvbl9pZBgDIAEoCRIxCgt2aWV3ZXJfa2luZBgEIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBISCgpzZWF0X2luZGV4GAUgASgNEhoKEmxhc3Rfc3RhdGVfdmVyc2lvbhgGIAEoBBIaChJsYXN0X2V2ZW50X29yZGluYWwYByABKA0SDgoGb3JpZ2luGAggASgJEi4KCmV4cGlyZXNfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wInkKC0NsaWVudEZyYW1lEjQKBWhlbGxvGAEgASgLMiMucGxhdGZvcm0uZ2FtZS52MS5TdWJzY3JpcHRpb25IZWxsb0gAEiwKBHBpbmcYAiABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLkNsaWVudFBpbmdIAEIGCgRib2R5IjIKEVN1YnNjcmlwdGlvbkhlbGxvEg4KBnRpY2tldBgBIAEoDBINCgVncmFudBgCIAEoDCIbCgpDbGllbnRQaW5nEg0KBW5vbmNlGAEgASgEIs0CCgtTZXJ2ZXJGcmFtZRI2Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbkgAEiwKBWRlbHRhGAIgASgLMhsucGxhdGZvcm0uZ2FtZS52MS5HYW1lRGVsdGFIABIwCgdyZWNlaXB0GAMgASgLMh0ucGxhdGZvcm0uZ2FtZS52MS5HYW1lUmVjZWlwdEgAEjoKCGRyYWluaW5nGAQgASgLMiYucGxhdGZvcm0uZ2FtZS52MS5TdWJzY3JpcHRpb25EcmFpbmluZ0gAEiwKBHBvbmcYBSABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLlNlcnZlclBvbmdIABI0CgVlcnJvchgGIAEoCzIjLnBsYXRmb3JtLmdhbWUudjEuU3Vic2NyaXB0aW9uRXJyb3JIAEIGCgRib2R5IlsKFFN1YnNjcmlwdGlvbkRyYWluaW5nEg4KBnJlYXNvbhgBIAEoCRIzCg9yZWNvbm5lY3RfYWZ0ZXIYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhsKClNlcnZlclBvbmcSDQoFbm9uY2UYASABKAQiIQoRU3Vic2NyaXB0aW9uRXJyb3ISDAoEY29kZRgBIAEoCSLGAQoRR2FtZVN5c3RlbVJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIbChNzeXN0ZW1fb3BlcmF0aW9uX2lkGAIgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgDIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAQgASgEEi8KB2NvbW1hbmQYBSABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIWCg5yZXF1ZXN0X2RpZ2VzdBgGIAEoDCKHAQoQR2FtZVRpbWVyUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEhAKCHRpbWVyX2lkGAIgASgJEh4KFmV4cGVjdGVkX3N0YXRlX3ZlcnNpb24YAyABKAQSLQoFdGltZXIYBCABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZSKkAQoLR2FtZVJlY2VpcHQSEgoKc2Vzc2lvbl9pZBgBIAEoCRIUCgxvcGVyYXRpb25faWQYAiABKAkSFQoNc3RhdGVfdmVyc2lvbhgDIAEoBBITCgtyZXN1bHRfY29kZRgEIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgFIAEoDBIVCg1yZXN1bHRfZGlnZXN0GAYgASgMEhAKCHJlcGxheWVkGAcgASgIKsABChFHYW1lU2Vzc2lvblN0YXR1cxIjCh9HQU1FX1NFU1NJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHgoaR0FNRV9TRVNTSU9OX1NUQVRVU19BQ1RJVkUQARIhCh1HQU1FX1NFU1NJT05fU1RBVFVTX1NVU1BFTkRFRBACEiAKHEdBTUVfU0VTU0lPTl9TVEFUVVNfRklOSVNIRUQQAxIhCh1HQU1FX1NFU1NJT05fU1RBVFVTX0NBTkNFTExFRBAEKnQKClZpZXdlcktpbmQSGwoXVklFV0VSX0tJTkRfVU5TUEVDSUZJRUQQABIWChJWSUVXRVJfS0lORF9QTEFZRVIQARIZChVWSUVXRVJfS0lORF9TUEVDVEFUT1IQAhIWChJWSUVXRVJfS0lORF9SRVBMQVkQAzLoBAoLR2FtZVNlcnZpY2USXQoMU3RhcnRTZXNzaW9uEiUucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXF1ZXN0GiYucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXNwb25zZRJXCgpHYW1lQWN0aW9uEiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lQWN0aW9uUmVxdWVzdBokLnBsYXRmb3JtLmdhbWUudjEuR2FtZUFjdGlvblJlc3BvbnNlEmAKDUdldFByb2plY3Rpb24SJi5wbGF0Zm9ybS5nYW1lLnYxLkdldFByb2plY3Rpb25SZXF1ZXN0GicucGxhdGZvcm0uZ2FtZS52MS5HZXRQcm9qZWN0aW9uUmVzcG9uc2UScgoTR2V0UmVwbGF5UHJvamVjdGlvbhIsLnBsYXRmb3JtLmdhbWUudjEuR2V0UmVwbGF5UHJvamVjdGlvblJlcXVlc3QaLS5wbGF0Zm9ybS5nYW1lLnYxLkdldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRJgCg1GaW5pc2hTZXNzaW9uEiYucGxhdGZvcm0uZ2FtZS52MS5GaW5pc2hTZXNzaW9uUmVxdWVzdBonLnBsYXRmb3JtLmdhbWUudjEuRmluaXNoU2Vzc2lvblJlc3BvbnNlEmkKEE9wZW5TdWJzY3JpcHRpb24SKS5wbGF0Zm9ybS5nYW1lLnYxLk9wZW5TdWJzY3JpcHRpb25SZXF1ZXN0GioucGxhdGZvcm0uZ2FtZS52MS5PcGVuU3Vic2NyaXB0aW9uUmVzcG9uc2VCR1pFZ2l0aHViLmNvbS9pRlRZLVIvZ2FtZS1uaWdodC9jb250cmFjdHMvZ2VuL2dvL3BsYXRmb3JtL2dhbWUvdjE7Z2FtZXYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("ChtwbGF0Zm9ybS9nYW1lL3YxL2dhbWUucHJvdG8SEHBsYXRmb3JtLmdhbWUudjEiQAoMVmVyc2lvblR1cGxlEg4KBmVuZ2luZRgBIAEoCRIQCghwcm90b2NvbBgCIAEoCRIOCgZjbGllbnQYAyABKAkijwEKDEdhbWVFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEi8KB3ZlcnNpb24YAiABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLlZlcnNpb25UdXBsZRIWCg5zY2hlbWFfdmVyc2lvbhgDIAEoDRIUCgxtZXNzYWdlX3R5cGUYBCABKAkSDwoHcGF5bG9hZBgFIAEoDCJcCgpHYW1lQ29uZmlnEg8KB2dhbWVfaWQYASABKAkSFgoOc2NoZW1hX3ZlcnNpb24YAiABKA0SFAoMbWVzc2FnZV90eXBlGAMgASgJEg8KB3BheWxvYWQYBCABKAwi4AEKEkdhbWVTZXNzaW9uU3VtbWFyeRISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSDwoHZ2FtZV9pZBgDIAEoCRIvCgd2ZXJzaW9uGAQgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5WZXJzaW9uVHVwbGUSFQoNc3RhdGVfdmVyc2lvbhgFIAEoBBIXCg9vd25lcnNoaXBfZXBvY2gYBiABKAQSMwoGc3RhdHVzGAcgASgOMiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN0YXR1cyLXAQoTU3RhcnRTZXNzaW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSHQoVZXhwZWN0ZWRfcm9vbV92ZXJzaW9uGAMgASgEEiMKG2V4cGVjdGVkX21lbWJlcnNoaXBfdmVyc2lvbhgEIAEoBBIsCgZjb25maWcYBSABKAsyHC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVDb25maWcSFAoMb3BlcmF0aW9uX2lkGAYgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAcgASgMIoMBChRTdGFydFNlc3Npb25SZXNwb25zZRI1CgdzZXNzaW9uGAEgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSNAoKcHJvamVjdGlvbhgCIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb24itAEKEUdhbWVBY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIRCglhY3Rpb25faWQYAyABKAkSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgEIAEoBBIvCgdjb21tYW5kGAUgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYBiABKAwi4wEKEkdhbWVBY3Rpb25SZXNwb25zZRISCgpzZXNzaW9uX2lkGAEgASgJEhUKDXN0YXRlX3ZlcnNpb24YAiABKAQSEwoLcmVzdWx0X2NvZGUYAyABKAkSFQoNcmVzdWx0X2RpZ2VzdBgEIAEoDBI0Cgpwcm9qZWN0aW9uGAUgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhIQCghyZXBsYXllZBgGIAEoCBIuCgdyZWNlaXB0GAcgASgLMh0ucGxhdGZvcm0uZ2FtZS52MS5HYW1lUmVjZWlwdCJuChRHZXRQcm9qZWN0aW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQihAEKFUdldFByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkikwEKGkdldFJlcGxheVByb2plY3Rpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIdChV0aHJvdWdoX3N0YXRlX3ZlcnNpb24YBCABKAQinAEKG0dldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRI0Cgpwcm9qZWN0aW9uGAEgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhI1CgdzZXNzaW9uGAIgASgLMiQucGxhdGZvcm0uZ2FtZS52MS5HYW1lU2Vzc2lvblN1bW1hcnkSEAoIY29tcGxldGUYAyABKAgi8wEKDFJlcGxheUFjY2VzcxISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3Jvb21faWQYAiABKAkSNAoGcG9saWN5GAMgASgOMiQucGxhdGZvcm0uZ2FtZS52MS5SZXBsYXlBY2Nlc3NQb2xpY3kSFgoOcG9saWN5X3ZlcnNpb24YBCABKAQSQAocbWVtYmVyX3NuYXBzaG90X2NvbXBsZXRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiPQoWR2V0UmVwbGF5QWNjZXNzUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkiSQoXR2V0UmVwbGF5QWNjZXNzUmVzcG9uc2USLgoGYWNjZXNzGAEgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5SZXBsYXlBY2Nlc3MilAEKFlNldFJlcGxheUFjY2Vzc1JlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEjQKBnBvbGljeRgDIAEoDjIkLnBsYXRmb3JtLmdhbWUudjEuUmVwbGF5QWNjZXNzUG9saWN5Eh8KF2V4cGVjdGVkX3BvbGljeV92ZXJzaW9uGAQgASgEIkkKF1NldFJlcGxheUFjY2Vzc1Jlc3BvbnNlEi4KBmFjY2VzcxgBIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuUmVwbGF5QWNjZXNzIpcCChRGaW5pc2hTZXNzaW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSFAoMb3BlcmF0aW9uX2lkGAMgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgEIAEoCRIdChVleHBlY3RlZF9yb29tX3ZlcnNpb24YBSABKAQSIwobZXhwZWN0ZWRfbWVtYmVyc2hpcF92ZXJzaW9uGAYgASgEEh4KFmV4cGVjdGVkX3N0YXRlX3ZlcnNpb24YByABKAQSLwoHY29tbWFuZBgIIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhYKDnJlcXVlc3RfZGlnZXN0GAkgASgMIsYBChVGaW5pc2hTZXNzaW9uUmVzcG9uc2USNQoHc2Vzc2lvbhgBIAEoCzIkLnBsYXRmb3JtLmdhbWUudjEuR2FtZVNlc3Npb25TdW1tYXJ5Ei4KB3JlY2VpcHQYAiABKAsyHS5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVSZWNlaXB0EjQKCnByb2plY3Rpb24YAyABKAsyIC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVQcm9qZWN0aW9uEhAKCHJlcGxheWVkGAQgASgIIqYBChRHYW1lU3Vic2NyaWJlUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSMQoLdmlld2VyX2tpbmQYAyABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSGgoSbGFzdF9zdGF0ZV92ZXJzaW9uGAQgASgEEhoKEmxhc3RfZXZlbnRfb3JkaW5hbBgFIAEoDSK1AQoOR2FtZVByb2plY3Rpb24SEgoKc2Vzc2lvbl9pZBgBIAEoCRIVCg1zdGF0ZV92ZXJzaW9uGAIgASgEEjEKC3ZpZXdlcl9raW5kGAMgASgOMhwucGxhdGZvcm0uZ2FtZS52MS5WaWV3ZXJLaW5kEiwKBHZpZXcYBCABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIXCg9hbGxvd2VkX2FjdGlvbnMYBSADKAkiiwIKCUdhbWVEZWx0YRISCgpzZXNzaW9uX2lkGAEgASgJEhoKEmZyb21fc3RhdGVfdmVyc2lvbhgCIAEoBBIYChB0b19zdGF0ZV92ZXJzaW9uGAMgASgEEjEKC3ZpZXdlcl9raW5kGAQgASgOMhwucGxhdGZvcm0uZ2FtZS52MS5WaWV3ZXJLaW5kEjAKCG1lc3NhZ2VzGAUgAygLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSGgoSZnJvbV9ldmVudF9vcmRpbmFsGAYgASgNEhgKEHRvX2V2ZW50X29yZGluYWwYByABKA0SGQoRc25hcHNob3RfZmFsbGJhY2sYCCABKAgiqQEKF09wZW5TdWJzY3JpcHRpb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgt2aWV3ZXJfa2luZBgDIAEoDjIcLnBsYXRmb3JtLmdhbWUudjEuVmlld2VyS2luZBIaChJsYXN0X3N0YXRlX3ZlcnNpb24YBCABKAQSGgoSbGFzdF9ldmVudF9vcmRpbmFsGAUgASgNItYBChhPcGVuU3Vic2NyaXB0aW9uUmVzcG9uc2USDgoGdGlja2V0GAEgASgMEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjUKB3Nlc3Npb24YAyABKAsyJC5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVTZXNzaW9uU3VtbWFyeRI0Cgpwcm9qZWN0aW9uGAQgASgLMiAucGxhdGZvcm0uZ2FtZS52MS5HYW1lUHJvamVjdGlvbhINCgVncmFudBgFIAEoDCKIAgoRU3Vic2NyaXB0aW9uR3JhbnQSDwoHdXNlcl9pZBgBIAEoCRIPCgdyb29tX2lkGAIgASgJEhIKCnNlc3Npb25faWQYAyABKAkSMQoLdmlld2VyX2tpbmQYBCABKA4yHC5wbGF0Zm9ybS5nYW1lLnYxLlZpZXdlcktpbmQSEgoKc2VhdF9pbmRleBgFIAEoDRIaChJsYXN0X3N0YXRlX3ZlcnNpb24YBiABKAQSGgoSbGFzdF9ldmVudF9vcmRpbmFsGAcgASgNEg4KBm9yaWdpbhgIIAEoCRIuCgpleHBpcmVzX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJ5CgtDbGllbnRGcmFtZRI0CgVoZWxsbxgBIAEoCzIjLnBsYXRmb3JtLmdhbWUudjEuU3Vic2NyaXB0aW9uSGVsbG9IABIsCgRwaW5nGAIgASgLMhwucGxhdGZvcm0uZ2FtZS52MS5DbGllbnRQaW5nSABCBgoEYm9keSIyChFTdWJzY3JpcHRpb25IZWxsbxIOCgZ0aWNrZXQYASABKAwSDQoFZ3JhbnQYAiABKAwiGwoKQ2xpZW50UGluZxINCgVub25jZRgBIAEoBCLNAgoLU2VydmVyRnJhbWUSNgoKcHJvamVjdGlvbhgBIAEoCzIgLnBsYXRmb3JtLmdhbWUudjEuR2FtZVByb2plY3Rpb25IABIsCgVkZWx0YRgCIAEoCzIbLnBsYXRmb3JtLmdhbWUudjEuR2FtZURlbHRhSAASMAoHcmVjZWlwdBgDIAEoCzIdLnBsYXRmb3JtLmdhbWUudjEuR2FtZVJlY2VpcHRIABI6CghkcmFpbmluZxgEIAEoCzImLnBsYXRmb3JtLmdhbWUudjEuU3Vic2NyaXB0aW9uRHJhaW5pbmdIABIsCgRwb25nGAUgASgLMhwucGxhdGZvcm0uZ2FtZS52MS5TZXJ2ZXJQb25nSAASNAoFZXJyb3IYBiABKAsyIy5wbGF0Zm9ybS5nYW1lLnYxLlN1YnNjcmlwdGlvbkVycm9ySABCBgoEYm9keSJbChRTdWJzY3JpcHRpb25EcmFpbmluZxIOCgZyZWFzb24YASABKAkSMwoPcmVjb25uZWN0X2FmdGVyGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIbCgpTZXJ2ZXJQb25nEg0KBW5vbmNlGAEgASgEIiEKEVN1YnNjcmlwdGlvbkVycm9yEgwKBGNvZGUYASABKAkixgEKEUdhbWVTeXN0ZW1SZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkSGwoTc3lzdGVtX29wZXJhdGlvbl9pZBgCIAEoCRIXCg9zb3VyY2VfZXZlbnRfaWQYAyABKAkSHgoWZXhwZWN0ZWRfc3RhdGVfdmVyc2lvbhgEIAEoBBIvCgdjb21tYW5kGAUgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFgoOcmVxdWVzdF9kaWdlc3QYBiABKAwihwEKEEdhbWVUaW1lclJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIQCgh0aW1lcl9pZBgCIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAMgASgEEi0KBXRpbWVyGAQgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUipAEKC0dhbWVSZWNlaXB0EhIKCnNlc3Npb25faWQYASABKAkSFAoMb3BlcmF0aW9uX2lkGAIgASgJEhUKDXN0YXRlX3ZlcnNpb24YAyABKAQSEwoLcmVzdWx0X2NvZGUYBCABKAkSFgoOcmVxdWVzdF9kaWdlc3QYBSABKAwSFQoNcmVzdWx0X2RpZ2VzdBgGIAEoDBIQCghyZXBsYXllZBgHIAEoCCrAAQoRR2FtZVNlc3Npb25TdGF0dXMSIwofR0FNRV9TRVNTSU9OX1NUQVRVU19VTlNQRUNJRklFRBAAEh4KGkdBTUVfU0VTU0lPTl9TVEFUVVNfQUNUSVZFEAESIQodR0FNRV9TRVNTSU9OX1NUQVRVU19TVVNQRU5ERUQQAhIgChxHQU1FX1NFU1NJT05fU1RBVFVTX0ZJTklTSEVEEAMSIQodR0FNRV9TRVNTSU9OX1NUQVRVU19DQU5DRUxMRUQQBCp0CgpWaWV3ZXJLaW5kEhsKF1ZJRVdFUl9LSU5EX1VOU1BFQ0lGSUVEEAASFgoSVklFV0VSX0tJTkRfUExBWUVSEAESGQoVVklFV0VSX0tJTkRfU1BFQ1RBVE9SEAISFgoSVklFV0VSX0tJTkRfUkVQTEFZEAMqpwEKElJlcGxheUFjY2Vzc1BvbGljeRIkCiBSRVBMQVlfQUNDRVNTX1BPTElDWV9VTlNQRUNJRklFRBAAEiQKIFJFUExBWV9BQ0NFU1NfUE9MSUNZX1BBUlRJQ0lQQU5UEAESJAogUkVQTEFZX0FDQ0VTU19QT0xJQ1lfUk9PTV9NRU1CRVIQAhIfChtSRVBMQVlfQUNDRVNTX1BPTElDWV9QVUJMSUMQAzK4BgoLR2FtZVNlcnZpY2USXQoMU3RhcnRTZXNzaW9uEiUucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXF1ZXN0GiYucGxhdGZvcm0uZ2FtZS52MS5TdGFydFNlc3Npb25SZXNwb25zZRJXCgpHYW1lQWN0aW9uEiMucGxhdGZvcm0uZ2FtZS52MS5HYW1lQWN0aW9uUmVxdWVzdBokLnBsYXRmb3JtLmdhbWUudjEuR2FtZUFjdGlvblJlc3BvbnNlEmAKDUdldFByb2plY3Rpb24SJi5wbGF0Zm9ybS5nYW1lLnYxLkdldFByb2plY3Rpb25SZXF1ZXN0GicucGxhdGZvcm0uZ2FtZS52MS5HZXRQcm9qZWN0aW9uUmVzcG9uc2UScgoTR2V0UmVwbGF5UHJvamVjdGlvbhIsLnBsYXRmb3JtLmdhbWUudjEuR2V0UmVwbGF5UHJvamVjdGlvblJlcXVlc3QaLS5wbGF0Zm9ybS5nYW1lLnYxLkdldFJlcGxheVByb2plY3Rpb25SZXNwb25zZRJmCg9HZXRSZXBsYXlBY2Nlc3MSKC5wbGF0Zm9ybS5nYW1lLnYxLkdldFJlcGxheUFjY2Vzc1JlcXVlc3QaKS5wbGF0Zm9ybS5nYW1lLnYxLkdldFJlcGxheUFjY2Vzc1Jlc3BvbnNlEmYKD1NldFJlcGxheUFjY2VzcxIoLnBsYXRmb3JtLmdhbWUudjEuU2V0UmVwbGF5QWNjZXNzUmVxdWVzdBopLnBsYXRmb3JtLmdhbWUudjEuU2V0UmVwbGF5QWNjZXNzUmVzcG9uc2USYAoNRmluaXNoU2Vzc2lvbhImLnBsYXRmb3JtLmdhbWUudjEuRmluaXNoU2Vzc2lvblJlcXVlc3QaJy5wbGF0Zm9ybS5nYW1lLnYxLkZpbmlzaFNlc3Npb25SZXNwb25zZRJpChBPcGVuU3Vic2NyaXB0aW9uEikucGxhdGZvcm0uZ2FtZS52MS5PcGVuU3Vic2NyaXB0aW9uUmVxdWVzdBoqLnBsYXRmb3JtLmdhbWUudjEuT3BlblN1YnNjcmlwdGlvblJlc3BvbnNlQkdaRWdpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9nYW1lL3YxO2dhbWV2MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * VersionTuple pins the exact engine, protocol, and client artifacts of one session.
@@ -436,6 +436,136 @@ export const GetReplayProjectionResponseSchema: GenMessage<GetReplayProjectionRe
   messageDesc(file_platform_game_v1_game, 11);
 
 /**
+ * @generated from message platform.game.v1.ReplayAccess
+ */
+export type ReplayAccess = Message<"platform.game.v1.ReplayAccess"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string room_id = 2;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ReplayAccessPolicy policy = 3;
+   */
+  policy: ReplayAccessPolicy;
+
+  /**
+   * @generated from field: uint64 policy_version = 4;
+   */
+  policyVersion: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp member_snapshot_completed_at = 5;
+   */
+  memberSnapshotCompletedAt?: Timestamp;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 6;
+   */
+  updatedAt?: Timestamp;
+};
+
+/**
+ * Describes the message platform.game.v1.ReplayAccess.
+ * Use `create(ReplayAccessSchema)` to create a new message.
+ */
+export const ReplayAccessSchema: GenMessage<ReplayAccess> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 12);
+
+/**
+ * @generated from message platform.game.v1.GetReplayAccessRequest
+ */
+export type GetReplayAccessRequest = Message<"platform.game.v1.GetReplayAccessRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message platform.game.v1.GetReplayAccessRequest.
+ * Use `create(GetReplayAccessRequestSchema)` to create a new message.
+ */
+export const GetReplayAccessRequestSchema: GenMessage<GetReplayAccessRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 13);
+
+/**
+ * @generated from message platform.game.v1.GetReplayAccessResponse
+ */
+export type GetReplayAccessResponse = Message<"platform.game.v1.GetReplayAccessResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.ReplayAccess access = 1;
+   */
+  access?: ReplayAccess;
+};
+
+/**
+ * Describes the message platform.game.v1.GetReplayAccessResponse.
+ * Use `create(GetReplayAccessResponseSchema)` to create a new message.
+ */
+export const GetReplayAccessResponseSchema: GenMessage<GetReplayAccessResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 14);
+
+/**
+ * @generated from message platform.game.v1.SetReplayAccessRequest
+ */
+export type SetReplayAccessRequest = Message<"platform.game.v1.SetReplayAccessRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: platform.game.v1.ReplayAccessPolicy policy = 3;
+   */
+  policy: ReplayAccessPolicy;
+
+  /**
+   * @generated from field: uint64 expected_policy_version = 4;
+   */
+  expectedPolicyVersion: bigint;
+};
+
+/**
+ * Describes the message platform.game.v1.SetReplayAccessRequest.
+ * Use `create(SetReplayAccessRequestSchema)` to create a new message.
+ */
+export const SetReplayAccessRequestSchema: GenMessage<SetReplayAccessRequest> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 15);
+
+/**
+ * @generated from message platform.game.v1.SetReplayAccessResponse
+ */
+export type SetReplayAccessResponse = Message<"platform.game.v1.SetReplayAccessResponse"> & {
+  /**
+   * @generated from field: platform.game.v1.ReplayAccess access = 1;
+   */
+  access?: ReplayAccess;
+};
+
+/**
+ * Describes the message platform.game.v1.SetReplayAccessResponse.
+ * Use `create(SetReplayAccessResponseSchema)` to create a new message.
+ */
+export const SetReplayAccessResponseSchema: GenMessage<SetReplayAccessResponse> = /*@__PURE__*/
+  messageDesc(file_platform_game_v1_game, 16);
+
+/**
  * @generated from message platform.game.v1.FinishSessionRequest
  */
 export type FinishSessionRequest = Message<"platform.game.v1.FinishSessionRequest"> & {
@@ -490,7 +620,7 @@ export type FinishSessionRequest = Message<"platform.game.v1.FinishSessionReques
  * Use `create(FinishSessionRequestSchema)` to create a new message.
  */
 export const FinishSessionRequestSchema: GenMessage<FinishSessionRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 12);
+  messageDesc(file_platform_game_v1_game, 17);
 
 /**
  * @generated from message platform.game.v1.FinishSessionResponse
@@ -522,7 +652,7 @@ export type FinishSessionResponse = Message<"platform.game.v1.FinishSessionRespo
  * Use `create(FinishSessionResponseSchema)` to create a new message.
  */
 export const FinishSessionResponseSchema: GenMessage<FinishSessionResponse> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 13);
+  messageDesc(file_platform_game_v1_game, 18);
 
 /**
  * GameSubscribeRequest starts a viewer-scoped realtime stream.
@@ -561,7 +691,7 @@ export type GameSubscribeRequest = Message<"platform.game.v1.GameSubscribeReques
  * Use `create(GameSubscribeRequestSchema)` to create a new message.
  */
 export const GameSubscribeRequestSchema: GenMessage<GameSubscribeRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 14);
+  messageDesc(file_platform_game_v1_game, 19);
 
 /**
  * GameProjection is a viewer-safe current snapshot produced by the module.
@@ -600,7 +730,7 @@ export type GameProjection = Message<"platform.game.v1.GameProjection"> & {
  * Use `create(GameProjectionSchema)` to create a new message.
  */
 export const GameProjectionSchema: GenMessage<GameProjection> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 15);
+  messageDesc(file_platform_game_v1_game, 20);
 
 /**
  * GameDelta contains only module-projected messages; raw authoritative events never cross this boundary.
@@ -654,7 +784,7 @@ export type GameDelta = Message<"platform.game.v1.GameDelta"> & {
  * Use `create(GameDeltaSchema)` to create a new message.
  */
 export const GameDeltaSchema: GenMessage<GameDelta> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 16);
+  messageDesc(file_platform_game_v1_game, 21);
 
 /**
  * @generated from message platform.game.v1.OpenSubscriptionRequest
@@ -691,7 +821,7 @@ export type OpenSubscriptionRequest = Message<"platform.game.v1.OpenSubscription
  * Use `create(OpenSubscriptionRequestSchema)` to create a new message.
  */
 export const OpenSubscriptionRequestSchema: GenMessage<OpenSubscriptionRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 17);
+  messageDesc(file_platform_game_v1_game, 22);
 
 /**
  * @generated from message platform.game.v1.OpenSubscriptionResponse
@@ -728,7 +858,7 @@ export type OpenSubscriptionResponse = Message<"platform.game.v1.OpenSubscriptio
  * Use `create(OpenSubscriptionResponseSchema)` to create a new message.
  */
 export const OpenSubscriptionResponseSchema: GenMessage<OpenSubscriptionResponse> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 18);
+  messageDesc(file_platform_game_v1_game, 23);
 
 /**
  * SubscriptionGrant is server-produced authorization stored behind one Redis ticket.
@@ -787,7 +917,7 @@ export type SubscriptionGrant = Message<"platform.game.v1.SubscriptionGrant"> & 
  * Use `create(SubscriptionGrantSchema)` to create a new message.
  */
 export const SubscriptionGrantSchema: GenMessage<SubscriptionGrant> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 19);
+  messageDesc(file_platform_game_v1_game, 24);
 
 /**
  * ClientFrame is sent as one deterministic protobuf binary WebSocket message.
@@ -818,7 +948,7 @@ export type ClientFrame = Message<"platform.game.v1.ClientFrame"> & {
  * Use `create(ClientFrameSchema)` to create a new message.
  */
 export const ClientFrameSchema: GenMessage<ClientFrame> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 20);
+  messageDesc(file_platform_game_v1_game, 25);
 
 /**
  * @generated from message platform.game.v1.SubscriptionHello
@@ -840,7 +970,7 @@ export type SubscriptionHello = Message<"platform.game.v1.SubscriptionHello"> & 
  * Use `create(SubscriptionHelloSchema)` to create a new message.
  */
 export const SubscriptionHelloSchema: GenMessage<SubscriptionHello> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 21);
+  messageDesc(file_platform_game_v1_game, 26);
 
 /**
  * @generated from message platform.game.v1.ClientPing
@@ -857,7 +987,7 @@ export type ClientPing = Message<"platform.game.v1.ClientPing"> & {
  * Use `create(ClientPingSchema)` to create a new message.
  */
 export const ClientPingSchema: GenMessage<ClientPing> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 22);
+  messageDesc(file_platform_game_v1_game, 27);
 
 /**
  * ServerFrame never carries raw event batches or authoritative snapshots.
@@ -912,7 +1042,7 @@ export type ServerFrame = Message<"platform.game.v1.ServerFrame"> & {
  * Use `create(ServerFrameSchema)` to create a new message.
  */
 export const ServerFrameSchema: GenMessage<ServerFrame> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 23);
+  messageDesc(file_platform_game_v1_game, 28);
 
 /**
  * @generated from message platform.game.v1.SubscriptionDraining
@@ -934,7 +1064,7 @@ export type SubscriptionDraining = Message<"platform.game.v1.SubscriptionDrainin
  * Use `create(SubscriptionDrainingSchema)` to create a new message.
  */
 export const SubscriptionDrainingSchema: GenMessage<SubscriptionDraining> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 24);
+  messageDesc(file_platform_game_v1_game, 29);
 
 /**
  * @generated from message platform.game.v1.ServerPong
@@ -951,7 +1081,7 @@ export type ServerPong = Message<"platform.game.v1.ServerPong"> & {
  * Use `create(ServerPongSchema)` to create a new message.
  */
 export const ServerPongSchema: GenMessage<ServerPong> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 25);
+  messageDesc(file_platform_game_v1_game, 30);
 
 /**
  * @generated from message platform.game.v1.SubscriptionError
@@ -968,7 +1098,7 @@ export type SubscriptionError = Message<"platform.game.v1.SubscriptionError"> & 
  * Use `create(SubscriptionErrorSchema)` to create a new message.
  */
 export const SubscriptionErrorSchema: GenMessage<SubscriptionError> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 26);
+  messageDesc(file_platform_game_v1_game, 31);
 
 /**
  * GameSystemRequest identifies durable platform-originated lifecycle work.
@@ -1012,7 +1142,7 @@ export type GameSystemRequest = Message<"platform.game.v1.GameSystemRequest"> & 
  * Use `create(GameSystemRequestSchema)` to create a new message.
  */
 export const GameSystemRequestSchema: GenMessage<GameSystemRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 27);
+  messageDesc(file_platform_game_v1_game, 32);
 
 /**
  * GameTimerRequest identifies a persisted timer firing and never carries a player actor.
@@ -1046,7 +1176,7 @@ export type GameTimerRequest = Message<"platform.game.v1.GameTimerRequest"> & {
  * Use `create(GameTimerRequestSchema)` to create a new message.
  */
 export const GameTimerRequestSchema: GenMessage<GameTimerRequest> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 28);
+  messageDesc(file_platform_game_v1_game, 33);
 
 /**
  * @generated from message platform.game.v1.GameReceipt
@@ -1093,7 +1223,7 @@ export type GameReceipt = Message<"platform.game.v1.GameReceipt"> & {
  * Use `create(GameReceiptSchema)` to create a new message.
  */
 export const GameReceiptSchema: GenMessage<GameReceipt> = /*@__PURE__*/
-  messageDesc(file_platform_game_v1_game, 29);
+  messageDesc(file_platform_game_v1_game, 34);
 
 /**
  * @generated from enum platform.game.v1.GameSessionStatus
@@ -1163,6 +1293,39 @@ export const ViewerKindSchema: GenEnum<ViewerKind> = /*@__PURE__*/
   enumDesc(file_platform_game_v1_game, 1);
 
 /**
+ * ReplayAccessPolicy controls resource authorization; game modules still decide which fields may be revealed.
+ *
+ * @generated from enum platform.game.v1.ReplayAccessPolicy
+ */
+export enum ReplayAccessPolicy {
+  /**
+   * @generated from enum value: REPLAY_ACCESS_POLICY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REPLAY_ACCESS_POLICY_PARTICIPANT = 1;
+   */
+  PARTICIPANT = 1,
+
+  /**
+   * @generated from enum value: REPLAY_ACCESS_POLICY_ROOM_MEMBER = 2;
+   */
+  ROOM_MEMBER = 2,
+
+  /**
+   * @generated from enum value: REPLAY_ACCESS_POLICY_PUBLIC = 3;
+   */
+  PUBLIC = 3,
+}
+
+/**
+ * Describes the enum platform.game.v1.ReplayAccessPolicy.
+ */
+export const ReplayAccessPolicySchema: GenEnum<ReplayAccessPolicy> = /*@__PURE__*/
+  enumDesc(file_platform_game_v1_game, 2);
+
+/**
  * GameService is the authenticated user-facing boundary for session state and commands.
  *
  * @generated from service platform.game.v1.GameService
@@ -1199,6 +1362,22 @@ export const GameService: GenService<{
     methodKind: "unary";
     input: typeof GetReplayProjectionRequestSchema;
     output: typeof GetReplayProjectionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.GetReplayAccess
+   */
+  getReplayAccess: {
+    methodKind: "unary";
+    input: typeof GetReplayAccessRequestSchema;
+    output: typeof GetReplayAccessResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.game.v1.GameService.SetReplayAccess
+   */
+  setReplayAccess: {
+    methodKind: "unary";
+    input: typeof SetReplayAccessRequestSchema;
+    output: typeof SetReplayAccessResponseSchema;
   },
   /**
    * @generated from rpc platform.game.v1.GameService.FinishSession

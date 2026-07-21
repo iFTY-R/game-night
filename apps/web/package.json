@@ -16,6 +16,8 @@
     "@game-night/game-ui-kit": "workspace:*",
     "@game-night/liars-dice-client": "workspace:*",
     "@game-night/liars-dice-themes": "workspace:*",
+    "@game-night/meet-by-chance-client": "workspace:*",
+    "@game-night/meet-by-chance-themes": "workspace:*",
     "@game-night/theme-system": "workspace:*",
     "lucide-vue-next": "catalog:",
     "pinia": "catalog:",

@@ -239,8 +239,9 @@ const confirmStand = (): void => {
 @media (orientation: landscape) {
   .meet-screen { min-height: 360px; }
   .meet-bar { inset-inline: 12px; }
-  /* The live table stays above the tray handle; replay owns a separate dock geometry. */
-  .meet-stage { inset: 56px 0 min(36dvh, 142px); }
+  /* Rotation changes both geometries at once; disabling those transitions prevents stale seats crossing the tray. */
+  .meet-stage { inset: 56px 0 min(36dvh, 142px); transition: none; }
+  .meet-screen :deep(.gn-tray) { transition: none; }
   .tray-collapsed .meet-stage { bottom: min(22dvh, 88px); }
   .tray-expanded .meet-stage { bottom: min(50dvh, 196px); }
   .table-focus { width: 250px; grid-template-columns: 1fr 1fr; column-gap: 8px; }

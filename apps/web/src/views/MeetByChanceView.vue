@@ -1,26 +1,35 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import {
   MEET_BY_CHANCE_REROLL_ACTION,
   MeetByChanceReplayTable,
   MeetByChanceTable,
+  Phase as MeetByChancePhase,
   applyMeetByChanceFixtureAction,
+  createFinishAction,
   finishMeetByChanceFixture,
   meetByChanceFixtureContext,
   meetByChanceFixtureView,
   meetByChanceReplayFixture,
+  meetByChanceReducer,
   type MeetByChanceActionInput,
   type MeetByChanceFixtureState,
   type MeetByChanceTableContext,
+  type MeetByChanceView,
 } from "@game-night/meet-by-chance-client";
 import { classicTheme, meetByChanceSoundProfile, meetByChanceThemes } from "@game-night/meet-by-chance-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
 import { useRoomStore } from "../stores/room";
+import { useLiveGameTable } from "../composables/use-live-game-table";
 
-const props = withDefaults(defineProps<{ fixtureState?: MeetByChanceFixtureState }>(), { fixtureState: "active" });
+const props = withDefaults(defineProps<{ roomId?: string; sessionId?: string; fixtureState?: MeetByChanceFixtureState }>(), {
+  roomId: "fixture-room",
+  sessionId: "fixture-session",
+  fixtureState: "active",
+});
 const router = useRouter();
 const room = useRoomStore();
 const themeRuntime = new ThemeRuntime();
@@ -30,7 +39,18 @@ const context = ref<MeetByChanceTableContext>({
   ...meetByChanceFixtureContext(room.displayName || "你", props.fixtureState),
   roomCode: room.roomCode ?? "MEET",
 });
-const pendingAction = ref<string | null>(null);
+const fixtureMode = computed(() => props.roomId === "fixture-room");
+const liveTable = useLiveGameTable<MeetByChanceView, MeetByChanceTableContext>({
+  roomId: props.roomId,
+  sessionId: props.sessionId,
+  fixtureMode,
+  reducer: meetByChanceReducer,
+  view,
+  context,
+  players: (current) => current.publicPlayers,
+  finished: (current) => current.phase === MeetByChancePhase.FINISHED,
+});
+const pendingAction = liveTable.pendingAction;
 const muted = ref(false);
 const themeIndex = ref(0);
 let pendingTimer: number | undefined;
@@ -71,20 +91,26 @@ onBeforeUnmount(() => {
   document.documentElement.dataset.themeFallback = "true";
 });
 
-const submitAction = (input: MeetByChanceActionInput): void => {
+const submitAction = async (input: MeetByChanceActionInput): Promise<void> => {
   if (pendingAction.value !== null || context.value.connection !== "online") return;
-  pendingAction.value = input.action;
   playSound(input.action === MEET_BY_CHANCE_REROLL_ACTION ? "reveal" : "target");
+  if (await liveTable.submitLiveAction(input)) return;
+  pendingAction.value = input.action;
   pendingTimer = window.setTimeout(() => {
     view.value = applyMeetByChanceFixtureAction(view.value, input);
     pendingAction.value = null;
     pendingTimer = undefined;
   }, 700);
 };
-const retry = (): void => { context.value = { ...context.value, connection: "online" }; };
+const finishSession = async (): Promise<void> => {
+  if (await liveTable.finishLiveSession(createFinishAction(room.userId).message)) return;
+  view.value = finishMeetByChanceFixture(view.value);
+};
 const cycleTheme = (): void => { themeIndex.value = (themeIndex.value + 1) % meetByChanceThemes.length; applyTheme(); };
 const toggleSound = (): void => { muted.value = !muted.value; document.documentElement.dataset.muted = String(muted.value); };
-const leave = async (): Promise<void> => { await router.push({ name: "home" }); };
+const leave = async (): Promise<void> => {
+  await router.push(fixtureMode.value ? { name: "home" } : { name: "room", params: { roomId: props.roomId } });
+};
 </script>
 
 <template>
@@ -105,8 +131,8 @@ const leave = async (): Promise<void> => { await router.push({ name: "home" }); 
     :pending-action="pendingAction"
     :muted="muted"
     @submit="submitAction"
-    @retry="retry"
-    @finish="view = finishMeetByChanceFixture(view)"
+    @retry="liveTable.retry"
+    @finish="finishSession"
     @leave="leave"
     @toggle-sound="toggleSound"
     @cycle-theme="cycleTheme"

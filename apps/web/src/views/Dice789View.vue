@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -8,21 +8,30 @@ import {
   DICE_789_ROLL_ACTION,
   Dice789ReplayTable,
   Dice789Table,
+  Phase as Dice789Phase,
   applyDice789FixtureAction,
+  createFinishAction,
   dice789FixtureContext,
   dice789FixtureView,
+  dice789Reducer,
   dice789ReplayFixture,
   finishDice789Fixture,
   type Dice789ActionInput,
   type Dice789FixtureState,
   type Dice789TableContext,
+  type Dice789View,
 } from "@game-night/dice-789-client";
 import { classicTheme, dice789SoundProfile, dice789Themes } from "@game-night/dice-789-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
 import { useRoomStore } from "../stores/room";
+import { useLiveGameTable } from "../composables/use-live-game-table";
 
-const props = withDefaults(defineProps<{ fixtureState?: Dice789FixtureState }>(), { fixtureState: "active" });
+const props = withDefaults(defineProps<{ roomId?: string; sessionId?: string; fixtureState?: Dice789FixtureState }>(), {
+  roomId: "fixture-room",
+  sessionId: "fixture-session",
+  fixtureState: "active",
+});
 const router = useRouter();
 const room = useRoomStore();
 const themeRuntime = new ThemeRuntime();
@@ -32,7 +41,18 @@ const context = ref<Dice789TableContext>({
   ...dice789FixtureContext(room.displayName || "你", props.fixtureState),
   roomCode: room.roomCode ?? "D789",
 });
-const pendingAction = ref<string | null>(null);
+const fixtureMode = computed(() => props.roomId === "fixture-room");
+const liveTable = useLiveGameTable<Dice789View, Dice789TableContext>({
+  roomId: props.roomId,
+  sessionId: props.sessionId,
+  fixtureMode,
+  reducer: dice789Reducer,
+  view,
+  context,
+  players: (current) => current.players,
+  finished: (current) => current.phase === Dice789Phase.FINISHED,
+});
+const pendingAction = liveTable.pendingAction;
 const muted = ref(false);
 const themeIndex = ref(0);
 let pendingTimer: number | undefined;
@@ -73,20 +93,26 @@ onBeforeUnmount(() => {
   document.documentElement.dataset.themeFallback = "true";
 });
 
-const submitAction = (input: Dice789ActionInput): void => {
+const submitAction = async (input: Dice789ActionInput): Promise<void> => {
   if (pendingAction.value !== null || context.value.connection !== "online") return;
-  pendingAction.value = input.action;
   playSound(input.action === DICE_789_ROLL_ACTION ? "roll" : "effect");
+  if (await liveTable.submitLiveAction(input)) return;
+  pendingAction.value = input.action;
   pendingTimer = window.setTimeout(() => {
     view.value = applyDice789FixtureAction(view.value, input);
     pendingAction.value = null;
     pendingTimer = undefined;
   }, input.action === DICE_789_CONFIRM_ACTION || input.action === DICE_789_DROPPED_ACTION ? 850 : 650);
 };
-const retry = (): void => { context.value = { ...context.value, connection: "online" }; };
+const finishSession = async (): Promise<void> => {
+  if (await liveTable.finishLiveSession(createFinishAction(room.userId).message)) return;
+  view.value = finishDice789Fixture(view.value);
+};
 const cycleTheme = (): void => { themeIndex.value = (themeIndex.value + 1) % dice789Themes.length; applyTheme(); };
 const toggleSound = (): void => { muted.value = !muted.value; document.documentElement.dataset.muted = String(muted.value); };
-const leave = async (): Promise<void> => { await router.push({ name: "home" }); };
+const leave = async (): Promise<void> => {
+  await router.push(fixtureMode.value ? { name: "home" } : { name: "room", params: { roomId: props.roomId } });
+};
 </script>
 
 <template>
@@ -107,8 +133,8 @@ const leave = async (): Promise<void> => { await router.push({ name: "home" }); 
     :pending-action="pendingAction"
     :muted="muted"
     @submit="submitAction"
-    @retry="retry"
-    @finish="view = finishDice789Fixture(view)"
+    @retry="liveTable.retry"
+    @finish="finishSession"
     @leave="leave"
     @toggle-sound="toggleSound"
     @cycle-theme="cycleTheme"

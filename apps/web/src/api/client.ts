@@ -96,6 +96,20 @@ export interface GameProjectionResponse {
   projection?: GameProjectionWire;
 }
 
+export interface GameSessionSummaryWire {
+  sessionId: string;
+  roomId: string;
+  gameId: string;
+  version?: { engine: string; protocol: string; client: string };
+  stateVersion: string;
+  status: string;
+}
+
+export interface GameReplayProjectionResponse extends GameProjectionResponse {
+  session?: GameSessionSummaryWire;
+  complete?: boolean;
+}
+
 export interface GameActionResponse extends GameProjectionResponse {
   sessionId?: string;
   stateVersion?: string;
@@ -304,6 +318,15 @@ export const roomClient = {
 export const gameClient = {
   getProjection(roomId: string, sessionId: string, viewerKind = "VIEWER_KIND_PLAYER", signal?: AbortSignal): Promise<GameProjectionResponse> {
     return call("platform.game.v1.GameService", "GetProjection", { roomId, sessionId, viewerKind }, false, undefined, signal);
+  },
+  /** Loads one immutable, authorized replay projection without opening a realtime subscription. */
+  getReplayProjection(roomId: string, sessionId: string, throughStateVersion = 0, signal?: AbortSignal): Promise<GameReplayProjectionResponse> {
+    return call("platform.game.v1.GameService", "GetReplayProjection", {
+      roomId,
+      sessionId,
+      viewerKind: "VIEWER_KIND_REPLAY",
+      throughStateVersion: String(throughStateVersion),
+    }, false, undefined, signal);
   },
   async action(
     roomId: string,

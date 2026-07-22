@@ -124,6 +124,20 @@ describe("Connect JSON mutation requests", () => {
     expect([...response.grant]).toEqual([3, 4]);
   });
 
+  it("requests an immutable replay projection with the replay viewer kind", async () => {
+    const { calls } = captureRequest({ complete: true });
+
+    await gameClient.getReplayProjection(room.roomId, room.activeSessionId);
+
+    expect(calls[0]?.url).toBe("/platform.game.v1.GameService/GetReplayProjection");
+    expect(calls[0]?.body).toEqual({
+      roomId: room.roomId,
+      sessionId: room.activeSessionId,
+      viewerKind: "VIEWER_KIND_REPLAY",
+      throughStateVersion: "0",
+    });
+  });
+
   it("fails closed when subscription credentials are malformed", async () => {
     captureRequest({ ticket: "not-base64", grant: "AwQ=" });
 

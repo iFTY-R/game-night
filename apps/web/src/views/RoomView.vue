@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, ChevronDown, Copy, LockKeyhole, Play, UserPlus, Users, X } from "lucide-vue-next";
+import { ArrowLeft, Check, ChevronDown, Copy, History, LockKeyhole, Play, UserPlus, Users, X } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -110,6 +110,13 @@ const enterActiveGame = async (): Promise<void> => {
   await router.push({ name: "game", params: { roomId: props.roomId, sessionId } });
 };
 
+/** Opens the immutable last-session projection; authorization remains enforced by the replay API. */
+const openLastReplay = async (): Promise<void> => {
+  const sessionId = remoteRoom.value?.lastFinishedSessionId;
+  if (!sessionId) return;
+  await router.push({ name: "replay", params: { roomId: props.roomId, sessionId } });
+};
+
 const toggleAdmission = async (): Promise<void> => {
   const nextOpen = !entryOpen.value;
   entryOpen.value = nextOpen;
@@ -159,6 +166,9 @@ const leave = async (): Promise<void> => {
       <p class="muted">开局后新玩家会在本局结束前等候。每局结束，房主可以重新开放进房许可。</p>
       <button v-if="isPlaying && canEnterActiveGame" class="button room-hero__enter" type="button" @click="enterActiveGame">
         <Play :size="18" fill="currentColor" aria-hidden="true" /> 进入{{ activeGame?.name ?? "当前游戏" }}
+      </button>
+      <button v-if="isPostGame && remoteRoom?.lastFinishedSessionId" class="button button--quiet room-hero__enter" type="button" @click="openLastReplay">
+        <History :size="18" aria-hidden="true" /> 查看上一局复盘
       </button>
       <p v-if="loading" class="loading-note" role="status">正在同步房间状态…</p>
       <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>

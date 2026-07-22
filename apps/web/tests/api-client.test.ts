@@ -89,6 +89,31 @@ describe("Connect JSON mutation requests", () => {
     expect(calls[0]?.body.requestDigest).toBe("XICV/mY8PglL1TVFqbbS7JaV2PTHkcCeLxPtDG/JVEU=");
   });
 
+  it("binds member removal and room closure to the current room version", async () => {
+    const { calls } = captureRequest();
+
+    await roomClient.removeMember(room, "00000000-0000-4000-8000-000000000006");
+    await roomClient.closeRoom(room);
+
+    expect(calls).toEqual([
+      {
+        url: "/platform.room.v1.RoomService/RemoveMember",
+        body: {
+          roomId: room.roomId,
+          userId: "00000000-0000-4000-8000-000000000006",
+          expectedVersion: { roomVersion: "9", membershipVersion: "4" },
+        },
+      },
+      {
+        url: "/platform.room.v1.RoomService/CloseRoom",
+        body: {
+          roomId: room.roomId,
+          expectedVersion: { roomVersion: "9", membershipVersion: "4" },
+        },
+      },
+    ]);
+  });
+
   it("serializes action versions and protobuf bytes using Connect JSON rules", async () => {
     const { calls } = captureRequest();
 

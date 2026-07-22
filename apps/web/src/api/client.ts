@@ -331,6 +331,14 @@ export const roomClient = {
   approveMember(room: RoomSnapshot, userId: string): Promise<RoomResponse> {
     return call("platform.room.v1.RoomService", "ApproveMember", { roomId: room.roomId, userId, expectedVersion: room.version }, true);
   },
+  /** Removes one non-host member under the room's exact membership version. */
+  removeMember(room: RoomSnapshot, userId: string): Promise<RoomResponse> {
+    return call("platform.room.v1.RoomService", "RemoveMember", { roomId: room.roomId, userId, expectedVersion: room.version }, true);
+  },
+  /** Permanently closes an idle room; active sessions require the separate cancellation boundary. */
+  closeRoom(room: RoomSnapshot): Promise<RoomResponse> {
+    return call("platform.room.v1.RoomService", "CloseRoom", { roomId: room.roomId, expectedVersion: room.version }, true);
+  },
 };
 
 export const gameClient = {

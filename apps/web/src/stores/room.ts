@@ -271,6 +271,30 @@ export const useRoomStore = defineStore("room", {
       return response.room ?? null;
     },
 
+    /** Removes one member and adopts the server's membership version before any later host command. */
+    async removeRemoteMember(userId: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) {
+        return null;
+      }
+      const response = await roomClient.removeMember(this.remoteRoom, userId);
+      if (response.room) {
+        this.setRemoteRoom(response.room);
+      }
+      return response.room ?? null;
+    },
+
+    /** Closes the current idle room while retaining the terminal snapshot until the view exits. */
+    async closeRemoteRoom(): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) {
+        return null;
+      }
+      const response = await roomClient.closeRoom(this.remoteRoom);
+      if (response.room) {
+        this.setRemoteRoom(response.room);
+      }
+      return response.room ?? null;
+    },
+
     setRemoteRoom(snapshot: RoomSnapshot): void {
       this.remoteRoom = snapshot;
       this.roomId = snapshot.roomId;

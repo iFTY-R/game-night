@@ -91,4 +91,51 @@ describe("room context recovery", () => {
     expect(room.remoteRoom?.version).toEqual({ roomVersion: "9", membershipVersion: "4" });
     expect(room.remoteRoom?.members[1]?.role).toBe("MEMBER_ROLE_WAITING");
   });
+
+  it("uses the removal result version for the next room closure command", async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const baseRoom = {
+      roomId: "room-1",
+      roomCode: "N789",
+      visibility: "ROOM_VISIBILITY_PRIVATE",
+      status: "ROOM_STATUS_LOBBY",
+      hostUserId: "user-1",
+      participantCapacity: 8,
+      participantAdmission: "ADMISSION_MODE_OPEN",
+      spectatorAdmission: "ADMISSION_MODE_OPEN",
+      members: [
+        { userId: "user-1", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 },
+        { userId: "user-2", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 1 },
+      ],
+      activeSessionId: "",
+      activeGameId: "",
+      lastFinishedSessionId: "",
+      lastFinishedGameId: "",
+      version: { roomVersion: "9", membershipVersion: "4" },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      calls.push({ url, body });
+      const room = url.endsWith("/RemoveMember")
+        ? { ...baseRoom, members: baseRoom.members.slice(0, 1), version: { roomVersion: "10", membershipVersion: "5" } }
+        : { ...baseRoom, members: baseRoom.members.slice(0, 1), status: "ROOM_STATUS_CLOSED", version: { roomVersion: "11", membershipVersion: "5" } };
+      return new Response(JSON.stringify({ room }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+
+    const room = useRoomStore();
+    room.setRemoteRoom(baseRoom);
+    await room.removeRemoteMember("user-2");
+    await room.closeRemoteRoom();
+
+    expect(calls[0]).toMatchObject({
+      url: "/platform.room.v1.RoomService/RemoveMember",
+      body: { expectedVersion: { roomVersion: "9", membershipVersion: "4" } },
+    });
+    expect(calls[1]).toMatchObject({
+      url: "/platform.room.v1.RoomService/CloseRoom",
+      body: { expectedVersion: { roomVersion: "10", membershipVersion: "5" } },
+    });
+    expect(room.remoteRoom?.status).toBe("ROOM_STATUS_CLOSED");
+  });
 });

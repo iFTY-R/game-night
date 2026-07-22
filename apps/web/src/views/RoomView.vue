@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, ChevronDown, Copy, History, LockKeyhole, Play, UserPlus, Users, X } from "lucide-vue-next";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { ArrowLeft, Check, ChevronDown, Copy, DoorClosed, History, LockKeyhole, Play, TriangleAlert, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomSnapshot } from "../api/client";
+import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomMember, type RoomSnapshot } from "../api/client";
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
 
@@ -18,6 +18,11 @@ const selectedGameId = ref<GameId>("liars-dice");
 const replayAccess = ref<ReplayAccessWire | null>(null);
 const replayAccessLoading = ref(false);
 const replayAccessSaving = ref(false);
+type GovernanceConfirmation = { kind: "remove"; userId: string } | { kind: "close" };
+const governanceConfirmation = ref<GovernanceConfirmation | null>(null);
+const governanceSaving = ref(false);
+const governanceCancelButton = ref<HTMLButtonElement | null>(null);
+let governanceTrigger: HTMLElement | null = null;
 let refreshTimer: number | undefined;
 let refreshPending = false;
 let gameSelectionInitialized = false;
@@ -36,6 +41,15 @@ const selectedGame = computed(() => gameById(selectedGameId.value) ?? gameCatalo
 const activeGame = computed(() => gameById(remoteRoom.value?.activeGameId ?? ""));
 const enoughPlayers = computed(() => participantCount.value >= selectedGame.value.minimumPlayers);
 const displayMemberName = (userId: string): string => userId === room.userId ? room.displayName || "你" : `玩家 ${userId.slice(0, 6)}`;
+const governanceTitle = computed(() => governanceConfirmation.value?.kind === "remove" ? "确认移出成员？" : "确认解散房间？");
+const governanceDescription = computed(() => {
+  const confirmation = governanceConfirmation.value;
+  if (confirmation?.kind === "remove") {
+    const effect = isPlaying.value ? "对局中的冻结座位会保留，并由游戏规则接管离场处理。" : "对方将立即失去这个房间的访问权限。";
+    return `${displayMemberName(confirmation.userId)}将被移出。${effect}`;
+  }
+  return "房间码会立即失效，所有成员都需要返回发现页。这项操作无法撤销。";
+});
 // Public replay is a valid choice only for a public room; private-room clients never offer an invalid widening command.
 const replayPolicyOptions = computed<readonly { value: ReplayAccessPolicy; label: string }[]>(() => [
   { value: "REPLAY_ACCESS_POLICY_PARTICIPANT", label: "仅本局玩家" },
@@ -204,6 +218,59 @@ const approveMember = async (userId: string): Promise<void> => {
   }
 };
 
+/** Opens one shared destructive confirmation and places keyboard focus on the safe action. */
+const openGovernanceConfirmation = async (confirmation: GovernanceConfirmation, event: Event): Promise<void> => {
+  if (governanceSaving.value) return;
+  actionError.value = "";
+  governanceTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  governanceConfirmation.value = confirmation;
+  await nextTick();
+  governanceCancelButton.value?.focus();
+};
+
+const requestRemoveMember = (member: RoomMember, event: Event): Promise<void> =>
+  openGovernanceConfirmation({ kind: "remove", userId: member.userId }, event);
+
+const requestCloseRoom = (event: Event): Promise<void> => openGovernanceConfirmation({ kind: "close" }, event);
+
+/** Cancels a pending destructive command and restores focus to the control that opened it. */
+const cancelGovernanceConfirmation = async (): Promise<void> => {
+  if (governanceSaving.value) return;
+  governanceConfirmation.value = null;
+  await nextTick();
+  governanceTrigger?.focus();
+  governanceTrigger = null;
+};
+
+/** Commits the confirmed command once; conflicts keep the dialog open and refresh the authoritative room. */
+const confirmGovernance = async (): Promise<void> => {
+  const confirmation = governanceConfirmation.value;
+  if (!confirmation || governanceSaving.value) return;
+  governanceSaving.value = true;
+  actionError.value = "";
+  let roomClosed = false;
+  try {
+    if (confirmation.kind === "remove") {
+      const updated = await room.removeRemoteMember(confirmation.userId);
+      if (!updated) throw new Error("成员移出响应不完整");
+    } else {
+      const updated = await room.closeRemoteRoom();
+      if (!updated?.status.includes("CLOSED")) throw new Error("房间解散响应不完整");
+      roomClosed = true;
+    }
+    governanceConfirmation.value = null;
+  } catch (error) {
+    actionError.value = error instanceof Error ? error.message : confirmation.kind === "remove" ? "成员移出失败" : "房间解散失败";
+    await refreshRoom();
+  } finally {
+    governanceSaving.value = false;
+  }
+  if (roomClosed) {
+    room.leaveRoom();
+    await router.replace({ name: "home" });
+  }
+};
+
 const leave = async (): Promise<void> => {
   room.leaveRoom();
   await router.push({ name: "home" });
@@ -251,9 +318,12 @@ const leave = async (): Promise<void> => {
         <article v-for="member in members" :key="member.userId" class="lobby-seat" :class="{ 'is-host': member.userId === remoteRoom?.hostUserId }">
           <span>{{ displayMemberName(member.userId).slice(0, 1) }}</span>
           <div><strong>{{ displayMemberName(member.userId) }}</strong><small>{{ member.role.includes("WAITING") ? "候场中" : member.userId === remoteRoom?.hostUserId ? "房主 · 已入座" : member.role.includes("SPECTATOR") ? "观战" : "已入座" }}</small></div>
-          <Check v-if="!member.role.includes('WAITING')" :size="18" aria-label="已入座" />
-          <button v-else-if="currentHost" class="mini-action" type="button" :title="`晋升 ${displayMemberName(member.userId)}`" @click="approveMember(member.userId)"><UserPlus :size="17" aria-hidden="true" /></button>
-          <ChevronDown v-else :size="18" aria-label="候场中" />
+          <span class="member-actions">
+            <Check v-if="!member.role.includes('WAITING')" :size="18" aria-label="已入座" />
+            <ChevronDown v-else :size="18" aria-label="候场中" />
+            <button v-if="member.role.includes('WAITING') && currentHost" class="mini-action" type="button" :aria-label="`晋升 ${displayMemberName(member.userId)}`" :disabled="governanceSaving" @click="approveMember(member.userId)"><UserPlus :size="17" aria-hidden="true" /></button>
+            <button v-if="currentHost && member.userId !== remoteRoom?.hostUserId" class="mini-action mini-action--danger" type="button" :aria-label="`移出 ${displayMemberName(member.userId)}`" :disabled="governanceSaving" @click="requestRemoveMember(member, $event)"><UserMinus :size="17" aria-hidden="true" /></button>
+          </span>
         </article>
       </div>
       <div v-else class="seat-list">
@@ -301,7 +371,27 @@ const leave = async (): Promise<void> => {
           <option v-for="option in replayPolicyOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
       </label>
+      <button v-if="currentHost" class="danger-control" type="button" :disabled="isPlaying || governanceSaving" :title="isPlaying ? '对局进行中不能直接解散房间' : '永久解散这个房间'" @click="requestCloseRoom">
+        <DoorClosed :size="18" aria-hidden="true" /> {{ isPlaying ? "对局结束后可解散" : "解散房间" }}
+      </button>
     </section>
+
+    <div v-if="governanceConfirmation" class="confirmation-backdrop" @click.self="cancelGovernanceConfirmation" @keydown.esc="cancelGovernanceConfirmation">
+      <section class="confirmation" role="dialog" aria-modal="true" aria-labelledby="governance-confirm-title" aria-describedby="governance-confirm-description">
+        <span class="confirmation__icon"><TriangleAlert :size="22" aria-hidden="true" /></span>
+        <div>
+          <h2 id="governance-confirm-title">{{ governanceTitle }}</h2>
+          <p id="governance-confirm-description">{{ governanceDescription }}</p>
+          <p v-if="actionError" class="confirmation__error" role="alert">{{ actionError }}</p>
+        </div>
+        <div class="confirmation__actions">
+          <button ref="governanceCancelButton" class="button button--quiet" type="button" :disabled="governanceSaving" @click="cancelGovernanceConfirmation">取消</button>
+          <button class="button button--danger" type="button" :disabled="governanceSaving" @click="confirmGovernance">
+            {{ governanceSaving ? "正在处理" : governanceConfirmation.kind === "remove" ? "确认移出" : "确认解散" }}
+          </button>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -323,14 +413,15 @@ const leave = async (): Promise<void> => {
 .entry-status { display: inline-flex; align-items: center; gap: 6px; color: #99d8b1; font-size: 12px; }
 .entry-status.is-closed { color: var(--platform-accent); }
 .seat-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.lobby-seat { min-height: 68px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 20px; align-items: center; gap: 10px; padding: 10px 12px; background: rgb(27 41 45 / 72%); border: 1px solid rgb(168 181 180 / 17%); border-radius: 8px; }
+.lobby-seat { min-height: 68px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; background: rgb(27 41 45 / 72%); border: 1px solid rgb(168 181 180 / 17%); border-radius: 8px; }
 .lobby-seat.is-host { border-color: rgb(230 181 102 / 40%); }
 .lobby-seat > span:first-child { width: 40px; height: 40px; display: grid; place-items: center; color: #171b1a; background: var(--platform-accent); border-radius: 50%; font-weight: 800; }
 .lobby-seat div { min-width: 0; display: grid; gap: 3px; }
 .lobby-seat strong,
 .lobby-seat small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lobby-seat small { color: var(--platform-muted); font-size: 11px; }
-.lobby-seat > svg { color: #99d8b1; }
+.member-actions { display: inline-flex; align-items: center; justify-content: end; gap: 6px; }
+.member-actions > svg { color: #99d8b1; }
 .pulse { width: 9px !important; height: 9px !important; background: var(--platform-accent) !important; box-shadow: 0 0 0 5px rgb(230 181 102 / 12%); }
 .host-controls { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(210px, auto) minmax(170px, auto); align-items: center; gap: 18px; padding: 18px; }
 .permission-toggle { min-height: 48px; display: inline-flex; align-items: center; gap: 9px; padding: 0 12px; color: var(--platform-ink); background: rgb(8 18 19 / 35%); border: 1px solid rgb(168 181 180 / 22%); border-radius: 7px; }
@@ -340,6 +431,18 @@ const leave = async (): Promise<void> => {
 .replay-policy select { min-height: 44px; padding: 0 36px 0 12px; color: var(--platform-ink); background: rgb(8 18 19 / 45%); border: 1px solid rgb(168 181 180 / 26%); border-radius: 7px; }
 .replay-policy select:disabled { opacity: .6; }
 .mini-action { width: 34px; height: 34px; display: grid; place-items: center; color: var(--platform-accent); background: transparent; border: 1px solid rgb(230 181 102 / 42%); border-radius: 6px; }
+.mini-action--danger { color: #ff9b91; border-color: rgb(255 115 101 / 38%); }
+.mini-action:disabled { cursor: not-allowed; opacity: .5; }
+.danger-control { grid-column: 1; min-height: 42px; width: fit-content; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; color: #ff9b91; background: transparent; border: 1px solid rgb(255 115 101 / 34%); border-radius: 6px; }
+.danger-control:disabled { cursor: not-allowed; color: var(--platform-muted); border-color: rgb(168 181 180 / 18%); opacity: .6; }
+.confirmation-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 18px; background: rgb(3 9 10 / 76%); }
+.confirmation { width: min(100%, 430px); display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 14px; padding: 18px; color: var(--platform-ink); background: #152123; border: 1px solid rgb(255 115 101 / 38%); border-radius: 8px; box-shadow: 0 24px 80px rgb(0 0 0 / 45%); }
+.confirmation__icon { width: 42px; height: 42px; display: grid; place-items: center; color: #ff9b91; background: rgb(255 115 101 / 10%); border: 1px solid rgb(255 115 101 / 28%); border-radius: 6px; }
+.confirmation h2 { margin: 1px 0 7px; font-size: 18px; }
+.confirmation p { margin: 0; color: var(--platform-muted); font-size: 13px; line-height: 1.6; }
+.confirmation .confirmation__error { margin-top: 8px; color: #ff9b91; }
+.confirmation__actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.button--danger { color: #170b0a; background: #ff8a7e; border-color: #ff8a7e; }
 .game-picker { display: grid; gap: 14px; }
 .game-picker__head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .game-picker__head > span { color: var(--platform-muted); font-size: 12px; }
@@ -358,5 +461,6 @@ const leave = async (): Promise<void> => {
   .game-option { min-height: 128px; }
   .host-controls { grid-template-columns: 1fr; }
   .replay-policy { grid-column: auto; grid-template-columns: 1fr; gap: 6px; }
+  .danger-control { grid-column: auto; }
 }
 </style>

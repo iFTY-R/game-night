@@ -831,6 +831,50 @@ func (q *Queries) ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCar
 	return items, nil
 }
 
+const listRoomMemberUsernames = `-- name: ListRoomMemberUsernames :many
+SELECT member.user_id, users.username
+FROM room_members AS member
+JOIN users ON users.user_id = member.user_id
+WHERE member.room_id = $1
+ORDER BY member.user_id
+`
+
+type ListRoomMemberUsernamesParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+type ListRoomMemberUsernamesRow struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	Username pgtype.Text `json:"username"`
+}
+
+// ListRoomMemberUsernames
+//
+//	SELECT member.user_id, users.username
+//	FROM room_members AS member
+//	JOIN users ON users.user_id = member.user_id
+//	WHERE member.room_id = $1
+//	ORDER BY member.user_id
+func (q *Queries) ListRoomMemberUsernames(ctx context.Context, arg ListRoomMemberUsernamesParams) ([]ListRoomMemberUsernamesRow, error) {
+	rows, err := q.db.Query(ctx, listRoomMemberUsernames, arg.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRoomMemberUsernamesRow{}
+	for rows.Next() {
+		var i ListRoomMemberUsernamesRow
+		if err := rows.Scan(&i.UserID, &i.Username); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRoomMembers = `-- name: ListRoomMembers :many
 SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
 FROM room_members

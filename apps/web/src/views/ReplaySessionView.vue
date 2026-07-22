@@ -25,6 +25,7 @@ import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 import { ApiError, gameClient } from "../api/client";
 import { gameProjectionFromConnect } from "../api/game-projection";
 import { isGameId, type GameId } from "../game-catalog";
+import { memberDisplayName } from "../member-display";
 import { useRoomStore } from "../stores/room";
 
 const props = defineProps<{ roomId: string; sessionId: string }>();
@@ -75,13 +76,13 @@ const replaySeats = computed<readonly ReplaySeat[]>(() => {
 const replayContext = computed(() => ({
   roomCode: room.remoteRoom?.roomCode ?? room.roomCode ?? props.roomId.slice(0, 6).toUpperCase(),
   players: replaySeats.value.map((player) => {
-    const ownSeat = player.userId === room.userId;
-    const displayName = ownSeat && room.displayName ? room.displayName : `玩家 ${player.userId.slice(-4)}`;
+    const member = room.remoteRoom?.members.find((candidate) => candidate.userId === player.userId);
+    const displayName = memberDisplayName(player.userId, member?.username);
     return {
       userId: player.userId,
       seatIndex: player.seatIndex,
       displayName,
-      avatarText: ownSeat && room.displayName ? room.displayName.slice(0, 1) : player.userId.slice(-2).toUpperCase(),
+      avatarText: displayName.slice(0, 1),
       connected: true,
       host: player.userId === room.remoteRoom?.hostUserId,
     };

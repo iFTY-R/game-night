@@ -39,6 +39,7 @@ export interface IdentityResponse {
 
 export interface RoomMember {
   userId: string;
+  username: string;
   role: string;
   requestedRole: string;
   seatIndex: number;

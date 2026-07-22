@@ -82,6 +82,7 @@ message RoomMember {
   uint32 seat_index = 4;
   google.protobuf.Timestamp joined_at = 5;
   google.protobuf.Timestamp last_seen_at = 6;
+  string username = 7;
 }
 
 message Room {

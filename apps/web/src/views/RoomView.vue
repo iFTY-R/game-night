@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomMember, type RoomSnapshot } from "../api/client";
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
+import { memberDisplayName } from "../member-display";
 
 const props = defineProps<{ roomId: string }>();
 const route = useRoute();
@@ -44,7 +45,10 @@ const canEnterActiveGame = computed(() => currentMember.value?.role.includes("PA
 const selectedGame = computed(() => gameById(selectedGameId.value) ?? gameCatalog[0]);
 const activeGame = computed(() => gameById(remoteRoom.value?.activeGameId ?? ""));
 const enoughPlayers = computed(() => participantCount.value >= selectedGame.value.minimumPlayers);
-const displayMemberName = (userId: string): string => userId === room.userId ? room.displayName || "你" : `玩家 ${userId.slice(0, 6)}`;
+const displayMemberName = (userId: string): string => {
+  const member = members.value.find((candidate) => candidate.userId === userId);
+  return memberDisplayName(userId, member?.username);
+};
 const governanceTitle = computed(() => governanceConfirmation.value?.kind === "remove" ? "确认移出成员？" : "确认解散房间？");
 const governanceDescription = computed(() => {
   const confirmation = governanceConfirmation.value;

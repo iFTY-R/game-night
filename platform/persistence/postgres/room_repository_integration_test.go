@@ -72,6 +72,10 @@ func TestRoomRepositoryPersistsMembershipAndRejectsStaleVersions(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(byCode.Snapshot(), updated.Snapshot()) {
 		t.Fatalf("load room by code: loaded=%+v err=%v", byCode.Snapshot(), err)
 	}
+	usernames, err := repository.ListRoomMemberUsernames(ctx, created.Snapshot().ID)
+	if err != nil || usernames[hostID] != "RoomHost1" || usernames[participantID] != "RoomPlayer2" || usernames[waitingID] != "RoomWait3" {
+		t.Fatalf("room member usernames: usernames=%v err=%v", usernames, err)
+	}
 
 	first, err := updated.SetAdmission(hostID, roomDomain.AdmissionOpen, roomDomain.AdmissionOpen, updated.Version(), now.Add(4*time.Second))
 	if err != nil {

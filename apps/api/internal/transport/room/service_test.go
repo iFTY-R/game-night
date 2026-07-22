@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -59,7 +60,21 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	if err != nil || !joined.Msg.GetCreated() || len(joined.Msg.GetRoom().GetMembers()) != 2 {
 		t.Fatalf("join room: response=%+v err=%v", joined, err)
 	}
-
+	hostReadRequest := connect.NewRequest(&roomv1.GetRoomRequest{RoomId: joined.Msg.GetRoom().GetRoomId()})
+	authorizeRoomRead(hostReadRequest, "host-device")
+	hostView, err := client.GetRoom(t.Context(), hostReadRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guestReadRequest := connect.NewRequest(&roomv1.GetRoomRequest{RoomId: joined.Msg.GetRoom().GetRoomId()})
+	authorizeRoomRead(guestReadRequest, "guest-device")
+	guestView, err := client.GetRoom(t.Context(), guestReadRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hostNames, guestNames := roomMemberUsernames(hostView.Msg.GetRoom()), roomMemberUsernames(guestView.Msg.GetRoom()); len(hostNames) != 2 || !maps.Equal(hostNames, guestNames) || hostNames[host.String()] != "测试房主" || hostNames[guest.String()] != "测试玩家" {
+		t.Fatalf("member usernames diverged: host=%v guest=%v", hostNames, guestNames)
+	}
 	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
 		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "liars-dice",
 		ExpectedVersion: joined.Msg.GetRoom().GetVersion(),
@@ -428,7 +443,7 @@ func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1con
 
 func newRoomTransportFixture(t testing.TB, actors map[string]uuid.UUID) roomTransportFixture {
 	t.Helper()
-	repository := newTransportRoomRepository()
+	repository := newTransportRoomRepository(actors)
 	source := clock.NewFake(time.Date(2026, time.July, 19, 18, 0, 0, 0, time.UTC))
 	domainService, err := roomDomain.NewService(repository, &transportCodeGenerator{}, source)
 	if err != nil {
@@ -467,6 +482,14 @@ func authorizeRoomWrite[T any](request *connect.Request[T], deviceToken string) 
 func authorizeRoomRead[T any](request *connect.Request[T], deviceToken string) {
 	csrfToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{7}, csrf.TokenBytes))
 	request.Header().Set("Cookie", cookies.UserDeviceCookieName+"="+deviceToken+"; "+cookies.UserCSRFCookieName+"="+csrfToken)
+}
+
+func roomMemberUsernames(room *roomv1.Room) map[string]string {
+	usernames := make(map[string]string, len(room.GetMembers()))
+	for _, member := range room.GetMembers() {
+		usernames[member.GetUserId()] = member.GetUsername()
+	}
+	return usernames
 }
 
 type transportAuthenticator struct{ actors map[string]uuid.UUID }
@@ -668,13 +691,29 @@ func roomTransportDigest(value string) []byte {
 }
 
 type transportRoomRepository struct {
-	mu     sync.Mutex
-	byID   map[uuid.UUID]roomDomain.Room
-	byCode map[string]uuid.UUID
+	mu        sync.Mutex
+	byID      map[uuid.UUID]roomDomain.Room
+	byCode    map[string]uuid.UUID
+	usernames map[uuid.UUID]string
 }
 
-func newTransportRoomRepository() *transportRoomRepository {
-	return &transportRoomRepository{byID: make(map[uuid.UUID]roomDomain.Room), byCode: make(map[string]uuid.UUID)}
+func newTransportRoomRepository(actors map[string]uuid.UUID) *transportRoomRepository {
+	usernames := make(map[uuid.UUID]string, len(actors))
+	for deviceToken, userID := range actors {
+		switch deviceToken {
+		case "host-device":
+			usernames[userID] = "测试房主"
+		case "guest-device":
+			usernames[userID] = "测试玩家"
+		case "newcomer-device":
+			usernames[userID] = "测试候场"
+		default:
+			usernames[userID] = "测试成员"
+		}
+	}
+	return &transportRoomRepository{
+		byID: make(map[uuid.UUID]roomDomain.Room), byCode: make(map[string]uuid.UUID), usernames: usernames,
+	}
 }
 
 func (repository *transportRoomRepository) Create(_ context.Context, room roomDomain.Room) (roomDomain.Room, error) {
@@ -706,6 +745,20 @@ func (repository *transportRoomRepository) GetByCode(ctx context.Context, code s
 		return roomDomain.Room{}, roomDomain.ErrRoomNotFound
 	}
 	return repository.GetByID(ctx, id)
+}
+
+func (repository *transportRoomRepository) ListRoomMemberUsernames(_ context.Context, roomID uuid.UUID) (map[uuid.UUID]string, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	room, exists := repository.byID[roomID]
+	if !exists {
+		return nil, roomDomain.ErrRoomNotFound
+	}
+	usernames := make(map[uuid.UUID]string, len(room.Snapshot().Members))
+	for _, member := range room.Snapshot().Members {
+		usernames[member.UserID] = repository.usernames[member.UserID]
+	}
+	return usernames, nil
 }
 
 func (repository *transportRoomRepository) UpdateCAS(_ context.Context, current, next roomDomain.Room) (roomDomain.Room, error) {

@@ -11,7 +11,7 @@ const roomSnapshot = (roomId: string, roomCode: string): RoomSnapshot => ({
   participantCapacity: 8,
   participantAdmission: "ADMISSION_MODE_OPEN",
   spectatorAdmission: "ADMISSION_MODE_OPEN",
-  members: [{ userId: "guest-device", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 }],
+  members: [{ userId: "guest-device", username: "阿青", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 }],
   activeSessionId: "",
   activeGameId: "",
   lastFinishedSessionId: "",
@@ -42,6 +42,56 @@ test("recognized device follows an invite without reopening the identity form", 
   await expect(page).toHaveURL(/\/room\/room42$/);
   await expect(page.getByText("ROOM42", { exact: true })).toBeVisible();
   await expect(page.locator("article").filter({ hasText: "本机" }).locator("strong")).toHaveText("阿青");
+});
+
+test("all viewers see the same server-projected member usernames", async ({ browser }) => {
+  const roomId = "00000000-0000-4000-8000-000000000041";
+  const hostId = "00000000-0000-4000-8000-000000000042";
+  const guestId = "00000000-0000-4000-8000-000000000043";
+  const snapshot: RoomSnapshot = {
+    ...roomSnapshot(roomId, "NAMES1"),
+    hostUserId: hostId,
+    members: [
+      { userId: hostId, username: "小满", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 },
+      { userId: guestId, username: "阿青", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 1 },
+    ],
+  };
+  const openViewer = async (userId: string, localName: string) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.addInitScript(({ currentUserId, currentLocalName }) => {
+      localStorage.setItem("game-night.room-context.v1", JSON.stringify({
+        schemaVersion: 1,
+        displayName: currentLocalName,
+        userId: currentUserId,
+        roomId: null,
+        roomCode: null,
+        sessionId: null,
+      }));
+    }, { currentUserId: userId, currentLocalName: localName });
+    await page.route("**/platform.identity.v1.IdentityService/GetCurrentIdentity", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: { userId, status: "USER_STATUS_ACTIVE", username: localName } }),
+      });
+    });
+    await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: snapshot }) });
+    });
+    await page.goto(`/room/${roomId}`);
+    return { context, page };
+  };
+
+  const host = await openViewer(hostId, "本地主机名");
+  const guest = await openViewer(guestId, "本地访客名");
+  for (const viewer of [host.page, guest.page]) {
+    await expect(viewer.locator(".lobby-seat strong")).toHaveText(["小满", "阿青"]);
+    await expect(viewer.getByText("本地主机名", { exact: true })).toHaveCount(0);
+    await expect(viewer.getByText("本地访客名", { exact: true })).toHaveCount(0);
+  }
+  await host.context.close();
+  await guest.context.close();
 });
 
 test("switching invites never sends the previous room version", async ({ page }) => {

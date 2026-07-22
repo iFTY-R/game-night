@@ -139,6 +139,13 @@ FROM room_members
 WHERE room_id = sqlc.arg(room_id)
 ORDER BY joined_at, user_id;
 
+-- name: ListRoomMemberUsernames :many
+SELECT member.user_id, users.username
+FROM room_members AS member
+JOIN users ON users.user_id = member.user_id
+WHERE member.room_id = sqlc.arg(room_id)
+ORDER BY member.user_id;
+
 -- name: GetRoomMemberRole :one
 SELECT role
 FROM room_members

@@ -16,6 +16,7 @@ import {
 import { BrowserRealtimeAdapter } from "../api/browser-realtime";
 import { ApiError, gameClient, type GameEnvelopeInput, type RoomSnapshot } from "../api/client";
 import { gameProjectionFromConnect } from "../api/game-projection";
+import { memberDisplayName } from "../member-display";
 import { useRoomStore } from "../stores/room";
 
 type TableConnection = "online" | "offline" | "reconnecting" | "draining";
@@ -153,8 +154,8 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
       viewerRole: state.viewerRole ?? options.context.value.viewerRole,
       connection: connectionState(state.connection),
       players: options.players(state.view).map((player) => {
-        const self = player.userId === room.userId;
-        const displayName = self ? room.displayName || "你" : "玩家 " + player.userId.slice(0, 6);
+        const member = room.remoteRoom?.members.find((candidate) => candidate.userId === player.userId);
+        const displayName = memberDisplayName(player.userId, member?.username);
         return {
           userId: player.userId,
           displayName,

@@ -409,6 +409,7 @@ type RoomMember struct {
 	SeatIndex     uint32                 `protobuf:"varint,4,opt,name=seat_index,json=seatIndex,proto3" json:"seat_index,omitempty"`
 	JoinedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
 	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	Username      string                 `protobuf:"bytes,7,opt,name=username,proto3" json:"username,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -483,6 +484,13 @@ func (x *RoomMember) GetLastSeenAt() *timestamppb.Timestamp {
 		return x.LastSeenAt
 	}
 	return nil
+}
+
+func (x *RoomMember) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
 }
 
 type Room struct {
@@ -2387,7 +2395,7 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x1bplatform/room/v1/room.proto\x12\x10platform.room.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/common.proto\x1a\x1bplatform/game/v1/game.proto\"_\n" +
 	"\vRoomVersion\x12!\n" +
 	"\froom_version\x18\x01 \x01(\x04R\vroomVersion\x12-\n" +
-	"\x12membership_version\x18\x02 \x01(\x04R\x11membershipVersion\"\xb2\x02\n" +
+	"\x12membership_version\x18\x02 \x01(\x04R\x11membershipVersion\"\xce\x02\n" +
 	"\n" +
 	"RoomMember\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x120\n" +
@@ -2397,7 +2405,8 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"seat_index\x18\x04 \x01(\rR\tseatIndex\x127\n" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12<\n" +
 	"\flast_seen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSeenAt\"\xd6\x06\n" +
+	"lastSeenAt\x12\x1a\n" +
+	"\busername\x18\a \x01(\tR\busername\"\xd6\x06\n" +
 	"\x04Room\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\troom_code\x18\x02 \x01(\tR\broomCode\x12@\n" +

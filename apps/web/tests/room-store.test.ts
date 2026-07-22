@@ -104,8 +104,8 @@ describe("room context recovery", () => {
       participantAdmission: "ADMISSION_MODE_OPEN",
       spectatorAdmission: "ADMISSION_MODE_OPEN",
       members: [
-        { userId: "user-1", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 },
-        { userId: "user-2", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 1 },
+        { userId: "user-1", username: "小满", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 0 },
+        { userId: "user-2", username: "阿青", role: "MEMBER_ROLE_PARTICIPANT", requestedRole: "MEMBER_ROLE_UNSPECIFIED", seatIndex: 1 },
       ],
       activeSessionId: "",
       activeGameId: "",

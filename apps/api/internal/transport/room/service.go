@@ -53,6 +53,7 @@ type GameSessionReader interface {
 // RoomReader reloads the atomically committed post-game room returned to RoomService clients.
 type RoomReader interface {
 	GetByID(context.Context, uuid.UUID) (roomDomain.Room, error)
+	ListRoomMemberUsernames(context.Context, uuid.UUID) (map[uuid.UUID]string, error)
 }
 
 // FanoutPublisher publishes only committed session cursors; PostgreSQL remains authoritative.
@@ -110,7 +111,11 @@ func (service *Service) CreateRoom(ctx context.Context, request *connect.Request
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&roomv1.CreateRoomResponse{Room: roomWire(created)}), nil
+	wireRoom, err := service.roomWire(ctx, created)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.CreateRoomResponse{Room: wireRoom}), nil
 }
 
 // GetRoom authenticates a safe read without requiring an Origin header or double-submit header.
@@ -127,7 +132,11 @@ func (service *Service) GetRoom(ctx context.Context, request *connect.Request[ro
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&roomv1.GetRoomResponse{Room: roomWire(loaded)}), nil
+	wireRoom, err := service.roomWire(ctx, loaded)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.GetRoomResponse{Room: wireRoom}), nil
 }
 
 // ListMyRooms authenticates a private member read and returns host-owned rooms before joined rooms.
@@ -203,8 +212,12 @@ func (service *Service) JoinRoom(ctx context.Context, request *connect.Request[r
 	if err != nil {
 		return nil, err
 	}
+	wireRoom, err := service.roomWire(ctx, joined)
+	if err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&roomv1.JoinRoomResponse{
-		Room: roomWire(joined), Member: memberWire(result.Member), Created: result.Created, Changed: result.Changed,
+		Room: wireRoom, Member: roomMemberWire(wireRoom, result.Member), Created: result.Created, Changed: result.Changed,
 	}), nil
 }
 
@@ -224,7 +237,11 @@ func (service *Service) ApproveMember(ctx context.Context, request *connect.Requ
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&roomv1.ApproveMemberResponse{Room: roomWire(updated), Member: memberWire(result.Member)}), nil
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.ApproveMemberResponse{Room: wireRoom, Member: roomMemberWire(wireRoom, result.Member)}), nil
 }
 
 // SetAdmission changes both role policies in one host command.
@@ -244,7 +261,11 @@ func (service *Service) SetAdmission(ctx context.Context, request *connect.Reque
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&roomv1.SetAdmissionResponse{Room: roomWire(updated)}), nil
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.SetAdmissionResponse{Room: wireRoom}), nil
 }
 
 // StartGame validates the opaque config and publishes PartyRoom plus GameSession atomically.
@@ -290,8 +311,12 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	for index, participant := range snapshot.Participants {
 		participants[index] = &roomv1.FrozenParticipant{UserId: participant.UserID.String(), SeatIndex: participant.SeatIndex}
 	}
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&roomv1.StartGameResponse{
-		Room: roomWire(updated), SessionId: snapshot.ID.String(), GameId: string(snapshot.VersionKey.GameID), Participants: participants,
+		Room: wireRoom, SessionId: snapshot.ID.String(), GameId: string(snapshot.VersionKey.GameID), Participants: participants,
 	}), nil
 }
 
@@ -344,7 +369,11 @@ func (service *Service) FinishGame(ctx context.Context, request *connect.Request
 	if updatedSnapshot.Status != roomDomain.RoomStatusPostGame || updatedSnapshot.ActiveSessionID != uuid.Nil {
 		return nil, gameruntime.ErrGameSessionIntegrity
 	}
-	return connect.NewResponse(&roomv1.FinishGameResponse{Room: roomWire(updated)}), nil
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.FinishGameResponse{Room: wireRoom}), nil
 }
 
 // RemoveMember returns the runtime revocation flag alongside the committed room state.
@@ -368,8 +397,12 @@ func (service *Service) RemoveMember(ctx context.Context, request *connect.Reque
 	if result.SessionID != uuid.Nil {
 		activeSessionID = result.SessionID.String()
 	}
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&roomv1.RemoveMemberResponse{
-		Room: roomWire(updated), Removed: memberWire(result.Removed), ParticipantRevoked: result.ParticipantRevoked,
+		Room: wireRoom, Removed: memberWire(result.Removed, ""), ParticipantRevoked: result.ParticipantRevoked,
 		ActiveSessionId: activeSessionID, SourceEventId: optionalUUIDString(result.SourceEventID),
 	}), nil
 }
@@ -427,7 +460,11 @@ func (service *Service) CloseRoom(ctx context.Context, request *connect.Request[
 		if err := service.publish(ctx, cancelled); err != nil {
 			return nil, err
 		}
-		return connect.NewResponse(&roomv1.CloseRoomResponse{Room: roomWire(updated)}), nil
+		wireRoom, err := service.roomWire(ctx, updated)
+		if err != nil {
+			return nil, err
+		}
+		return connect.NewResponse(&roomv1.CloseRoomResponse{Room: wireRoom}), nil
 	}
 	updated, err := service.domain.CloseRoom(ctx, roomDomain.CloseRoomCommand{
 		ActorUserID: actor, RoomID: roomID, Expected: expected,
@@ -435,7 +472,11 @@ func (service *Service) CloseRoom(ctx context.Context, request *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&roomv1.CloseRoomResponse{Room: roomWire(updated)}), nil
+	wireRoom, err := service.roomWire(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.CloseRoomResponse{Room: wireRoom}), nil
 }
 
 func (service *Service) authenticate(ctx context.Context, request *http.Request) (uuid.UUID, error) {
@@ -594,11 +635,21 @@ func twoUUIDs(first, second string) (uuid.UUID, uuid.UUID, error) {
 	return firstID, secondID, nil
 }
 
-func roomWire(room roomDomain.Room) *roomv1.Room {
+// roomWire resolves mutable identity names at response time so every viewer receives the same member projection.
+func (service *Service) roomWire(ctx context.Context, room roomDomain.Room) (*roomv1.Room, error) {
+	snapshot := room.Snapshot()
+	usernames, err := service.rooms.ListRoomMemberUsernames(ctx, snapshot.ID)
+	if err != nil {
+		return nil, err
+	}
+	return roomWire(room, usernames), nil
+}
+
+func roomWire(room roomDomain.Room, usernames map[uuid.UUID]string) *roomv1.Room {
 	snapshot := room.Snapshot()
 	members := make([]*roomv1.RoomMember, len(snapshot.Members))
 	for index, member := range snapshot.Members {
-		members[index] = memberWire(member)
+		members[index] = memberWire(member, usernames[member.UserID])
 	}
 	activeSessionID := ""
 	if snapshot.ActiveSessionID != uuid.Nil {
@@ -647,11 +698,22 @@ func myRoomCardWire(card roomDomain.MyRoomCard) *roomv1.MyRoomCard {
 	}
 }
 
-func memberWire(member roomDomain.MemberSnapshot) *roomv1.RoomMember {
+func memberWire(member roomDomain.MemberSnapshot, username string) *roomv1.RoomMember {
 	return &roomv1.RoomMember{
 		UserId: member.UserID.String(), Role: memberRoleWire(member.Role), RequestedRole: memberRoleWire(member.RequestedRole),
 		SeatIndex: member.SeatIndex, JoinedAt: timestamppb.New(member.JoinedAt), LastSeenAt: timestamppb.New(member.LastSeenAt),
+		Username: username,
 	}
+}
+
+// roomMemberWire reuses the already projected member so command-specific responses cannot diverge from Room.members.
+func roomMemberWire(room *roomv1.Room, member roomDomain.MemberSnapshot) *roomv1.RoomMember {
+	for _, candidate := range room.GetMembers() {
+		if candidate.GetUserId() == member.UserID.String() {
+			return candidate
+		}
+	}
+	return memberWire(member, "")
 }
 
 func visibilityDomain(value roomv1.RoomVisibility) roomDomain.Visibility {

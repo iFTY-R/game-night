@@ -2071,6 +2071,14 @@ type Querier interface {
 	//  ORDER BY room.updated_at DESC, room.room_id DESC
 	//  LIMIT $10
 	ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCardsParams) ([]ListPublicRoomCardsRow, error)
+	//ListRoomMemberUsernames
+	//
+	//  SELECT member.user_id, users.username
+	//  FROM room_members AS member
+	//  JOIN users ON users.user_id = member.user_id
+	//  WHERE member.room_id = $1
+	//  ORDER BY member.user_id
+	ListRoomMemberUsernames(ctx context.Context, arg ListRoomMemberUsernamesParams) ([]ListRoomMemberUsernamesRow, error)
 	//ListRoomMembers
 	//
 	//  SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at

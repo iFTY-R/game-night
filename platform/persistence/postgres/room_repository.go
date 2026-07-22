@@ -87,6 +87,29 @@ func (repository *RoomRepository) GetByCode(ctx context.Context, roomCode string
 	})
 }
 
+// ListRoomMemberUsernames projects current identity names without copying mutable profile data into the room aggregate.
+func (repository *RoomRepository) ListRoomMemberUsernames(ctx context.Context, roomID uuid.UUID) (map[uuid.UUID]string, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || roomID == uuid.Nil {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
+	var rows []sqlcgen.ListRoomMemberUsernamesRow
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		var err error
+		rows, err = queries.ListRoomMemberUsernames(ctx, sqlcgen.ListRoomMemberUsernamesParams{RoomID: uuidToPG(roomID)})
+		return err
+	})
+	if err != nil {
+		return nil, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomNotFound)
+	}
+	usernames := make(map[uuid.UUID]string, len(rows))
+	for _, row := range rows {
+		if row.UserID.Valid && row.Username.Valid {
+			usernames[uuid.UUID(row.UserID.Bytes)] = row.Username.String
+		}
+	}
+	return usernames, nil
+}
+
 // ListPublicRooms reads one actor-aware lobby page without loading invitation codes or complete member snapshots.
 func (repository *RoomRepository) ListPublicRooms(
 	ctx context.Context,

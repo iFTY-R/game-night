@@ -12,6 +12,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	roomDomain "github.com/iFTY-R/game-night/platform/room"
 )
 
 var (
@@ -46,6 +47,7 @@ type Runtime interface {
 	HandleAction(context.Context, gameruntime.ActionCommand) (gameruntime.ActionResult, error)
 	HandleTimer(context.Context, gameruntime.DueTimer, uint64) (gameruntime.TimerCommitResult, error)
 	HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error)
+	Cancel(context.Context, gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error)
 }
 
 // FanoutPublisher wakes subscribers only after PostgreSQL has committed a new authoritative version.
@@ -284,6 +286,31 @@ func (manager *Manager) HandleSystem(ctx context.Context, command gameruntime.Sy
 		return gameruntime.SystemCommitResult{}, err
 	}
 	return result, nil
+}
+
+// Cancel fences a terminal room/session transaction with the epoch held by this process, never the remote caller.
+func (manager *Manager) Cancel(ctx context.Context, command gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error) {
+	if manager == nil || ctx == nil || command.RoomID == uuid.Nil || command.SessionID == uuid.Nil {
+		return roomDomain.Room{}, gameruntime.Session{}, ErrOwnershipUnavailable
+	}
+	state, err := manager.owned(command.SessionID)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	command.OwnershipEpoch = state.epoch
+	ownedCtx, cancel := commandContext(ctx, state.ctx)
+	defer cancel()
+	room, session, err := manager.runtime.Cancel(ownedCtx, command)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	if !manager.stillOwns(command.SessionID, state) {
+		return roomDomain.Room{}, gameruntime.Session{}, ErrLeaseLost
+	}
+	if err := manager.publish(ownedCtx, session); err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	return room, session, nil
 }
 
 // Close first cancels all commands, then compare-token releases every lease. It is idempotent.

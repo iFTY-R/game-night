@@ -11,6 +11,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	realtimev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1/realtimev1connect"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
@@ -40,6 +41,24 @@ func TestOwnerServiceActionAcquiresOwnerAndNeverAcceptsCallerEpoch(t *testing.T)
 		response.Msg.GetProjection().GetView().GetMessageType() != "viewer.state" ||
 		response.Msg.GetReceipt().GetActionId() != operationID.Value() {
 		t.Fatalf("action response = %+v", response.Msg)
+	}
+}
+
+func TestOwnerServiceCancelUsesOwnerFencingAndReturnsTerminalSnapshots(t *testing.T) {
+	fixture := newInternalGameFixture(t)
+	roomSnapshot := fixture.room.Snapshot()
+	response, err := fixture.service.CancelSession(t.Context(), connect.NewRequest(&realtimev1.CancelSessionRequest{
+		RoomId: roomSnapshot.ID.String(), SessionId: fixture.session.Snapshot().ID.String(),
+		ExpectedRoomVersion: roomSnapshot.RoomVersion, ExpectedMembershipVersion: roomSnapshot.MembershipVersion,
+		CloseRoom: true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.ownership.lastCancel.OwnershipEpoch != 0 || !fixture.ownership.lastCancel.CloseRoom ||
+		response.Msg.GetRoom().GetStatus() != string(roomdomain.RoomStatusClosed) ||
+		response.Msg.GetSession().GetStatus() != gamev1.GameSessionStatus_GAME_SESSION_STATUS_CANCELLED {
+		t.Fatalf("command=%+v response=%+v", fixture.ownership.lastCancel, response.Msg)
 	}
 }
 
@@ -113,6 +132,7 @@ type internalGameFixture struct {
 	runtime   *fakeInternalRuntime
 	ownership *fakeInternalOwnership
 	sessions  *fakeInternalSessions
+	room      roomdomain.Room
 	session   gameruntime.Session
 	actorID   uuid.UUID
 }
@@ -121,8 +141,9 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 	t.Helper()
 	now := time.Date(2026, time.July, 20, 12, 0, 0, 0, time.UTC)
 	actorID := uuid.New()
+	roomID, sessionID := uuid.New(), uuid.New()
 	session, err := gameruntime.RestoreSession(gameruntime.SessionSnapshot{
-		ID: uuid.New(), RoomID: uuid.New(),
+		ID: sessionID, RoomID: roomID,
 		VersionKey:     game.VersionKey{GameID: "liars-dice", Engine: "1.0.0", Protocol: "1.0.0", Client: "1.0.0"},
 		OwnershipEpoch: 7, Participants: []gameruntime.Participant{{UserID: actorID, SeatIndex: 2}},
 		State: game.Snapshot{
@@ -133,11 +154,24 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	room, err := roomdomain.Restore(roomdomain.RoomSnapshot{
+		ID: roomID, RoomCode: "OWNER1", Visibility: roomdomain.VisibilityPrivate, Status: roomdomain.RoomStatusPlaying,
+		HostUserID: actorID, ParticipantCapacity: 3, ParticipantAdmission: roomdomain.AdmissionClosed,
+		SpectatorAdmission: roomdomain.AdmissionOpen,
+		Members: []roomdomain.MemberSnapshot{{
+			UserID: actorID, Role: roomdomain.MemberRoleParticipant, SeatIndex: 0, JoinedAt: now, LastSeenAt: now,
+		}},
+		ActiveSessionID: sessionID, ActiveGameID: "liars-dice", RoomVersion: 2, MembershipVersion: 1,
+		CreatedAt: now, UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	projection := game.Projection{
 		View: internalMessage("viewer.state", []byte("safe")), AllowedActions: []game.Identifier{"round.roll"},
 	}
 	runtime := &fakeInternalRuntime{session: session, projection: projection}
-	ownership := &fakeInternalOwnership{session: session, projection: projection}
+	ownership := &fakeInternalOwnership{room: room, session: session, projection: projection}
 	routes := &fakeInternalRoutes{lease: redisstore.SessionLease{
 		SessionID: session.Snapshot().ID, Owner: "realtime-a", Address: "http://realtime-a.internal:8091",
 		Ready: true, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
@@ -147,7 +181,7 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return internalGameFixture{service: service, runtime: runtime, ownership: ownership, sessions: sessions, session: session, actorID: actorID}
+	return internalGameFixture{service: service, runtime: runtime, ownership: ownership, sessions: sessions, room: room, session: session, actorID: actorID}
 }
 
 type fakeInternalRuntime struct {
@@ -172,10 +206,12 @@ func (runtime *fakeInternalRuntime) ProjectReplayCurrent(context.Context, uuid.U
 }
 
 type fakeInternalOwnership struct {
+	room        roomdomain.Room
 	session     gameruntime.Session
 	projection  game.Projection
 	ensureCalls int
 	lastAction  gameruntime.ActionCommand
+	lastCancel  gameruntime.CancelCommand
 }
 
 func (ownership *fakeInternalOwnership) EnsureOwned(context.Context, uuid.UUID) (uint64, error) {
@@ -209,6 +245,23 @@ func (*fakeInternalOwnership) HandleTimer(context.Context, gameruntime.DueTimer)
 
 func (*fakeInternalOwnership) HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error) {
 	return gameruntime.SystemCommitResult{}, gameruntime.ErrInvalidSessionInput
+}
+
+func (ownership *fakeInternalOwnership) Cancel(_ context.Context, command gameruntime.CancelCommand) (roomdomain.Room, gameruntime.Session, error) {
+	ownership.lastCancel = command
+	cancelledAt := ownership.session.Snapshot().UpdatedAt.Add(time.Microsecond)
+	cancelled, err := ownership.session.Cancel(ownership.session.Snapshot().OwnershipEpoch, cancelledAt)
+	if err != nil {
+		return roomdomain.Room{}, gameruntime.Session{}, err
+	}
+	closed, err := ownership.room.CancelSessionAndClose(
+		ownership.room.Snapshot().HostUserID, command.SessionID, ownership.room.Version(), cancelledAt,
+	)
+	if err != nil {
+		return roomdomain.Room{}, gameruntime.Session{}, err
+	}
+	ownership.room, ownership.session = closed, cancelled
+	return closed, cancelled, nil
 }
 
 type fakeInternalSessions struct {

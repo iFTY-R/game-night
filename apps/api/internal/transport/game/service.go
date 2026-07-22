@@ -29,6 +29,7 @@ type Runtime interface {
 	Start(context.Context, gameruntime.StartCommand) (roomDomain.Room, gameruntime.Session, error)
 	HandleAction(context.Context, gameruntime.ActionCommand) (gameruntime.ActionResult, error)
 	HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error)
+	Cancel(context.Context, gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error)
 	ProjectCurrent(context.Context, uuid.UUID, gameSDK.Viewer) (gameruntime.Session, gameSDK.Projection, error)
 	ProjectReplayCurrent(context.Context, uuid.UUID, gameSDK.Viewer, gameSDK.ReplayAccessPolicy) (gameruntime.Session, gameSDK.Projection, error)
 }

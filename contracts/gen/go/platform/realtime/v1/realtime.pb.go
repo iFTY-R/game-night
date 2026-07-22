@@ -1999,6 +1999,135 @@ func (x *SystemReceipt) GetCommittedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// CancelSessionRequest omits ownership_epoch so only the receiving owner can fence the terminal write.
+type CancelSessionRequest struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	RoomId                    string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SessionId                 string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ExpectedRoomVersion       uint64                 `protobuf:"varint,3,opt,name=expected_room_version,json=expectedRoomVersion,proto3" json:"expected_room_version,omitempty"`
+	ExpectedMembershipVersion uint64                 `protobuf:"varint,4,opt,name=expected_membership_version,json=expectedMembershipVersion,proto3" json:"expected_membership_version,omitempty"`
+	CloseRoom                 bool                   `protobuf:"varint,5,opt,name=close_room,json=closeRoom,proto3" json:"close_room,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *CancelSessionRequest) Reset() {
+	*x = CancelSessionRequest{}
+	mi := &file_platform_realtime_v1_realtime_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelSessionRequest) ProtoMessage() {}
+
+func (x *CancelSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_realtime_v1_realtime_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelSessionRequest.ProtoReflect.Descriptor instead.
+func (*CancelSessionRequest) Descriptor() ([]byte, []int) {
+	return file_platform_realtime_v1_realtime_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CancelSessionRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *CancelSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CancelSessionRequest) GetExpectedRoomVersion() uint64 {
+	if x != nil {
+		return x.ExpectedRoomVersion
+	}
+	return 0
+}
+
+func (x *CancelSessionRequest) GetExpectedMembershipVersion() uint64 {
+	if x != nil {
+		return x.ExpectedMembershipVersion
+	}
+	return 0
+}
+
+func (x *CancelSessionRequest) GetCloseRoom() bool {
+	if x != nil {
+		return x.CloseRoom
+	}
+	return false
+}
+
+type CancelSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *RoomSnapshot          `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	Session       *SessionSnapshot       `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelSessionResponse) Reset() {
+	*x = CancelSessionResponse{}
+	mi := &file_platform_realtime_v1_realtime_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelSessionResponse) ProtoMessage() {}
+
+func (x *CancelSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_realtime_v1_realtime_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelSessionResponse.ProtoReflect.Descriptor instead.
+func (*CancelSessionResponse) Descriptor() ([]byte, []int) {
+	return file_platform_realtime_v1_realtime_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CancelSessionResponse) GetRoom() *RoomSnapshot {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+func (x *CancelSessionResponse) GetSession() *SessionSnapshot {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
 var File_platform_realtime_v1_realtime_proto protoreflect.FileDescriptor
 
 const file_platform_realtime_v1_realtime_proto_rawDesc = "" +
@@ -2200,7 +2329,18 @@ const file_platform_realtime_v1_realtime_proto_rawDesc = "" +
 	"\rresult_digest\x18\b \x01(\fR\fresultDigest\x12#\n" +
 	"\rstate_version\x18\t \x01(\x04R\fstateVersion\x12=\n" +
 	"\fcommitted_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\vcommittedAt2\xdb\x06\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vcommittedAt\"\xe1\x01\n" +
+	"\x14CancelSessionRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x122\n" +
+	"\x15expected_room_version\x18\x03 \x01(\x04R\x13expectedRoomVersion\x12>\n" +
+	"\x1bexpected_membership_version\x18\x04 \x01(\x04R\x19expectedMembershipVersion\x12\x1d\n" +
+	"\n" +
+	"close_room\x18\x05 \x01(\bR\tcloseRoom\"\x90\x01\n" +
+	"\x15CancelSessionResponse\x126\n" +
+	"\x04room\x18\x01 \x01(\v2\".platform.realtime.v1.RoomSnapshotR\x04room\x12?\n" +
+	"\asession\x18\x02 \x01(\v2%.platform.realtime.v1.SessionSnapshotR\asession2\xc5\a\n" +
 	"\fOwnerService\x12e\n" +
 	"\fResolveOwner\x12).platform.realtime.v1.ResolveOwnerRequest\x1a*.platform.realtime.v1.ResolveOwnerResponse\x12e\n" +
 	"\fStartSession\x12).platform.realtime.v1.StartSessionRequest\x1a*.platform.realtime.v1.StartSessionResponse\x12_\n" +
@@ -2211,7 +2351,8 @@ const file_platform_realtime_v1_realtime_proto_rawDesc = "" +
 	"\tGameTimer\x12&.platform.realtime.v1.GameTimerRequest\x1a'.platform.realtime.v1.GameTimerResponse\x12h\n" +
 	"\rGetProjection\x12*.platform.realtime.v1.GetProjectionRequest\x1a+.platform.realtime.v1.GetProjectionResponse\x12w\n" +
 	"\x12GetEventProjection\x12/.platform.realtime.v1.GetEventProjectionRequest\x1a0.platform.realtime.v1.GetEventProjectionResponse\x12z\n" +
-	"\x13GetReplayProjection\x120.platform.realtime.v1.GetReplayProjectionRequest\x1a1.platform.realtime.v1.GetReplayProjectionResponseBOZMgithub.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1;realtimev1b\x06proto3"
+	"\x13GetReplayProjection\x120.platform.realtime.v1.GetReplayProjectionRequest\x1a1.platform.realtime.v1.GetReplayProjectionResponse\x12h\n" +
+	"\rCancelSession\x12*.platform.realtime.v1.CancelSessionRequest\x1a+.platform.realtime.v1.CancelSessionResponseBOZMgithub.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1;realtimev1b\x06proto3"
 
 var (
 	file_platform_realtime_v1_realtime_proto_rawDescOnce sync.Once
@@ -2225,7 +2366,7 @@ func file_platform_realtime_v1_realtime_proto_rawDescGZIP() []byte {
 	return file_platform_realtime_v1_realtime_proto_rawDescData
 }
 
-var file_platform_realtime_v1_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_platform_realtime_v1_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_platform_realtime_v1_realtime_proto_goTypes = []any{
 	(*ResolveOwnerRequest)(nil),         // 0: platform.realtime.v1.ResolveOwnerRequest
 	(*ResolveOwnerResponse)(nil),        // 1: platform.realtime.v1.ResolveOwnerResponse
@@ -2252,80 +2393,86 @@ var file_platform_realtime_v1_realtime_proto_goTypes = []any{
 	(*ActionReceipt)(nil),               // 22: platform.realtime.v1.ActionReceipt
 	(*TimerReceipt)(nil),                // 23: platform.realtime.v1.TimerReceipt
 	(*SystemReceipt)(nil),               // 24: platform.realtime.v1.SystemReceipt
-	(*v1.GameConfig)(nil),               // 25: platform.game.v1.GameConfig
-	(*v1.GameEnvelope)(nil),             // 26: platform.game.v1.GameEnvelope
-	(*v1.GameProjection)(nil),           // 27: platform.game.v1.GameProjection
-	(*timestamppb.Timestamp)(nil),       // 28: google.protobuf.Timestamp
-	(v1.ViewerKind)(0),                  // 29: platform.game.v1.ViewerKind
-	(*v1.VersionTuple)(nil),             // 30: platform.game.v1.VersionTuple
-	(v1.GameSessionStatus)(0),           // 31: platform.game.v1.GameSessionStatus
+	(*CancelSessionRequest)(nil),        // 25: platform.realtime.v1.CancelSessionRequest
+	(*CancelSessionResponse)(nil),       // 26: platform.realtime.v1.CancelSessionResponse
+	(*v1.GameConfig)(nil),               // 27: platform.game.v1.GameConfig
+	(*v1.GameEnvelope)(nil),             // 28: platform.game.v1.GameEnvelope
+	(*v1.GameProjection)(nil),           // 29: platform.game.v1.GameProjection
+	(*timestamppb.Timestamp)(nil),       // 30: google.protobuf.Timestamp
+	(v1.ViewerKind)(0),                  // 31: platform.game.v1.ViewerKind
+	(*v1.VersionTuple)(nil),             // 32: platform.game.v1.VersionTuple
+	(v1.GameSessionStatus)(0),           // 33: platform.game.v1.GameSessionStatus
 }
 var file_platform_realtime_v1_realtime_proto_depIdxs = []int32{
-	25, // 0: platform.realtime.v1.StartSessionRequest.config:type_name -> platform.game.v1.GameConfig
+	27, // 0: platform.realtime.v1.StartSessionRequest.config:type_name -> platform.game.v1.GameConfig
 	17, // 1: platform.realtime.v1.StartSessionResponse.room:type_name -> platform.realtime.v1.RoomSnapshot
 	19, // 2: platform.realtime.v1.StartSessionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
-	26, // 3: platform.realtime.v1.GameActionRequest.command:type_name -> platform.game.v1.GameEnvelope
+	28, // 3: platform.realtime.v1.GameActionRequest.command:type_name -> platform.game.v1.GameEnvelope
 	19, // 4: platform.realtime.v1.GameActionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
 	22, // 5: platform.realtime.v1.GameActionResponse.receipt:type_name -> platform.realtime.v1.ActionReceipt
-	27, // 6: platform.realtime.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
-	26, // 7: platform.realtime.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
+	29, // 6: platform.realtime.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
+	28, // 7: platform.realtime.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
 	19, // 8: platform.realtime.v1.GameSystemResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
 	24, // 9: platform.realtime.v1.GameSystemResponse.receipt:type_name -> platform.realtime.v1.SystemReceipt
-	28, // 10: platform.realtime.v1.GameTimerRequest.due_at:type_name -> google.protobuf.Timestamp
-	26, // 11: platform.realtime.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
+	30, // 10: platform.realtime.v1.GameTimerRequest.due_at:type_name -> google.protobuf.Timestamp
+	28, // 11: platform.realtime.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
 	19, // 12: platform.realtime.v1.GameTimerResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
 	23, // 13: platform.realtime.v1.GameTimerResponse.receipt:type_name -> platform.realtime.v1.TimerReceipt
-	29, // 14: platform.realtime.v1.Viewer.kind:type_name -> platform.game.v1.ViewerKind
+	31, // 14: platform.realtime.v1.Viewer.kind:type_name -> platform.game.v1.ViewerKind
 	10, // 15: platform.realtime.v1.GetProjectionRequest.viewer:type_name -> platform.realtime.v1.Viewer
 	19, // 16: platform.realtime.v1.GetProjectionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
-	27, // 17: platform.realtime.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	29, // 17: platform.realtime.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
 	10, // 18: platform.realtime.v1.GetEventProjectionRequest.viewer:type_name -> platform.realtime.v1.Viewer
 	19, // 19: platform.realtime.v1.GetEventProjectionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
-	26, // 20: platform.realtime.v1.GetEventProjectionResponse.messages:type_name -> platform.game.v1.GameEnvelope
-	27, // 21: platform.realtime.v1.GetEventProjectionResponse.snapshot_fallback:type_name -> platform.game.v1.GameProjection
+	28, // 20: platform.realtime.v1.GetEventProjectionResponse.messages:type_name -> platform.game.v1.GameEnvelope
+	29, // 21: platform.realtime.v1.GetEventProjectionResponse.snapshot_fallback:type_name -> platform.game.v1.GameProjection
 	10, // 22: platform.realtime.v1.GetReplayProjectionRequest.viewer:type_name -> platform.realtime.v1.Viewer
 	19, // 23: platform.realtime.v1.GetReplayProjectionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
-	27, // 24: platform.realtime.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	29, // 24: platform.realtime.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
 	18, // 25: platform.realtime.v1.RoomSnapshot.members:type_name -> platform.realtime.v1.RoomMember
-	28, // 26: platform.realtime.v1.RoomSnapshot.created_at:type_name -> google.protobuf.Timestamp
-	28, // 27: platform.realtime.v1.RoomSnapshot.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 28: platform.realtime.v1.RoomMember.joined_at:type_name -> google.protobuf.Timestamp
-	28, // 29: platform.realtime.v1.RoomMember.last_seen_at:type_name -> google.protobuf.Timestamp
-	30, // 30: platform.realtime.v1.SessionSnapshot.version:type_name -> platform.game.v1.VersionTuple
+	30, // 26: platform.realtime.v1.RoomSnapshot.created_at:type_name -> google.protobuf.Timestamp
+	30, // 27: platform.realtime.v1.RoomSnapshot.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 28: platform.realtime.v1.RoomMember.joined_at:type_name -> google.protobuf.Timestamp
+	30, // 29: platform.realtime.v1.RoomMember.last_seen_at:type_name -> google.protobuf.Timestamp
+	32, // 30: platform.realtime.v1.SessionSnapshot.version:type_name -> platform.game.v1.VersionTuple
 	20, // 31: platform.realtime.v1.SessionSnapshot.participants:type_name -> platform.realtime.v1.Participant
-	26, // 32: platform.realtime.v1.SessionSnapshot.authoritative_state:type_name -> platform.game.v1.GameEnvelope
+	28, // 32: platform.realtime.v1.SessionSnapshot.authoritative_state:type_name -> platform.game.v1.GameEnvelope
 	21, // 33: platform.realtime.v1.SessionSnapshot.timers:type_name -> platform.realtime.v1.Timer
-	28, // 34: platform.realtime.v1.SessionSnapshot.next_deadline_at:type_name -> google.protobuf.Timestamp
-	31, // 35: platform.realtime.v1.SessionSnapshot.status:type_name -> platform.game.v1.GameSessionStatus
-	28, // 36: platform.realtime.v1.SessionSnapshot.started_at:type_name -> google.protobuf.Timestamp
-	28, // 37: platform.realtime.v1.SessionSnapshot.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 38: platform.realtime.v1.SessionSnapshot.ended_at:type_name -> google.protobuf.Timestamp
-	28, // 39: platform.realtime.v1.Timer.due_at:type_name -> google.protobuf.Timestamp
-	26, // 40: platform.realtime.v1.Timer.message:type_name -> platform.game.v1.GameEnvelope
-	28, // 41: platform.realtime.v1.ActionReceipt.committed_at:type_name -> google.protobuf.Timestamp
-	28, // 42: platform.realtime.v1.TimerReceipt.committed_at:type_name -> google.protobuf.Timestamp
-	28, // 43: platform.realtime.v1.SystemReceipt.committed_at:type_name -> google.protobuf.Timestamp
-	0,  // 44: platform.realtime.v1.OwnerService.ResolveOwner:input_type -> platform.realtime.v1.ResolveOwnerRequest
-	2,  // 45: platform.realtime.v1.OwnerService.StartSession:input_type -> platform.realtime.v1.StartSessionRequest
-	4,  // 46: platform.realtime.v1.OwnerService.GameAction:input_type -> platform.realtime.v1.GameActionRequest
-	6,  // 47: platform.realtime.v1.OwnerService.GameSystem:input_type -> platform.realtime.v1.GameSystemRequest
-	8,  // 48: platform.realtime.v1.OwnerService.GameTimer:input_type -> platform.realtime.v1.GameTimerRequest
-	11, // 49: platform.realtime.v1.OwnerService.GetProjection:input_type -> platform.realtime.v1.GetProjectionRequest
-	13, // 50: platform.realtime.v1.OwnerService.GetEventProjection:input_type -> platform.realtime.v1.GetEventProjectionRequest
-	15, // 51: platform.realtime.v1.OwnerService.GetReplayProjection:input_type -> platform.realtime.v1.GetReplayProjectionRequest
-	1,  // 52: platform.realtime.v1.OwnerService.ResolveOwner:output_type -> platform.realtime.v1.ResolveOwnerResponse
-	3,  // 53: platform.realtime.v1.OwnerService.StartSession:output_type -> platform.realtime.v1.StartSessionResponse
-	5,  // 54: platform.realtime.v1.OwnerService.GameAction:output_type -> platform.realtime.v1.GameActionResponse
-	7,  // 55: platform.realtime.v1.OwnerService.GameSystem:output_type -> platform.realtime.v1.GameSystemResponse
-	9,  // 56: platform.realtime.v1.OwnerService.GameTimer:output_type -> platform.realtime.v1.GameTimerResponse
-	12, // 57: platform.realtime.v1.OwnerService.GetProjection:output_type -> platform.realtime.v1.GetProjectionResponse
-	14, // 58: platform.realtime.v1.OwnerService.GetEventProjection:output_type -> platform.realtime.v1.GetEventProjectionResponse
-	16, // 59: platform.realtime.v1.OwnerService.GetReplayProjection:output_type -> platform.realtime.v1.GetReplayProjectionResponse
-	52, // [52:60] is the sub-list for method output_type
-	44, // [44:52] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	30, // 34: platform.realtime.v1.SessionSnapshot.next_deadline_at:type_name -> google.protobuf.Timestamp
+	33, // 35: platform.realtime.v1.SessionSnapshot.status:type_name -> platform.game.v1.GameSessionStatus
+	30, // 36: platform.realtime.v1.SessionSnapshot.started_at:type_name -> google.protobuf.Timestamp
+	30, // 37: platform.realtime.v1.SessionSnapshot.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 38: platform.realtime.v1.SessionSnapshot.ended_at:type_name -> google.protobuf.Timestamp
+	30, // 39: platform.realtime.v1.Timer.due_at:type_name -> google.protobuf.Timestamp
+	28, // 40: platform.realtime.v1.Timer.message:type_name -> platform.game.v1.GameEnvelope
+	30, // 41: platform.realtime.v1.ActionReceipt.committed_at:type_name -> google.protobuf.Timestamp
+	30, // 42: platform.realtime.v1.TimerReceipt.committed_at:type_name -> google.protobuf.Timestamp
+	30, // 43: platform.realtime.v1.SystemReceipt.committed_at:type_name -> google.protobuf.Timestamp
+	17, // 44: platform.realtime.v1.CancelSessionResponse.room:type_name -> platform.realtime.v1.RoomSnapshot
+	19, // 45: platform.realtime.v1.CancelSessionResponse.session:type_name -> platform.realtime.v1.SessionSnapshot
+	0,  // 46: platform.realtime.v1.OwnerService.ResolveOwner:input_type -> platform.realtime.v1.ResolveOwnerRequest
+	2,  // 47: platform.realtime.v1.OwnerService.StartSession:input_type -> platform.realtime.v1.StartSessionRequest
+	4,  // 48: platform.realtime.v1.OwnerService.GameAction:input_type -> platform.realtime.v1.GameActionRequest
+	6,  // 49: platform.realtime.v1.OwnerService.GameSystem:input_type -> platform.realtime.v1.GameSystemRequest
+	8,  // 50: platform.realtime.v1.OwnerService.GameTimer:input_type -> platform.realtime.v1.GameTimerRequest
+	11, // 51: platform.realtime.v1.OwnerService.GetProjection:input_type -> platform.realtime.v1.GetProjectionRequest
+	13, // 52: platform.realtime.v1.OwnerService.GetEventProjection:input_type -> platform.realtime.v1.GetEventProjectionRequest
+	15, // 53: platform.realtime.v1.OwnerService.GetReplayProjection:input_type -> platform.realtime.v1.GetReplayProjectionRequest
+	25, // 54: platform.realtime.v1.OwnerService.CancelSession:input_type -> platform.realtime.v1.CancelSessionRequest
+	1,  // 55: platform.realtime.v1.OwnerService.ResolveOwner:output_type -> platform.realtime.v1.ResolveOwnerResponse
+	3,  // 56: platform.realtime.v1.OwnerService.StartSession:output_type -> platform.realtime.v1.StartSessionResponse
+	5,  // 57: platform.realtime.v1.OwnerService.GameAction:output_type -> platform.realtime.v1.GameActionResponse
+	7,  // 58: platform.realtime.v1.OwnerService.GameSystem:output_type -> platform.realtime.v1.GameSystemResponse
+	9,  // 59: platform.realtime.v1.OwnerService.GameTimer:output_type -> platform.realtime.v1.GameTimerResponse
+	12, // 60: platform.realtime.v1.OwnerService.GetProjection:output_type -> platform.realtime.v1.GetProjectionResponse
+	14, // 61: platform.realtime.v1.OwnerService.GetEventProjection:output_type -> platform.realtime.v1.GetEventProjectionResponse
+	16, // 62: platform.realtime.v1.OwnerService.GetReplayProjection:output_type -> platform.realtime.v1.GetReplayProjectionResponse
+	26, // 63: platform.realtime.v1.OwnerService.CancelSession:output_type -> platform.realtime.v1.CancelSessionResponse
+	55, // [55:64] is the sub-list for method output_type
+	46, // [46:55] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_platform_realtime_v1_realtime_proto_init() }
@@ -2339,7 +2486,7 @@ func file_platform_realtime_v1_realtime_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_realtime_v1_realtime_proto_rawDesc), len(file_platform_realtime_v1_realtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

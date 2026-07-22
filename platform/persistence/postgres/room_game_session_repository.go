@@ -388,7 +388,8 @@ func (repository *RoomGameSessionRepository) Cancel(
 			return err
 		}
 		if !sameRoomSnapshot(locked.Snapshot(), before.Snapshot()) {
-			if !samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusCancelled) {
+			if !sameRoomSnapshot(locked.Snapshot(), after.Snapshot()) ||
+				!samePersistedTerminalSession(current.Snapshot(), commit.After().Snapshot(), gameruntime.StatusCancelled) {
 				return roomDomain.ErrRoomVersionConflict
 			}
 			storedRoom, storedSession = locked, current
@@ -601,7 +602,16 @@ func validateRoomGameSessionTermination(
 	expectedRoom.LastFinishedSessionID = roomBefore.ActiveSessionID
 	expectedRoom.LastFinishedGameID = roomBefore.ActiveGameID
 	if wantStatus == gameruntime.StatusCancelled {
-		expectedRoom.Status = roomDomain.RoomStatusLobby
+		// Cancellation has two explicit products: an operational return to lobby or a permanent host-requested closure.
+		switch roomAfter.Status {
+		case roomDomain.RoomStatusLobby:
+			expectedRoom.Status = roomDomain.RoomStatusLobby
+		case roomDomain.RoomStatusClosed:
+			expectedRoom.Status = roomDomain.RoomStatusClosed
+			expectedRoom.SpectatorAdmission = roomDomain.AdmissionClosed
+		default:
+			return gameruntime.ErrInvalidSessionInput
+		}
 		expectedRoom.LastFinishedSessionID = uuid.Nil
 		expectedRoom.LastFinishedGameID = ""
 	}

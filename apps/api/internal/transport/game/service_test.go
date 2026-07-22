@@ -442,6 +442,10 @@ func (*gameTransportRuntime) HandleSystem(context.Context, gameruntime.SystemCom
 	return gameruntime.SystemCommitResult{}, errors.New("unused test system command")
 }
 
+func (*gameTransportRuntime) Cancel(context.Context, gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error) {
+	return roomDomain.Room{}, gameruntime.Session{}, errors.New("unused test cancel command")
+}
+
 func (runtime *gameTransportRuntime) ProjectCurrent(_ context.Context, _ uuid.UUID, viewer gameSDK.Viewer) (gameruntime.Session, gameSDK.Projection, error) {
 	runtime.lastViewer = viewer
 	return runtime.session, runtime.projection, nil

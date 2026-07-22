@@ -530,6 +530,34 @@ func (room Room) CancelSession(sessionID uuid.UUID, expected Version, at time.Ti
 	return Restore(next)
 }
 
+// CancelSessionAndClose lets the current host terminate one active session and permanently close its room in one transaction.
+func (room Room) CancelSessionAndClose(hostUserID, sessionID uuid.UUID, expected Version, at time.Time) (Room, error) {
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || sessionID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.Status != RoomStatusPlaying {
+		return Room{}, ErrRoomStatus
+	}
+	if room.snapshot.ActiveSessionID != sessionID {
+		return Room{}, ErrSessionNotFound
+	}
+	next := room.snapshot
+	next.Status, next.ActiveSessionID, next.ActiveGameID = RoomStatusClosed, uuid.Nil, ""
+	next.ParticipantAdmission, next.SpectatorAdmission = AdmissionClosed, AdmissionClosed
+	next.LastFinishedSessionID, next.LastFinishedGameID = uuid.Nil, ""
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
 // RemoveMember removes a non-host member and reports whether the active game must revoke a frozen participant.
 func (room Room) RemoveMember(hostUserID, userID uuid.UUID, expected Version, at time.Time) (Room, RemovalResult, error) {
 	at = canonicalRoomTime(at)

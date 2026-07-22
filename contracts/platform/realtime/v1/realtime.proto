@@ -17,6 +17,7 @@ service OwnerService {
   rpc GetProjection(GetProjectionRequest) returns (GetProjectionResponse);
   rpc GetEventProjection(GetEventProjectionRequest) returns (GetEventProjectionResponse);
   rpc GetReplayProjection(GetReplayProjectionRequest) returns (GetReplayProjectionResponse);
+  rpc CancelSession(CancelSessionRequest) returns (CancelSessionResponse);
 }
 
 message ResolveOwnerRequest {
@@ -230,4 +231,18 @@ message SystemReceipt {
   bytes result_digest = 8;
   uint64 state_version = 9;
   google.protobuf.Timestamp committed_at = 10;
+}
+
+// CancelSessionRequest omits ownership_epoch so only the receiving owner can fence the terminal write.
+message CancelSessionRequest {
+  string room_id = 1;
+  string session_id = 2;
+  uint64 expected_room_version = 3;
+  uint64 expected_membership_version = 4;
+  bool close_room = 5;
+}
+
+message CancelSessionResponse {
+  RoomSnapshot room = 1;
+  SessionSnapshot session = 2;
 }

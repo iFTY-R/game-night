@@ -215,6 +215,76 @@ func TestRoomConnectRemovalReturnsDurableSourceForPlayingParticipant(t *testing.
 	}
 }
 
+func TestRoomConnectHostCancelsActiveGameAndClosesRoom(t *testing.T) {
+	host, guest := uuid.New(), uuid.New()
+	fixture := newRoomTransportFixture(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
+	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 3,
+		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+	})
+	authorizeRoomWrite(createRequest, "host-device")
+	created, err := fixture.client.CreateRoom(t.Context(), createRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joinRequest := connect.NewRequest(&roomv1.JoinRoomRequest{
+		RoomCode: created.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
+	})
+	authorizeRoomWrite(joinRequest, "guest-device")
+	joined, err := fixture.client.JoinRoom(t.Context(), joinRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
+		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "liars-dice", ExpectedVersion: joined.Msg.GetRoom().GetVersion(),
+		Config: &gamev1.GameConfig{
+			GameId: "liars-dice", SchemaVersion: 1, MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: roomTransportOperationID(t, 12).Value(), RequestDigest: roomTransportDigest("close-start")[:],
+	})
+	authorizeRoomWrite(startRequest, "host-device")
+	started, err := fixture.client.StartGame(t.Context(), startRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeRequest := connect.NewRequest(&roomv1.CloseRoomRequest{
+		RoomId: started.Msg.GetRoom().GetRoomId(), ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(closeRequest, "guest-device")
+	if _, err := fixture.client.CloseRoom(t.Context(), closeRequest); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("non-host close error=%v code=%v", err, connect.CodeOf(err))
+	}
+	closeRequest = connect.NewRequest(&roomv1.CloseRoomRequest{
+		RoomId: started.Msg.GetRoom().GetRoomId(), ExpectedVersion: started.Msg.GetRoom().GetVersion(),
+	})
+	authorizeRoomWrite(closeRequest, "host-device")
+	closed, err := fixture.client.CloseRoom(t.Context(), closeRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedRoom := closed.Msg.GetRoom()
+	if closedRoom.GetStatus() != roomv1.RoomStatus_ROOM_STATUS_CLOSED || closedRoom.GetActiveSessionId() != "" ||
+		closedRoom.GetActiveGameId() != "" || closedRoom.GetParticipantAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED ||
+		closedRoom.GetSpectatorAdmission() != roomv1.AdmissionMode_ADMISSION_MODE_CLOSED {
+		t.Fatalf("closed room=%+v", closedRoom)
+	}
+	sessionID, err := uuid.Parse(started.Msg.GetSessionId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := fixture.runtime.Get(t.Context(), sessionID)
+	if err != nil || cancelled.Snapshot().Status != gameruntime.StatusCancelled {
+		t.Fatalf("cancelled session=%+v err=%v", cancelled.Snapshot(), err)
+	}
+	fixture.fanout.mu.Lock()
+	events := append([]redisstore.SessionFanoutEvent(nil), fixture.fanout.events...)
+	fixture.fanout.mu.Unlock()
+	if len(events) != 2 || events[1].SessionID != sessionID || events[1].StateVersion != cancelled.Snapshot().State.StateVersion {
+		t.Fatalf("fanout events=%+v", events)
+	}
+}
+
 func TestPublicRoomCursorRoundTripsAndRejectsNonCanonicalInput(t *testing.T) {
 	want := roomDomain.PublicRoomPageCursor{
 		UpdatedAt: time.Date(2026, time.July, 19, 22, 0, 0, 123456000, time.UTC), RoomID: uuid.New(),
@@ -283,7 +353,17 @@ func TestEveryRoomRPCIsImplemented(t *testing.T) {
 	}
 }
 
+type roomTransportFixture struct {
+	client  roomv1connect.RoomServiceClient
+	runtime *transportGameRuntime
+	fanout  *transportFanout
+}
+
 func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1connect.RoomServiceClient {
+	return newRoomTransportFixture(t, actors).client
+}
+
+func newRoomTransportFixture(t testing.TB, actors map[string]uuid.UUID) roomTransportFixture {
 	t.Helper()
 	repository := newTransportRoomRepository()
 	source := clock.NewFake(time.Date(2026, time.July, 19, 18, 0, 0, 0, time.UTC))
@@ -296,8 +376,9 @@ func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1con
 		t.Fatal(err)
 	}
 	runtime := newTransportGameRuntime(repository)
+	fanout := &transportFanout{}
 	service, err := NewService(
-		domainService, transportGameCatalog{}, runtime, runtime, repository, &transportFanout{},
+		domainService, transportGameCatalog{}, runtime, runtime, repository, fanout,
 		&transportAuthenticator{actors: actors}, origins, csrf.NewUserValidator(),
 	)
 	if err != nil {
@@ -308,7 +389,9 @@ func newRoomTransportClient(t testing.TB, actors map[string]uuid.UUID) roomv1con
 	mux.Handle(path, handler)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
-	return roomv1connect.NewRoomServiceClient(server.Client(), server.URL)
+	return roomTransportFixture{
+		client: roomv1connect.NewRoomServiceClient(server.Client(), server.URL), runtime: runtime, fanout: fanout,
+	}
 }
 
 func authorizeRoomWrite[T any](request *connect.Request[T], deviceToken string) {
@@ -397,6 +480,45 @@ func (runtime *transportGameRuntime) Start(
 	}
 	runtime.sessions[sessionID] = session
 	return storedRoom, session, nil
+}
+
+func (runtime *transportGameRuntime) Cancel(
+	ctx context.Context,
+	command gameruntime.CancelCommand,
+) (roomDomain.Room, gameruntime.Session, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	beforeSession, exists := runtime.sessions[command.SessionID]
+	if !exists {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrSessionNotFound
+	}
+	beforeRoom, err := runtime.rooms.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	if beforeRoom.Version() != command.ExpectedRoom || beforeRoom.Snapshot().ActiveSessionID != command.SessionID {
+		return roomDomain.Room{}, gameruntime.Session{}, roomDomain.ErrRoomVersionConflict
+	}
+	cancelledAt := beforeSession.Snapshot().UpdatedAt.Add(time.Microsecond)
+	afterSession, err := beforeSession.Cancel(command.OwnershipEpoch, cancelledAt)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	var afterRoom roomDomain.Room
+	if command.CloseRoom {
+		afterRoom, err = beforeRoom.CancelSessionAndClose(beforeRoom.Snapshot().HostUserID, command.SessionID, beforeRoom.Version(), cancelledAt)
+	} else {
+		afterRoom, err = beforeRoom.CancelSession(command.SessionID, beforeRoom.Version(), cancelledAt)
+	}
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	storedRoom, err := runtime.rooms.UpdateCAS(ctx, beforeRoom, afterRoom)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	runtime.sessions[command.SessionID] = afterSession
+	return storedRoom, afterSession, nil
 }
 
 func (runtime *transportGameRuntime) HandleSystem(

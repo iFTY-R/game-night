@@ -12,6 +12,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	roomDomain "github.com/iFTY-R/game-night/platform/room"
 )
 
 // errRedisUnavailable is the stable cause used to prove lease acquisition fails before PostgreSQL CAS.
@@ -255,6 +256,11 @@ func (runtime ownershipRuntime) HandleTimer(context.Context, gameruntime.DueTime
 func (runtime ownershipRuntime) HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error) {
 	session, _ := runtime.store.Get(context.Background(), uuid.Nil)
 	return gameruntime.SystemCommitResult{Session: session}, nil
+}
+
+func (runtime ownershipRuntime) Cancel(context.Context, gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error) {
+	session, _ := runtime.store.Get(context.Background(), uuid.Nil)
+	return roomDomain.Room{}, session, nil
 }
 
 type ownershipPublisher struct{}

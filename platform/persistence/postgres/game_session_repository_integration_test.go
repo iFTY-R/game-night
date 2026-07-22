@@ -872,6 +872,63 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	assertGameSessionCounts(t, ctx, fixture, owner.Snapshot().ID, 1, 0, 1, 5)
 }
 
+func TestRoomGameSessionRepositoryAtomicallyCancelsAndClosesRoom(t *testing.T) {
+	fixture, repository, session, now := openGameSessionFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)
+	defer cancel()
+	owner, err := session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err = repository.AcquireOwnershipCAS(ctx, session, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelledAt := now.Add(2 * time.Second)
+	cancelled, err := owner.Cancel(owner.Snapshot().OwnershipEpoch, cancelledAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, err := NewRoomRepository(fixture.Pool).GetByID(ctx, owner.Snapshot().RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed, err := room.CancelSessionAndClose(room.Snapshot().HostUserID, owner.Snapshot().ID, room.Version(), cancelledAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := newGameLifecycleCommit(t, owner, cancelled, gameruntime.GameSessionCancelledEventType)
+	roomSessions := NewRoomGameSessionRepository(fixture.Pool)
+	storedRoom, storedSession, err := roomSessions.Cancel(ctx, room, closed, commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roomSnapshot, sessionSnapshot := storedRoom.Snapshot(), storedSession.Snapshot()
+	if roomSnapshot.Status != roomDomain.RoomStatusClosed || roomSnapshot.ActiveSessionID != uuid.Nil || roomSnapshot.ActiveGameID != "" ||
+		roomSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed || roomSnapshot.SpectatorAdmission != roomDomain.AdmissionClosed ||
+		roomSnapshot.LastFinishedSessionID != uuid.Nil || roomSnapshot.LastFinishedGameID != "" ||
+		sessionSnapshot.Status != gameruntime.StatusCancelled || len(sessionSnapshot.Timers) != 0 ||
+		!sessionSnapshot.NextDeadlineAt.IsZero() || !sessionSnapshot.EndedAt.Equal(cancelledAt) {
+		t.Fatalf("room=%+v session=%+v", roomSnapshot, sessionSnapshot)
+	}
+	due, err := repository.ListDueTimers(ctx, cancelledAt.Add(time.Hour), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 0 {
+		t.Fatalf("cancelled session retained due timers: %+v", due)
+	}
+
+	lobby, err := room.CancelSession(owner.Snapshot().ID, room.Version(), cancelledAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := roomSessions.Cancel(ctx, room, lobby, commit); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
+		t.Fatalf("closed cancellation accepted as lobby retry: %v", err)
+	}
+	assertGameSessionCounts(t, ctx, fixture, owner.Snapshot().ID, 1, 0, 1, 2)
+}
+
 func TestRoomGameSessionRepositoryRollsBackTerminalSessionWhenRoomFinishFails(t *testing.T) {
 	fixture, repository, session, now := openGameSessionFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), gameSessionRepositoryIntegrationTimeout)

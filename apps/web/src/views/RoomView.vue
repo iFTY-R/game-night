@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ArrowLeft, Check, ChevronDown, Copy, DoorClosed, History, LockKeyhole, Play, TriangleAlert, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomMember, type RoomSnapshot } from "../api/client";
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
 
 const props = defineProps<{ roomId: string }>();
+const route = useRoute();
 const router = useRouter();
 const room = useRoomStore();
 const copied = ref(false);
@@ -32,6 +33,8 @@ const isRemote = computed(() => remoteRoom.value !== null);
 const roomStatus = computed(() => remoteRoom.value?.status ?? "ROOM_STATUS_LOBBY");
 const isPlaying = computed(() => roomStatus.value.includes("PLAYING"));
 const isPostGame = computed(() => roomStatus.value.includes("POST_GAME"));
+// A table exit sets this query flag so hosts can reach governance controls without being auto-routed back into the game.
+const stayInRoom = computed(() => route.query.manage === "1");
 const currentHost = computed(() => remoteRoom.value?.hostUserId === room.userId);
 const members = computed(() => remoteRoom.value?.members ?? []);
 const participantCount = computed(() => members.value.filter((member) => member.role.includes("PARTICIPANT")).length);
@@ -48,7 +51,8 @@ const governanceDescription = computed(() => {
     const effect = isPlaying.value ? "对局中的冻结座位会保留，并由游戏规则接管离场处理。" : "对方将立即失去这个房间的访问权限。";
     return `${displayMemberName(confirmation.userId)}将被移出。${effect}`;
   }
-  return "房间码会立即失效，所有成员都需要返回发现页。这项操作无法撤销。";
+  const sessionEffect = isPlaying.value ? "当前对局会立即取消，且不会生成复盘。" : "";
+  return `${sessionEffect}房间码会立即失效，所有成员都需要返回发现页。这项操作无法撤销。`;
 });
 // Public replay is a valid choice only for a public room; private-room clients never offer an invalid widening command.
 const replayPolicyOptions = computed<readonly { value: ReplayAccessPolicy; label: string }[]>(() => [
@@ -108,7 +112,7 @@ const refreshRoom = async (): Promise<void> => {
       entryOpen.value = !loaded.participantAdmission.includes("CLOSED");
       initializeGameSelection(loaded);
       void loadReplayAccess(loaded);
-      if (loaded.status.includes("PLAYING") && loaded.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
+      if (!stayInRoom.value && loaded.status.includes("PLAYING") && loaded.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
     }
   } catch (error) {
     actionError.value = error instanceof Error ? error.message : "房间加载失败";
@@ -122,7 +126,7 @@ onMounted(async () => {
     entryOpen.value = !room.remoteRoom.participantAdmission.includes("CLOSED");
     initializeGameSelection(room.remoteRoom);
     void loadReplayAccess(room.remoteRoom);
-    if (room.remoteRoom.status.includes("PLAYING") && room.remoteRoom.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
+    if (!stayInRoom.value && room.remoteRoom.status.includes("PLAYING") && room.remoteRoom.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
   } else {
     await refreshRoom();
   }
@@ -371,8 +375,8 @@ const leave = async (): Promise<void> => {
           <option v-for="option in replayPolicyOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
       </label>
-      <button v-if="currentHost" class="danger-control" type="button" :disabled="isPlaying || governanceSaving" :title="isPlaying ? '对局进行中不能直接解散房间' : '永久解散这个房间'" @click="requestCloseRoom">
-        <DoorClosed :size="18" aria-hidden="true" /> {{ isPlaying ? "对局结束后可解散" : "解散房间" }}
+      <button v-if="currentHost" class="danger-control" type="button" :disabled="governanceSaving" :title="isPlaying ? '取消当前对局并永久解散房间' : '永久解散这个房间'" @click="requestCloseRoom">
+        <DoorClosed :size="18" aria-hidden="true" /> 解散房间
       </button>
     </section>
 

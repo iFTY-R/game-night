@@ -11,6 +11,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
@@ -137,6 +138,31 @@ func TestCloseCancelsCommandsAndReleasesExactLeaseOnce(t *testing.T) {
 	}
 	if _, err := fixture.manager.EnsureOwned(context.Background(), fixture.sessionID); !errors.Is(err, ErrClosed) {
 		t.Fatalf("EnsureOwned() after close error = %v, want ErrClosed", err)
+	}
+}
+
+func TestCancelUsesHeldEpochAndPublishesTerminalCursor(t *testing.T) {
+	t.Parallel()
+	fixture := newOwnerFixture(t)
+	epoch, err := fixture.manager.EnsureOwned(t.Context(), fixture.sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roomID := fixture.sessions.session.Snapshot().RoomID
+	_, cancelled, err := fixture.manager.Cancel(t.Context(), gameruntime.CancelCommand{
+		RoomID: roomID, SessionID: fixture.sessionID, ExpectedRoom: roomDomain.Version{Room: 2, Membership: 1},
+		OwnershipEpoch: 999, CloseRoom: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.Snapshot().Status != gameruntime.StatusCancelled || fixture.runtime.cancelCalls != 1 ||
+		fixture.runtime.cancelEpoch != epoch || len(fixture.publisher.events) != 1 ||
+		fixture.publisher.events[0].SessionID != fixture.sessionID {
+		t.Fatalf(
+			"session=%+v cancel calls=%d epoch=%d want=%d fanout=%+v",
+			cancelled.Snapshot(), fixture.runtime.cancelCalls, fixture.runtime.cancelEpoch, epoch, fixture.publisher.events,
+		)
 	}
 }
 
@@ -369,6 +395,8 @@ type fakeRuntime struct {
 	actionEpoch   uint64
 	systemEpoch   uint64
 	systemCalls   int
+	cancelEpoch   uint64
+	cancelCalls   int
 	blockAction   bool
 	actionStarted chan struct{}
 }
@@ -399,6 +427,26 @@ func (runtime *fakeRuntime) HandleSystem(_ context.Context, command gameruntime.
 	runtime.systemCalls++
 	runtime.mu.Unlock()
 	return gameruntime.SystemCommitResult{Session: runtime.session}, nil
+}
+
+func (runtime *fakeRuntime) Cancel(_ context.Context, command gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error) {
+	runtime.mu.Lock()
+	runtime.cancelEpoch = command.OwnershipEpoch
+	runtime.cancelCalls++
+	snapshot := runtime.session.Snapshot()
+	runtime.mu.Unlock()
+	cancelledAt := snapshot.UpdatedAt.Add(time.Second)
+	snapshot.OwnershipEpoch = command.OwnershipEpoch
+	snapshot.Status = gameruntime.StatusCancelled
+	snapshot.Timers = nil
+	snapshot.NextDeadlineAt = time.Time{}
+	snapshot.UpdatedAt = cancelledAt
+	snapshot.EndedAt = cancelledAt
+	cancelled, err := gameruntime.RestoreSession(snapshot)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	return roomDomain.Room{}, cancelled, nil
 }
 
 type fakePublisher struct {

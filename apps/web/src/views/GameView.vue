@@ -140,8 +140,9 @@ const toggleSound = (): void => {
   document.documentElement.dataset.muted = String(muted.value);
 };
 
+/** Returns to room governance without the active-session auto-entry redirect. */
 const leaveTable = async (): Promise<void> => {
-  await router.push({ name: "room", params: { roomId: props.roomId } });
+  await router.push({ name: "room", params: { roomId: props.roomId }, query: { manage: "1" } });
 };
 </script>
 

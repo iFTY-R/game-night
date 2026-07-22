@@ -54,6 +54,9 @@ const (
 	// OwnerServiceGetReplayProjectionProcedure is the fully-qualified name of the OwnerService's
 	// GetReplayProjection RPC.
 	OwnerServiceGetReplayProjectionProcedure = "/platform.realtime.v1.OwnerService/GetReplayProjection"
+	// OwnerServiceCancelSessionProcedure is the fully-qualified name of the OwnerService's
+	// CancelSession RPC.
+	OwnerServiceCancelSessionProcedure = "/platform.realtime.v1.OwnerService/CancelSession"
 )
 
 // OwnerServiceClient is a client for the platform.realtime.v1.OwnerService service.
@@ -66,6 +69,7 @@ type OwnerServiceClient interface {
 	GetProjection(context.Context, *connect.Request[v1.GetProjectionRequest]) (*connect.Response[v1.GetProjectionResponse], error)
 	GetEventProjection(context.Context, *connect.Request[v1.GetEventProjectionRequest]) (*connect.Response[v1.GetEventProjectionResponse], error)
 	GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error)
+	CancelSession(context.Context, *connect.Request[v1.CancelSessionRequest]) (*connect.Response[v1.CancelSessionResponse], error)
 }
 
 // NewOwnerServiceClient constructs a client for the platform.realtime.v1.OwnerService service. By
@@ -127,6 +131,12 @@ func NewOwnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(ownerServiceMethods.ByName("GetReplayProjection")),
 			connect.WithClientOptions(opts...),
 		),
+		cancelSession: connect.NewClient[v1.CancelSessionRequest, v1.CancelSessionResponse](
+			httpClient,
+			baseURL+OwnerServiceCancelSessionProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("CancelSession")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -140,6 +150,7 @@ type ownerServiceClient struct {
 	getProjection       *connect.Client[v1.GetProjectionRequest, v1.GetProjectionResponse]
 	getEventProjection  *connect.Client[v1.GetEventProjectionRequest, v1.GetEventProjectionResponse]
 	getReplayProjection *connect.Client[v1.GetReplayProjectionRequest, v1.GetReplayProjectionResponse]
+	cancelSession       *connect.Client[v1.CancelSessionRequest, v1.CancelSessionResponse]
 }
 
 // ResolveOwner calls platform.realtime.v1.OwnerService.ResolveOwner.
@@ -182,6 +193,11 @@ func (c *ownerServiceClient) GetReplayProjection(ctx context.Context, req *conne
 	return c.getReplayProjection.CallUnary(ctx, req)
 }
 
+// CancelSession calls platform.realtime.v1.OwnerService.CancelSession.
+func (c *ownerServiceClient) CancelSession(ctx context.Context, req *connect.Request[v1.CancelSessionRequest]) (*connect.Response[v1.CancelSessionResponse], error) {
+	return c.cancelSession.CallUnary(ctx, req)
+}
+
 // OwnerServiceHandler is an implementation of the platform.realtime.v1.OwnerService service.
 type OwnerServiceHandler interface {
 	ResolveOwner(context.Context, *connect.Request[v1.ResolveOwnerRequest]) (*connect.Response[v1.ResolveOwnerResponse], error)
@@ -192,6 +208,7 @@ type OwnerServiceHandler interface {
 	GetProjection(context.Context, *connect.Request[v1.GetProjectionRequest]) (*connect.Response[v1.GetProjectionResponse], error)
 	GetEventProjection(context.Context, *connect.Request[v1.GetEventProjectionRequest]) (*connect.Response[v1.GetEventProjectionResponse], error)
 	GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error)
+	CancelSession(context.Context, *connect.Request[v1.CancelSessionRequest]) (*connect.Response[v1.CancelSessionResponse], error)
 }
 
 // NewOwnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -249,6 +266,12 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(ownerServiceMethods.ByName("GetReplayProjection")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ownerServiceCancelSessionHandler := connect.NewUnaryHandler(
+		OwnerServiceCancelSessionProcedure,
+		svc.CancelSession,
+		connect.WithSchema(ownerServiceMethods.ByName("CancelSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/platform.realtime.v1.OwnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OwnerServiceResolveOwnerProcedure:
@@ -267,6 +290,8 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 			ownerServiceGetEventProjectionHandler.ServeHTTP(w, r)
 		case OwnerServiceGetReplayProjectionProcedure:
 			ownerServiceGetReplayProjectionHandler.ServeHTTP(w, r)
+		case OwnerServiceCancelSessionProcedure:
+			ownerServiceCancelSessionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -306,4 +331,8 @@ func (UnimplementedOwnerServiceHandler) GetEventProjection(context.Context, *con
 
 func (UnimplementedOwnerServiceHandler) GetReplayProjection(context.Context, *connect.Request[v1.GetReplayProjectionRequest]) (*connect.Response[v1.GetReplayProjectionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.realtime.v1.OwnerService.GetReplayProjection is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) CancelSession(context.Context, *connect.Request[v1.CancelSessionRequest]) (*connect.Response[v1.CancelSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.realtime.v1.OwnerService.CancelSession is not implemented"))
 }

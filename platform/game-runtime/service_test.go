@@ -521,6 +521,45 @@ func TestRuntimeServiceCancelReplaysAlreadyCancelledSession(t *testing.T) {
 		firstSession.Snapshot().Status != StatusCancelled || secondSession.Snapshot().ID != firstSession.Snapshot().ID {
 		t.Fatalf("first room=%+v session=%+v second room=%+v session=%+v", firstRoom.Snapshot(), firstSession.Snapshot(), secondRoom.Snapshot(), secondSession.Snapshot())
 	}
+	command.CloseRoom = true
+	if _, _, err := fixture.service.Cancel(t.Context(), command); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
+		t.Fatalf("lobby cancellation accepted as close retry: %v", err)
+	}
+}
+
+func TestRuntimeServiceCancelCanCloseRoomIdempotently(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	playing, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	command := CancelCommand{
+		RoomID: playing.Snapshot().ID, SessionID: session.Snapshot().ID, ExpectedRoom: playing.Version(),
+		OwnershipEpoch: session.Snapshot().OwnershipEpoch, CloseRoom: true,
+	}
+	firstRoom, firstSession, err := fixture.service.Cancel(t.Context(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRoom, secondSession, err := fixture.service.Cancel(t.Context(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstSnapshot := firstRoom.Snapshot()
+	if firstSnapshot.Status != roomDomain.RoomStatusClosed || firstSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed ||
+		firstSnapshot.SpectatorAdmission != roomDomain.AdmissionClosed || firstSnapshot.RoomVersion != playing.Snapshot().RoomVersion+1 ||
+		secondRoom.Snapshot().RoomVersion != firstSnapshot.RoomVersion || firstSession.Snapshot().Status != StatusCancelled ||
+		secondSession.Snapshot().ID != firstSession.Snapshot().ID {
+		t.Fatalf("first room=%+v session=%+v second room=%+v session=%+v", firstSnapshot, firstSession.Snapshot(), secondRoom.Snapshot(), secondSession.Snapshot())
+	}
+	command.CloseRoom = false
+	if _, _, err := fixture.service.Cancel(t.Context(), command); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
+		t.Fatalf("closed cancellation accepted as lobby retry: %v", err)
+	}
 }
 
 func TestRuntimeServiceProjectsViewerDeltaAndFallsBackToSafeSnapshot(t *testing.T) {

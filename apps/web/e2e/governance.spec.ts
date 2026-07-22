@@ -95,6 +95,50 @@ test("host confirms member removal and idle-room closure on mobile", async ({ pa
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { roomId?: unknown })).toMatchObject({ roomId: null });
 });
 
+test("host cancels the active game and closes the room from management view", async ({ page }) => {
+  await seedIdentity(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  let currentRoom: RoomSnapshot = {
+    ...roomSnapshot(),
+    status: "ROOM_STATUS_PLAYING",
+    participantAdmission: "ADMISSION_MODE_CLOSED",
+    activeSessionId: "00000000-0000-4000-8000-000000000012",
+    activeGameId: "liars-dice",
+    version: { roomVersion: "3", membershipVersion: "1" },
+  };
+  let closeBody: Record<string, unknown> | undefined;
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: currentRoom }) });
+  });
+  await page.route("**/platform.room.v1.RoomService/CloseRoom", async (route) => {
+    closeBody = route.request().postDataJSON() as Record<string, unknown>;
+    currentRoom = {
+      ...currentRoom,
+      status: "ROOM_STATUS_CLOSED",
+      spectatorAdmission: "ADMISSION_MODE_CLOSED",
+      activeSessionId: "",
+      activeGameId: "",
+      version: { roomVersion: "4", membershipVersion: "1" },
+    };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: currentRoom }) });
+  });
+
+  await page.goto(`/room/${roomId}?manage=1`);
+  await expect(page).toHaveURL(new RegExp(`/room/${roomId}\\?manage=1$`));
+  const closeButton = page.getByRole("button", { name: "解散房间" });
+  await expect(closeButton).toBeEnabled();
+  await closeButton.click();
+  const dialog = page.getByRole("dialog", { name: "确认解散房间？" });
+  await expect(dialog).toContainText("当前对局会立即取消，且不会生成复盘");
+  await page.getByRole("button", { name: "确认解散" }).click();
+
+  await expect.poll(() => closeBody).toMatchObject({
+    roomId,
+    expectedVersion: { roomVersion: "3", membershipVersion: "1" },
+  });
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("non-host members never receive governance controls", async ({ page }) => {
   await seedIdentity(page);
   await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {

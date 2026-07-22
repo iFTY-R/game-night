@@ -110,6 +110,41 @@ func TestCancelledSessionReturnsToLobbyWithoutReplayPointer(t *testing.T) {
 	}
 }
 
+func TestCancelSessionAndCloseRequiresHostAndExactVersion(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 11, 30, 0, 0, time.UTC)
+	host, participant, sessionID := uuid.New(), uuid.New(), uuid.New()
+	room, err := New(uuid.New(), host, "CLOSE1", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(participant, JoinIntentParticipant, room.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.StartSession(host, sessionID, "dice", 2, 9, room.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := room.CancelSessionAndClose(participant, sessionID, room.Version(), now.Add(3*time.Second)); !errors.Is(err, ErrHostRequired) {
+		t.Fatalf("non-host close error=%v", err)
+	}
+	stale := room.Version()
+	stale.Room--
+	if _, err := room.CancelSessionAndClose(host, sessionID, stale, now.Add(3*time.Second)); !errors.Is(err, ErrRoomVersionConflict) {
+		t.Fatalf("stale close error=%v", err)
+	}
+
+	closed, err := room.CancelSessionAndClose(host, sessionID, room.Version(), now.Add(3*time.Second))
+	snapshot := closed.Snapshot()
+	if err != nil || snapshot.Status != RoomStatusClosed || snapshot.ActiveSessionID != uuid.Nil || snapshot.ActiveGameID != "" ||
+		snapshot.ParticipantAdmission != AdmissionClosed || snapshot.SpectatorAdmission != AdmissionClosed ||
+		snapshot.LastFinishedSessionID != uuid.Nil || snapshot.LastFinishedGameID != "" ||
+		closed.Version().Room != room.Version().Room+1 || closed.Version().Membership != room.Version().Membership {
+		t.Fatalf("closed room=%+v err=%v", snapshot, err)
+	}
+}
+
 func TestRoomApprovalPromotesWaitingMemberToLowestStableSeat(t *testing.T) {
 	now := time.Date(2026, time.July, 19, 11, 0, 0, 0, time.UTC)
 	host, participant, waiting := uuid.New(), uuid.New(), uuid.New()

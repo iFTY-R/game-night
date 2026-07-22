@@ -112,8 +112,9 @@ const finishSession = async (): Promise<void> => {
 };
 const cycleTheme = (): void => { themeIndex.value = (themeIndex.value + 1) % dice789Themes.length; applyTheme(); };
 const toggleSound = (): void => { muted.value = !muted.value; document.documentElement.dataset.muted = String(muted.value); };
+/** Returns live players to room governance while fixture previews still exit to the home screen. */
 const leave = async (): Promise<void> => {
-  await router.push(fixtureMode.value ? { name: "home" } : { name: "room", params: { roomId: props.roomId } });
+  await router.push(fixtureMode.value ? { name: "home" } : { name: "room", params: { roomId: props.roomId }, query: { manage: "1" } });
 };
 </script>
 

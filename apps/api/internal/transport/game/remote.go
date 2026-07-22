@@ -165,6 +165,45 @@ func (runtime *RemoteRuntime) HandleSystem(ctx context.Context, command gamerunt
 	return gameruntime.SystemCommitResult{}, redisstore.ErrCoordinationUnavailable
 }
 
+// Cancel routes an administrative terminal request to the current lease owner without trusting the caller's epoch.
+func (runtime *RemoteRuntime) Cancel(ctx context.Context, command gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error) {
+	if runtime == nil || ctx == nil || command.RoomID == uuid.Nil || command.SessionID == uuid.Nil ||
+		command.ExpectedRoom.Room == 0 || command.ExpectedRoom.Membership == 0 || command.OwnershipEpoch == 0 {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidSessionInput
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		client, err := runtime.resolveOwner(ctx, command.SessionID)
+		if err != nil {
+			return roomDomain.Room{}, gameruntime.Session{}, err
+		}
+		request := connect.NewRequest(&realtimev1.CancelSessionRequest{
+			RoomId: command.RoomID.String(), SessionId: command.SessionID.String(),
+			ExpectedRoomVersion: command.ExpectedRoom.Room, ExpectedMembershipVersion: command.ExpectedRoom.Membership,
+			CloseRoom: command.CloseRoom,
+		})
+		runtime.authorize(request)
+		response, callErr := client.CancelSession(ctx, request)
+		if callErr != nil {
+			mapped := mapRemoteError(callErr)
+			if attempt == 0 && retryableOwner(mapped) {
+				continue
+			}
+			return roomDomain.Room{}, gameruntime.Session{}, mapped
+		}
+		room, err := roomFromRemote(response.Msg.GetRoom())
+		if err != nil {
+			return roomDomain.Room{}, gameruntime.Session{}, err
+		}
+		session, err := sessionFromRemote(response.Msg.GetSession())
+		if err != nil || room.Snapshot().ID != command.RoomID || session.Snapshot().ID != command.SessionID ||
+			session.Snapshot().RoomID != command.RoomID {
+			return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
+		}
+		return room, session, nil
+	}
+	return roomDomain.Room{}, gameruntime.Session{}, redisstore.ErrCoordinationUnavailable
+}
+
 func (runtime *RemoteRuntime) ProjectCurrent(ctx context.Context, sessionID uuid.UUID, viewer gameSDK.Viewer) (gameruntime.Session, gameSDK.Projection, error) {
 	requestMessage := &realtimev1.GetProjectionRequest{SessionId: sessionID.String(), Viewer: viewerToRemote(viewer)}
 	for _, peer := range runtime.peerURLs {

@@ -18,6 +18,7 @@ import (
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -54,6 +55,17 @@ func TestRemoteRuntimeRoutesActionOnlyToAllowlistedReadyOwner(t *testing.T) {
 		result.Session.Snapshot().OwnershipEpoch != 7 || result.Projection.View.MessageType != "viewer.state" {
 		t.Fatalf("resolve=%d action=%d token=%t result=%+v", service.resolveCalls, service.actionCalls, service.sawToken, result)
 	}
+	closed, cancelled, err := runtime.Cancel(t.Context(), gameruntime.CancelCommand{
+		RoomID: roomID, SessionID: sessionID, ExpectedRoom: roomDomain.Version{Room: 2, Membership: 1},
+		OwnershipEpoch: 7, CloseRoom: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.resolveCalls != 2 || service.cancelCalls != 1 || closed.Snapshot().Status != roomDomain.RoomStatusClosed ||
+		cancelled.Snapshot().Status != gameruntime.StatusCancelled {
+		t.Fatalf("resolve=%d cancel=%d room=%+v session=%+v", service.resolveCalls, service.cancelCalls, closed.Snapshot(), cancelled.Snapshot())
+	}
 
 	service.routeAddress = "http://not-allowlisted.internal:8091"
 	if _, err := runtime.HandleAction(t.Context(), gameruntime.ActionCommand{
@@ -70,6 +82,7 @@ type remoteOwnerFixture struct {
 	actorID, roomID, sessionID uuid.UUID
 	operationID                idempotency.OperationID
 	resolveCalls, actionCalls  int
+	cancelCalls                int
 	sawToken                   bool
 }
 
@@ -107,6 +120,35 @@ func (service *remoteOwnerFixture) GameAction(
 			View:           envelopeWire(remoteVersion(), remoteMessage("viewer.state", []byte("safe"))),
 			AllowedActions: []string{"round.roll"},
 		},
+	}), nil
+}
+
+func (service *remoteOwnerFixture) CancelSession(
+	_ context.Context,
+	request *connect.Request[realtimev1.CancelSessionRequest],
+) (*connect.Response[realtimev1.CancelSessionResponse], error) {
+	service.cancelCalls++
+	service.sawToken = service.sawToken || request.Header().Get(internalTokenHeader) == service.token
+	if request.Msg.GetRoomId() != service.roomID.String() || request.Msg.GetSessionId() != service.sessionID.String() ||
+		request.Msg.GetExpectedRoomVersion() != 2 || request.Msg.GetExpectedMembershipVersion() != 1 || !request.Msg.GetCloseRoom() {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid cancel request"))
+	}
+	now := time.Date(2026, time.July, 20, 13, 1, 0, 0, time.UTC)
+	session := remoteSessionWire(service.sessionID, service.roomID, service.actorID, now)
+	session.Status = gamev1.GameSessionStatus_GAME_SESSION_STATUS_CANCELLED
+	session.EndedAt = timestamppb.New(now)
+	return connect.NewResponse(&realtimev1.CancelSessionResponse{
+		Room: &realtimev1.RoomSnapshot{
+			RoomId: service.roomID.String(), RoomCode: "REMOTE", Visibility: string(roomDomain.VisibilityPrivate),
+			Status: string(roomDomain.RoomStatusClosed), HostUserId: service.actorID.String(), ParticipantCapacity: 3,
+			ParticipantAdmission: string(roomDomain.AdmissionClosed), SpectatorAdmission: string(roomDomain.AdmissionClosed),
+			Members: []*realtimev1.RoomMember{{
+				UserId: service.actorID.String(), Role: string(roomDomain.MemberRoleParticipant), SeatIndex: 0,
+				JoinedAt: timestamppb.New(now), LastSeenAt: timestamppb.New(now),
+			}},
+			RoomVersion: 3, MembershipVersion: 1, CreatedAt: timestamppb.New(now), UpdatedAt: timestamppb.New(now),
+		},
+		Session: session,
 	}), nil
 }
 

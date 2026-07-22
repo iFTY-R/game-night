@@ -30,6 +30,7 @@ type Ownership interface {
 	HandleAction(context.Context, gameruntime.ActionCommand) (gameruntime.ActionResult, error)
 	HandleTimer(context.Context, gameruntime.DueTimer) (gameruntime.TimerCommitResult, error)
 	HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error)
+	Cancel(context.Context, gameruntime.CancelCommand) (roomdomain.Room, gameruntime.Session, error)
 }
 
 // SessionReader reloads the post-claim epoch and projection metadata from PostgreSQL.
@@ -211,6 +212,28 @@ func (service *Service) GameSystem(ctx context.Context, request *connect.Request
 		Session: sessionToWire(result.Session), Receipt: systemReceiptToWire(result.Receipt),
 		Replayed: result.Replayed, Retry: result.Retry,
 	}), nil
+}
+
+// CancelSession delegates epoch selection to the owner manager before committing the room/session terminal transaction.
+func (service *Service) CancelSession(ctx context.Context, request *connect.Request[realtimev1.CancelSessionRequest]) (*connect.Response[realtimev1.CancelSessionResponse], error) {
+	if request == nil || request.Msg == nil || request.Msg.GetExpectedRoomVersion() == 0 || request.Msg.GetExpectedMembershipVersion() == 0 {
+		return nil, gameruntime.ErrInvalidSessionInput
+	}
+	roomID, sessionID, err := requiredPair(request.Msg.GetRoomId(), request.Msg.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	room, session, err := service.ownership.Cancel(ctx, gameruntime.CancelCommand{
+		RoomID: roomID, SessionID: sessionID,
+		ExpectedRoom: roomdomain.Version{
+			Room: request.Msg.GetExpectedRoomVersion(), Membership: request.Msg.GetExpectedMembershipVersion(),
+		},
+		CloseRoom: request.Msg.GetCloseRoom(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&realtimev1.CancelSessionResponse{Room: roomToWire(room), Session: sessionToWire(session)}), nil
 }
 
 func (service *Service) GameTimer(ctx context.Context, request *connect.Request[realtimev1.GameTimerRequest]) (*connect.Response[realtimev1.GameTimerResponse], error) {

@@ -619,6 +619,8 @@ type CancelCommand struct {
 	SessionID      uuid.UUID
 	ExpectedRoom   roomDomain.Version
 	OwnershipEpoch uint64
+	// CloseRoom distinguishes permanent host dissolution from an operational cancellation that returns to the lobby.
+	CloseRoom bool
 }
 
 // ResumeCommand identifies one suspended session and the ownership epoch allowed to re-enable execution.
@@ -675,7 +677,7 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 		cancelled, getErr := service.sessions.Get(ctx, command.SessionID)
 		if getErr == nil && cancelled.Snapshot().RoomID == command.RoomID &&
 			cancelled.Snapshot().OwnershipEpoch == command.OwnershipEpoch &&
-			cancelled.Snapshot().Status == StatusCancelled && room.Snapshot().ActiveSessionID != command.SessionID {
+			cancelled.Snapshot().Status == StatusCancelled && cancelledRoomMatchesCommand(room, command) {
 			return room, cancelled, nil
 		}
 		if getErr != nil && !errors.Is(getErr, ErrSessionNotFound) {
@@ -692,7 +694,12 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}
-	nextRoom, err := room.CancelSession(command.SessionID, room.Version(), at)
+	var nextRoom roomDomain.Room
+	if command.CloseRoom {
+		nextRoom, err = room.CancelSessionAndClose(room.Snapshot().HostUserID, command.SessionID, room.Version(), at)
+	} else {
+		nextRoom, err = room.CancelSession(command.SessionID, room.Version(), at)
+	}
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}
@@ -705,6 +712,21 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 		return roomDomain.Room{}, Session{}, err
 	}
 	return service.roomSessions.Cancel(ctx, room, nextRoom, commit)
+}
+
+// cancelledRoomMatchesCommand prevents one cancellation mode or a later room update from satisfying another retry.
+func cancelledRoomMatchesCommand(room roomDomain.Room, command CancelCommand) bool {
+	snapshot := room.Snapshot()
+	if snapshot.RoomVersion != command.ExpectedRoom.Room+1 || snapshot.MembershipVersion != command.ExpectedRoom.Membership ||
+		snapshot.ActiveSessionID != uuid.Nil || snapshot.ActiveGameID != "" ||
+		snapshot.LastFinishedSessionID != uuid.Nil || snapshot.LastFinishedGameID != "" {
+		return false
+	}
+	if command.CloseRoom {
+		return snapshot.Status == roomDomain.RoomStatusClosed && snapshot.ParticipantAdmission == roomDomain.AdmissionClosed &&
+			snapshot.SpectatorAdmission == roomDomain.AdmissionClosed
+	}
+	return snapshot.Status == roomDomain.RoomStatusLobby && snapshot.ParticipantAdmission == roomDomain.AdmissionClosed
 }
 
 // Project returns a current viewer-safe snapshot from the exact retained module.

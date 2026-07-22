@@ -38,6 +38,7 @@ const (
 type GameRuntime interface {
 	Start(context.Context, gameruntime.StartCommand) (roomDomain.Room, gameruntime.Session, error)
 	HandleSystem(context.Context, gameruntime.SystemCommand) (gameruntime.SystemCommitResult, error)
+	Cancel(context.Context, gameruntime.CancelCommand) (roomDomain.Room, gameruntime.Session, error)
 }
 
 // GameSessionReader supplies exact version and ownership data needed by a host finish command.
@@ -342,18 +343,63 @@ func (service *Service) RemoveMember(ctx context.Context, request *connect.Reque
 	}), nil
 }
 
-// CloseRoom permanently closes an idle room under host authority.
+// CloseRoom permanently closes an idle room or atomically cancels its active session under host authority.
 func (service *Service) CloseRoom(ctx context.Context, request *connect.Request[roomv1.CloseRoomRequest]) (*connect.Response[roomv1.CloseRoomResponse], error) {
 	actor, err := service.authenticateWrite(ctx, requestHTTP(request))
 	if err != nil {
 		return nil, err
 	}
+	if request == nil || request.Msg == nil || request.Msg.GetExpectedVersion() == nil {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
 	roomID, err := parseUUID(request.Msg.GetRoomId())
 	if err != nil {
 		return nil, err
 	}
+	expected := versionDomain(request.Msg.GetExpectedVersion())
+	current, err := service.rooms.GetByID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	currentSnapshot := current.Snapshot()
+	// A playing room owns live timers and session state, so only the runtime transaction may clear its pointer and close it.
+	if currentSnapshot.Status == roomDomain.RoomStatusPlaying {
+		if currentSnapshot.HostUserID != actor {
+			return nil, roomDomain.ErrHostRequired
+		}
+		if current.Version() != expected || currentSnapshot.ActiveSessionID == uuid.Nil {
+			return nil, roomDomain.ErrRoomVersionConflict
+		}
+		session, err := service.sessions.Get(ctx, currentSnapshot.ActiveSessionID)
+		if err != nil {
+			return nil, err
+		}
+		sessionSnapshot := session.Snapshot()
+		if sessionSnapshot.RoomID != roomID || sessionSnapshot.ID != currentSnapshot.ActiveSessionID ||
+			string(sessionSnapshot.VersionKey.GameID) != currentSnapshot.ActiveGameID || sessionSnapshot.OwnershipEpoch == 0 ||
+			sessionSnapshot.Status.Terminal() {
+			return nil, gameruntime.ErrGameSessionIntegrity
+		}
+		updated, cancelled, err := service.runtime.Cancel(ctx, gameruntime.CancelCommand{
+			RoomID: roomID, SessionID: sessionSnapshot.ID, ExpectedRoom: expected,
+			OwnershipEpoch: sessionSnapshot.OwnershipEpoch, CloseRoom: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		updatedSnapshot, cancelledSnapshot := updated.Snapshot(), cancelled.Snapshot()
+		if updatedSnapshot.Status != roomDomain.RoomStatusClosed || updatedSnapshot.ActiveSessionID != uuid.Nil ||
+			updatedSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed || updatedSnapshot.SpectatorAdmission != roomDomain.AdmissionClosed ||
+			cancelledSnapshot.ID != sessionSnapshot.ID || cancelledSnapshot.RoomID != roomID || cancelledSnapshot.Status != gameruntime.StatusCancelled {
+			return nil, gameruntime.ErrGameSessionIntegrity
+		}
+		if err := service.publish(ctx, cancelled); err != nil {
+			return nil, err
+		}
+		return connect.NewResponse(&roomv1.CloseRoomResponse{Room: roomWire(updated)}), nil
+	}
 	updated, err := service.domain.CloseRoom(ctx, roomDomain.CloseRoomCommand{
-		ActorUserID: actor, RoomID: roomID, Expected: versionDomain(request.Msg.GetExpectedVersion()),
+		ActorUserID: actor, RoomID: roomID, Expected: expected,
 	})
 	if err != nil {
 		return nil, err

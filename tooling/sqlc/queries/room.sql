@@ -39,6 +39,22 @@ RETURNING room_id, room_code, visibility, status, host_user_id, participant_capa
     room_version, membership_version, created_at, updated_at,
     last_finished_session_id, last_finished_game_id;
 
+-- name: CreateRoomActivityLease :exec
+INSERT INTO room_activity_leases (room_id, last_seen_at)
+VALUES (sqlc.arg(room_id), sqlc.arg(last_seen_at));
+
+-- name: LockRoomActivityLease :one
+SELECT last_seen_at
+FROM room_activity_leases
+WHERE room_id = sqlc.arg(room_id)
+FOR UPDATE;
+
+-- name: TouchRoomActivityLease :one
+UPDATE room_activity_leases
+SET last_seen_at = GREATEST(last_seen_at, pg_catalog.clock_timestamp())
+WHERE room_id = sqlc.arg(room_id)
+RETURNING last_seen_at;
+
 -- name: GetPartyRoomForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,

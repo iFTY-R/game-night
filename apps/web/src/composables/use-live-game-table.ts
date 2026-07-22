@@ -18,6 +18,7 @@ import { ApiError, gameClient, type GameEnvelopeInput, type RoomSnapshot } from 
 import { gameProjectionFromConnect } from "../api/game-projection";
 import { memberDisplayName } from "../member-display";
 import { useRoomStore } from "../stores/room";
+import { useRoomPresenceLease } from "./use-room-presence-lease";
 
 type TableConnection = "online" | "offline" | "reconnecting" | "draining";
 
@@ -61,6 +62,7 @@ export const isActiveRoomSession = (snapshot: RoomSnapshot, sessionId: string): 
 
 /** Owns the platform transport lifecycle shared by every versioned game table. */
 export const useLiveGameTable = <TView, TContext extends LiveTableContext>(options: UseLiveGameTableOptions<TView, TContext>) => {
+  useRoomPresenceLease(() => options.roomId, { enabled: () => !options.fixtureMode.value });
   const router = useRouter();
   const room = useRoomStore();
   const liveFallback = ref(false);

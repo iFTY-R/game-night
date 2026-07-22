@@ -16,6 +16,7 @@ func TestLoadComposesBoundedWorkerSettings(t *testing.T) {
 	values[workerBatchEnvironment] = "25"
 	values[workerPollEnvironment] = "3s"
 	values[workerShutdownEnvironment] = "20s"
+	values[roomIdleEnvironment] = "12m"
 
 	loaded, err := Load(mapLookup(values))
 	if err != nil {
@@ -23,11 +24,21 @@ func TestLoadComposesBoundedWorkerSettings(t *testing.T) {
 	}
 	if loaded.Runtime.InstanceID != "worker-node-1" || loaded.Runtime.LeaseDuration != 2*time.Minute ||
 		loaded.Runtime.BatchSize != 25 || loaded.Runtime.PollInterval != 3*time.Second ||
-		loaded.Runtime.ShutdownTimeout != 20*time.Second {
+		loaded.Runtime.ShutdownTimeout != 20*time.Second || loaded.Runtime.RoomIdleTimeout != 12*time.Minute {
 		t.Fatalf("unexpected worker runtime config: %+v", loaded.Runtime)
 	}
 	if loaded.CheckpointStorage.LocalDirectory == "" || loaded.Shared.PostgreSQL.Schema != "public" {
 		t.Fatal("shared worker dependencies were not composed")
+	}
+}
+
+func TestLoadDefaultsRoomIdleTimeout(t *testing.T) {
+	loaded, err := Load(mapLookup(validWorkerEnvironment(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Runtime.RoomIdleTimeout != 10*time.Minute {
+		t.Fatalf("default room idle timeout=%v", loaded.Runtime.RoomIdleTimeout)
 	}
 }
 
@@ -38,6 +49,7 @@ func TestLoadRejectsUnsafeWorkerValuesWithoutEchoingThem(t *testing.T) {
 		workerBatchEnvironment:    "1001-secret",
 		workerPollEnvironment:     "61s-secret",
 		workerShutdownEnvironment: "61s-secret",
+		roomIdleEnvironment:       "30s-secret",
 	} {
 		t.Run(name, func(t *testing.T) {
 			values := validWorkerEnvironment(t)

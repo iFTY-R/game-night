@@ -71,6 +71,10 @@ export interface RoomResponse {
   gameId?: string;
 }
 
+export interface HeartbeatRoomResponse {
+  observedAt?: string;
+}
+
 export interface PageInfoWire {
   nextPageToken?: string;
 }
@@ -314,6 +318,9 @@ export const identityClient = {
 export const roomClient = {
   getRoom(roomId?: string, roomCode?: string): Promise<RoomResponse> {
     return call("platform.room.v1.RoomService", "GetRoom", { roomId: roomId ?? "", roomCode: roomCode ?? "" });
+  },
+  heartbeatRoom(roomId: string): Promise<HeartbeatRoomResponse> {
+    return call("platform.room.v1.RoomService", "HeartbeatRoom", { roomId }, true);
   },
   listMyRooms(pageToken = "", pageSize = 20): Promise<MyRoomListResponse> {
     return call("platform.room.v1.RoomService", "ListMyRooms", { page: { pageToken, pageSize } });

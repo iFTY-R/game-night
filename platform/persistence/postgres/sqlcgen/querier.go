@@ -246,6 +246,10 @@ type Querier interface {
 	//    AND username_claims.reserved_until <= $4
 	//  RETURNING username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 	ClaimUsername(ctx context.Context, arg ClaimUsernameParams) (UsernameClaim, error)
+	//CloseExpiredPartyRooms
+	//
+	//  SELECT close_expired_party_rooms($1)
+	CloseExpiredPartyRooms(ctx context.Context, arg CloseExpiredPartyRoomsParams) (int64, error)
 	//CompleteGameSessionReplayMemberSnapshot
 	//
 	//  UPDATE game_session_replay_access
@@ -1059,6 +1063,11 @@ type Querier interface {
 	//  RETURNING export_id, ordinal, user_id, username, profile_version,
 	//            real_name_ciphertext, real_name_nonce, real_name_key_version
 	CreateProfileExportItem(ctx context.Context, arg CreateProfileExportItemParams) (ProfileExportItem, error)
+	//CreateRoomActivityLease
+	//
+	//  INSERT INTO room_activity_leases (room_id, last_seen_at)
+	//  VALUES ($1, $2)
+	CreateRoomActivityLease(ctx context.Context, arg CreateRoomActivityLeaseParams) error
 	//CreateRoomMember
 	//
 	//  INSERT INTO room_members (
@@ -2118,6 +2127,13 @@ type Querier interface {
 	//  ORDER BY user_id
 	//  LIMIT $3
 	ListUserProfilesForKeyRotation(ctx context.Context, arg ListUserProfilesForKeyRotationParams) ([]UserProfile, error)
+	//LockRoomActivityLease
+	//
+	//  SELECT last_seen_at
+	//  FROM room_activity_leases
+	//  WHERE room_id = $1
+	//  FOR UPDATE
+	LockRoomActivityLease(ctx context.Context, arg LockRoomActivityLeaseParams) (pgtype.Timestamptz, error)
 	//ReadAuditAnchor
 	//
 	//  WITH result AS (
@@ -2546,6 +2562,13 @@ type Querier interface {
 	//    AND last_seen_at < $1
 	//  RETURNING credential_id, generation, last_seen_at, idle_expires_at, absolute_expires_at
 	TouchDeviceCredentialCAS(ctx context.Context, arg TouchDeviceCredentialCASParams) (TouchDeviceCredentialCASRow, error)
+	//TouchRoomActivityLease
+	//
+	//  UPDATE room_activity_leases
+	//  SET last_seen_at = GREATEST(last_seen_at, pg_catalog.clock_timestamp())
+	//  WHERE room_id = $1
+	//  RETURNING last_seen_at
+	TouchRoomActivityLease(ctx context.Context, arg TouchRoomActivityLeaseParams) (pgtype.Timestamptz, error)
 	//TransitionAdminStatusCAS
 	//
 	//  UPDATE admin_accounts

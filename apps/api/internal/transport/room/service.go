@@ -54,6 +54,7 @@ type GameSessionReader interface {
 type RoomReader interface {
 	GetByID(context.Context, uuid.UUID) (roomDomain.Room, error)
 	ListRoomMemberUsernames(context.Context, uuid.UUID) (map[uuid.UUID]string, error)
+	RecordRoomPresence(context.Context, uuid.UUID, uuid.UUID) (time.Time, error)
 }
 
 // FanoutPublisher publishes only committed session cursors; PostgreSQL remains authoritative.
@@ -137,6 +138,23 @@ func (service *Service) GetRoom(ctx context.Context, request *connect.Request[ro
 		return nil, err
 	}
 	return connect.NewResponse(&roomv1.GetRoomResponse{Room: wireRoom}), nil
+}
+
+// HeartbeatRoom renews the authenticated member's room lease without changing optimistic room versions.
+func (service *Service) HeartbeatRoom(ctx context.Context, request *connect.Request[roomv1.HeartbeatRoomRequest]) (*connect.Response[roomv1.HeartbeatRoomResponse], error) {
+	actor, err := service.authenticateWrite(ctx, requestHTTP(request))
+	if err != nil {
+		return nil, err
+	}
+	roomID, err := parseUUID(request.Msg.GetRoomId())
+	if err != nil {
+		return nil, err
+	}
+	observedAt, err := service.rooms.RecordRoomPresence(ctx, roomID, actor)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.HeartbeatRoomResponse{ObservedAt: timestamppb.New(observedAt)}), nil
 }
 
 // ListMyRooms authenticates a private member read and returns host-owned rooms before joined rooms.

@@ -154,6 +154,25 @@ func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams
 	return i, err
 }
 
+const createRoomActivityLease = `-- name: CreateRoomActivityLease :exec
+INSERT INTO room_activity_leases (room_id, last_seen_at)
+VALUES ($1, $2)
+`
+
+type CreateRoomActivityLeaseParams struct {
+	RoomID     pgtype.UUID        `json:"room_id"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
+// CreateRoomActivityLease
+//
+//	INSERT INTO room_activity_leases (room_id, last_seen_at)
+//	VALUES ($1, $2)
+func (q *Queries) CreateRoomActivityLease(ctx context.Context, arg CreateRoomActivityLeaseParams) error {
+	_, err := q.db.Exec(ctx, createRoomActivityLease, arg.RoomID, arg.LastSeenAt)
+	return err
+}
+
 const createRoomMember = `-- name: CreateRoomMember :exec
 INSERT INTO room_members (
     room_id,
@@ -918,6 +937,54 @@ func (q *Queries) ListRoomMembers(ctx context.Context, arg ListRoomMembersParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockRoomActivityLease = `-- name: LockRoomActivityLease :one
+SELECT last_seen_at
+FROM room_activity_leases
+WHERE room_id = $1
+FOR UPDATE
+`
+
+type LockRoomActivityLeaseParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+// LockRoomActivityLease
+//
+//	SELECT last_seen_at
+//	FROM room_activity_leases
+//	WHERE room_id = $1
+//	FOR UPDATE
+func (q *Queries) LockRoomActivityLease(ctx context.Context, arg LockRoomActivityLeaseParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lockRoomActivityLease, arg.RoomID)
+	var last_seen_at pgtype.Timestamptz
+	err := row.Scan(&last_seen_at)
+	return last_seen_at, err
+}
+
+const touchRoomActivityLease = `-- name: TouchRoomActivityLease :one
+UPDATE room_activity_leases
+SET last_seen_at = GREATEST(last_seen_at, pg_catalog.clock_timestamp())
+WHERE room_id = $1
+RETURNING last_seen_at
+`
+
+type TouchRoomActivityLeaseParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+// TouchRoomActivityLease
+//
+//	UPDATE room_activity_leases
+//	SET last_seen_at = GREATEST(last_seen_at, pg_catalog.clock_timestamp())
+//	WHERE room_id = $1
+//	RETURNING last_seen_at
+func (q *Queries) TouchRoomActivityLease(ctx context.Context, arg TouchRoomActivityLeaseParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, touchRoomActivityLease, arg.RoomID)
+	var last_seen_at pgtype.Timestamptz
+	err := row.Scan(&last_seen_at)
+	return last_seen_at, err
 }
 
 const updatePartyRoomCAS = `-- name: UpdatePartyRoomCAS :one

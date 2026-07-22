@@ -50,6 +50,17 @@ afterEach(() => {
 });
 
 describe("Connect JSON mutation requests", () => {
+  it("renews a room lease through the authenticated write boundary", async () => {
+    const { calls } = captureRequest({ observedAt: "2026-07-22T12:00:00Z" });
+
+    await roomClient.heartbeatRoom(room.roomId);
+
+    expect(calls[0]).toEqual({
+      url: "/platform.room.v1.RoomService/HeartbeatRoom",
+      body: { roomId: room.roomId },
+    });
+  });
+
   it("binds room creation state when starting a game", async () => {
     const { calls } = captureRequest();
 

@@ -37,6 +37,7 @@ var IdentityOperations = []string{
 var RoomOperations = []string{
 	roomv1connect.RoomServiceCreateRoomProcedure,
 	roomv1connect.RoomServiceGetRoomProcedure,
+	roomv1connect.RoomServiceHeartbeatRoomProcedure,
 	roomv1connect.RoomServiceListMyRoomsProcedure,
 	roomv1connect.RoomServiceListPublicRoomsProcedure,
 	roomv1connect.RoomServiceJoinRoomProcedure,

@@ -46,6 +46,11 @@ func (repository *RoomRepository) Create(ctx context.Context, room roomDomain.Ro
 		if err != nil {
 			return err
 		}
+		if err := queries.CreateRoomActivityLease(ctx, sqlcgen.CreateRoomActivityLeaseParams{
+			RoomID: uuidToPG(snapshot.ID), LastSeenAt: timeToPG(snapshot.CreatedAt),
+		}); err != nil {
+			return err
+		}
 		for _, member := range snapshot.Members {
 			if err := queries.CreateRoomMember(ctx, createRoomMemberParams(snapshot.ID, member)); err != nil {
 				return err
@@ -108,6 +113,53 @@ func (repository *RoomRepository) ListRoomMemberUsernames(ctx context.Context, r
 		}
 	}
 	return usernames, nil
+}
+
+// RecordRoomPresence renews one room-level lease only for a current member of a non-closed room.
+func (repository *RoomRepository) RecordRoomPresence(ctx context.Context, roomID, userID uuid.UUID) (time.Time, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || roomID == uuid.Nil || userID == uuid.Nil {
+		return time.Time{}, roomDomain.ErrInvalidRoomInput
+	}
+	var observedAt time.Time
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		if _, err := queries.LockRoomActivityLease(ctx, sqlcgen.LockRoomActivityLeaseParams{RoomID: uuidToPG(roomID)}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return roomDomain.ErrRoomNotFound
+			}
+			return err
+		}
+		room, err := queries.GetPartyRoomForShare(ctx, sqlcgen.GetPartyRoomForShareParams{RoomID: uuidToPG(roomID)})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return roomDomain.ErrRoomNotFound
+			}
+			return err
+		}
+		if room.Status == string(roomDomain.RoomStatusClosed) {
+			return roomDomain.ErrRoomClosed
+		}
+		if _, err := queries.GetRoomMemberRole(ctx, sqlcgen.GetRoomMemberRoleParams{
+			RoomID: uuidToPG(roomID), UserID: uuidToPG(userID),
+		}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return roomDomain.ErrMemberNotFound
+			}
+			return err
+		}
+		value, err := queries.TouchRoomActivityLease(ctx, sqlcgen.TouchRoomActivityLeaseParams{RoomID: uuidToPG(roomID)})
+		if err == nil && value.Valid {
+			observedAt = value.Time
+		}
+		return err
+	})
+	if err != nil {
+		return time.Time{}, mapUnitOfWorkError(err, roomDomain.ErrRoomRepositoryUnavailable,
+			roomDomain.ErrInvalidRoomInput, roomDomain.ErrRoomNotFound, roomDomain.ErrRoomClosed, roomDomain.ErrMemberNotFound)
+	}
+	if observedAt.IsZero() {
+		return time.Time{}, roomDomain.ErrRoomIntegrity
+	}
+	return observedAt, nil
 }
 
 // ListPublicRooms reads one actor-aware lobby page without loading invitation codes or complete member snapshots.

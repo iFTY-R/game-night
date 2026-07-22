@@ -18,13 +18,17 @@ const (
 	workerBatchEnvironment    = "GAME_NIGHT_WORKER_BATCH_SIZE"
 	workerPollEnvironment     = "GAME_NIGHT_WORKER_POLL_INTERVAL"
 	workerShutdownEnvironment = "GAME_NIGHT_WORKER_SHUTDOWN_TIMEOUT"
+	roomIdleEnvironment       = "GAME_NIGHT_ROOM_IDLE_TIMEOUT"
 	// Defaults keep recovery latency low without holding leases across long idle periods.
 	defaultLeaseDuration = time.Minute
 	defaultBatchSize     = 10
 	defaultPollInterval  = time.Second
 	defaultShutdown      = 15 * time.Second
+	defaultRoomIdle      = 10 * time.Minute
 	maximumPollInterval  = time.Minute
 	maximumShutdown      = time.Minute
+	minimumRoomIdle      = time.Minute
+	maximumRoomIdle      = 24 * time.Hour
 )
 
 // RuntimeConfig controls lease ownership and the single checkpoint consumer loop.
@@ -34,6 +38,7 @@ type RuntimeConfig struct {
 	BatchSize       uint32
 	PollInterval    time.Duration
 	ShutdownTimeout time.Duration
+	RoomIdleTimeout time.Duration
 }
 
 // Config separates worker scheduling from the shared database, keyring, and checkpoint sink policy.
@@ -77,21 +82,29 @@ func Load(lookup sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, fieldError(workerShutdownEnvironment)
 	}
+	roomIdleTimeout, err := parseDurationRange(read(roomIdleEnvironment), defaultRoomIdle, minimumRoomIdle, maximumRoomIdle)
+	if err != nil {
+		return Config{}, fieldError(roomIdleEnvironment)
+	}
 	return Config{
 		Shared: shared, CheckpointStorage: storage,
 		Runtime: RuntimeConfig{
 			InstanceID: instanceID, LeaseDuration: leaseDuration, BatchSize: uint32(batchSize),
-			PollInterval: pollInterval, ShutdownTimeout: shutdownTimeout,
+			PollInterval: pollInterval, ShutdownTimeout: shutdownTimeout, RoomIdleTimeout: roomIdleTimeout,
 		},
 	}, nil
 }
 
 func parseDuration(value string, fallback, maximum time.Duration) (time.Duration, error) {
+	return parseDurationRange(value, fallback, time.Nanosecond, maximum)
+}
+
+func parseDurationRange(value string, fallback, minimum, maximum time.Duration) (time.Duration, error) {
 	if value == "" {
 		return fallback, nil
 	}
 	parsed, err := time.ParseDuration(value)
-	if err != nil || parsed <= 0 || parsed > maximum {
+	if err != nil || parsed < minimum || parsed > maximum {
 		return 0, fmt.Errorf("invalid duration")
 	}
 	return parsed, nil

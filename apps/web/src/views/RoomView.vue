@@ -7,11 +7,13 @@ import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomMe
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
 import { memberDisplayName } from "../member-display";
+import { useRoomPresenceLease } from "../composables/use-room-presence-lease";
 
 const props = defineProps<{ roomId: string }>();
 const route = useRoute();
 const router = useRouter();
 const room = useRoomStore();
+useRoomPresenceLease(() => props.roomId);
 const shared = ref(false);
 const entryOpen = ref(true);
 const loading = ref(true);

@@ -12,6 +12,7 @@ option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room
 service RoomService {
   rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
   rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc HeartbeatRoom(HeartbeatRoomRequest) returns (HeartbeatRoomResponse);
   rpc ListMyRooms(ListMyRoomsRequest) returns (ListMyRoomsResponse);
   rpc ListPublicRooms(ListPublicRoomsRequest) returns (ListPublicRoomsResponse);
   rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
@@ -122,6 +123,14 @@ message GetRoomRequest {
 
 message GetRoomResponse {
   Room room = 1;
+}
+
+message HeartbeatRoomRequest {
+  string room_id = 1;
+}
+
+message HeartbeatRoomResponse {
+  google.protobuf.Timestamp observed_at = 1;
 }
 
 // MyRoomCard includes invitation and membership fields because the authenticated viewer already belongs to the room.

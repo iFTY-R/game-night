@@ -75,6 +75,13 @@ func TestRoomConnectFlowCreatesJoinsStartsAndFinishes(t *testing.T) {
 	if hostNames, guestNames := roomMemberUsernames(hostView.Msg.GetRoom()), roomMemberUsernames(guestView.Msg.GetRoom()); len(hostNames) != 2 || !maps.Equal(hostNames, guestNames) || hostNames[host.String()] != "测试房主" || hostNames[guest.String()] != "测试玩家" {
 		t.Fatalf("member usernames diverged: host=%v guest=%v", hostNames, guestNames)
 	}
+	heartbeatRequest := connect.NewRequest(&roomv1.HeartbeatRoomRequest{RoomId: joined.Msg.GetRoom().GetRoomId()})
+	authorizeRoomWrite(heartbeatRequest, "guest-device")
+	heartbeat, err := client.HeartbeatRoom(t.Context(), heartbeatRequest)
+	if err != nil || heartbeat.Msg.GetObservedAt() == nil {
+		t.Fatalf("heartbeat room: response=%+v err=%v", heartbeat, err)
+	}
+
 	startRequest := connect.NewRequest(&roomv1.StartGameRequest{
 		RoomId: joined.Msg.GetRoom().GetRoomId(), GameId: "liars-dice",
 		ExpectedVersion: joined.Msg.GetRoom().GetVersion(),
@@ -745,6 +752,28 @@ func (repository *transportRoomRepository) GetByCode(ctx context.Context, code s
 		return roomDomain.Room{}, roomDomain.ErrRoomNotFound
 	}
 	return repository.GetByID(ctx, id)
+}
+
+// RecordRoomPresence mirrors the persistence authorization boundary without mutating the aggregate version.
+func (repository *transportRoomRepository) RecordRoomPresence(
+	_ context.Context,
+	roomID uuid.UUID,
+	userID uuid.UUID,
+) (time.Time, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	room, exists := repository.byID[roomID]
+	if !exists {
+		return time.Time{}, roomDomain.ErrRoomNotFound
+	}
+	snapshot := room.Snapshot()
+	if snapshot.Status == roomDomain.RoomStatusClosed {
+		return time.Time{}, roomDomain.ErrRoomClosed
+	}
+	if _, member := room.Member(userID); !member {
+		return time.Time{}, roomDomain.ErrMemberNotFound
+	}
+	return snapshot.UpdatedAt.Add(time.Millisecond), nil
 }
 
 func (repository *transportRoomRepository) ListRoomMemberUsernames(_ context.Context, roomID uuid.UUID) (map[uuid.UUID]string, error) {

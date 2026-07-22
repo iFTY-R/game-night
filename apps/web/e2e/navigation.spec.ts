@@ -79,7 +79,13 @@ test("all viewers see the same server-projected member usernames", async ({ brow
     await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: snapshot }) });
     });
+    await page.route("**/platform.room.v1.RoomService/HeartbeatRoom", async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ roomId });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ observedAt: "2026-07-22T12:00:00Z" }) });
+    });
+    const firstHeartbeat = page.waitForRequest("**/platform.room.v1.RoomService/HeartbeatRoom");
     await page.goto(`/room/${roomId}`);
+    await firstHeartbeat;
     return { context, page };
   };
 

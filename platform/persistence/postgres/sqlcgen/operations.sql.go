@@ -9,6 +9,24 @@ import (
 	"context"
 )
 
+const closeExpiredPartyRooms = `-- name: CloseExpiredPartyRooms :one
+SELECT close_expired_party_rooms($1)
+`
+
+type CloseExpiredPartyRoomsParams struct {
+	RoomIdleSeconds int64 `json:"room_idle_seconds"`
+}
+
+// CloseExpiredPartyRooms
+//
+//	SELECT close_expired_party_rooms($1)
+func (q *Queries) CloseExpiredPartyRooms(ctx context.Context, arg CloseExpiredPartyRoomsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, closeExpiredPartyRooms, arg.RoomIdleSeconds)
+	var close_expired_party_rooms int64
+	err := row.Scan(&close_expired_party_rooms)
+	return close_expired_party_rooms, err
+}
+
 const runExpiryCleanup = `-- name: RunExpiryCleanup :one
 SELECT run_expiry_cleanup()
 `

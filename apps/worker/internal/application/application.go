@@ -113,7 +113,7 @@ func New(ctx context.Context, config workerconfig.Config, logger *slog.Logger) (
 	if err != nil {
 		return nil, errInitializeRuntime
 	}
-	cleanup := postgres.NewExpiryCleanup(pool)
+	cleanup := postgres.NewExpiryCleanup(pool, config.Runtime.RoomIdleTimeout)
 	application.runtime, err = workerruntime.NewWithOperations(dispatcher, rotation, cleanup, config.Runtime.PollInterval, logger)
 	if err != nil {
 		return nil, errInitializeRuntime

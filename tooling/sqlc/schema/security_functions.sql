@@ -53,3 +53,10 @@ LANGUAGE sql
 AS $$
     SELECT '{}'::jsonb
 $$;
+
+CREATE FUNCTION close_expired_party_rooms(room_idle_seconds bigint)
+RETURNS bigint
+LANGUAGE sql
+AS $$
+    SELECT 0::bigint
+$$;

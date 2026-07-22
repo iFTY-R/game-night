@@ -68,6 +68,18 @@ func TestRoomRepositoryPersistsMembershipAndRejectsStaleVersions(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(loaded.Snapshot(), updated.Snapshot()) {
 		t.Fatalf("load updated room: loaded=%+v err=%v", loaded.Snapshot(), err)
 	}
+	versionBeforeHeartbeat := loaded.Version()
+	observedAt, err := repository.RecordRoomPresence(ctx, created.Snapshot().ID, participantID)
+	if err != nil || observedAt.IsZero() {
+		t.Fatalf("record room presence: observed_at=%v err=%v", observedAt, err)
+	}
+	afterHeartbeat, err := repository.GetByID(ctx, created.Snapshot().ID)
+	if err != nil || afterHeartbeat.Version() != versionBeforeHeartbeat {
+		t.Fatalf("heartbeat changed room version: before=%+v after=%+v err=%v", versionBeforeHeartbeat, afterHeartbeat.Version(), err)
+	}
+	if _, err := repository.RecordRoomPresence(ctx, created.Snapshot().ID, uuid.New()); !errors.Is(err, roomDomain.ErrMemberNotFound) {
+		t.Fatalf("non-member heartbeat error=%v", err)
+	}
 	byCode, err := repository.GetByCode(ctx, "PGROOM1")
 	if err != nil || !reflect.DeepEqual(byCode.Snapshot(), updated.Snapshot()) {
 		t.Fatalf("load room by code: loaded=%+v err=%v", byCode.Snapshot(), err)
@@ -90,6 +102,16 @@ func TestRoomRepositoryPersistsMembershipAndRejectsStaleVersions(t *testing.T) {
 	}
 	if _, err := repository.UpdateCAS(ctx, updated, second); !errors.Is(err, roomDomain.ErrRoomVersionConflict) {
 		t.Fatalf("stale room update error=%v", err)
+	}
+	closed, err := first.Close(hostID, first.Version(), now.Add(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.UpdateCAS(ctx, first, closed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.RecordRoomPresence(ctx, created.Snapshot().ID, hostID); !errors.Is(err, roomDomain.ErrRoomClosed) {
+		t.Fatalf("closed room heartbeat error=%v", err)
 	}
 }
 

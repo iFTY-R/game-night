@@ -65,6 +65,7 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
 		"CreateRoom",
 		"GetRoom",
+		"HeartbeatRoom",
 		"ListMyRooms",
 		"ListPublicRooms",
 		"JoinRoom",

@@ -415,6 +415,11 @@ type ProfileExportItem struct {
 	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
 }
 
+type RoomActivityLease struct {
+	RoomID     pgtype.UUID        `json:"room_id"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
 type RoomMember struct {
 	RoomID        pgtype.UUID        `json:"room_id"`
 	UserID        pgtype.UUID        `json:"user_id"`

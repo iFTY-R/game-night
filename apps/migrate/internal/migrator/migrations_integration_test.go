@@ -118,6 +118,64 @@ func TestReplayAccessMigrationBackfillsExistingSessionsWithoutInventingMemberSna
 	}
 }
 
+func TestRoomActivityMigrationBackfillsExistingRooms(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 22); err != nil {
+		t.Fatal(err)
+	}
+	userID, roomID := "40000000-0000-4000-8000-000000000001", "50000000-0000-4000-8000-000000000001"
+	updatedAt := time.Now().UTC().Truncate(time.Microsecond)
+	createdAt := updatedAt.Add(-time.Hour)
+	transaction, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = transaction.Rollback(ctx) }()
+	if _, err := transaction.Exec(ctx, `
+		INSERT INTO users (user_id, status, created_at, updated_at)
+		VALUES ($1, 'onboarding', $2, $3)
+	`, userID, createdAt, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transaction.Exec(ctx, `
+		INSERT INTO party_rooms (
+			room_id, room_code, visibility, status, host_user_id, participant_capacity,
+			participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
+		) VALUES ($1, 'LEASE23', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, $3, $4)
+	`, roomID, userID, createdAt, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transaction.Exec(ctx, `
+		INSERT INTO room_members (room_id, user_id, role, seat_index, joined_at, last_seen_at)
+		VALUES ($1, $2, 'participant', 0, $3, $4)
+	`, roomID, userID, createdAt, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 23); err != nil {
+		t.Fatal(err)
+	}
+	var leaseAt time.Time
+	if err := fixture.Pool.QueryRow(ctx, "SELECT last_seen_at FROM room_activity_leases WHERE room_id = $1", roomID).Scan(&leaseAt); err != nil {
+		t.Fatal(err)
+	}
+	if !leaseAt.Equal(updatedAt) {
+		t.Fatalf("backfilled room lease=%v want=%v", leaseAt, updatedAt)
+	}
+}
+
 func TestIdentityInvariantMigrationAcceptsValidVersionEightRows(t *testing.T) {
 	ctx, fixture, database, migrationsDir := openMigrationEightTest(t)
 	_, err := fixture.Pool.Exec(ctx, `

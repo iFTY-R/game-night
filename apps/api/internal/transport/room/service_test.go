@@ -164,6 +164,48 @@ func TestRoomConnectListsPublicCardsWithoutWriteHeaders(t *testing.T) {
 	}
 }
 
+func TestRoomConnectListsPrivateMemberRoomsWithoutWriteHeaders(t *testing.T) {
+	host, guest := uuid.New(), uuid.New()
+	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
+	createRequest := connect.NewRequest(&roomv1.CreateRoomRequest{
+		Visibility: roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE, ParticipantCapacity: 4,
+		ParticipantAdmission: roomv1.AdmissionMode_ADMISSION_MODE_OPEN,
+		SpectatorAdmission:   roomv1.AdmissionMode_ADMISSION_MODE_CLOSED,
+	})
+	authorizeRoomWrite(createRequest, "host-device")
+	created, err := client.CreateRoom(t.Context(), createRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joinRequest := connect.NewRequest(&roomv1.JoinRoomRequest{
+		RoomCode: created.Msg.GetRoom().GetRoomCode(), Intent: roomv1.JoinIntent_JOIN_INTENT_PARTICIPANT,
+	})
+	authorizeRoomWrite(joinRequest, "guest-device")
+	if _, err := client.JoinRoom(t.Context(), joinRequest); err != nil {
+		t.Fatal(err)
+	}
+
+	hostRequest := connect.NewRequest(&roomv1.ListMyRoomsRequest{})
+	authorizeRoomRead(hostRequest, "host-device")
+	hostRooms, err := client.ListMyRooms(t.Context(), hostRequest)
+	if err != nil || len(hostRooms.Msg.GetRooms()) != 1 {
+		t.Fatalf("host rooms: response=%+v err=%v", hostRooms, err)
+	}
+	hostCard := hostRooms.Msg.GetRooms()[0]
+	if hostCard.GetRoomCode() != created.Msg.GetRoom().GetRoomCode() || !hostCard.GetIsHost() ||
+		hostCard.GetVisibility() != roomv1.RoomVisibility_ROOM_VISIBILITY_PRIVATE || hostCard.GetParticipantCount() != 2 {
+		t.Fatalf("host card = %+v", hostCard)
+	}
+
+	guestRequest := connect.NewRequest(&roomv1.ListMyRoomsRequest{})
+	authorizeRoomRead(guestRequest, "guest-device")
+	guestRooms, err := client.ListMyRooms(t.Context(), guestRequest)
+	if err != nil || len(guestRooms.Msg.GetRooms()) != 1 || guestRooms.Msg.GetRooms()[0].GetIsHost() ||
+		guestRooms.Msg.GetRooms()[0].GetViewerRole() != roomv1.MemberRole_MEMBER_ROLE_PARTICIPANT {
+		t.Fatalf("guest rooms: response=%+v err=%v", guestRooms, err)
+	}
+}
+
 func TestRoomConnectRemovalReturnsDurableSourceForPlayingParticipant(t *testing.T) {
 	host, guest := uuid.New(), uuid.New()
 	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": host, "guest-device": guest})
@@ -302,6 +344,23 @@ func TestPublicRoomCursorRoundTripsAndRejectsNonCanonicalInput(t *testing.T) {
 	}
 }
 
+func TestMyRoomCursorRoundTripsHostPriorityAndRejectsNonCanonicalInput(t *testing.T) {
+	want := roomDomain.MyRoomPageCursor{
+		IsHost: true, UpdatedAt: time.Date(2026, time.July, 22, 22, 0, 0, 654321000, time.UTC), RoomID: uuid.New(),
+	}
+	token, err := encodeMyRoomCursor(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := decodeMyRoomCursor(token)
+	if err != nil || got != want {
+		t.Fatalf("cursor = %+v, want %+v, err = %v", got, want, err)
+	}
+	if _, err := decodeMyRoomCursor(token + "A"); !errors.Is(err, roomDomain.ErrInvalidRoomInput) {
+		t.Fatalf("non-canonical cursor error = %v", err)
+	}
+}
+
 func TestEveryRoomRPCIsImplemented(t *testing.T) {
 	client := newRoomTransportClient(t, map[string]uuid.UUID{"host-device": uuid.New()})
 	calls := []func() error{
@@ -311,6 +370,10 @@ func TestEveryRoomRPCIsImplemented(t *testing.T) {
 		},
 		func() error {
 			_, err := client.GetRoom(t.Context(), connect.NewRequest(&roomv1.GetRoomRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.ListMyRooms(t.Context(), connect.NewRequest(&roomv1.ListMyRoomsRequest{}))
 			return err
 		},
 		func() error {
@@ -675,17 +738,9 @@ func (repository *transportRoomRepository) ListPublicRooms(_ context.Context, re
 			!transportRoomMatchesFilter(snapshot, request.Filter) || !transportRoomAfterCursor(snapshot, request.After) {
 			continue
 		}
-		participantCount, spectatorCount, waitingCount := uint32(0), uint32(0), uint32(0)
+		participantCount, spectatorCount, waitingCount := transportRoomMemberCounts(snapshot)
 		viewerRole, viewerRequestedRole := roomDomain.MemberRole(""), roomDomain.MemberRole("")
 		for _, member := range snapshot.Members {
-			switch member.Role {
-			case roomDomain.MemberRoleParticipant:
-				participantCount++
-			case roomDomain.MemberRoleSpectator:
-				spectatorCount++
-			case roomDomain.MemberRoleWaiting:
-				waitingCount++
-			}
 			if member.UserID == request.ActorUserID {
 				viewerRole, viewerRequestedRole = member.Role, member.RequestedRole
 			}
@@ -711,6 +766,76 @@ func (repository *transportRoomRepository) ListPublicRooms(_ context.Context, re
 		return leftSnapshot.RoomID.String() > rightSnapshot.RoomID.String()
 	})
 	return append([]roomDomain.PublicRoomCard(nil), cards[:min(len(cards), int(request.Limit))]...), nil
+}
+
+func (repository *transportRoomRepository) ListMyRooms(_ context.Context, request roomDomain.MyRoomListRequest) ([]roomDomain.MyRoomCard, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	if !request.Valid() {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
+	cards := make([]roomDomain.MyRoomCard, 0, len(repository.byID))
+	for _, candidate := range repository.byID {
+		snapshot := candidate.Snapshot()
+		viewer, member := candidate.Member(request.ActorUserID)
+		if !member || snapshot.Status == roomDomain.RoomStatusClosed {
+			continue
+		}
+		isHost := snapshot.HostUserID == request.ActorUserID
+		if !transportMyRoomAfterCursor(isHost, snapshot, request.After) {
+			continue
+		}
+		participantCount, spectatorCount, waitingCount := transportRoomMemberCounts(snapshot)
+		card, err := roomDomain.RestoreMyRoomCard(roomDomain.MyRoomCardSnapshot{
+			RoomID: snapshot.ID, RoomCode: snapshot.RoomCode, Visibility: snapshot.Visibility, HostUsername: "TestHost",
+			Status: snapshot.Status, IsHost: isHost, ParticipantCapacity: snapshot.ParticipantCapacity,
+			ParticipantCount: participantCount, SpectatorCount: spectatorCount, WaitingCount: waitingCount,
+			ParticipantAdmission: snapshot.ParticipantAdmission, SpectatorAdmission: snapshot.SpectatorAdmission,
+			ActiveGameID: snapshot.ActiveGameID, LastFinishedGameID: snapshot.LastFinishedGameID,
+			ViewerRole: viewer.Role, ViewerRequestedRole: viewer.RequestedRole, UpdatedAt: snapshot.UpdatedAt,
+		})
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	sort.Slice(cards, func(left, right int) bool {
+		leftSnapshot, rightSnapshot := cards[left].Snapshot(), cards[right].Snapshot()
+		if leftSnapshot.IsHost != rightSnapshot.IsHost {
+			return leftSnapshot.IsHost
+		}
+		if !leftSnapshot.UpdatedAt.Equal(rightSnapshot.UpdatedAt) {
+			return leftSnapshot.UpdatedAt.After(rightSnapshot.UpdatedAt)
+		}
+		return leftSnapshot.RoomID.String() > rightSnapshot.RoomID.String()
+	})
+	return append([]roomDomain.MyRoomCard(nil), cards[:min(len(cards), int(request.Limit))]...), nil
+}
+
+func transportRoomMemberCounts(snapshot roomDomain.RoomSnapshot) (uint32, uint32, uint32) {
+	participantCount, spectatorCount, waitingCount := uint32(0), uint32(0), uint32(0)
+	for _, member := range snapshot.Members {
+		switch member.Role {
+		case roomDomain.MemberRoleParticipant:
+			participantCount++
+		case roomDomain.MemberRoleSpectator:
+			spectatorCount++
+		case roomDomain.MemberRoleWaiting:
+			waitingCount++
+		}
+	}
+	return participantCount, spectatorCount, waitingCount
+}
+
+func transportMyRoomAfterCursor(isHost bool, snapshot roomDomain.RoomSnapshot, after roomDomain.MyRoomPageCursor) bool {
+	if after.UpdatedAt.IsZero() {
+		return true
+	}
+	if isHost != after.IsHost {
+		return !isHost && after.IsHost
+	}
+	return snapshot.UpdatedAt.Before(after.UpdatedAt) ||
+		(snapshot.UpdatedAt.Equal(after.UpdatedAt) && snapshot.ID.String() < after.RoomID.String())
 }
 
 func transportRoomMatchesFilter(snapshot roomDomain.RoomSnapshot, filter roomDomain.PublicRoomFilter) bool {

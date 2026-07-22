@@ -64,6 +64,12 @@ const replayPolicyOptions = computed<readonly { value: ReplayAccessPolicy; label
     : []),
 ]);
 
+const requestedGame = typeof route.query.game === "string" ? route.query.game : "";
+if (isGameId(requestedGame)) {
+  selectedGameId.value = requestedGame;
+  gameSelectionInitialized = true;
+}
+
 /** Seeds the next game from room history once without overwriting a host choice during polling. */
 const initializeGameSelection = (snapshot: NonNullable<typeof room.remoteRoom>): void => {
   if (gameSelectionInitialized) return;

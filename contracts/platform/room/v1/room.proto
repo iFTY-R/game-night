@@ -12,6 +12,7 @@ option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/room
 service RoomService {
   rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
   rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc ListMyRooms(ListMyRoomsRequest) returns (ListMyRoomsResponse);
   rpc ListPublicRooms(ListPublicRoomsRequest) returns (ListPublicRoomsResponse);
   rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
   rpc ApproveMember(ApproveMemberRequest) returns (ApproveMemberResponse);
@@ -120,6 +121,36 @@ message GetRoomRequest {
 
 message GetRoomResponse {
   Room room = 1;
+}
+
+// MyRoomCard includes invitation and membership fields because the authenticated viewer already belongs to the room.
+message MyRoomCard {
+  string room_id = 1;
+  string room_code = 2;
+  RoomVisibility visibility = 3;
+  string host_username = 4;
+  RoomStatus status = 5;
+  bool is_host = 6;
+  uint32 participant_capacity = 7;
+  uint32 participant_count = 8;
+  uint32 spectator_count = 9;
+  uint32 waiting_count = 10;
+  AdmissionMode participant_admission = 11;
+  AdmissionMode spectator_admission = 12;
+  string active_game_id = 13;
+  string last_finished_game_id = 14;
+  MemberRole viewer_role = 15;
+  MemberRole viewer_requested_role = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+message ListMyRoomsRequest {
+  platform.common.v1.PageRequest page = 1;
+}
+
+message ListMyRoomsResponse {
+  repeated MyRoomCard rooms = 1;
+  platform.common.v1.PageInfo page = 2;
 }
 
 // PublicRoomFilter supports the stable discovery facets currently backed by authoritative room state.

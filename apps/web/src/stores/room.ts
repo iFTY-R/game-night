@@ -1,6 +1,15 @@
 import { defineStore } from "pinia";
 
-import { ApiError, identityClient, isDevelopmentFallbackAllowed, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../api/client";
+import {
+  ApiError,
+  identityClient,
+  isDevelopmentFallbackAllowed,
+  roomClient,
+  type GameEnvelopeInput,
+  type MyRoomCardWire,
+  type PublicRoomCardWire,
+  type RoomSnapshot,
+} from "../api/client";
 
 const STORAGE_KEY = "game-night.room-context.v1";
 const STORAGE_SCHEMA_VERSION = 1;
@@ -35,6 +44,12 @@ export const useRoomStore = defineStore("room", {
     busy: false,
     error: "",
     notice: "",
+    myRooms: [] as MyRoomCardWire[],
+    publicRooms: [] as PublicRoomCardWire[],
+    myRoomsNextPageToken: "",
+    publicRoomsNextPageToken: "",
+    myRoomsLoading: false,
+    publicRoomsLoading: false,
   }),
   getters: {
     hasIdentity: (state) => state.displayName.length > 0 && state.userId.length > 0 && state.identityState !== "anonymous",
@@ -209,9 +224,9 @@ export const useRoomStore = defineStore("room", {
     },
 
     /** Creates a room through the host command and stores its server-issued code. */
-    async createRemoteRoom(): Promise<RoomSnapshot | null> {
+    async createRemoteRoom(visibility: "ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC" = "ROOM_VISIBILITY_PRIVATE"): Promise<RoomSnapshot | null> {
       try {
-        const response = await roomClient.createRoom();
+        const response = await roomClient.createRoom(visibility);
         if (response.room) {
           this.setRemoteRoom(response.room);
         }
@@ -222,6 +237,53 @@ export const useRoomStore = defineStore("room", {
         }
         throw error;
       }
+    },
+
+    /** Loads the actor's authoritative active rooms; reset is used after create, close, or identity recovery. */
+    async loadMyRooms(reset = true): Promise<void> {
+      if (this.myRoomsLoading) return;
+      this.myRoomsLoading = true;
+      try {
+        const pageToken = reset ? "" : this.myRoomsNextPageToken;
+        if (!reset && pageToken === "") return;
+        const response = await roomClient.listMyRooms(pageToken);
+        const rooms = response.rooms ?? [];
+        this.myRooms = reset ? [...rooms] : [...this.myRooms, ...rooms];
+        this.myRoomsNextPageToken = response.page?.nextPageToken ?? "";
+      } catch (error) {
+        if (!(isDevelopmentFallbackAllowed() && error instanceof ApiError && [401, 403, 404].includes(error.status))) throw error;
+        if (reset) this.myRooms = [];
+        this.myRoomsNextPageToken = "";
+      } finally {
+        this.myRoomsLoading = false;
+      }
+    },
+
+    /** Loads discoverable public rooms independently so one failed list never hides the actor's own rooms. */
+    async loadPublicRooms(reset = true): Promise<void> {
+      if (this.publicRoomsLoading) return;
+      this.publicRoomsLoading = true;
+      try {
+        const pageToken = reset ? "" : this.publicRoomsNextPageToken;
+        if (!reset && pageToken === "") return;
+        const response = await roomClient.listPublicRooms(pageToken);
+        const rooms = response.rooms ?? [];
+        this.publicRooms = reset ? [...rooms] : [...this.publicRooms, ...rooms];
+        this.publicRoomsNextPageToken = response.page?.nextPageToken ?? "";
+      } catch (error) {
+        if (!(isDevelopmentFallbackAllowed() && error instanceof ApiError && [401, 403, 404].includes(error.status))) throw error;
+        if (reset) this.publicRooms = [];
+        this.publicRoomsNextPageToken = "";
+      } finally {
+        this.publicRoomsLoading = false;
+      }
+    },
+
+    /** Joins a discoverable room by public ID; private invites continue to use room codes. */
+    async joinPublicRemote(roomId: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR"): Promise<RoomSnapshot | null> {
+      const response = await roomClient.joinPublicRoom(roomId, intent);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
     },
 
     /** Applies host admission policy with the snapshot version as a CAS token. */

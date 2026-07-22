@@ -225,6 +225,8 @@ type memoryRoomRepository struct {
 	byCode      map[string]uuid.UUID
 	publicRooms []PublicRoomCard
 	lastList    PublicRoomListRequest
+	myRooms     []MyRoomCard
+	lastMyList  MyRoomListRequest
 	removals    []outbox.Event
 }
 
@@ -296,6 +298,14 @@ func (repository *memoryRoomRepository) ListPublicRooms(_ context.Context, reque
 	repository.lastList = request
 	limit := min(len(repository.publicRooms), int(request.Limit))
 	return append([]PublicRoomCard(nil), repository.publicRooms[:limit]...), nil
+}
+
+func (repository *memoryRoomRepository) ListMyRooms(_ context.Context, request MyRoomListRequest) ([]MyRoomCard, error) {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	repository.lastMyList = request
+	limit := min(len(repository.myRooms), int(request.Limit))
+	return append([]MyRoomCard(nil), repository.myRooms[:limit]...), nil
 }
 
 var _ Repository = (*memoryRoomRepository)(nil)

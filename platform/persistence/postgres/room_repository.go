@@ -131,6 +131,42 @@ func (repository *RoomRepository) ListPublicRooms(
 	return cards, nil
 }
 
+// ListMyRooms reads active public and private room cards only through the actor's membership row.
+func (repository *RoomRepository) ListMyRooms(
+	ctx context.Context,
+	request roomDomain.MyRoomListRequest,
+) ([]roomDomain.MyRoomCard, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !request.Valid() {
+		return nil, roomDomain.ErrInvalidRoomInput
+	}
+	afterUpdatedAt, afterRoomID := timeToPG(roomLobbyCursorFloor()), uuidToPG(uuid.Nil)
+	if !request.After.UpdatedAt.IsZero() {
+		afterUpdatedAt, afterRoomID = timeToPG(request.After.UpdatedAt), uuidToPG(request.After.RoomID)
+	}
+	var rows []sqlcgen.ListMyRoomCardsRow
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		var err error
+		rows, err = queries.ListMyRoomCards(ctx, sqlcgen.ListMyRoomCardsParams{
+			ActorUserID: uuidToPG(request.ActorUserID), HasAfter: !request.After.UpdatedAt.IsZero(),
+			AfterIsHost: request.After.IsHost, AfterUpdatedAt: afterUpdatedAt, AfterRoomID: afterRoomID,
+			PageLimit: int32(request.Limit),
+		})
+		return err
+	})
+	if err != nil {
+		return nil, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomRepositoryUnavailable)
+	}
+	cards := make([]roomDomain.MyRoomCard, 0, len(rows))
+	for _, row := range rows {
+		card, mapErr := myRoomCardFromRow(row)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
+}
+
 // UpdateCAS commits a domain-produced snapshot only when both room and membership versions still match.
 func (repository *RoomRepository) UpdateCAS(ctx context.Context, current, next roomDomain.Room) (roomDomain.Room, error) {
 	if repository == nil || repository.runner == nil || ctx == nil {
@@ -342,6 +378,25 @@ func publicRoomCardFromRow(row sqlcgen.ListPublicRoomCardsRow) (roomDomain.Publi
 		SpectatorAdmission: roomDomain.AdmissionMode(row.SpectatorAdmission), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
 		ViewerRole: optionalMemberRoleFromPG(row.ViewerRole), ViewerRequestedRole: optionalMemberRoleFromPG(row.ViewerRequestedRole),
 		UpdatedAt: row.UpdatedAt.Time,
+	})
+}
+
+func myRoomCardFromRow(row sqlcgen.ListMyRoomCardsRow) (roomDomain.MyRoomCard, error) {
+	if !row.RoomID.Valid || !row.HostUsername.Valid || row.ParticipantCapacity <= 0 ||
+		row.ParticipantCount < 0 || row.ParticipantCount > math.MaxUint32 ||
+		row.SpectatorCount < 0 || row.SpectatorCount > math.MaxUint32 ||
+		row.WaitingCount < 0 || row.WaitingCount > math.MaxUint32 || !row.UpdatedAt.Valid {
+		return roomDomain.MyRoomCard{}, roomDomain.ErrRoomIntegrity
+	}
+	return roomDomain.RestoreMyRoomCard(roomDomain.MyRoomCardSnapshot{
+		RoomID: uuid.UUID(row.RoomID.Bytes), RoomCode: row.RoomCode, Visibility: roomDomain.Visibility(row.Visibility),
+		HostUsername: row.HostUsername.String, Status: roomDomain.RoomStatus(row.Status), IsHost: row.IsHost,
+		ParticipantCapacity: uint32(row.ParticipantCapacity), ParticipantCount: uint32(row.ParticipantCount),
+		SpectatorCount: uint32(row.SpectatorCount), WaitingCount: uint32(row.WaitingCount),
+		ParticipantAdmission: roomDomain.AdmissionMode(row.ParticipantAdmission),
+		SpectatorAdmission:   roomDomain.AdmissionMode(row.SpectatorAdmission), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
+		LastFinishedGameID: optionalTextFromPG(row.LastFinishedGameID), ViewerRole: roomDomain.MemberRole(row.ViewerRole),
+		ViewerRequestedRole: optionalMemberRoleFromPG(row.ViewerRequestedRole), UpdatedAt: row.UpdatedAt.Time,
 	})
 }
 

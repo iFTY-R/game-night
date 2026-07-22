@@ -196,3 +196,50 @@ WHERE room.visibility = 'public'
   )
 ORDER BY room.updated_at DESC, room.room_id DESC
 LIMIT sqlc.arg(page_limit);
+
+-- name: ListMyRoomCards :many
+SELECT room.room_id,
+    room.room_code,
+    room.visibility,
+    host.username AS host_username,
+    room.status,
+    room.host_user_id = sqlc.arg(actor_user_id) AS is_host,
+    room.participant_capacity,
+    counts.participant_count,
+    counts.spectator_count,
+    counts.waiting_count,
+    room.participant_admission,
+    room.spectator_admission,
+    room.active_game_id,
+    room.last_finished_game_id,
+    viewer.role AS viewer_role,
+    viewer.requested_role AS viewer_requested_role,
+    room.updated_at
+FROM room_members AS viewer
+JOIN party_rooms AS room
+  ON room.room_id = viewer.room_id
+JOIN users AS host
+  ON host.user_id = room.host_user_id
+JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
+        count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
+        count(*) FILTER (WHERE member.role = 'waiting') AS waiting_count
+    FROM room_members AS member
+    WHERE member.room_id = room.room_id
+) AS counts ON true
+WHERE viewer.user_id = sqlc.arg(actor_user_id)
+  AND room.status <> 'closed'
+  AND (
+      NOT sqlc.arg(has_after)::boolean
+      OR (
+          room.host_user_id = sqlc.arg(actor_user_id),
+          room.updated_at,
+          room.room_id
+      ) < (
+          sqlc.arg(after_is_host)::boolean,
+          sqlc.arg(after_updated_at)::timestamptz,
+          sqlc.arg(after_room_id)::uuid
+      )
+  )
+ORDER BY (room.host_user_id = sqlc.arg(actor_user_id)) DESC, room.updated_at DESC, room.room_id DESC
+LIMIT sqlc.arg(page_limit);

@@ -283,6 +283,84 @@ func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 	}
 }
 
+func TestRoomRepositoryListsHostRoomsBeforeJoinedRoomsAndHidesClosedRooms(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
+	defer cancel()
+	applyTransactionTestMigrations(t, ctx, fixture)
+
+	now := databaseIntegrationTime(t, ctx, fixture).Truncate(time.Second)
+	actorID, otherHostID := uuid.New(), uuid.New()
+	createRoomTestUser(t, ctx, fixture, actorID, "MyRoomOwner", now)
+	createRoomTestUser(t, ctx, fixture, otherHostID, "OtherRoomOwner", now)
+	repository := NewRoomRepository(fixture.Pool)
+
+	hosted, err := roomDomain.New(uuid.New(), actorID, "MINE01", roomDomain.VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hosted, err = repository.Create(ctx, hosted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined, err := roomDomain.New(uuid.New(), otherHostID, "JOIN01", roomDomain.VisibilityPublic, 4, now.Add(2*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined, err = repository.Create(ctx, joined)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withActor, _, err := joined.Join(actorID, roomDomain.JoinIntentSpectator, joined.Version(), now.Add(3*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined, err = repository.UpdateCAS(ctx, joined, withActor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed, err := roomDomain.New(uuid.New(), actorID, "CLOSE1", roomDomain.VisibilityPrivate, 4, now.Add(4*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed, err = repository.Create(ctx, closed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedNext, err := closed.Close(actorID, closed.Version(), now.Add(5*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.UpdateCAS(ctx, closed, closedNext); err != nil {
+		t.Fatal(err)
+	}
+
+	request, err := roomDomain.NewMyRoomListRequest(actorID, roomDomain.MyRoomPageCursor{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards, err := repository.ListMyRooms(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 2 || cards[0].Snapshot().RoomID != hosted.Snapshot().ID || !cards[0].Snapshot().IsHost ||
+		cards[0].Snapshot().RoomCode != "MINE01" {
+		t.Fatalf("my room cards = %+v", myRoomSnapshots(cards))
+	}
+	first := cards[0].Snapshot()
+	nextRequest, err := roomDomain.NewMyRoomListRequest(actorID, roomDomain.MyRoomPageCursor{
+		IsHost: first.IsHost, UpdatedAt: first.UpdatedAt, RoomID: first.RoomID,
+	}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextCards, err := repository.ListMyRooms(ctx, nextRequest)
+	if err != nil || len(nextCards) != 1 || nextCards[0].Snapshot().RoomID != joined.Snapshot().ID ||
+		nextCards[0].Snapshot().IsHost || nextCards[0].Snapshot().ViewerRole != roomDomain.MemberRoleSpectator {
+		t.Fatalf("next my room cards = %+v, err = %v", myRoomSnapshots(nextCards), err)
+	}
+}
+
 func TestRoomRepositoryEnforcesCodeAndHostMembershipIntegrity(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
@@ -362,6 +440,14 @@ func createRoomTestUser(
 
 func publicRoomSnapshots(cards []roomDomain.PublicRoomCard) []roomDomain.PublicRoomCardSnapshot {
 	snapshots := make([]roomDomain.PublicRoomCardSnapshot, 0, len(cards))
+	for _, card := range cards {
+		snapshots = append(snapshots, card.Snapshot())
+	}
+	return snapshots
+}
+
+func myRoomSnapshots(cards []roomDomain.MyRoomCard) []roomDomain.MyRoomCardSnapshot {
+	snapshots := make([]roomDomain.MyRoomCardSnapshot, 0, len(cards))
 	for _, card := range cards {
 		snapshots = append(snapshots, card.Snapshot())
 	}

@@ -70,6 +70,57 @@ export interface RoomResponse {
   gameId?: string;
 }
 
+export interface PageInfoWire {
+  nextPageToken?: string;
+}
+
+export interface MyRoomCardWire {
+  roomId: string;
+  roomCode: string;
+  visibility: string;
+  hostUsername: string;
+  status: string;
+  isHost: boolean;
+  participantCapacity: number;
+  participantCount: number;
+  spectatorCount: number;
+  waitingCount: number;
+  participantAdmission: string;
+  spectatorAdmission: string;
+  activeGameId: string;
+  lastFinishedGameId: string;
+  viewerRole: string;
+  viewerRequestedRole: string;
+  updatedAt?: string;
+}
+
+export interface PublicRoomCardWire {
+  roomId: string;
+  hostUsername: string;
+  status: string;
+  participantCapacity: number;
+  participantCount: number;
+  spectatorCount: number;
+  waitingCount: number;
+  participantAdmission: string;
+  spectatorAdmission: string;
+  activeGameId: string;
+  viewerRole: string;
+  viewerRequestedRole: string;
+  primaryAction: string;
+  updatedAt?: string;
+}
+
+export interface MyRoomListResponse {
+  rooms: MyRoomCardWire[];
+  page?: PageInfoWire;
+}
+
+export interface PublicRoomListResponse {
+  rooms: PublicRoomCardWire[];
+  page?: PageInfoWire;
+}
+
 export interface GameEnvelopeInput {
   gameId: string;
   version: { engine: string; protocol: string; client: string };
@@ -263,9 +314,15 @@ export const roomClient = {
   getRoom(roomId?: string, roomCode?: string): Promise<RoomResponse> {
     return call("platform.room.v1.RoomService", "GetRoom", { roomId: roomId ?? "", roomCode: roomCode ?? "" });
   },
-  createRoom(): Promise<RoomResponse> {
+  listMyRooms(pageToken = "", pageSize = 20): Promise<MyRoomListResponse> {
+    return call("platform.room.v1.RoomService", "ListMyRooms", { page: { pageToken, pageSize } });
+  },
+  listPublicRooms(pageToken = "", pageSize = 20): Promise<PublicRoomListResponse> {
+    return call("platform.room.v1.RoomService", "ListPublicRooms", { filter: {}, page: { pageToken, pageSize } });
+  },
+  createRoom(visibility: "ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC" = "ROOM_VISIBILITY_PRIVATE"): Promise<RoomResponse> {
     return call("platform.room.v1.RoomService", "CreateRoom", {
-      visibility: "ROOM_VISIBILITY_PRIVATE",
+      visibility,
       participantCapacity: 8,
       participantAdmission: "ADMISSION_MODE_OPEN",
       spectatorAdmission: "ADMISSION_MODE_OPEN",
@@ -277,6 +334,9 @@ export const roomClient = {
       intent,
       expectedVersion: version ?? undefined,
     }, true);
+  },
+  joinPublicRoom(roomId: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR"): Promise<RoomResponse> {
+    return call("platform.room.v1.RoomService", "JoinRoom", { roomId, intent }, true);
   },
   setAdmission(room: RoomSnapshot, participantAdmission: string, spectatorAdmission: string): Promise<RoomResponse> {
     return call("platform.room.v1.RoomService", "SetAdmission", {

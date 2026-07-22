@@ -242,6 +242,6 @@ test("active table returns a member home when the host closes the room", async (
 
   await expect(page.getByTestId("liars-dice-screen")).toBeVisible();
   await expect(page).toHaveURL(/\/$/, { timeout: 7_000 });
-  await expect(page.getByRole("status")).toContainText("房主已解散房间，当前游戏已结束");
+  await expect(page.getByRole("status").filter({ hasText: "房主已解散房间，当前游戏已结束" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { sessionId?: unknown })).toMatchObject({ sessionId: null });
 });

@@ -30,6 +30,10 @@ const (
 	publicRoomCursorVersion byte = 1
 	// publicRoomCursorBytes stores one version byte, Unix nanoseconds, and a UUID.
 	publicRoomCursorBytes = 1 + 8 + 16
+	// myRoomCursorVersion separates host-first member cursors from public-lobby cursors.
+	myRoomCursorVersion byte = 1
+	// myRoomCursorBytes adds one host-priority byte to the stable timestamp and UUID position.
+	myRoomCursorBytes = 1 + 1 + 8 + 16
 	// finishAction is the platform-owned system command that every registered module must implement.
 	finishAction gameSDK.Identifier = "session.finish"
 )
@@ -124,6 +128,33 @@ func (service *Service) GetRoom(ctx context.Context, request *connect.Request[ro
 		return nil, err
 	}
 	return connect.NewResponse(&roomv1.GetRoomResponse{Room: roomWire(loaded)}), nil
+}
+
+// ListMyRooms authenticates a private member read and returns host-owned rooms before joined rooms.
+func (service *Service) ListMyRooms(ctx context.Context, request *connect.Request[roomv1.ListMyRoomsRequest]) (*connect.Response[roomv1.ListMyRoomsResponse], error) {
+	actor, err := service.authenticate(ctx, requestHTTP(request))
+	if err != nil {
+		return nil, err
+	}
+	after, pageSize, err := myRoomPageRequest(request.Msg.GetPage())
+	if err != nil {
+		return nil, err
+	}
+	page, err := service.domain.ListMyRooms(ctx, roomDomain.ListMyRoomsCommand{ActorUserID: actor, After: after, PageSize: pageSize})
+	if err != nil {
+		return nil, err
+	}
+	rooms := make([]*roomv1.MyRoomCard, 0, len(page.Rooms))
+	for _, card := range page.Rooms {
+		rooms = append(rooms, myRoomCardWire(card))
+	}
+	nextToken, err := encodeMyRoomCursor(page.NextCursor)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&roomv1.ListMyRoomsResponse{
+		Rooms: rooms, Page: &commonv1.PageInfo{NextPageToken: nextToken},
+	}), nil
 }
 
 // ListPublicRooms authenticates a safe lobby read and returns only redacted actor-aware cards.
@@ -495,6 +526,54 @@ func decodePublicRoomCursor(value string) (roomDomain.PublicRoomPageCursor, erro
 	return roomDomain.PublicRoomPageCursor{UpdatedAt: updatedAt, RoomID: roomID}, nil
 }
 
+func myRoomPageRequest(page *commonv1.PageRequest) (roomDomain.MyRoomPageCursor, uint32, error) {
+	if page == nil {
+		return roomDomain.MyRoomPageCursor{}, 0, nil
+	}
+	if page.GetPageSize() < 0 || page.GetPageSize() > int32(roomDomain.MaximumPublicRoomPageSize) {
+		return roomDomain.MyRoomPageCursor{}, 0, roomDomain.ErrInvalidRoomInput
+	}
+	cursor, err := decodeMyRoomCursor(page.GetPageToken())
+	return cursor, uint32(page.GetPageSize()), err
+}
+
+func encodeMyRoomCursor(cursor roomDomain.MyRoomPageCursor) (string, error) {
+	if cursor.UpdatedAt.IsZero() && cursor.RoomID == uuid.Nil {
+		return "", nil
+	}
+	if cursor.UpdatedAt.IsZero() || cursor.RoomID == uuid.Nil || cursor.UpdatedAt.UnixNano() <= 0 {
+		return "", roomDomain.ErrInvalidRoomInput
+	}
+	raw := make([]byte, myRoomCursorBytes)
+	raw[0] = myRoomCursorVersion
+	if cursor.IsHost {
+		raw[1] = 1
+	}
+	binary.BigEndian.PutUint64(raw[2:10], uint64(cursor.UpdatedAt.UnixNano()))
+	copy(raw[10:], cursor.RoomID[:])
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func decodeMyRoomCursor(value string) (roomDomain.MyRoomPageCursor, error) {
+	if value == "" {
+		return roomDomain.MyRoomPageCursor{}, nil
+	}
+	raw, err := base64.RawURLEncoding.Strict().DecodeString(value)
+	if err != nil || len(raw) != myRoomCursorBytes || raw[0] != myRoomCursorVersion || raw[1] > 1 ||
+		base64.RawURLEncoding.EncodeToString(raw) != value {
+		return roomDomain.MyRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	roomID, err := uuid.FromBytes(raw[10:])
+	if err != nil || roomID == uuid.Nil {
+		return roomDomain.MyRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	updatedAt := time.Unix(0, int64(binary.BigEndian.Uint64(raw[2:10]))).UTC()
+	if updatedAt.UnixNano() <= 0 {
+		return roomDomain.MyRoomPageCursor{}, roomDomain.ErrInvalidRoomInput
+	}
+	return roomDomain.MyRoomPageCursor{IsHost: raw[1] == 1, UpdatedAt: updatedAt, RoomID: roomID}, nil
+}
+
 func parseUUID(value string) (uuid.UUID, error) {
 	parsed, err := uuid.Parse(strings.TrimSpace(value))
 	if err != nil || parsed == uuid.Nil {
@@ -550,6 +629,20 @@ func publicRoomCardWire(card roomDomain.PublicRoomCard) *roomv1.PublicRoomCard {
 		ParticipantAdmission: admissionWire(snapshot.ParticipantAdmission), SpectatorAdmission: admissionWire(snapshot.SpectatorAdmission),
 		ActiveGameId: snapshot.ActiveGameID, ViewerRole: memberRoleWire(snapshot.ViewerRole),
 		ViewerRequestedRole: memberRoleWire(snapshot.ViewerRequestedRole), PrimaryAction: publicRoomPrimaryActionWire(card.PrimaryAction()),
+		UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
+	}
+}
+
+func myRoomCardWire(card roomDomain.MyRoomCard) *roomv1.MyRoomCard {
+	snapshot := card.Snapshot()
+	return &roomv1.MyRoomCard{
+		RoomId: snapshot.RoomID.String(), RoomCode: snapshot.RoomCode, Visibility: visibilityWire(snapshot.Visibility),
+		HostUsername: snapshot.HostUsername, Status: statusWire(snapshot.Status), IsHost: snapshot.IsHost,
+		ParticipantCapacity: snapshot.ParticipantCapacity, ParticipantCount: snapshot.ParticipantCount,
+		SpectatorCount: snapshot.SpectatorCount, WaitingCount: snapshot.WaitingCount,
+		ParticipantAdmission: admissionWire(snapshot.ParticipantAdmission), SpectatorAdmission: admissionWire(snapshot.SpectatorAdmission),
+		ActiveGameId: snapshot.ActiveGameID, LastFinishedGameId: snapshot.LastFinishedGameID,
+		ViewerRole: memberRoleWire(snapshot.ViewerRole), ViewerRequestedRole: memberRoleWire(snapshot.ViewerRequestedRole),
 		UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
 	}
 }

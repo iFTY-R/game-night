@@ -483,6 +483,175 @@ func (q *Queries) GetRoomMemberRole(ctx context.Context, arg GetRoomMemberRolePa
 	return role, err
 }
 
+const listMyRoomCards = `-- name: ListMyRoomCards :many
+SELECT room.room_id,
+    room.room_code,
+    room.visibility,
+    host.username AS host_username,
+    room.status,
+    room.host_user_id = $1 AS is_host,
+    room.participant_capacity,
+    counts.participant_count,
+    counts.spectator_count,
+    counts.waiting_count,
+    room.participant_admission,
+    room.spectator_admission,
+    room.active_game_id,
+    room.last_finished_game_id,
+    viewer.role AS viewer_role,
+    viewer.requested_role AS viewer_requested_role,
+    room.updated_at
+FROM room_members AS viewer
+JOIN party_rooms AS room
+  ON room.room_id = viewer.room_id
+JOIN users AS host
+  ON host.user_id = room.host_user_id
+JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
+        count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
+        count(*) FILTER (WHERE member.role = 'waiting') AS waiting_count
+    FROM room_members AS member
+    WHERE member.room_id = room.room_id
+) AS counts ON true
+WHERE viewer.user_id = $1
+  AND room.status <> 'closed'
+  AND (
+      NOT $2::boolean
+      OR (
+          room.host_user_id = $1,
+          room.updated_at,
+          room.room_id
+      ) < (
+          $3::boolean,
+          $4::timestamptz,
+          $5::uuid
+      )
+  )
+ORDER BY (room.host_user_id = $1) DESC, room.updated_at DESC, room.room_id DESC
+LIMIT $6
+`
+
+type ListMyRoomCardsParams struct {
+	ActorUserID    pgtype.UUID        `json:"actor_user_id"`
+	HasAfter       bool               `json:"has_after"`
+	AfterIsHost    bool               `json:"after_is_host"`
+	AfterUpdatedAt pgtype.Timestamptz `json:"after_updated_at"`
+	AfterRoomID    pgtype.UUID        `json:"after_room_id"`
+	PageLimit      int32              `json:"page_limit"`
+}
+
+type ListMyRoomCardsRow struct {
+	RoomID               pgtype.UUID        `json:"room_id"`
+	RoomCode             string             `json:"room_code"`
+	Visibility           string             `json:"visibility"`
+	HostUsername         pgtype.Text        `json:"host_username"`
+	Status               string             `json:"status"`
+	IsHost               bool               `json:"is_host"`
+	ParticipantCapacity  int32              `json:"participant_capacity"`
+	ParticipantCount     int64              `json:"participant_count"`
+	SpectatorCount       int64              `json:"spectator_count"`
+	WaitingCount         int64              `json:"waiting_count"`
+	ParticipantAdmission string             `json:"participant_admission"`
+	SpectatorAdmission   string             `json:"spectator_admission"`
+	ActiveGameID         pgtype.Text        `json:"active_game_id"`
+	LastFinishedGameID   pgtype.Text        `json:"last_finished_game_id"`
+	ViewerRole           string             `json:"viewer_role"`
+	ViewerRequestedRole  pgtype.Text        `json:"viewer_requested_role"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
+// ListMyRoomCards
+//
+//	SELECT room.room_id,
+//	    room.room_code,
+//	    room.visibility,
+//	    host.username AS host_username,
+//	    room.status,
+//	    room.host_user_id = $1 AS is_host,
+//	    room.participant_capacity,
+//	    counts.participant_count,
+//	    counts.spectator_count,
+//	    counts.waiting_count,
+//	    room.participant_admission,
+//	    room.spectator_admission,
+//	    room.active_game_id,
+//	    room.last_finished_game_id,
+//	    viewer.role AS viewer_role,
+//	    viewer.requested_role AS viewer_requested_role,
+//	    room.updated_at
+//	FROM room_members AS viewer
+//	JOIN party_rooms AS room
+//	  ON room.room_id = viewer.room_id
+//	JOIN users AS host
+//	  ON host.user_id = room.host_user_id
+//	JOIN LATERAL (
+//	    SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
+//	        count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
+//	        count(*) FILTER (WHERE member.role = 'waiting') AS waiting_count
+//	    FROM room_members AS member
+//	    WHERE member.room_id = room.room_id
+//	) AS counts ON true
+//	WHERE viewer.user_id = $1
+//	  AND room.status <> 'closed'
+//	  AND (
+//	      NOT $2::boolean
+//	      OR (
+//	          room.host_user_id = $1,
+//	          room.updated_at,
+//	          room.room_id
+//	      ) < (
+//	          $3::boolean,
+//	          $4::timestamptz,
+//	          $5::uuid
+//	      )
+//	  )
+//	ORDER BY (room.host_user_id = $1) DESC, room.updated_at DESC, room.room_id DESC
+//	LIMIT $6
+func (q *Queries) ListMyRoomCards(ctx context.Context, arg ListMyRoomCardsParams) ([]ListMyRoomCardsRow, error) {
+	rows, err := q.db.Query(ctx, listMyRoomCards,
+		arg.ActorUserID,
+		arg.HasAfter,
+		arg.AfterIsHost,
+		arg.AfterUpdatedAt,
+		arg.AfterRoomID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyRoomCardsRow{}
+	for rows.Next() {
+		var i ListMyRoomCardsRow
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.RoomCode,
+			&i.Visibility,
+			&i.HostUsername,
+			&i.Status,
+			&i.IsHost,
+			&i.ParticipantCapacity,
+			&i.ParticipantCount,
+			&i.SpectatorCount,
+			&i.WaitingCount,
+			&i.ParticipantAdmission,
+			&i.SpectatorAdmission,
+			&i.ActiveGameID,
+			&i.LastFinishedGameID,
+			&i.ViewerRole,
+			&i.ViewerRequestedRole,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicRoomCards = `-- name: ListPublicRoomCards :many
 SELECT room.room_id,
     host.username AS host_username,

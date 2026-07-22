@@ -20,6 +20,7 @@ type Repository interface {
 type Store interface {
 	Repository
 	PublicRoomRepository
+	MyRoomRepository
 }
 
 // ValidateRoomCode exposes the canonical code grammar to transport and persistence adapters.

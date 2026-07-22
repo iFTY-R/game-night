@@ -43,6 +43,13 @@ type ListPublicRoomsCommand struct {
 	PageSize    uint32
 }
 
+// ListMyRoomsCommand restores all active rooms containing the authenticated actor.
+type ListMyRoomsCommand struct {
+	ActorUserID uuid.UUID
+	After       MyRoomPageCursor
+	PageSize    uint32
+}
+
 // JoinRoomCommand admits or queues an authenticated actor under one current aggregate version.
 type JoinRoomCommand struct {
 	ActorUserID uuid.UUID
@@ -88,6 +95,7 @@ type CloseRoomCommand struct {
 type Service struct {
 	repository Repository
 	lobby      PublicRoomRepository
+	myRooms    MyRoomRepository
 	codes      CodeGenerator
 	clock      clock.Clock
 }
@@ -97,7 +105,7 @@ func NewService(store Store, codes CodeGenerator, source clock.Clock) (*Service,
 	if store == nil || codes == nil || source == nil {
 		return nil, ErrInvalidRoomInput
 	}
-	return &Service{repository: store, lobby: store, codes: codes, clock: source}, nil
+	return &Service{repository: store, lobby: store, myRooms: store, codes: codes, clock: source}, nil
 }
 
 // CreateRoom generates server-owned identifiers and retries only invitation-code uniqueness races.
@@ -168,6 +176,31 @@ func (service *Service) ListPublicRooms(ctx context.Context, command ListPublicR
 		page.Rooms = append([]PublicRoomCard(nil), rooms[:request.PageSize]...)
 		last := page.Rooms[len(page.Rooms)-1].Snapshot()
 		page.NextCursor = PublicRoomPageCursor{UpdatedAt: last.UpdatedAt, RoomID: last.RoomID}
+	}
+	return page, nil
+}
+
+// ListMyRooms returns only active member projections and emits a host-aware cursor for the next page.
+func (service *Service) ListMyRooms(ctx context.Context, command ListMyRoomsCommand) (MyRoomPage, error) {
+	if service == nil || service.myRooms == nil || ctx == nil {
+		return MyRoomPage{}, ErrInvalidRoomInput
+	}
+	request, err := NewMyRoomListRequest(command.ActorUserID, command.After, command.PageSize)
+	if err != nil {
+		return MyRoomPage{}, err
+	}
+	rooms, err := service.myRooms.ListMyRooms(ctx, request)
+	if err != nil {
+		return MyRoomPage{}, err
+	}
+	if len(rooms) > int(request.Limit) {
+		return MyRoomPage{}, ErrRoomIntegrity
+	}
+	page := MyRoomPage{Rooms: rooms}
+	if len(rooms) > int(request.PageSize) {
+		page.Rooms = append([]MyRoomCard(nil), rooms[:request.PageSize]...)
+		last := page.Rooms[len(page.Rooms)-1].Snapshot()
+		page.NextCursor = MyRoomPageCursor{IsHost: last.IsHost, UpdatedAt: last.UpdatedAt, RoomID: last.RoomID}
 	}
 	return page, nil
 }

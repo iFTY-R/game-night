@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, ChevronDown, Copy, DoorClosed, History, LockKeyhole, Play, TriangleAlert, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
+import { ArrowLeft, Check, ChevronDown, DoorClosed, History, LockKeyhole, Play, Share2, TriangleAlert, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -11,7 +11,7 @@ const props = defineProps<{ roomId: string }>();
 const route = useRoute();
 const router = useRouter();
 const room = useRoomStore();
-const copied = ref(false);
+const shared = ref(false);
 const entryOpen = ref(true);
 const loading = ref(true);
 const actionError = ref("");
@@ -27,6 +27,7 @@ let governanceTrigger: HTMLElement | null = null;
 let refreshTimer: number | undefined;
 let refreshPending = false;
 let gameSelectionInitialized = false;
+let roomTerminated = false;
 const roomCode = computed(() => room.roomCode ?? props.roomId.toUpperCase().slice(0, 6));
 const remoteRoom = computed(() => room.remoteRoom);
 const isRemote = computed(() => remoteRoom.value !== null);
@@ -102,13 +103,31 @@ const loadReplayAccess = async (snapshot: RoomSnapshot): Promise<void> => {
   }
 };
 
+/** Stops the fallback poll before terminal navigation or component teardown. */
+const stopRefreshPolling = (): void => {
+  if (refreshTimer !== undefined) window.clearInterval(refreshTimer);
+  refreshTimer = undefined;
+};
+
+/** Treats CLOSED as a terminal state so members never remain inside an invalid room shell. */
+const exitClosedRoom = async (snapshot: RoomSnapshot): Promise<boolean> => {
+  if (!snapshot.status.includes("CLOSED")) return false;
+  roomTerminated = true;
+  stopRefreshPolling();
+  const message = snapshot.hostUserId === room.userId ? "房间已解散" : "房主已解散房间";
+  room.exitRoom(message);
+  await router.replace({ name: "home" });
+  return true;
+};
+
 /** Refreshes lobby state so remote starts and admission changes appear without reloading. */
 const refreshRoom = async (): Promise<void> => {
-  if (refreshPending || document.visibilityState === "hidden") return;
+  if (roomTerminated || refreshPending || document.visibilityState === "hidden") return;
   refreshPending = true;
   try {
     const loaded = await room.loadRoom(props.roomId);
     if (loaded) {
+      if (await exitClosedRoom(loaded)) return;
       entryOpen.value = !loaded.participantAdmission.includes("CLOSED");
       initializeGameSelection(loaded);
       void loadReplayAccess(loaded);
@@ -123,6 +142,10 @@ const refreshRoom = async (): Promise<void> => {
 
 onMounted(async () => {
   if (room.remoteRoom?.roomId === props.roomId) {
+    if (await exitClosedRoom(room.remoteRoom)) {
+      loading.value = false;
+      return;
+    }
     entryOpen.value = !room.remoteRoom.participantAdmission.includes("CLOSED");
     initializeGameSelection(room.remoteRoom);
     void loadReplayAccess(room.remoteRoom);
@@ -131,17 +154,28 @@ onMounted(async () => {
     await refreshRoom();
   }
   loading.value = false;
-  refreshTimer = window.setInterval(() => { void refreshRoom(); }, 2_500);
+  if (!roomTerminated) refreshTimer = window.setInterval(() => { void refreshRoom(); }, 2_500);
 });
 
 onBeforeUnmount(() => {
-  if (refreshTimer !== undefined) window.clearInterval(refreshTimer);
+  stopRefreshPolling();
 });
 
-const copyRoomCode = async (): Promise<void> => {
-  await navigator.clipboard?.writeText(roomCode.value);
-  copied.value = true;
-  window.setTimeout(() => { copied.value = false; }, 1200);
+/** Uses the platform share sheet on mobile and copies the same deep link everywhere else. */
+const shareRoom = async (): Promise<void> => {
+  const url = new URL(`/invite/${encodeURIComponent(roomCode.value)}`, window.location.origin).toString();
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "加入 Game Night 房间", text: `房间码 ${roomCode.value}`, url });
+    } else {
+      await navigator.clipboard.writeText(url);
+    }
+    shared.value = true;
+    window.setTimeout(() => { shared.value = false; }, 1200);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return;
+    actionError.value = "分享失败，请稍后重试";
+  }
 };
 
 const startGame = async (): Promise<void> => {
@@ -288,9 +322,9 @@ const leave = async (): Promise<void> => {
       <div class="room-code">
         <span>房间码</span>
         <strong>{{ roomCode }}</strong>
-        <button type="button" :title="copied ? '已复制' : '复制房间码'" @click="copyRoomCode">
-          <Check v-if="copied" :size="17" aria-hidden="true" />
-          <Copy v-else :size="17" aria-hidden="true" />
+        <button type="button" :title="shared ? '已分享' : '分享房间链接'" @click="shareRoom">
+          <Check v-if="shared" :size="17" aria-hidden="true" />
+          <Share2 v-else :size="17" aria-hidden="true" />
         </button>
       </div>
       <span class="room-count"><Users :size="16" aria-hidden="true" /> {{ isRemote ? `${participantCount} / ${remoteRoom?.participantCapacity ?? 0}` : "4 / 8" }}</span>

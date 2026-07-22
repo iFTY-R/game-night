@@ -72,6 +72,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   let subscriptionController: AbortController | undefined;
   let actionController: AbortController | undefined;
   let stopLiveState: (() => void) | undefined;
+  let roomReconciliationTimer: number | undefined;
   let roomReconciliationPending = false;
   let returningToRoom = false;
 
@@ -88,15 +89,30 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     return "offline";
   };
 
-  /** Refreshes the room before leaving so the post-game page renders the committed admission policy. */
-  const returnToRoom = async (): Promise<void> => {
+  /** Leaves a terminal or inaccessible room instead of routing the viewer into a stale room shell. */
+  const exitUnavailableRoom = async (message: string): Promise<void> => {
+    room.exitRoom(message);
+    if (!lifecycleController.signal.aborted) await router.replace({ name: "home" });
+  };
+
+  /** Refreshes the room before leaving so the destination follows the aggregate's authoritative lifecycle. */
+  const returnToRoom = async (knownSnapshot?: RoomSnapshot | null): Promise<void> => {
     if (returningToRoom || lifecycleController.signal.aborted) return;
     returningToRoom = true;
     subscriptionController?.abort();
+    let snapshot = knownSnapshot;
     try {
-      await room.loadRoom(options.roomId);
-    } catch {
-      // The room page owns its own recovery loop when this best-effort refresh is unavailable.
+      if (snapshot === undefined) snapshot = await room.loadRoom(options.roomId);
+    } catch (error) {
+      if (error instanceof ApiError && [403, 404].includes(error.status)) {
+        await exitUnavailableRoom("你已无法继续访问这个房间");
+        return;
+      }
+      // The room page owns transient recovery when this best-effort refresh is unavailable.
+    }
+    if (snapshot?.status.includes("CLOSED")) {
+      await exitUnavailableRoom("房主已解散房间，当前游戏已结束");
+      return;
     }
     if (!lifecycleController.signal.aborted) {
       await router.replace({ name: "room", params: { roomId: options.roomId } });
@@ -109,9 +125,12 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     roomReconciliationPending = true;
     try {
       const snapshot = await room.loadRoom(options.roomId);
-      if (snapshot !== null && !isActiveRoomSession(snapshot, options.sessionId)) await returnToRoom();
-    } catch {
-      // Subscription retry remains responsible for transient room-read failures.
+      if (snapshot !== null && !isActiveRoomSession(snapshot, options.sessionId)) await returnToRoom(snapshot);
+    } catch (error) {
+      if (error instanceof ApiError && [403, 404].includes(error.status)) {
+        await exitUnavailableRoom("你已无法继续访问这个房间");
+      }
+      // Subscription retry remains responsible for other transient room-read failures.
     } finally {
       roomReconciliationPending = false;
     }
@@ -209,7 +228,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
       try {
         const snapshot = await room.loadRoom(options.roomId);
         if (snapshot !== null && !isActiveRoomSession(snapshot, options.sessionId)) {
-          void returnToRoom();
+          void returnToRoom(snapshot);
           throw new SubscriptionFailure("session_finished", "游戏会话已结束", false);
         }
       } catch (refreshError) {
@@ -325,12 +344,17 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     options.context.value = { ...options.context.value, connection: "reconnecting", selfUserId: room.userId };
     stopLiveState = liveClient.subscribe(applyLiveState);
     void initializeLiveTable();
+    // Session fanout is the fast path; polling also covers idle/cancel transitions that do not advance a game projection.
+    roomReconciliationTimer = window.setInterval(() => {
+      if (document.visibilityState !== "hidden") void reconcileRoomSession();
+    }, 2_500);
   });
 
   onBeforeUnmount(() => {
     lifecycleController.abort();
     subscriptionController?.abort();
     actionController?.abort();
+    if (roomReconciliationTimer !== undefined) window.clearInterval(roomReconciliationTimer);
     stopLiveState?.();
     liveClient.dispose();
   });

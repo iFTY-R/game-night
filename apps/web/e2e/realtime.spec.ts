@@ -207,3 +207,41 @@ test("finished liars dice session URL returns to the room without loading stale 
   await expect(page).toHaveURL(new RegExp(`/room/${roomId}$`));
   expect(gameRequests).toBe(0);
 });
+
+test("active table returns a member home when the host closes the room", async ({ page }) => {
+  await page.addInitScript(({ storedRoomId, storedSessionId }) => {
+    localStorage.setItem("game-night.room-context.v1", JSON.stringify({
+      schemaVersion: 1,
+      displayName: "阿青",
+      userId: "member-user",
+      roomId: storedRoomId,
+      roomCode: "N789",
+      sessionId: storedSessionId,
+    }));
+  }, { storedRoomId: roomId, storedSessionId: sessionId });
+
+  let roomReads = 0;
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    roomReads += 1;
+    const snapshot = roomSnapshot({ hostUserId: "host-user" });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        room: roomReads >= 3
+          ? { ...snapshot, status: "ROOM_STATUS_CLOSED", activeSessionId: "", activeGameId: "" }
+          : snapshot,
+      }),
+    });
+  });
+  await page.route("**/platform.game.v1.GameService/*", async (route) => {
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ code: "not_found", message: "fixture fallback" }) });
+  });
+
+  await page.goto(`/room/${roomId}/game/${sessionId}`);
+
+  await expect(page.getByTestId("liars-dice-screen")).toBeVisible();
+  await expect(page).toHaveURL(/\/$/, { timeout: 7_000 });
+  await expect(page.getByRole("status")).toContainText("房主已解散房间，当前游戏已结束");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { sessionId?: unknown })).toMatchObject({ sessionId: null });
+});

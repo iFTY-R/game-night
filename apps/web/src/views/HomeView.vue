@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, Dices, DoorOpen, ShieldCheck, Spade } from "lucide-vue-next";
+import { ArrowRight, Dices, DoorOpen, ShieldCheck, Spade, X } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -106,6 +106,11 @@ onMounted(async () => {
       <span class="device-badge"><ShieldCheck :size="15" aria-hidden="true" /> 设备已识别</span>
     </header>
 
+    <div v-if="room.notice" class="home-notice" role="status">
+      <span>{{ room.notice }}</span>
+      <button class="icon-button" type="button" title="关闭提示" @click="room.clearNotice"><X :size="18" aria-hidden="true" /></button>
+    </div>
+
     <section class="home-intro" aria-labelledby="home-title">
       <p class="eyebrow">朋友在线，今晚开桌</p>
       <h1 id="home-title" class="display-title">不在同一张桌，也能一起玩。</h1>
@@ -170,6 +175,7 @@ onMounted(async () => {
 .home-screen { display: grid; align-content: start; gap: 30px; }
 .device-badge { display: inline-flex; align-items: center; gap: 6px; color: #99d8b1; font-size: 12px; }
 .home-intro { padding: clamp(26px, 8vh, 72px) 0 4px; }
+.home-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; color: var(--platform-ink); background: rgb(255 138 126 / 10%); border: 1px solid rgb(255 138 126 / 38%); border-radius: 7px; font-size: 13px; }
 .home-intro__copy { max-width: 620px; margin: 20px 0 0; color: var(--platform-muted); font-size: 16px; line-height: 1.7; }
 .join-panel { display: grid; gap: 20px; padding: 20px; border-left: 3px solid var(--platform-accent); }
 .entry-form { display: grid; gap: 10px; }

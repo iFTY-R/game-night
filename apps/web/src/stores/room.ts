@@ -34,6 +34,7 @@ export const useRoomStore = defineStore("room", {
     remoteRoom: null as RoomSnapshot | null,
     busy: false,
     error: "",
+    notice: "",
   }),
   getters: {
     hasIdentity: (state) => state.displayName.length > 0 && state.userId.length > 0 && state.identityState !== "anonymous",
@@ -188,7 +189,10 @@ export const useRoomStore = defineStore("room", {
     /** Joins or queues this device and replaces the locally displayed snapshot. */
     async joinRemote(roomCode: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR" = "JOIN_INTENT_PARTICIPANT"): Promise<RoomSnapshot | null> {
       try {
-        const response = await roomClient.joinRoom(roomCode, intent, this.remoteRoom?.version);
+        const normalizedCode = roomCode.trim().toUpperCase();
+        // A CAS token is room-specific; carrying the previous room's version into a new invite causes a false conflict.
+        const knownVersion = this.remoteRoom?.roomCode === normalizedCode ? this.remoteRoom.version : undefined;
+        const response = await roomClient.joinRoom(normalizedCode, intent, knownVersion);
         if (response.room) {
           this.remoteRoom = response.room;
           this.roomId = response.room.roomId;
@@ -323,6 +327,16 @@ export const useRoomStore = defineStore("room", {
       this.sessionId = null;
       this.remoteRoom = null;
       this.persist();
+    },
+
+    /** Clears room recovery data while keeping one user-facing reason available on the destination page. */
+    exitRoom(message: string): void {
+      this.notice = message.trim();
+      this.leaveRoom();
+    },
+
+    clearNotice(): void {
+      this.notice = "";
     },
 
     applyIdentity(user: { userId?: string; username?: string; status?: string } | undefined, fallbackName: string): void {

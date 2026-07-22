@@ -151,6 +151,51 @@ test("non-host members never receive governance controls", async ({ page }) => {
   await expect(page.getByRole("button", { name: "解散房间" })).toHaveCount(0);
 });
 
+test("member leaves an idle room after the host closes it", async ({ page }) => {
+  await seedIdentity(page);
+  let roomReads = 0;
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    roomReads += 1;
+    const snapshot = roomSnapshot("another-host");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ room: roomReads >= 2 ? { ...snapshot, status: "ROOM_STATUS_CLOSED" } : snapshot }),
+    });
+  });
+
+  await page.goto(`/room/${roomId}`);
+
+  await expect(page.getByRole("heading", { name: "朋友到齐，再开骰盅。" })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/, { timeout: 6_000 });
+  await expect(page.getByRole("status")).toContainText("房主已解散房间");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { roomId?: unknown })).toMatchObject({ roomId: null });
+});
+
+test("room share action sends an absolute invite link", async ({ page }) => {
+  await seedIdentity(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data: ShareData) => {
+        (window as typeof window & { __sharedRoom?: ShareData }).__sharedRoom = data;
+      },
+    });
+  });
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: roomSnapshot() }) });
+  });
+
+  await page.goto(`/room/${roomId}`);
+  await page.getByRole("button", { name: "分享房间链接" }).click();
+
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { __sharedRoom?: ShareData }).__sharedRoom)).toMatchObject({
+    title: "加入 Game Night 房间",
+    text: "房间码 GOV123",
+    url: "http://127.0.0.1:4173/invite/GOV123",
+  });
+});
+
 test("governance conflicts stay in context and refresh the authoritative room", async ({ page }) => {
   await seedIdentity(page);
   let currentRoom = roomSnapshot();

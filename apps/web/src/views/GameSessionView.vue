@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import Dice789View from "./Dice789View.vue";
@@ -13,6 +13,7 @@ const router = useRouter();
 const room = useRoomStore();
 const loading = ref(true);
 const loadError = ref("");
+let terminalNavigationStarted = false;
 
 const gameId = computed(() => {
   const snapshot = room.remoteRoom;
@@ -27,10 +28,29 @@ const gameComponent = computed(() => {
   return null;
 });
 
+/** Owns terminal navigation above the game component, which unmounts as soon as active game metadata is cleared. */
+const exitClosedRoom = async (): Promise<void> => {
+  if (terminalNavigationStarted) return;
+  terminalNavigationStarted = true;
+  room.exitRoom("房主已解散房间，当前游戏已结束");
+  await router.replace({ name: "home" });
+};
+
+watch(
+  () => room.remoteRoom,
+  (snapshot) => {
+    if (snapshot?.roomId === props.roomId && snapshot.status.includes("CLOSED")) void exitClosedRoom();
+  },
+);
+
 /** Loads authoritative room metadata before selecting a versioned game client. */
 onMounted(async () => {
   try {
-    await room.loadRoom(props.roomId);
+    const snapshot = await room.loadRoom(props.roomId);
+    if (snapshot?.status.includes("CLOSED")) {
+      await exitClosedRoom();
+      return;
+    }
     if (!isGameId(gameId.value)) loadError.value = "这个会话没有可用的游戏客户端";
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : "游戏会话加载失败";

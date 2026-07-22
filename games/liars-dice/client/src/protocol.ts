@@ -56,12 +56,26 @@ const validateView = (view: View): View => {
   return view;
 };
 
+/**
+ * The module-owned actions are embedded in the opaque view, while the platform
+ * may append host-only actions such as session.finish to the outer projection.
+ * Requiring an exact match would reject that valid platform authorization.
+ */
+const validateProjectionActions = (viewActions: readonly string[], projectionActions: readonly string[]): void => {
+  if (
+    projectionActions.length < viewActions.length ||
+    viewActions.some((action, index) => projectionActions[index] !== action)
+  ) {
+    throw new Error("liars_dice_actions_mismatch");
+  }
+};
+
 export const liarsDiceReducer: ProjectionReducer<View> = {
   fromProjection(projection: GameProjection): View {
     assertEnvelope(projection.view, LIARS_DICE_VIEW_MESSAGE);
     const view = validateView(fromBinary(ViewSchema, projection.view.payload));
     if (projection.viewerRole !== "player" && view.ownDice.length > 0) throw new Error("liars_dice_private_dice_leak");
-    if (view.allowedActions.join("\0") !== projection.allowedActions.join("\0")) throw new Error("liars_dice_actions_mismatch");
+    validateProjectionActions(view.allowedActions, projection.allowedActions);
     return view;
   },
   applyDelta(_current, delta) {

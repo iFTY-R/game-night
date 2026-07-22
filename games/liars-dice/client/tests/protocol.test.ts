@@ -47,6 +47,28 @@ describe("liarsDiceReducer", () => {
     expect(liarsDiceReducer.fromProjection(projection("spectator", false)).ownDice).toEqual([]);
   });
 
+  it("accepts platform actions appended to the module action set", () => {
+    const hostProjection = projection("player");
+
+    expect(liarsDiceReducer.fromProjection({
+      ...hostProjection,
+      allowedActions: [...hostProjection.allowedActions, "session.finish"],
+    }).allowedActions).toEqual(hostProjection.allowedActions);
+  });
+
+  it("rejects missing or reordered module actions", () => {
+    const playerProjection = projection("player");
+
+    expect(() => liarsDiceReducer.fromProjection({
+      ...playerProjection,
+      allowedActions: playerProjection.allowedActions.slice(1),
+    })).toThrow("liars_dice_actions_mismatch");
+    expect(() => liarsDiceReducer.fromProjection({
+      ...playerProjection,
+      allowedActions: ["session.finish", ...playerProjection.allowedActions],
+    })).toThrow("liars_dice_actions_mismatch");
+  });
+
   it("encodes a version-pinned bid command", () => {
     const action = createBidAction({ quantity: 7, face: 5, mode: BidMode.FLYING });
     const command = fromBinary(CommandSchema, action.message.payload);

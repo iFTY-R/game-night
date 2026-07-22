@@ -61,3 +61,22 @@ go run ./apps/realtime
 ## 负载与故障注入入口
 
 压测和演练不得使用生产凭据。固定场景应覆盖 1,000 个在线玩家、热点观战房、WebSocket 断线重连、lease 转移、draining、PostgreSQL/Redis 连接失败和主题对象存储失败；记录 p50/p95/p99、重连成功率、恢复时间和未提交动作数。演练完成后保留原始日志、配置摘要（脱敏）和数据库 migration 版本。
+
+仓库内置的无凭据容量门禁使用真实 realtime Hub 和 ownership manager，默认建立 125 个房间、1,000 名玩家及热点房 500 名观众：
+
+```powershell
+pnpm run test:load
+```
+
+命令向标准输出写入 schema-versioned JSON；任一 p95 超标、依赖故障未 fail closed、恢复不完整或出现未提交更新时返回非零。CI 同时运行 WebSocket coder 重连/draining 和主题对象存储不可用回退，并将原始 JSON 保留在 `game-quality-<run-id>-<attempt>` artifact 30 天。
+
+| 场景 | CI p95 门禁 | 生产恢复目标 |
+| --- | ---: | ---: |
+| 普通 fanout / 热点观战房 | 2s | 提交后 2s 内可见 |
+| 全量连接重建 | 3s | 可达新实例后 5s 内恢复 |
+| Redis 通知丢失 | 2s（20ms 缩放扫描） | 默认周期与投影超时内 20s |
+| PostgreSQL 恢复后重新投影 | 3s | readiness 恢复后 30s |
+| lease 主动转移 | 1s | 滚动发布 5s；崩溃转移 20s |
+| 蓝绿 draining | 2s | 5s 内发出 draining 并关闭旧连接 |
+
+这些 CI 数值用于发现代码和并发退化，不替代 staging 网络压测。staging 必须使用相同人口模型记录实际 p50/p95/p99，并在超出生产恢复目标时阻止发布。

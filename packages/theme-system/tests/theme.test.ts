@@ -55,6 +55,29 @@ describe("ThemeLoader", () => {
     expect(loaded.errorCode).toBe("integrity_mismatch");
     expect(loaded.manifest.themeId).toBe("safe-table");
   });
+
+  it("falls back when theme object storage is unavailable", async () => {
+    const loader = new ThemeLoader({
+      fetch: vi.fn(async () => {
+        throw new TypeError("object storage unavailable");
+      }),
+    });
+
+    const loaded = await loader.load(
+      {
+        manifestUrl: "https://assets.example.test/manifest.json",
+        manifestIntegrity: "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      },
+      { gameVersion: "1.0.0", fallback: safeTheme },
+    );
+
+    expect(loaded).toMatchObject({
+      manifest: { themeId: "safe-table" },
+      usedFallback: true,
+      errorCode: "theme_load_failed",
+    });
+    expect(loaded.assets.size).toBe(0);
+  });
 });
 
 describe("ThemeRuntime", () => {

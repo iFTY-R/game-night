@@ -1,6 +1,6 @@
 # 三款骰子游戏平台完整实施计划
 
-> **状态：** 实施中；Task 13 已完成，Task 14 的负载/故障演练仍待完成
+> **状态：** 已完成；Task 0-14 的实现与质量门禁均已落地
 >
 > **执行要求：** 按任务依赖顺序实施；每个任务先写测试、完成验证后独立提交。三款游戏均实现其正式规则规范，任务顺序只表示依赖，不代表 MVP 取舍。
 
@@ -326,7 +326,7 @@
 - [x] Protocol/生成：`buf format/lint/breaking`、所有 games proto 生成零漂移、module registry 与 version artifact 覆盖检查。
 - [x] TypeScript/Vue：`pnpm run check`、Vitest、Playwright 固定视口、axe-core、主题 fallback/reduced-motion、客户端 bundle 版本 pin。
 - [x] Integration：真实 PostgreSQL/Redis 测试跨聚合 start、action receipt、ownership epoch、Redis publish loss、恢复、replay 和 outbox；不允许把必需依赖记为 skip。
-- [ ] 负载与故障：1,000 在线玩家、热点观战房、WebSocket reconnect、lease 转移、蓝绿 draining、PostgreSQL/Redis 故障、对象存储主题回退；记录 p95 和恢复目标。
+- [x] 负载与故障：`pnpm run test:load` 固定覆盖 1,000 在线玩家、热点房 500 观众、reconnect、lease 转移、蓝绿 draining、PostgreSQL/Redis fail-closed 与恢复；主题对象存储不可用单独验证 fallback，CI 归档 p50/p95/p99 和恢复目标证据。
 - [x] 更新运维文档：独立 DSN/Redis、migration、registry artifact 保留、旧版本清理、主题资源哈希、秘密不进入日志/配置提交；运行 `git diff --check` 和 `git status --short`。
 
 **Verify:** 完整 CI matrix 全绿，固定输出证据归档，工作树干净；任何已知失败继续修复，不能以“已知失败”收尾。

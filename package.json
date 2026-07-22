@@ -17,6 +17,7 @@
     "generate:sql": "go tool sqlc generate -f tooling/sqlc/sqlc.yaml",
     "test": "go test ./... && turbo run test",
     "test:backend:integration": "go test -p 1 -race ./platform/... ./apps/... ./internal/integrationtest/... ./infra/nginx/test/...",
+    "test:load": "go run ./apps/realtime/cmd/loadtest",
     "test:web:e2e": "pnpm --filter @game-night/web test:e2e",
     "dev:web": "pnpm --filter @game-night/web dev"
   },

@@ -95,6 +95,7 @@ func RestoreEventBatch(snapshot EventBatchSnapshot) (EventBatch, error) {
 	snapshot.CommittedAt = canonicalRuntimeTime(snapshot.CommittedAt)
 	// PostgreSQL may decode timestamptz values in the connection's local zone; replay state always uses canonical UTC.
 	snapshot.Execution = snapshot.Execution.Clone()
+	snapshot.Execution.Now = canonicalRuntimeTime(snapshot.Execution.Now)
 	zeroDigest := idempotency.Digest{}
 	if snapshot.ID == uuid.Nil || snapshot.SessionID == uuid.Nil || snapshot.StateVersion == 0 || !snapshot.Cause.Valid() ||
 		!snapshot.Execution.Valid() || !snapshot.Execution.Now.Equal(snapshot.CommittedAt) || !snapshot.Input.Valid() ||

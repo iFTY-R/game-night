@@ -55,7 +55,9 @@ func (SecureGenerator) NewID() (uuid.UUID, error) { return uuid.NewV7() }
 
 // NewExecution fills the complete deterministic ID pool and a cryptographic 256-bit seed.
 func (SecureGenerator) NewExecution(at time.Time) (game.DeterministicContext, error) {
-	at = at.Round(0).UTC()
+	// Runtime timestamps cross PostgreSQL and outbox boundaries, both of which
+	// persist microseconds. Modules must receive the same value replay will see.
+	at = canonicalRuntimeTime(at)
 	if at.IsZero() {
 		return game.DeterministicContext{}, ErrInvalidSessionInput
 	}

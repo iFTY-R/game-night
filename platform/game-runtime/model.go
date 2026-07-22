@@ -560,5 +560,7 @@ func canonicalRuntimeTime(value time.Time) time.Time {
 	if value.IsZero() {
 		return time.Time{}
 	}
-	return value.Round(0).UTC()
+	// PostgreSQL timestamptz and the shared outbox both retain microseconds.
+	// Canonicalizing here keeps aggregate, receipt, batch, and outbox equality stable.
+	return value.UTC().Truncate(time.Microsecond)
 }

@@ -180,7 +180,9 @@ func TestSystemReceiptReplaysOnlyMatchingOperationSourceAndDigest(t *testing.T) 
 
 func TestTimerCommitRequiresScheduledTimerReceiptAndActorlessBatch(t *testing.T) {
 	now := time.Date(2026, time.July, 19, 14, 0, 0, 0, time.UTC)
-	dueAt := now.Add(10 * time.Second)
+	// PostgreSQL and the outbox persist microseconds, so runtime timestamps must
+	// discard finer precision before the atomic commit compares them.
+	dueAt := now.Add(10*time.Second + 789*time.Nanosecond)
 	create := testRuntimeCreateRequest(now)
 	create.Transition = testRuntimeTransition(1, false, testRuntimeTimer("turn.timeout", dueAt))
 	before, _, err := NewSession(create)
@@ -194,7 +196,7 @@ func TestTimerCommitRequiresScheduledTimerReceiptAndActorlessBatch(t *testing.T)
 	timer := before.Snapshot().Timers[0]
 	after, batch, err := before.ApplyTimer(TimerTransitionRequest{
 		BatchID: uuid.New(), OwnershipEpoch: 1, TimerID: timer.TimerID,
-		ExpectedStateVersion: timer.ExpectedStateVersion, Execution: testRuntimeExecution(dueAt),
+		ExpectedStateVersion: timer.ExpectedStateVersion, Execution: testRuntimeExecution(timer.DueAt),
 		Input: timer.Message, Transition: testRuntimeTransition(2, false),
 	})
 	if err != nil {
@@ -203,12 +205,12 @@ func TestTimerCommitRequiresScheduledTimerReceiptAndActorlessBatch(t *testing.T)
 	receipt, err := NewTimerReceipt(TimerReceiptSnapshot{
 		Key:        TimerKey{SessionID: before.Snapshot().ID, TimerID: timer.TimerID, ExpectedStateVersion: 1},
 		ResultCode: ResultCodeAccepted, ResultDigest: idempotency.Digest(sha256.Sum256([]byte("timer-result"))),
-		StateVersion: 2, CommittedAt: dueAt,
+		StateVersion: 2, CommittedAt: timer.DueAt,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, err := NewTimerCommit(before, after, batch, receipt, []outbox.Event{testRuntimeTransitionOutboxEvent(t, before.Snapshot().ID, 2, dueAt)})
+	commit, err := NewTimerCommit(before, after, batch, receipt, []outbox.Event{testRuntimeTransitionOutboxEvent(t, before.Snapshot().ID, 2, timer.DueAt)})
 	if err != nil || !commit.Valid() {
 		t.Fatalf("timer commit valid = %v, err = %v", commit.Valid(), err)
 	}

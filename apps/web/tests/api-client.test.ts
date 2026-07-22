@@ -138,6 +138,32 @@ describe("Connect JSON mutation requests", () => {
     });
   });
 
+  it("reads and updates replay access with an explicit policy version", async () => {
+    const { calls } = captureRequest({ access: { policy: "REPLAY_ACCESS_POLICY_ROOM_MEMBER", policyVersion: "2" } });
+
+    await gameClient.getReplayAccess(room.roomId, room.activeSessionId);
+    await gameClient.setReplayAccess(
+      room.roomId,
+      room.activeSessionId,
+      "REPLAY_ACCESS_POLICY_ROOM_MEMBER",
+      "1",
+    );
+
+    expect(calls[0]).toMatchObject({
+      url: "/platform.game.v1.GameService/GetReplayAccess",
+      body: { roomId: room.roomId, sessionId: room.activeSessionId },
+    });
+    expect(calls[1]).toMatchObject({
+      url: "/platform.game.v1.GameService/SetReplayAccess",
+      body: {
+        roomId: room.roomId,
+        sessionId: room.activeSessionId,
+        policy: "REPLAY_ACCESS_POLICY_ROOM_MEMBER",
+        expectedPolicyVersion: "1",
+      },
+    });
+  });
+
   it("fails closed when subscription credentials are malformed", async () => {
     captureRequest({ ticket: "not-base64", grant: "AwQ=" });
 

@@ -110,6 +110,24 @@ export interface GameReplayProjectionResponse extends GameProjectionResponse {
   complete?: boolean;
 }
 
+export type ReplayAccessPolicy =
+  | "REPLAY_ACCESS_POLICY_PARTICIPANT"
+  | "REPLAY_ACCESS_POLICY_ROOM_MEMBER"
+  | "REPLAY_ACCESS_POLICY_PUBLIC";
+
+export interface ReplayAccessWire {
+  sessionId: string;
+  roomId: string;
+  policy: ReplayAccessPolicy;
+  policyVersion: string;
+  memberSnapshotCompletedAt?: string;
+  updatedAt?: string;
+}
+
+export interface ReplayAccessResponse {
+  access?: ReplayAccessWire;
+}
+
 export interface GameActionResponse extends GameProjectionResponse {
   sessionId?: string;
   stateVersion?: string;
@@ -327,6 +345,19 @@ export const gameClient = {
       viewerKind: "VIEWER_KIND_REPLAY",
       throughStateVersion: String(throughStateVersion),
     }, false, undefined, signal);
+  },
+  /** Reads the host-controlled resource policy separately from the viewer-safe replay payload. */
+  getReplayAccess(roomId: string, sessionId: string, signal?: AbortSignal): Promise<ReplayAccessResponse> {
+    return call("platform.game.v1.GameService", "GetReplayAccess", { roomId, sessionId }, false, undefined, signal);
+  },
+  /** Applies a replay policy through the server's policy-version compare-and-swap boundary. */
+  setReplayAccess(roomId: string, sessionId: string, policy: ReplayAccessPolicy, expectedPolicyVersion: string): Promise<ReplayAccessResponse> {
+    return call("platform.game.v1.GameService", "SetReplayAccess", {
+      roomId,
+      sessionId,
+      policy,
+      expectedPolicyVersion,
+    }, true);
   },
   async action(
     roomId: string,

@@ -104,6 +104,20 @@ const mockReplay = async (page: Page, replay: typeof replays[number]): Promise<v
       }),
     });
   });
+  await page.route("**/platform.game.v1.GameService/GetReplayAccess", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        access: {
+          sessionId,
+          roomId,
+          policy: "REPLAY_ACCESS_POLICY_PARTICIPANT",
+          policyVersion: "1",
+        },
+      }),
+    });
+  });
 };
 
 for (const replay of replays) {
@@ -154,4 +168,39 @@ test("replay access denial fails closed with an explicit state", async ({ page }
 
   await expect(page.getByRole("heading", { name: "这局复盘暂时不可用。" })).toBeVisible();
   await expect(page.getByText("你没有查看这局复盘的权限")).toBeVisible();
+});
+
+test("host widens replay access with policy-version concurrency control", async ({ page }) => {
+  await mockReplay(page, replays[0]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  let updateBody: Record<string, unknown> | undefined;
+  await page.route("**/platform.game.v1.GameService/SetReplayAccess", async (route) => {
+    updateBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        access: {
+          sessionId,
+          roomId,
+          policy: "REPLAY_ACCESS_POLICY_ROOM_MEMBER",
+          policyVersion: "2",
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/room/${roomId}`);
+  const policy = page.getByRole("combobox", { name: "复盘可见范围" });
+  await expect(policy).toHaveValue("REPLAY_ACCESS_POLICY_PARTICIPANT");
+  await expect(policy.locator("option[value='REPLAY_ACCESS_POLICY_PUBLIC']")).toHaveCount(0);
+  await policy.selectOption("REPLAY_ACCESS_POLICY_ROOM_MEMBER");
+
+  await expect.poll(() => updateBody).toMatchObject({
+    roomId,
+    sessionId,
+    policy: "REPLAY_ACCESS_POLICY_ROOM_MEMBER",
+    expectedPolicyVersion: "1",
+  });
+  await expect(policy).toHaveValue("REPLAY_ACCESS_POLICY_ROOM_MEMBER");
 });

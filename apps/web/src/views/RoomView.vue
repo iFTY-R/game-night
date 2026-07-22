@@ -3,6 +3,7 @@ import { ArrowLeft, Check, ChevronDown, Copy, History, LockKeyhole, Play, UserPl
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import { gameClient, type ReplayAccessPolicy, type ReplayAccessWire, type RoomSnapshot } from "../api/client";
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
 
@@ -14,6 +15,9 @@ const entryOpen = ref(true);
 const loading = ref(true);
 const actionError = ref("");
 const selectedGameId = ref<GameId>("liars-dice");
+const replayAccess = ref<ReplayAccessWire | null>(null);
+const replayAccessLoading = ref(false);
+const replayAccessSaving = ref(false);
 let refreshTimer: number | undefined;
 let refreshPending = false;
 let gameSelectionInitialized = false;
@@ -32,6 +36,14 @@ const selectedGame = computed(() => gameById(selectedGameId.value) ?? gameCatalo
 const activeGame = computed(() => gameById(remoteRoom.value?.activeGameId ?? ""));
 const enoughPlayers = computed(() => participantCount.value >= selectedGame.value.minimumPlayers);
 const displayMemberName = (userId: string): string => userId === room.userId ? room.displayName || "你" : `玩家 ${userId.slice(0, 6)}`;
+// Public replay is a valid choice only for a public room; private-room clients never offer an invalid widening command.
+const replayPolicyOptions = computed<readonly { value: ReplayAccessPolicy; label: string }[]>(() => [
+  { value: "REPLAY_ACCESS_POLICY_PARTICIPANT", label: "仅本局玩家" },
+  { value: "REPLAY_ACCESS_POLICY_ROOM_MEMBER", label: "本局结束时的房间成员" },
+  ...(remoteRoom.value?.visibility.includes("PUBLIC")
+    ? [{ value: "REPLAY_ACCESS_POLICY_PUBLIC" as const, label: "所有已登录用户" }]
+    : []),
+]);
 
 /** Seeds the next game from room history once without overwriting a host choice during polling. */
 const initializeGameSelection = (snapshot: NonNullable<typeof room.remoteRoom>): void => {
@@ -50,6 +62,28 @@ if (room.roomId !== props.roomId) {
   room.enterRoom(props.roomId, roomCode.value);
 }
 
+/** Loads policy only for the current host and terminal session; the replay endpoint remains independently authorized. */
+const loadReplayAccess = async (snapshot: RoomSnapshot): Promise<void> => {
+  const sessionId = snapshot.lastFinishedSessionId;
+  if (!snapshot.status.includes("POST_GAME") || snapshot.hostUserId !== room.userId || !sessionId) {
+    replayAccess.value = null;
+    return;
+  }
+  if (replayAccessLoading.value || replayAccess.value?.sessionId === sessionId) return;
+  replayAccessLoading.value = true;
+  try {
+    const response = await gameClient.getReplayAccess(snapshot.roomId, sessionId);
+    if (response.access?.roomId !== snapshot.roomId || response.access.sessionId !== sessionId) {
+      throw new Error("复盘权限响应与上一局不匹配");
+    }
+    replayAccess.value = response.access;
+  } catch (error) {
+    actionError.value = error instanceof Error ? error.message : "复盘权限加载失败";
+  } finally {
+    replayAccessLoading.value = false;
+  }
+};
+
 /** Refreshes lobby state so remote starts and admission changes appear without reloading. */
 const refreshRoom = async (): Promise<void> => {
   if (refreshPending || document.visibilityState === "hidden") return;
@@ -59,6 +93,7 @@ const refreshRoom = async (): Promise<void> => {
     if (loaded) {
       entryOpen.value = !loaded.participantAdmission.includes("CLOSED");
       initializeGameSelection(loaded);
+      void loadReplayAccess(loaded);
       if (loaded.status.includes("PLAYING") && loaded.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
     }
   } catch (error) {
@@ -72,6 +107,7 @@ onMounted(async () => {
   if (room.remoteRoom?.roomId === props.roomId) {
     entryOpen.value = !room.remoteRoom.participantAdmission.includes("CLOSED");
     initializeGameSelection(room.remoteRoom);
+    void loadReplayAccess(room.remoteRoom);
     if (room.remoteRoom.status.includes("PLAYING") && room.remoteRoom.activeSessionId && canEnterActiveGame.value) void enterActiveGame();
   } else {
     await refreshRoom();
@@ -115,6 +151,35 @@ const openLastReplay = async (): Promise<void> => {
   const sessionId = remoteRoom.value?.lastFinishedSessionId;
   if (!sessionId) return;
   await router.push({ name: "replay", params: { roomId: props.roomId, sessionId } });
+};
+
+/** Saves one allowed policy and reloads the authoritative value after any CAS conflict or transport failure. */
+const changeReplayPolicy = async (event: Event): Promise<void> => {
+  const select = event.target as HTMLSelectElement;
+  const requested = select.value as ReplayAccessPolicy;
+  const current = replayAccess.value;
+  if (!current || replayAccessSaving.value || !replayPolicyOptions.value.some((option) => option.value === requested)) {
+    if (current) select.value = current.policy;
+    return;
+  }
+  replayAccessSaving.value = true;
+  actionError.value = "";
+  let reload = false;
+  try {
+    const response = await gameClient.setReplayAccess(props.roomId, current.sessionId, requested, current.policyVersion);
+    if (response.access?.roomId !== props.roomId || response.access.sessionId !== current.sessionId) {
+      throw new Error("复盘权限更新响应不完整");
+    }
+    replayAccess.value = response.access;
+  } catch (error) {
+    actionError.value = error instanceof Error ? error.message : "复盘权限更新失败";
+    select.value = current.policy;
+    replayAccess.value = null;
+    reload = true;
+  } finally {
+    replayAccessSaving.value = false;
+  }
+  if (reload && remoteRoom.value) await loadReplayAccess(remoteRoom.value);
 };
 
 const toggleAdmission = async (): Promise<void> => {
@@ -230,6 +295,12 @@ const leave = async (): Promise<void> => {
         {{ entryOpen ? (isPostGame ? "开放下一局加入" : "本局开始前允许加入") : "新玩家进入等候区" }}
       </button>
       <button class="button button--wide" type="button" :disabled="isPlaying || !enoughPlayers || (isRemote && !currentHost)" @click="startGame"><Play :size="19" fill="currentColor" aria-hidden="true" /> {{ enoughPlayers ? (isPostGame ? "再开一局" : "开始" + selectedGame.name) : "还需 " + (selectedGame.minimumPlayers - participantCount) + " 人" }}</button>
+      <label v-if="isPostGame && currentHost && replayAccess" class="replay-policy">
+        <span>复盘可见范围</span>
+        <select :value="replayAccess.policy" :disabled="replayAccessSaving" aria-label="复盘可见范围" @change="changeReplayPolicy">
+          <option v-for="option in replayPolicyOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
     </section>
   </main>
 </template>
@@ -265,6 +336,9 @@ const leave = async (): Promise<void> => {
 .permission-toggle { min-height: 48px; display: inline-flex; align-items: center; gap: 9px; padding: 0 12px; color: var(--platform-ink); background: rgb(8 18 19 / 35%); border: 1px solid rgb(168 181 180 / 22%); border-radius: 7px; }
 .permission-toggle > span { width: 26px; height: 26px; display: grid; place-items: center; color: #13201d; background: #99d8b1; border-radius: 5px; }
 .permission-toggle:disabled { cursor: not-allowed; opacity: .55; }
+.replay-policy { grid-column: 2 / 4; display: grid; grid-template-columns: minmax(120px, auto) minmax(220px, 1fr); align-items: center; gap: 12px; color: var(--platform-muted); font-size: 12px; }
+.replay-policy select { min-height: 44px; padding: 0 36px 0 12px; color: var(--platform-ink); background: rgb(8 18 19 / 45%); border: 1px solid rgb(168 181 180 / 26%); border-radius: 7px; }
+.replay-policy select:disabled { opacity: .6; }
 .mini-action { width: 34px; height: 34px; display: grid; place-items: center; color: var(--platform-accent); background: transparent; border: 1px solid rgb(230 181 102 / 42%); border-radius: 6px; }
 .game-picker { display: grid; gap: 14px; }
 .game-picker__head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
@@ -283,5 +357,6 @@ const leave = async (): Promise<void> => {
   .game-options { grid-template-columns: 1fr; }
   .game-option { min-height: 128px; }
   .host-controls { grid-template-columns: 1fr; }
+  .replay-policy { grid-column: auto; grid-template-columns: 1fr; gap: 6px; }
 }
 </style>

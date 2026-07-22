@@ -53,7 +53,9 @@ describe("Connect JSON mutation requests", () => {
   it("binds room creation state when starting a game", async () => {
     const { calls } = captureRequest();
 
-    await roomClient.startGame(room);
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("00000000-0000-4000-8000-000000000004");
+
+    await roomClient.startGame(room, room.hostUserId);
 
     expect(calls[0]?.url).toBe("/platform.room.v1.RoomService/StartGame");
     expect(calls[0]?.body).toMatchObject({
@@ -62,13 +64,17 @@ describe("Connect JSON mutation requests", () => {
       expectedVersion: { roomVersion: "9", membershipVersion: "4" },
       config: { gameId: "liars-dice", schemaVersion: 1, messageType: "session.config", payload: "" },
     });
-    expectDigest(calls[0]?.body.requestDigest);
+    expect(calls[0]?.body.requestDigest).toBe("9K0P+U1xdZycwUwjMQIMujaX+EOBfbsoT5NNbWH8Rko=");
   });
 
   it("uses the atomic room finish boundary and canonical uint64 strings", async () => {
     const { calls } = captureRequest();
 
-    await roomClient.finishGame(room, room.activeSessionId, 12, command);
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000004")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000005");
+
+    await roomClient.finishGame(room, room.hostUserId, room.activeSessionId, 12, command);
 
     expect(calls[0]?.url).toBe("/platform.room.v1.RoomService/FinishGame");
     expect(calls[0]?.body).toMatchObject({
@@ -80,20 +86,20 @@ describe("Connect JSON mutation requests", () => {
     });
     expect(calls[0]?.body.operationId).toEqual(expect.any(String));
     expect(calls[0]?.body.sourceEventId).toEqual(expect.any(String));
-    expectDigest(calls[0]?.body.requestDigest);
+    expect(calls[0]?.body.requestDigest).toBe("XICV/mY8PglL1TVFqbbS7JaV2PTHkcCeLxPtDG/JVEU=");
   });
 
   it("serializes action versions and protobuf bytes using Connect JSON rules", async () => {
     const { calls } = captureRequest();
 
-    await gameClient.action(room.roomId, room.activeSessionId, 7, "00000000-0000-4000-8000-000000000004", command);
+    await gameClient.action(room.roomId, room.hostUserId, room.activeSessionId, 7, "00000000-0000-4000-8000-000000000004", command);
 
     expect(calls[0]?.url).toBe("/platform.game.v1.GameService/GameAction");
     expect(calls[0]?.body).toMatchObject({
       expectedStateVersion: "7",
       command: { payload: "AQID" },
     });
-    expectDigest(calls[0]?.body.requestDigest);
+    expect(calls[0]?.body.requestDigest).toBe("7qbUc9o04q9LvdThmOOhdfikCYvziClTVZ/uX4+a8wU=");
   });
 
   it("opens a cursor-bound subscription and decodes one-time credentials", async () => {

@@ -6,6 +6,8 @@
 
 import { SubscriptionFailure } from "@game-night/game-client";
 
+import { actionRequestDigest, finishRequestDigest, startRequestDigest } from "./operation-digest";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -155,23 +157,6 @@ const invalidSubscriptionCredentials = (cause?: unknown): SubscriptionFailure =>
     cause === undefined ? undefined : { cause },
   );
 
-const digest = async (...parts: string[]): Promise<string> => {
-  const input = new TextEncoder().encode(parts.join("\u0000"));
-  const hashed = await crypto.subtle.digest("SHA-256", input);
-  return base64(new Uint8Array(hashed));
-};
-
-/** Includes the complete opaque command identity in mutation idempotency bindings. */
-const envelopeDigestParts = (command: GameEnvelopeInput): string[] => [
-  command.gameId,
-  command.version.engine,
-  command.version.protocol,
-  command.version.client,
-  String(command.schemaVersion),
-  command.messageType,
-  base64(command.payload),
-];
-
 const errorMessage = (body: unknown, status: number): { code: string; message: string } => {
   if (typeof body === "object" && body !== null) {
     const candidate = body as { code?: unknown; message?: unknown; error?: { code?: unknown; message?: unknown } };
@@ -269,27 +254,28 @@ export const roomClient = {
       expectedVersion: room.version,
     }, true);
   },
-  async startGame(room: RoomSnapshot, gameId = "liars-dice"): Promise<RoomResponse> {
+  async startGame(room: RoomSnapshot, actorUserId: string, gameId = "liars-dice"): Promise<RoomResponse> {
     const operationId = requestID();
-    const config = { gameId, schemaVersion: 1, messageType: "session.config", payload: "" };
+    const configInput = { messageType: "session.config", schemaVersion: 1, payload: new Uint8Array() };
+    const config = { gameId, schemaVersion: configInput.schemaVersion, messageType: configInput.messageType, payload: "" };
     return call("platform.room.v1.RoomService", "StartGame", {
       roomId: room.roomId,
       gameId,
       config,
       expectedVersion: room.version,
       operationId,
-      requestDigest: await digest(
-        room.roomId,
-        gameId,
-        String(room.version?.roomVersion ?? ""),
-        String(room.version?.membershipVersion ?? ""),
+      requestDigest: await startRequestDigest({
+        actorUserId,
+        roomId: room.roomId,
         operationId,
-        config.messageType,
-        config.payload,
-      ),
+        gameId,
+        roomVersion: String(room.version?.roomVersion ?? ""),
+        membershipVersion: String(room.version?.membershipVersion ?? ""),
+        config: configInput,
+      }),
     }, true);
   },
-  async finishGame(room: RoomSnapshot, sessionId: string, expectedStateVersion: number, command: GameEnvelopeInput): Promise<RoomResponse> {
+  async finishGame(room: RoomSnapshot, actorUserId: string, sessionId: string, expectedStateVersion: number, command: GameEnvelopeInput): Promise<RoomResponse> {
     const operationId = requestID();
     const sourceEventId = requestID();
     return call("platform.room.v1.RoomService", "FinishGame", {
@@ -300,16 +286,14 @@ export const roomClient = {
       sourceEventId,
       expectedStateVersion: String(expectedStateVersion),
       command: { ...command, payload: base64(command.payload) },
-      requestDigest: await digest(
-        room.roomId,
+      requestDigest: await finishRequestDigest({
+        actorUserId,
         sessionId,
-        String(room.version?.roomVersion ?? ""),
-        String(room.version?.membershipVersion ?? ""),
         operationId,
         sourceEventId,
-        String(expectedStateVersion),
-        ...envelopeDigestParts(command),
-      ),
+        expectedStateVersion,
+        command,
+      }),
     }, true);
   },
   approveMember(room: RoomSnapshot, userId: string): Promise<RoomResponse> {
@@ -323,6 +307,7 @@ export const gameClient = {
   },
   async action(
     roomId: string,
+    actorUserId: string,
     sessionId: string,
     expectedStateVersion: number,
     actionId: string,
@@ -335,7 +320,7 @@ export const gameClient = {
       actionId,
       expectedStateVersion: String(expectedStateVersion),
       command: { ...command, payload: base64(command.payload) },
-      requestDigest: await digest(roomId, sessionId, actionId, String(expectedStateVersion), ...envelopeDigestParts(command)),
+      requestDigest: await actionRequestDigest({ sessionId, actorUserId, actionId, expectedStateVersion, command }),
     }, true, undefined, signal);
   },
   /** Exchanges the device cookie for one short-lived ticket/grant pair bound to the current Origin. */

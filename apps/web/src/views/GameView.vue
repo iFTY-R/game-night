@@ -285,6 +285,7 @@ const submitAction = async (input: LiarsDiceActionInput): Promise<void> => {
       const actionId = crypto.randomUUID();
       const response = await gameClient.action(
         props.roomId,
+        room.userId,
         props.sessionId,
         liveStateVersion.value,
         actionId,

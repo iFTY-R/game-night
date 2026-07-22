@@ -237,7 +237,7 @@ export const useRoomStore = defineStore("room", {
       if (!this.remoteRoom) {
         return { sessionId: "" };
       }
-      const response = await roomClient.startGame(this.remoteRoom, gameId);
+      const response = await roomClient.startGame(this.remoteRoom, this.userId, gameId);
       if (response.room) {
         this.setRemoteRoom(response.room);
       }
@@ -252,7 +252,7 @@ export const useRoomStore = defineStore("room", {
       if (!this.remoteRoom) {
         return null;
       }
-      const response = await roomClient.finishGame(this.remoteRoom, sessionId, expectedStateVersion, command);
+      const response = await roomClient.finishGame(this.remoteRoom, this.userId, sessionId, expectedStateVersion, command);
       if (response.room) {
         this.setRemoteRoom(response.room);
       }

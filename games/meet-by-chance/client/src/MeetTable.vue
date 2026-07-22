@@ -46,7 +46,12 @@ const positioned = computed(() => positions.value.map((position) => ({
 onMounted(() => {
   // Seat density follows the actual stage, so tray expansion and rotation never reuse stale geometry.
   observer = new ResizeObserver(([entry]) => {
-    if (entry !== undefined && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+    if (
+      entry !== undefined &&
+      entry.contentRect.width > seatMetrics.value.width &&
+      entry.contentRect.height > seatMetrics.value.height
+    ) {
+      // Page transitions can briefly collapse the stage below one seat; retain the last valid geometry until it is measurable again.
       size.value = { width: entry.contentRect.width, height: entry.contentRect.height };
     }
   });

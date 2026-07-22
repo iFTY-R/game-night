@@ -17,7 +17,11 @@ const props = withDefaults(
 
 const root = ref<HTMLElement>();
 const size = ref({ width: 390, height: 520 });
+// Shared seats use a fixed compact height; measured stages smaller than this are transition artifacts.
+const seatHeight = 50;
 let observer: ResizeObserver | undefined;
+
+const seatWidthFor = (width: number): number => (width <= 370 ? 104 : 116);
 
 const positions = computed(() =>
   computeSeatLayout({
@@ -25,8 +29,8 @@ const positions = computed(() =>
     selfSeatIndex: props.selfSeatIndex,
     width: size.value.width,
     height: size.value.height,
-    seatWidth: size.value.width <= 370 ? 104 : 116,
-    seatHeight: 50,
+    seatWidth: seatWidthFor(size.value.width),
+    seatHeight,
     shape: props.shape,
   }),
 );
@@ -40,7 +44,12 @@ const positionedSeats = computed(() =>
 
 onMounted(() => {
   observer = new ResizeObserver(([entry]) => {
-    if (entry !== undefined && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+    if (
+      entry !== undefined &&
+      entry.contentRect.width > seatWidthFor(entry.contentRect.width) &&
+      entry.contentRect.height > seatHeight
+    ) {
+      // Route and orientation transitions may briefly collapse the table; preserve the last valid positions during that frame.
       size.value = { width: entry.contentRect.width, height: entry.contentRect.height };
     }
   });

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { gameClient, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../src/api/client";
+import { gameProjectionFromConnect } from "../src/api/game-projection";
 
 const room: RoomSnapshot = {
   roomId: "00000000-0000-4000-8000-000000000001",
@@ -27,14 +28,14 @@ const command: GameEnvelopeInput = {
   payload: new Uint8Array([1, 2, 3]),
 };
 
-const captureRequest = (): { calls: Array<{ url: string; body: Record<string, unknown> }> } => {
+const captureRequest = (responseBody: Record<string, unknown> = {}): { calls: Array<{ url: string; body: Record<string, unknown> }> } => {
   const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({
       url: String(input),
       body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
     });
-    return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(responseBody), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
   return { calls };
 };
@@ -93,5 +94,59 @@ describe("Connect JSON mutation requests", () => {
       command: { payload: "AQID" },
     });
     expectDigest(calls[0]?.body.requestDigest);
+  });
+
+  it("opens a cursor-bound subscription and decodes one-time credentials", async () => {
+    const { calls } = captureRequest({ ticket: "AQI=", grant: "AwQ=" });
+
+    const response = await gameClient.openSubscription(
+      room.roomId,
+      room.activeSessionId,
+      "VIEWER_KIND_PLAYER",
+      15,
+    );
+
+    expect(calls[0]?.url).toBe("/platform.game.v1.GameService/OpenSubscription");
+    expect(calls[0]?.body).toEqual({
+      roomId: room.roomId,
+      sessionId: room.activeSessionId,
+      viewerKind: "VIEWER_KIND_PLAYER",
+      lastStateVersion: "15",
+      lastEventOrdinal: 0,
+    });
+    expect([...response.ticket]).toEqual([1, 2]);
+    expect([...response.grant]).toEqual([3, 4]);
+  });
+
+  it("fails closed when subscription credentials are malformed", async () => {
+    captureRequest({ ticket: "not-base64", grant: "AwQ=" });
+
+    await expect(gameClient.openSubscription(
+      room.roomId,
+      room.activeSessionId,
+      "VIEWER_KIND_PLAYER",
+      15,
+    )).rejects.toMatchObject({
+      code: "invalid_subscription_credentials",
+      retryable: false,
+    });
+  });
+});
+
+describe("Connect JSON projection validation", () => {
+  it("rejects viewer enum lookalikes instead of widening authorization", () => {
+    expect(() => gameProjectionFromConnect({
+      sessionId: room.activeSessionId,
+      stateVersion: "1",
+      viewerKind: "NOT_VIEWER_KIND_PLAYER",
+      view: {
+        gameId: "liars-dice",
+        version: { engine: "1.0.0", protocol: "1.0.0", client: "1.0.0" },
+        schemaVersion: 1,
+        messageType: "session.view",
+        payload: "",
+      },
+      allowedActions: [],
+    })).toThrowError("game_viewer_kind_invalid");
   });
 });

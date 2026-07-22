@@ -1,4 +1,5 @@
 import type { GameClient } from "./client";
+import { SubscriptionFailure } from "./errors";
 import type { ReconnectAdapter, ReconnectPolicy } from "./types";
 
 export interface SubscriptionRunnerOptions {
@@ -32,6 +33,7 @@ export class SubscriptionRunner<TView> {
   public async run(client: GameClient<TView>, adapter: ReconnectAdapter, signal: AbortSignal): Promise<void> {
     let delayMs = this.#policy.initialDelayMs;
     while (!signal.aborted) {
+      let nextDelayMs = delayMs;
       client.markReconnecting();
       try {
         const updates = await adapter.connect(client.cursor(), signal);
@@ -42,14 +44,27 @@ export class SubscriptionRunner<TView> {
           }
           client.accept(update);
           delayMs = this.#policy.initialDelayMs;
+          nextDelayMs = delayMs;
         }
+        if (signal.aborted) return;
+        client.markReconnecting("connection_closed");
       } catch (error) {
         if (signal.aborted) {
           return;
         }
-        client.markReconnecting(errorCode(error));
+        const failure = normalizeSubscriptionFailure(error);
+        if (!failure.retryable) {
+          client.fail(failure.code);
+          return;
+        }
+        if (failure.phase === "draining") {
+          client.markDraining();
+        } else {
+          client.markReconnecting(failure.code);
+        }
+        nextDelayMs = failure.retryAfterMs ?? delayMs;
       }
-      await this.#sleep(delayMs, signal);
+      await this.#sleep(nextDelayMs, signal);
       delayMs = Math.min(Math.max(delayMs * 2, 1), this.#policy.maximumDelayMs);
     }
   }
@@ -57,21 +72,27 @@ export class SubscriptionRunner<TView> {
 
 const sleep = async (delayMs: number, signal: AbortSignal): Promise<void> => {
   await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, delayMs);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (): void => {
+      if (timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    timer = setTimeout(finish, delayMs);
+    signal.addEventListener("abort", finish, { once: true });
+    // Abort may have happened between the runner's loop check and listener registration.
+    if (signal.aborted) finish();
   });
 };
 
-const errorCode = (error: unknown): string => {
-  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
-    return error.code;
+const normalizeSubscriptionFailure = (error: unknown): SubscriptionFailure => {
+  if (error instanceof SubscriptionFailure) {
+    return error;
   }
-  return "connection_lost";
+  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
+    return new SubscriptionFailure(error.code, "Subscription connection failed", true, "reconnecting", null, { cause: error });
+  }
+  return new SubscriptionFailure("connection_lost", "Subscription connection failed", true, "reconnecting", null, { cause: error });
 };

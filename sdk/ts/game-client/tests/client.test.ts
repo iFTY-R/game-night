@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DispatchFailure, GameClient, SubscriptionRunner, actionPending } from "../src";
+import { DispatchFailure, GameClient, SubscriptionFailure, SubscriptionRunner, actionPending } from "../src";
 import type { GameDelta, GameEnvelope, GameProjection, ProjectionReducer, ReconnectAdapter } from "../src";
 
 interface TestView {
@@ -47,6 +47,16 @@ describe("GameClient", () => {
 
     expect(() => client.accept(delta(1, 3))).toThrowError(/does not continue/);
     expect(client.snapshot()).toMatchObject({ stateVersion: 2, connection: "reconnecting", errorCode: "cursor_gap" });
+  });
+
+  it("ignores stale projections and deltas already covered by an action response", () => {
+    const client = new GameClient<TestView>({ reducer, dispatch: vi.fn() });
+    client.accept(projection(1));
+    client.accept(projection(3));
+    client.accept(projection(2));
+    client.accept(delta(1, 3));
+
+    expect(client.snapshot()).toMatchObject({ stateVersion: 3, view: { value: 3 }, connection: "online" });
   });
 
   it("blocks duplicate pending actions and clears pending after the receipt", async () => {
@@ -114,5 +124,70 @@ describe("SubscriptionRunner", () => {
 
     expect(cursors).toEqual([1, 1]);
     expect(client.snapshot()).toMatchObject({ stateVersion: 2, view: { value: 2 } });
+  });
+
+  it("honors server draining delay before reconnecting", async () => {
+    const controller = new AbortController();
+    const delays: number[] = [];
+    const adapter: ReconnectAdapter = {
+      connect: async () => (async function* () {
+        throw new SubscriptionFailure("service_restart", "restart", true, "draining", 1_250);
+        yield projection();
+      })(),
+    };
+    const client = new GameClient<TestView>({ reducer, dispatch: vi.fn() });
+    const runner = new SubscriptionRunner<TestView>({
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+        controller.abort();
+      },
+    });
+
+    await runner.run(client, adapter, controller.signal);
+
+    expect(delays).toEqual([1_250]);
+    expect(client.snapshot().connection).toBe("draining");
+  });
+
+  it("resets exponential backoff after accepting a recovered projection", async () => {
+    const controller = new AbortController();
+    const delays: number[] = [];
+    let attempts = 0;
+    const adapter: ReconnectAdapter = {
+      connect: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new SubscriptionFailure("offline", "offline");
+        return (async function* () {
+          yield projection(2);
+          throw new SubscriptionFailure("offline_again", "offline again");
+        })();
+      },
+    };
+    const client = new GameClient<TestView>({ reducer, dispatch: vi.fn() });
+    const runner = new SubscriptionRunner<TestView>({
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+        if (delays.length === 2) controller.abort();
+      },
+    });
+
+    await runner.run(client, adapter, controller.signal);
+
+    expect(delays).toEqual([250, 250]);
+    expect(client.snapshot().stateVersion).toBe(2);
+  });
+
+  it("stops retrying after a permanent subscription rejection", async () => {
+    const adapter: ReconnectAdapter = {
+      connect: async () => {
+        throw new SubscriptionFailure("subscription_unauthorized", "removed", false);
+      },
+    };
+    const client = new GameClient<TestView>({ reducer, dispatch: vi.fn() });
+    const runner = new SubscriptionRunner<TestView>({ sleep: async () => undefined });
+
+    await runner.run(client, adapter, new AbortController().signal);
+
+    expect(client.snapshot()).toMatchObject({ connection: "failed", errorCode: "subscription_unauthorized" });
   });
 });

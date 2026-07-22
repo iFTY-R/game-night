@@ -16,6 +16,26 @@ export class DispatchFailure extends GameClientError {
   }
 }
 
+export type SubscriptionFailurePhase = "reconnecting" | "draining";
+
+/** Describes whether a broken subscription should stop, retry normally, or wait for service draining. */
+export class SubscriptionFailure extends GameClientError {
+  public constructor(
+    code: string,
+    message: string,
+    public readonly retryable = true,
+    public readonly phase: SubscriptionFailurePhase = "reconnecting",
+    public readonly retryAfterMs: number | null = null,
+    options?: ErrorOptions,
+  ) {
+    super(code, message, options);
+    this.name = "SubscriptionFailure";
+    if (retryAfterMs !== null && (!Number.isSafeInteger(retryAfterMs) || retryAfterMs < 0)) {
+      throw new TypeError("Subscription retry delay is invalid");
+    }
+  }
+}
+
 export const invalidProjection = (message: string): GameClientError =>
   new GameClientError("invalid_projection", message);
 

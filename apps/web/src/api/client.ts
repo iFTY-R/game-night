@@ -4,6 +4,8 @@
  * generated protobuf runtime details while preserving the server contract.
  */
 
+import { SubscriptionFailure } from "@game-night/game-client";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -74,20 +76,22 @@ export interface GameEnvelopeInput {
   payload: Uint8Array;
 }
 
-export interface GameProjectionResponse {
-  projection?: {
-    sessionId: string;
-    stateVersion: string;
-    viewerKind: string;
-    view?: {
-      gameId: string;
-      version?: { engine: string; protocol: string; client: string };
-      schemaVersion: number;
-      messageType: string;
-      payload: string;
-    };
-    allowedActions: string[];
+export interface GameProjectionWire {
+  sessionId: string;
+  stateVersion: string;
+  viewerKind: string;
+  view?: {
+    gameId: string;
+    version?: { engine: string; protocol: string; client: string };
+    schemaVersion: number;
+    messageType: string;
+    payload: string;
   };
+  allowedActions: string[];
+}
+
+export interface GameProjectionResponse {
+  projection?: GameProjectionWire;
 }
 
 export interface GameActionResponse extends GameProjectionResponse {
@@ -95,6 +99,12 @@ export interface GameActionResponse extends GameProjectionResponse {
   stateVersion?: string;
   resultCode?: string;
   replayed?: boolean;
+}
+
+export interface GameSubscriptionResponse extends GameProjectionResponse {
+  ticket: Uint8Array;
+  grant: Uint8Array;
+  expiresAt?: string;
 }
 
 const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -129,6 +139,22 @@ const base64 = (bytes: Uint8Array): string => {
   return btoa(value);
 };
 
+/** Decodes Connect JSON bytes fields before one-time credentials reach the WebSocket transport. */
+const base64Bytes = (encoded: string): Uint8Array => {
+  const binary = atob(encoded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const invalidSubscriptionCredentials = (cause?: unknown): SubscriptionFailure =>
+  new SubscriptionFailure(
+    "invalid_subscription_credentials",
+    "Subscription credentials are invalid",
+    false,
+    "reconnecting",
+    null,
+    cause === undefined ? undefined : { cause },
+  );
+
 const digest = async (...parts: string[]): Promise<string> => {
   const input = new TextEncoder().encode(parts.join("\u0000"));
   const hashed = await crypto.subtle.digest("SHA-256", input);
@@ -157,7 +183,14 @@ const errorMessage = (body: unknown, status: number): { code: string; message: s
   return { code: "http_error", message: `请求失败 (${status})` };
 };
 
-async function call<T>(service: string, method: string, body: Record<string, unknown>, write = false, extraHeaders?: Record<string, string>): Promise<T> {
+async function call<T>(
+  service: string,
+  method: string,
+  body: Record<string, unknown>,
+  write = false,
+  extraHeaders?: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<T> {
   const headers: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -176,6 +209,7 @@ async function call<T>(service: string, method: string, body: Record<string, unk
     credentials: "include",
     headers,
     body: JSON.stringify(body),
+    ...(signal === undefined ? {} : { signal }),
   });
   const text = await response.text();
   let payload: unknown = undefined;
@@ -284,10 +318,17 @@ export const roomClient = {
 };
 
 export const gameClient = {
-  getProjection(roomId: string, sessionId: string, viewerKind = "VIEWER_KIND_PLAYER"): Promise<GameProjectionResponse> {
-    return call("platform.game.v1.GameService", "GetProjection", { roomId, sessionId, viewerKind });
+  getProjection(roomId: string, sessionId: string, viewerKind = "VIEWER_KIND_PLAYER", signal?: AbortSignal): Promise<GameProjectionResponse> {
+    return call("platform.game.v1.GameService", "GetProjection", { roomId, sessionId, viewerKind }, false, undefined, signal);
   },
-  async action(roomId: string, sessionId: string, expectedStateVersion: number, actionId: string, command: GameEnvelopeInput): Promise<GameActionResponse> {
+  async action(
+    roomId: string,
+    sessionId: string,
+    expectedStateVersion: number,
+    actionId: string,
+    command: GameEnvelopeInput,
+    signal?: AbortSignal,
+  ): Promise<GameActionResponse> {
     return call("platform.game.v1.GameService", "GameAction", {
       roomId,
       sessionId,
@@ -295,7 +336,44 @@ export const gameClient = {
       expectedStateVersion: String(expectedStateVersion),
       command: { ...command, payload: base64(command.payload) },
       requestDigest: await digest(roomId, sessionId, actionId, String(expectedStateVersion), ...envelopeDigestParts(command)),
-    }, true);
+    }, true, undefined, signal);
+  },
+  /** Exchanges the device cookie for one short-lived ticket/grant pair bound to the current Origin. */
+  async openSubscription(
+    roomId: string,
+    sessionId: string,
+    viewerKind: string,
+    lastStateVersion: number,
+    signal?: AbortSignal,
+  ): Promise<GameSubscriptionResponse> {
+    const response = await call<GameProjectionResponse & { ticket?: unknown; grant?: unknown; expiresAt?: string }>(
+      "platform.game.v1.GameService",
+      "OpenSubscription",
+      {
+        roomId,
+        sessionId,
+        viewerKind,
+        lastStateVersion: String(lastStateVersion),
+        lastEventOrdinal: 0,
+      },
+      true,
+      undefined,
+      signal,
+    );
+    if (typeof response.ticket !== "string" || typeof response.grant !== "string") {
+      throw invalidSubscriptionCredentials();
+    }
+    try {
+      return {
+        ticket: base64Bytes(response.ticket),
+        grant: base64Bytes(response.grant),
+        ...(response.projection === undefined ? {} : { projection: response.projection }),
+        ...(response.expiresAt === undefined ? {} : { expiresAt: response.expiresAt }),
+      };
+    } catch (error) {
+      if (error instanceof SubscriptionFailure) throw error;
+      throw invalidSubscriptionCredentials(error);
+    }
   },
 };
 

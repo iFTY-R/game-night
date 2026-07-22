@@ -151,6 +151,10 @@ export class GameClient<TView> {
     if (this.#state.sessionId !== null && this.#state.sessionId !== projection.sessionId) {
       throw invalidProjection("Projection belongs to another session");
     }
+    // An HTTP action projection can overtake an already queued WebSocket frame; never roll viewer state backward.
+    if (this.#state.sessionId === projection.sessionId && projection.stateVersion < this.#state.stateVersion) {
+      return;
+    }
     const view = this.#reducer.fromProjection(projection);
     this.#state = {
       ...this.#state,
@@ -167,6 +171,14 @@ export class GameClient<TView> {
 
   #acceptDelta(delta: GameDelta): void {
     validateDelta(delta);
+    // A projection returned by the action API may already include this exact committed delta.
+    if (
+      this.#state.sessionId === delta.sessionId &&
+      this.#state.viewerRole === delta.viewerRole &&
+      delta.toStateVersion <= this.#state.stateVersion
+    ) {
+      return;
+    }
     if (
       this.#state.sessionId === null ||
       this.#state.viewerRole === null ||

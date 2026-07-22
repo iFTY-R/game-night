@@ -71,12 +71,18 @@ importers:
 
   apps/web:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.6.2
+        version: 2.6.2
       '@game-night/dice-789-client':
         specifier: workspace:*
         version: link:../../games/dice-789/client
       '@game-night/dice-789-themes':
         specifier: workspace:*
         version: link:../../games/dice-789/themes
+      '@game-night/game-client':
+        specifier: workspace:*
+        version: link:../../sdk/ts/game-client
       '@game-night/game-ui-kit':
         specifier: workspace:*
         version: link:../../packages/game-ui-kit

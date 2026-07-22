@@ -1,6 +1,6 @@
 # 三款骰子游戏平台完整实施计划
 
-> **状态：** 实施中；Task 13 的实时前端闭环与 Task 14 的负载/故障演练仍待完成
+> **状态：** 实施中；Task 13 已完成，Task 14 的负载/故障演练仍待完成
 >
 > **执行要求：** 按任务依赖顺序实施；每个任务先写测试、完成验证后独立提交。三款游戏均实现其正式规则规范，任务顺序只表示依赖，不代表 MVP 取舍。
 
@@ -185,7 +185,7 @@
 - [ ] WebSocket 使用 Protobuf binary envelope，握手后按身份、房间角色和 viewer kind 建立订阅；服务端只推送投影和动作回执，不发送权威 snapshot。
 - [ ] Redis 只做非权威 fanout、在线状态和 ownership lease；PostgreSQL commit 成功后才 publish，Redis 丢失时停止新租约并按安全策略暂停/恢复。
 - [ ] 实现订阅游标：小差距只通过 module `ProjectEvents(currentSnapshot, versionedEvents, viewer)` 生成 viewer-safe delta；大差距、角色变化或模块拒绝 delta 时返回最新 viewer-scoped snapshot。不同玩家/观众、开骰前后和历史游标不得共享缓存；raw event 永不下发。
-- [ ] 实现断线恢复、客户端 pending action、draining 和旧连接关闭；不同 viewer 的 snapshot/delta 必须独立生成。
+- [x] 实现断线恢复、客户端 pending action、draining 和旧连接关闭；不同 viewer 的 snapshot/delta 必须独立生成。
 - [ ] 连接 `UserSurface`/`AdminSurface`、敏感 operation registry、no-store、稳定错误码和 metrics；Nginx 路由新增 game API/WebSocket path 并覆盖转发头。
 
 **Verify:** `httptest`/WebSocket integration 覆盖未认证、跨房间、观众、断线、重复 action、Redis publish 丢失、旧租约和 projection leak；`go test -race ./apps/api/... ./apps/realtime/...`。
@@ -307,12 +307,12 @@
 
 **Files:** `apps/web` room/game routes、`apps/api/internal/transport/game/**`、`apps/realtime/**`、`platform/replay/**`、`platform/room/**`、`platform/game-runtime/system_inbox.go`、PostgreSQL outbox/inbox migrations and adapters。
 
-- [ ] 房间页区分 lobby/playing/post-game；playing 时 participant admission 强制 closed，旧参赛者可重连，新用户只能观战/候场；一局结束后房主可直接开放/需批准/保持关闭。
+- [x] 房间页区分 lobby/playing/post-game；playing 时 participant admission 强制 closed，旧参赛者可重连，新用户只能观战/候场；一局结束后房主可直接开放/需批准/保持关闭。
 - [x] 观众 projection 不含私密骰子；复盘只通过 `ProjectReplay` 和授权策略读取，未结算当前轮不生成复盘；资源地址不能绕过授权。
 - [x] 房主/管理员移除参赛者后，runtime 发送 `ParticipantRevoked`；座位本局不交给新玩家；审计/复盘摘要记录原因和规则影响。
 - [x] 成员移除/封禁的房间事务同时写 durable `room.participant.revoked.v1` outbox，事件 ID 作为 runtime `source_event_id`；runtime inbox 以 `(session_id, source_event_id, digest)` 幂等消费并重试 `HandleSystem(ParticipantRevoked)`。房间权限立即撤销，游戏规则效果最终可靠提交；进程在任一写点退出不能丢撤销或重复罚酒。
 - [x] 移除提交与 action commit 使用 Task 3 的统一 PartyRoom→GameSession 锁顺序和 participant fence；测试“移除已提交、inbox 未消费”窗口中的旧玩家动作必定拒绝，同时其他未撤销参赛者仍可正常行动。
-- [ ] 公开大厅状态卡片、房间码/邀请深链、身份完成后回房、赛后重新加入/候场/晋升和 roomVersion/membershipVersion 冲突全部闭环。
+- [x] 公开大厅状态卡片、房间码/邀请深链、身份完成后回房、赛后重新加入/候场/晋升和 roomVersion/membershipVersion 冲突全部闭环；游戏路由使用一次性票据建立 Protobuf WebSocket，并按 viewer cursor 自动恢复。
 
 **Verify:** Playwright 从邀请深链开始覆盖身份恢复、观战、赛后开放、候场提升、踢人/封禁、复盘授权和跨 session 房间连续使用；PostgreSQL 故障/并发注入覆盖 finish 原子回滚、remove-vs-action 锁序、移除后即时 fence、revoke outbox 提交后崩溃、inbox 重投、不同 digest 冲突和最终收敛。
 

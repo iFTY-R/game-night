@@ -3,6 +3,16 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import {
+  GameClient as ViewerGameClient,
+  SubscriptionFailure,
+  SubscriptionRunner,
+  type ConnectionPhase,
+  type GameClientState,
+  type SubscriptionCursor,
+  type ViewerRole,
+} from "@game-night/game-client";
+
+import {
   LiarsDiceTable,
   LiarsDiceReplayTable,
   LIARS_DICE_OPEN_ACTION,
@@ -16,15 +26,17 @@ import {
   liarsDiceReducer,
   liarsDiceSpectatorFixture,
   liarsDiceTimeoutFixture,
-  type GameProjection,
   type LiarsDiceActionInput,
   type LiarsDiceTableContext,
+  type LiarsDiceView,
 } from "@game-night/liars-dice-client";
 import { classicTheme, liarsDiceSoundProfile, liarsDiceThemes } from "@game-night/liars-dice-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
 import { useRoomStore } from "../stores/room";
+import { BrowserRealtimeAdapter } from "../api/browser-realtime";
 import { ApiError, gameClient } from "../api/client";
+import { gameProjectionFromConnect } from "../api/game-projection";
 
 type FixtureState = "active" | "revealed" | "spectator" | "reconnecting" | "timeout" | "replay";
 
@@ -48,6 +60,19 @@ const muted = ref(false);
 const themeIndex = ref(0);
 let pendingTimer: number | undefined;
 let audioContext: AudioContext | undefined;
+let subscriptionController: AbortController | undefined;
+let actionController: AbortController | undefined;
+let stopLiveState: (() => void) | undefined;
+
+// This client owns only viewer-safe projection state; mutations remain on the authenticated Connect API.
+const liveClient = new ViewerGameClient<LiarsDiceView>({
+  reducer: liarsDiceReducer,
+  dispatch: async () => {
+    throw new Error("live_dispatch_port_unused");
+  },
+});
+const subscriptionRunner = new SubscriptionRunner<LiarsDiceView>();
+const lifecycleController = new AbortController();
 
 const fixtureMode = computed(() => props.roomId === "fixture-room");
 const context = ref<LiarsDiceTableContext>({
@@ -60,61 +85,26 @@ if (context.value.viewerRole === "spectator") {
   view.value = liarsDiceSpectatorFixture();
 }
 
-type WireProjection = NonNullable<Awaited<ReturnType<typeof gameClient.getProjection>>["projection"]>;
-
-const fromBase64 = (encoded: string): Uint8Array => {
-  const binary = atob(encoded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+const connectionState = (phase: ConnectionPhase): LiarsDiceTableContext["connection"] => {
+  if (phase === "online" || phase === "reconnecting" || phase === "draining") return phase;
+  return "offline";
 };
 
-const safeStateVersion = (wire: string): number => {
-  if (!/^[1-9]\d*$/.test(wire)) {
-    throw new Error("game_state_version_invalid");
+/** Applies one immutable SDK snapshot to the table without exposing transport frames to the game client. */
+const applyLiveState = (state: GameClientState<LiarsDiceView>): void => {
+  if (state.view === null) {
+    context.value = { ...context.value, connection: connectionState(state.connection) };
+    return;
   }
-  const version = Number(wire);
-  if (!Number.isSafeInteger(version)) {
-    throw new Error("game_state_version_unsupported");
-  }
-  return version;
-};
-
-/** Converts the Connect JSON shape into the versioned game-client contract. */
-const toProjection = (wire: WireProjection): GameProjection => {
-  if (!wire.view) {
-    throw new Error("game_projection_missing");
-  }
-  const viewerRole = wire.viewerKind.includes("SPECTATOR") ? "spectator" : wire.viewerKind.includes("REPLAY") ? "replay" : "player";
-  return {
-    kind: "projection",
-    sessionId: wire.sessionId,
-    stateVersion: safeStateVersion(wire.stateVersion),
-    viewerRole,
-    view: {
-      gameId: wire.view.gameId,
-      version: wire.view.version ?? { engine: "1.0.0", protocol: "1.0.0", client: "1.0.0" },
-      schemaVersion: wire.view.schemaVersion,
-      messageType: wire.view.messageType,
-      payload: fromBase64(wire.view.payload),
-    },
-    allowedActions: wire.allowedActions ?? [],
-  };
-};
-
-const applyLiveProjection = (wire: WireProjection | undefined): void => {
-  if (!wire) {
-    throw new Error("game_projection_missing");
-  }
-  const projection = toProjection(wire);
-  const nextView = liarsDiceReducer.fromProjection(projection);
-  view.value = nextView;
-  liveStateVersion.value = projection.stateVersion;
+  view.value = state.view;
+  liveStateVersion.value = state.stateVersion;
   context.value = {
     ...context.value,
     selfUserId: room.userId,
     roomCode: room.roomCode ?? context.value.roomCode,
-    viewerRole: projection.viewerRole,
-    connection: "online",
-    players: nextView.players.map((player) => ({
+    viewerRole: state.viewerRole ?? context.value.viewerRole,
+    connection: connectionState(state.connection),
+    players: state.view.players.map((player) => ({
       userId: player.userId,
       displayName: player.userId === room.userId ? room.displayName || "你" : `玩家 ${player.userId.slice(0, 6)}`,
       avatarText: (player.userId === room.userId ? room.displayName || "你" : player.userId).slice(0, 1),
@@ -125,16 +115,107 @@ const applyLiveProjection = (wire: WireProjection | undefined): void => {
   };
 };
 
+const viewerRoleForRoom = (): Exclude<ViewerRole, "replay"> => {
+  const member = room.remoteRoom?.members.find((candidate) => candidate.userId === room.userId);
+  return member?.role.includes("SPECTATOR") ? "spectator" : "player";
+};
+
+const viewerKind = (role: Exclude<ViewerRole, "replay">): string =>
+  role === "spectator" ? "VIEWER_KIND_SPECTATOR" : "VIEWER_KIND_PLAYER";
+
+/** Uses an explicit deployment endpoint when provided, otherwise the exact same-origin public route. */
+const realtimeWebSocketURL = (): string => {
+  const configured = String(import.meta.env.VITE_REALTIME_URL ?? "").trim();
+  const url = new URL(configured || "/realtime/game", window.location.href);
+  if (url.protocol === "http:") url.protocol = "ws:";
+  if (url.protocol === "https:") url.protocol = "wss:";
+  return url.toString();
+};
+
 const loadLiveProjection = async (): Promise<void> => {
   try {
-    const response = await gameClient.getProjection(props.roomId, props.sessionId);
-    applyLiveProjection(response.projection);
+    const response = await gameClient.getProjection(
+      props.roomId,
+      props.sessionId,
+      viewerKind(viewerRoleForRoom()),
+      lifecycleController.signal,
+    );
+    liveClient.accept(gameProjectionFromConnect(response.projection));
   } catch (error) {
     if (import.meta.env.DEV && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
       liveFallback.value = true;
     }
-    context.value = { ...context.value, connection: "offline" };
+    liveClient.markReconnecting(error instanceof ApiError ? error.code : "projection_unavailable");
   }
+};
+
+const subscriptionFailure = (error: ApiError): SubscriptionFailure =>
+  new SubscriptionFailure(error.code, error.message, ![401, 403, 404].includes(error.status), "reconnecting", null, { cause: error });
+
+/** Refreshes room membership once when a reconnect reports that the viewer role changed. */
+const openLiveSubscription = async (cursor: SubscriptionCursor | null, signal: AbortSignal) => {
+  let role = viewerRoleForRoom();
+  const request = async () => gameClient.openSubscription(
+    props.roomId,
+    props.sessionId,
+    viewerKind(role),
+    cursor?.stateVersion ?? 0,
+    signal,
+  );
+  let response;
+  try {
+    response = await request();
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 403) {
+      if (error instanceof ApiError) throw subscriptionFailure(error);
+      throw error;
+    }
+    try {
+      await room.loadRoom(props.roomId);
+    } catch (refreshError) {
+      if (refreshError instanceof ApiError) throw subscriptionFailure(refreshError);
+      throw refreshError;
+    }
+    const refreshedRole = viewerRoleForRoom();
+    if (refreshedRole === role) throw subscriptionFailure(error);
+    role = refreshedRole;
+    try {
+      response = await request();
+    } catch (retryError) {
+      if (retryError instanceof ApiError) throw subscriptionFailure(retryError);
+      throw retryError;
+    }
+  }
+  try {
+    return {
+      ticket: response.ticket,
+      grant: response.grant,
+      projection: gameProjectionFromConnect(response.projection),
+    };
+  } catch (error) {
+    throw new SubscriptionFailure("invalid_subscription_projection", "订阅投影无效", false, "reconnecting", null, { cause: error });
+  }
+};
+
+/** Replaces the current attempt so manual retry and component teardown cannot leave overlapping sockets. */
+const startLiveSubscription = (): void => {
+  subscriptionController?.abort();
+  const controller = new AbortController();
+  subscriptionController = controller;
+  const adapter = new BrowserRealtimeAdapter({
+    url: realtimeWebSocketURL,
+    openSubscription: openLiveSubscription,
+  });
+  void subscriptionRunner.run(liveClient, adapter, controller.signal).catch((error: unknown) => {
+    if (!controller.signal.aborted) {
+      liveClient.fail(error instanceof Error ? error.name : "subscription_failed");
+    }
+  });
+};
+
+const initializeLiveTable = async (): Promise<void> => {
+  await loadLiveProjection();
+  if (!liveFallback.value && !lifecycleController.signal.aborted) startLiveSubscription();
 };
 
 const applyTheme = (): void => {
@@ -174,11 +255,17 @@ onMounted(() => {
     }
     room.setSession(props.sessionId);
     context.value = { ...context.value, connection: "reconnecting", selfUserId: room.userId };
-    void loadLiveProjection();
+    stopLiveState = liveClient.subscribe(applyLiveState);
+    void initializeLiveTable();
   }
 });
 
 onBeforeUnmount(() => {
+  lifecycleController.abort();
+  subscriptionController?.abort();
+  actionController?.abort();
+  stopLiveState?.();
+  liveClient.dispose();
   if (pendingTimer !== undefined) window.clearTimeout(pendingTimer);
   if (audioContext !== undefined) void audioContext.close();
   themeRuntime.apply({ manifest: safeTheme, assets: new Map(), usedFallback: true, errorCode: null }, document.documentElement);
@@ -191,14 +278,27 @@ const submitAction = async (input: LiarsDiceActionInput): Promise<void> => {
   pendingAction.value = input.action;
   playSound(input.action === LIARS_DICE_OPEN_ACTION ? "reveal" : "bid");
   if (!fixtureMode.value && !liveFallback.value) {
+    const controller = new AbortController();
+    actionController?.abort();
+    actionController = controller;
     try {
       const actionId = crypto.randomUUID();
-      const response = await gameClient.action(props.roomId, props.sessionId, liveStateVersion.value, actionId, input.message);
-      applyLiveProjection(response.projection);
-    } catch {
-      context.value = { ...context.value, connection: "reconnecting" };
+      const response = await gameClient.action(
+        props.roomId,
+        props.sessionId,
+        liveStateVersion.value,
+        actionId,
+        input.message,
+        controller.signal,
+      );
+      liveClient.accept(gameProjectionFromConnect(response.projection));
+    } catch (error) {
+      if (!controller.signal.aborted) liveClient.markReconnecting(error instanceof ApiError ? error.code : "action_failed");
     } finally {
-      pendingAction.value = null;
+      if (actionController === controller) {
+        actionController = undefined;
+        pendingAction.value = null;
+      }
     }
     return;
   }
@@ -217,7 +317,7 @@ const finishSession = async (): Promise<void> => {
       await room.finishRemoteGame(props.sessionId, liveStateVersion.value, createFinishAction().message);
       await router.push({ name: "room", params: { roomId: props.roomId } });
     } catch {
-      context.value = { ...context.value, connection: "reconnecting" };
+      liveClient.markReconnecting("finish_failed");
     } finally {
       pendingAction.value = null;
     }
@@ -232,7 +332,7 @@ const retry = (): void => {
     return;
   }
   context.value = { ...context.value, connection: "reconnecting" };
-  void loadLiveProjection();
+  startLiveSubscription();
 };
 
 const cycleTheme = (): void => {

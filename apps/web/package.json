@@ -11,8 +11,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.6.2",
     "@game-night/dice-789-client": "workspace:*",
     "@game-night/dice-789-themes": "workspace:*",
+    "@game-night/game-client": "workspace:*",
     "@game-night/game-ui-kit": "workspace:*",
     "@game-night/liars-dice-client": "workspace:*",
     "@game-night/liars-dice-themes": "workspace:*",

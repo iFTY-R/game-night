@@ -9,12 +9,38 @@ import {
 } from "../../../games/liars-dice/client/src/constants";
 import { liarsDiceFixtureView } from "../../../games/liars-dice/client/src/fixture";
 import { ViewSchema } from "../../../games/liars-dice/client/src/generated/game/liars_dice/v1/liars_dice_pb";
+import type { RoomSnapshot } from "../src/api/client";
 
 const sessionId = "00000000-0000-4000-8000-000000000003";
 const roomId = "00000000-0000-4000-8000-000000000001";
 
+/** Builds the authoritative room metadata that selects the versioned game client under test. */
+const roomSnapshot = (overrides: Partial<RoomSnapshot> = {}): RoomSnapshot => ({
+  roomId,
+  roomCode: "N789",
+  visibility: "ROOM_VISIBILITY_PRIVATE",
+  status: "ROOM_STATUS_PLAYING",
+  hostUserId: "user-self",
+  participantCapacity: 8,
+  participantAdmission: "ADMISSION_MODE_OPEN",
+  spectatorAdmission: "ADMISSION_MODE_OPEN",
+  members: [{
+    userId: "user-self",
+    role: "MEMBER_ROLE_PARTICIPANT",
+    requestedRole: "MEMBER_ROLE_UNSPECIFIED",
+    seatIndex: 0,
+  }],
+  activeSessionId: sessionId,
+  activeGameId: "liars-dice",
+  lastFinishedSessionId: "",
+  lastFinishedGameId: "",
+  version: { roomVersion: "1", membershipVersion: "1" },
+  ...overrides,
+});
+
 test("live table exchanges a fresh ticket and recovers after WebSocket disconnect", async ({ page }) => {
   const view = liarsDiceFixtureView(Date.now() + 60_000);
+  view.allowedActions = view.allowedActions.filter((action) => action !== "session.finish");
   const projection = {
     sessionId,
     stateVersion: "1",
@@ -26,7 +52,7 @@ test("live table exchanges a fresh ticket and recovers after WebSocket disconnec
       messageType: LIARS_DICE_VIEW_MESSAGE,
       payload: Buffer.from(toBinary(ViewSchema, view)).toString("base64"),
     },
-    allowedActions: view.allowedActions,
+    allowedActions: [...view.allowedActions, "session.finish"],
   };
   let subscriptionRequests = 0;
   const pageErrors: string[] = [];
@@ -110,6 +136,9 @@ test("live table exchanges a fresh ticket and recovers after WebSocket disconnec
       body: JSON.stringify({ user: { userId: "user-self", status: "USER_STATUS_ACTIVE", username: "你" } }),
     });
   });
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ room: roomSnapshot() }) });
+  });
   await page.route("**/platform.game.v1.GameService/*", async (route) => {
     const method = new URL(route.request().url()).pathname.split("/").at(-1);
     if (method === "OpenSubscription") subscriptionRequests += 1;
@@ -129,5 +158,52 @@ test("live table exchanges a fresh ticket and recovers after WebSocket disconnec
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __realtimeBinaryHellos?: number }).__realtimeBinaryHellos ?? 0)).toBeGreaterThanOrEqual(2);
   await expect(page.getByText("已连接")).toBeVisible();
   await expect(page.getByTestId("bid-action")).toBeEnabled();
+  await page.getByRole("button", { name: "展开操作区" }).click();
+  await expect(page.getByRole("button", { name: "结束本局" })).toBeVisible();
   expect(pageErrors).toEqual([]);
+});
+
+test("finished liars dice session URL returns to the room without loading stale projection", async ({ page }) => {
+  await page.addInitScript(({ storedRoomId, storedSessionId }) => {
+    localStorage.setItem("game-night.room-context.v1", JSON.stringify({
+      schemaVersion: 1,
+      displayName: "你",
+      userId: "user-self",
+      roomId: storedRoomId,
+      roomCode: "N789",
+      sessionId: storedSessionId,
+    }));
+  }, { storedRoomId: roomId, storedSessionId: sessionId });
+
+  let gameRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.includes("/platform.game.v1.GameService/")) gameRequests += 1;
+  });
+  await page.route("**/platform.identity.v1.IdentityService/GetCurrentIdentity", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ user: { userId: "user-self", status: "USER_STATUS_ACTIVE", username: "你" } }),
+    });
+  });
+  await page.route("**/platform.room.v1.RoomService/GetRoom", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        room: roomSnapshot({
+          status: "ROOM_STATUS_POST_GAME",
+          activeSessionId: "",
+          activeGameId: "",
+          lastFinishedSessionId: sessionId,
+          lastFinishedGameId: "liars-dice",
+        }),
+      }),
+    });
+  });
+
+  await page.goto(`/room/${roomId}/game/${sessionId}`);
+
+  await expect(page).toHaveURL(new RegExp(`/room/${roomId}$`));
+  expect(gameRequests).toBe(0);
 });

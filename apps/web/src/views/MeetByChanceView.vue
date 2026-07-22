@@ -48,8 +48,10 @@ const liveTable = useLiveGameTable<MeetByChanceView, MeetByChanceTableContext>({
   view,
   context,
   players: (current) => current.publicPlayers,
+  viewActions: (current) => current.allowedActions,
   finished: (current) => current.phase === MeetByChancePhase.FINISHED,
 });
+const allowedActions = liveTable.allowedActions;
 const pendingAction = liveTable.pendingAction;
 const muted = ref(false);
 const themeIndex = ref(0);
@@ -127,7 +129,7 @@ const leave = async (): Promise<void> => {
     v-else
     :view="view"
     :context="context"
-    :allowed-actions="view.allowedActions"
+    :allowed-actions="allowedActions"
     :pending-action="pendingAction"
     :muted="muted"
     @submit="submitAction"

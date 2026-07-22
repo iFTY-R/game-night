@@ -50,6 +50,7 @@ interface UseLiveGameTableOptions<TView, TContext extends LiveTableContext> {
   readonly view: Ref<TView>;
   readonly context: Ref<TContext>;
   readonly players: (view: TView) => readonly LivePlayer[];
+  readonly viewActions: (view: TView) => readonly string[];
   readonly finished: (view: TView) => boolean;
 }
 
@@ -64,6 +65,8 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   const liveFallback = ref(false);
   const liveStateVersion = ref(0);
   const pendingAction = ref<string | null>(null);
+  // The outer projection includes platform-owned commands that are intentionally absent from the opaque game view.
+  const authoritativeActions = ref<readonly string[]>([]);
   const subscriptionRunner = new SubscriptionRunner<TView>();
   const lifecycleController = new AbortController();
   let subscriptionController: AbortController | undefined;
@@ -123,6 +126,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     }
     options.view.value = state.view;
     liveStateVersion.value = state.stateVersion;
+    authoritativeActions.value = [...state.allowedActions];
     options.context.value = {
       ...options.context.value,
       selfUserId: room.userId,
@@ -333,6 +337,9 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
 
   return {
     liveFallback: computed(() => liveFallback.value),
+    allowedActions: computed(() => options.fixtureMode.value || liveFallback.value
+      ? options.viewActions(options.view.value)
+      : authoritativeActions.value),
     pendingAction,
     submitLiveAction,
     finishLiveSession,

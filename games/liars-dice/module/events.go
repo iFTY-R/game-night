@@ -31,7 +31,9 @@ func encodeEvent(fact engine.Event) (game.Message, error) {
 		if fact.Round == 0 || fact.FirstActor == "" {
 			return game.Message{}, malformed("round start event is incomplete")
 		}
-		messageType, message = EventRoundStartedMessage, &liarsdicev1.RoundStarted{Round: fact.Round, FirstActorUserId: fact.FirstActor}
+		messageType, message = EventRoundStartedMessage, &liarsdicev1.RoundStarted{
+			Round: fact.Round, FirstActorUserId: fact.FirstActor, Players: replayPlayersToProto(fact.Players),
+		}
 	case engine.EventBidPlaced:
 		if fact.Bid == nil || fact.UserID == "" {
 			return game.Message{}, malformed("bid event is incomplete")
@@ -115,6 +117,9 @@ func validateEventMessage(message game.Message) error {
 		if err := unmarshalStrict(message.Payload, &value); err != nil || value.GetRound() == 0 || value.GetFirstActorUserId() == "" {
 			return malformed("round.started event is invalid")
 		}
+		if _, err := replayPlayersFromProto(value.GetPlayers()); err != nil {
+			return err
+		}
 	case EventBidPlacedMessage:
 		var value liarsdicev1.BidPlaced
 		if err := unmarshalStrict(message.Payload, &value); err != nil || value.GetUserId() == "" || value.GetBid() == nil {
@@ -172,7 +177,11 @@ func decodeEvent(message game.Message, currentRound uint32) (engine.Event, uint3
 		if err := unmarshalStrict(message.Payload, &value); err != nil || value.GetRound() == 0 || value.GetFirstActorUserId() == "" {
 			return engine.Event{}, 0, malformed("round.started event is invalid")
 		}
-		return engine.Event{Kind: engine.EventRoundStarted, Round: value.GetRound(), FirstActor: value.GetFirstActorUserId()}, value.GetRound(), nil
+		players, err := replayPlayersFromProto(value.GetPlayers())
+		if err != nil {
+			return engine.Event{}, 0, err
+		}
+		return engine.Event{Kind: engine.EventRoundStarted, Round: value.GetRound(), FirstActor: value.GetFirstActorUserId(), Players: players}, value.GetRound(), nil
 	case EventBidPlacedMessage:
 		var value liarsdicev1.BidPlaced
 		if err := unmarshalStrict(message.Payload, &value); err != nil || value.GetUserId() == "" || value.GetBid() == nil {
@@ -237,4 +246,30 @@ func decodeEvent(message game.Message, currentRound uint32) (engine.Event, uint3
 	default:
 		return engine.Event{}, 0, malformed("unknown event message type")
 	}
+}
+
+func replayPlayersToProto(players []engine.Participant) []*liarsdicev1.ReplayPlayer {
+	values := make([]*liarsdicev1.ReplayPlayer, len(players))
+	for index, player := range players {
+		values[index] = &liarsdicev1.ReplayPlayer{UserId: player.UserID, SeatIndex: player.SeatIndex}
+	}
+	return values
+}
+
+// replayPlayersFromProto accepts an empty roster for sessions written before the additive replay field existed.
+func replayPlayersFromProto(values []*liarsdicev1.ReplayPlayer) ([]engine.Participant, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	players := make([]engine.Participant, len(values))
+	for index, value := range values {
+		if value == nil {
+			return nil, malformed("round.started replay roster is invalid")
+		}
+		players[index] = engine.Participant{UserID: value.GetUserId(), SeatIndex: value.GetSeatIndex()}
+	}
+	if err := engine.ValidateParticipants(players); err != nil {
+		return nil, malformed("round.started replay roster is invalid")
+	}
+	return players, nil
 }

@@ -34,6 +34,7 @@ func NewState(config Config, participants []Participant, startingSeat uint32, no
 	if err != nil {
 		return State{}, nil, err
 	}
+	event.Players = append([]Participant(nil), canonical...)
 	return state, []Event{event}, nil
 }
 

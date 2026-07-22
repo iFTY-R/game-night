@@ -140,10 +140,12 @@ const (
 
 // Event is an engine fact. Dice must be populated only for EventDiceRevealed.
 type Event struct {
-	Kind           EventKind
-	Round          uint32
-	UserID         string
-	FirstActor     string
+	Kind       EventKind
+	Round      uint32
+	UserID     string
+	FirstActor string
+	// Players is populated only on the first round start so replay can restore every frozen seat.
+	Players        []Participant
 	Bid            *Bid
 	Dice           []PrivateRoll
 	LoserUserID    string

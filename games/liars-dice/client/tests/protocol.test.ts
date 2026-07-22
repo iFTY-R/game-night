@@ -93,6 +93,8 @@ describe("liarsDiceReducer", () => {
         payload: toBinary(ReplaySchema, replay),
       },
     });
+    expect(decoded.players).toHaveLength(4);
+    expect(decoded.players[3]).toMatchObject({ userId: "user-self", seatIndex: 3 });
     expect(decoded.rounds[0]?.bids).toHaveLength(4);
     expect(decoded.rounds[0]?.dice).toHaveLength(4);
   });

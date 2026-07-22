@@ -88,6 +88,8 @@ message BidPlaced {
 message RoundStarted {
   uint32 round = 1;
   string first_actor_user_id = 2;
+  // The first round freezes the public session roster for deterministic replay.
+  repeated ReplayPlayer players = 3;
 }
 
 message DiceRevealed {
@@ -164,6 +166,11 @@ message ReplayBid {
   Bid bid = 2;
 }
 
+message ReplayPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+}
+
 // ReplayRound contains only a settled round; dice is empty when rules never revealed that round.
 message ReplayRound {
   uint32 round = 1;
@@ -183,4 +190,5 @@ message Replay {
   repeated ReplayRound rounds = 1;
   repeated string revoked_user_ids = 2;
   string finish_reason = 3;
+  repeated ReplayPlayer players = 4;
 }

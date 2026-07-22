@@ -10,6 +10,7 @@ import {
   PrivateDiceSchema,
   PublicPlayerSchema,
   ReplayBidSchema,
+  ReplayPlayerSchema,
   ReplayRoundSchema,
   ReplaySchema,
   RoundSettledSchema,
@@ -99,6 +100,12 @@ export const liarsDiceTimeoutFixture = (now = Date.now()): View => {
 
 export const liarsDiceReplayFixture = () =>
   create(ReplaySchema, {
+    players: [
+      create(ReplayPlayerSchema, { userId: "user-qing", seatIndex: 0 }),
+      create(ReplayPlayerSchema, { userId: "user-man", seatIndex: 1 }),
+      create(ReplayPlayerSchema, { userId: "user-nan", seatIndex: 2 }),
+      create(ReplayPlayerSchema, { userId: "user-self", seatIndex: 3 }),
+    ],
     rounds: [
       create(ReplayRoundSchema, {
         round: 3,

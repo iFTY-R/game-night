@@ -30,17 +30,23 @@ watch(
 const selectedRound = computed(() => props.replay.rounds[roundIndex.value]);
 const presentations = computed(() => new Map(props.context.players.map((player) => [player.userId, player])));
 const displayName = (userId: string): string => presentations.value.get(userId)?.displayName ?? `玩家 ${userId.slice(-4)}`;
-const seats = computed<readonly TableSeat[]>(() =>
-  props.context.players.map((player, index) => ({
-    seatIndex: player.seatIndex ?? index,
-    userId: player.userId,
-    displayName: player.displayName,
-    connected: true,
-    status: "复盘席位",
-    ...(player.avatarText === undefined ? {} : { avatarText: player.avatarText }),
-    ...(player.host === undefined ? {} : { host: player.host }),
-  })),
-);
+const seats = computed<readonly TableSeat[]>(() => {
+  const roster = props.replay.players.length > 0
+    ? props.replay.players
+    : props.context.players.map((player, index) => ({ userId: player.userId, seatIndex: player.seatIndex ?? index }));
+  return roster.map((player) => {
+    const presentation = presentations.value.get(player.userId);
+    return {
+      seatIndex: player.seatIndex,
+      userId: player.userId,
+      displayName: presentation?.displayName ?? displayName(player.userId),
+      connected: true,
+      status: "复盘席位",
+      ...(presentation?.avatarText === undefined ? {} : { avatarText: presentation.avatarText }),
+      ...(presentation?.host === undefined ? {} : { host: presentation.host }),
+    };
+  });
+});
 const anchorSeat = computed(() => seats.value[0]?.seatIndex ?? 0);
 const finalBid = computed(() => {
   const round = selectedRound.value;

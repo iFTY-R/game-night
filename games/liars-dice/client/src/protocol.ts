@@ -95,23 +95,35 @@ export const decodeLiarsDiceReplay = (projection: GameProjection): Replay => {
   }
   assertEnvelope(projection.view, LIARS_DICE_REPLAY_MESSAGE);
   const replay = fromBinary(ReplaySchema, projection.view.payload);
+  const replayUsers = new Set<string>();
+  const replaySeats = new Set<number>();
+  if (replay.players.length > 0 && (replay.players.length < 2 || replay.players.length > 8)) throw new Error("liars_dice_replay_invalid");
+  for (const player of replay.players) {
+    if (!player.userId || replayUsers.has(player.userId) || replaySeats.has(player.seatIndex)) throw new Error("liars_dice_replay_invalid");
+    replayUsers.add(player.userId);
+    replaySeats.add(player.seatIndex);
+  }
   let previousRound = 0;
   for (const round of replay.rounds) {
     const reasonValid = round.reason === "opened" || round.reason === "timeout";
     const revealValid = round.reason === "opened" ? round.diceRevealed && round.dice.length > 0 : !round.diceRevealed && round.dice.length === 0;
-    if (round.round <= previousRound || !round.firstActorUserId || !round.loserUserId || !reasonValid || !revealValid) {
+    if (round.round <= previousRound || !round.firstActorUserId || !round.loserUserId || !reasonValid || !revealValid ||
+      replayUsers.size > 0 && (!replayUsers.has(round.firstActorUserId) || !replayUsers.has(round.loserUserId) ||
+        round.openerUserId !== "" && !replayUsers.has(round.openerUserId))) {
       throw new Error("liars_dice_replay_invalid");
     }
     for (const entry of round.bids) {
-      if (!entry.userId || entry.bid === undefined || entry.bid.quantity < 1 || entry.bid.face < 1 || entry.bid.face > 6) {
+      if (!entry.userId || replayUsers.size > 0 && !replayUsers.has(entry.userId) || entry.bid === undefined ||
+        entry.bid.quantity < 1 || entry.bid.face < 1 || entry.bid.face > 6) {
         throw new Error("liars_dice_replay_invalid");
       }
     }
-    if (round.dice.some((roll) => !roll.userId || roll.faces.some((face) => face < 1 || face > 6))) {
+    if (round.dice.some((roll) => !roll.userId || replayUsers.size > 0 && !replayUsers.has(roll.userId) || roll.faces.some((face) => face < 1 || face > 6))) {
       throw new Error("liars_dice_replay_invalid");
     }
     previousRound = round.round;
   }
+  if (replayUsers.size > 0 && replay.revokedUserIds.some((userId) => !replayUsers.has(userId))) throw new Error("liars_dice_replay_invalid");
   return replay;
 };
 

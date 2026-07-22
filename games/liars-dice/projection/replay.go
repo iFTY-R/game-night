@@ -27,6 +27,15 @@ func BuildReplay(events []engine.Event) (*liarsdicev1.Replay, error) {
 			if event.Round == 0 || event.Round <= lastRound || event.FirstActor == "" || current != nil && current.DiceRevealed {
 				return nil, projectionError("round start does not advance a valid replay lifecycle")
 			}
+			if len(event.Players) > 0 {
+				if started || event.Round != 1 || engine.ValidateParticipants(event.Players) != nil || !participantExists(event.Players, event.FirstActor) {
+					return nil, projectionError("round start replay roster is invalid")
+				}
+				replay.Players = make([]*liarsdicev1.ReplayPlayer, len(event.Players))
+				for index, player := range event.Players {
+					replay.Players[index] = &liarsdicev1.ReplayPlayer{UserId: player.UserID, SeatIndex: player.SeatIndex}
+				}
+			}
 			// A current-actor revocation cancels an un-revealed accumulator.
 			current = &liarsdicev1.ReplayRound{Round: event.Round, FirstActorUserId: event.FirstActor}
 			lastRound = event.Round
@@ -83,6 +92,15 @@ func BuildReplay(events []engine.Event) (*liarsdicev1.Replay, error) {
 		}
 	}
 	return replay, nil
+}
+
+func participantExists(players []engine.Participant, userID string) bool {
+	for _, player := range players {
+		if player.UserID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func contains(values []string, target string) bool {

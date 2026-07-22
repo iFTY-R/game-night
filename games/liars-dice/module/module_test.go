@@ -286,7 +286,8 @@ func TestReplayIncludesOnlySettledRounds(t *testing.T) {
 	if err := proto.Unmarshal(projection.View.Payload, &replay); err != nil {
 		t.Fatal(err)
 	}
-	if len(replay.GetRounds()) != 1 || !replay.GetRounds()[0].GetDiceRevealed() || len(replay.GetRounds()[0].GetDice()) != 2 || replay.GetRounds()[0].GetRound() != 1 {
+	if len(replay.GetPlayers()) != 2 || replay.GetPlayers()[0].GetUserId() != "user-1" || replay.GetPlayers()[0].GetSeatIndex() != 0 ||
+		len(replay.GetRounds()) != 1 || !replay.GetRounds()[0].GetDiceRevealed() || len(replay.GetRounds()[0].GetDice()) != 2 || replay.GetRounds()[0].GetRound() != 1 {
 		t.Fatalf("replay = %+v", replay.GetRounds())
 	}
 }

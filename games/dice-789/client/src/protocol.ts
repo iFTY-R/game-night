@@ -70,6 +70,7 @@ export const dice789Reducer: ProjectionReducer<View> = {
     if (!hasOrderedActionPrefix(view.allowedActions, projection.allowedActions)) throw new Error("dice_789_actions_mismatch");
     return view;
   },
+  moduleActions: (view) => view.allowedActions,
   applyDelta(_current, delta) {
     if (delta.messages.length !== 1) throw new Error("dice_789_delta_invalid");
     const envelope = delta.messages[0];

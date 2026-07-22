@@ -14,7 +14,7 @@ import type {
   StateListener,
   SubscriptionCursor,
 } from "./types";
-import { validateAllowedActions, validateDelta, validateProjection } from "./validate";
+import { hasOrderedActionPrefix, validateAllowedActions, validateDelta, validateProjection } from "./validate";
 
 export interface GameClientOptions<TView> {
   readonly reducer: ProjectionReducer<TView>;
@@ -37,6 +37,8 @@ export class GameClient<TView> {
   readonly #listeners = new Set<StateListener<TView>>();
   readonly #pending = new Map<string, PendingEntry>();
   readonly #retries = new Map<string, RetryAction>();
+  // Full projections append platform commands after module commands; realtime deltas carry only module messages.
+  #platformActions: readonly string[] = [];
   #state: GameClientState<TView>;
 
   public constructor(options: GameClientOptions<TView>) {
@@ -156,6 +158,12 @@ export class GameClient<TView> {
       return;
     }
     const view = this.#reducer.fromProjection(projection);
+    const moduleActions = this.#reducer.moduleActions(view);
+    validateAllowedActions(moduleActions);
+    if (!hasOrderedActionPrefix(moduleActions, projection.allowedActions)) {
+      throw invalidProjection("Projection actions do not extend the module action set");
+    }
+    this.#platformActions = projection.allowedActions.slice(moduleActions.length);
     this.#state = {
       ...this.#state,
       connection: "online",
@@ -191,7 +199,11 @@ export class GameClient<TView> {
       throw cursorGap("Delta does not continue the accepted viewer cursor");
     }
     const reduced = this.#reducer.applyDelta(this.#state.view, delta);
-    const allowedActions = reduced.allowedActions ?? this.#state.allowedActions;
+    const moduleActions = reduced.allowedActions ?? this.#reducer.moduleActions(reduced.view);
+    const allowedActions = [
+      ...moduleActions,
+      ...this.#platformActions.filter((action) => !moduleActions.includes(action)),
+    ];
     validateAllowedActions(allowedActions);
     this.#state = {
       ...this.#state,

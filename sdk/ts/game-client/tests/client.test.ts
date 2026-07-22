@@ -35,6 +35,7 @@ const delta = (fromStateVersion: number, toStateVersion: number): GameDelta => (
 
 const reducer: ProjectionReducer<TestView> = {
   fromProjection: (value) => ({ value: value.view.payload[0] ?? 0 }),
+  moduleActions: () => ["round.roll"],
   applyDelta: (_current, value) => ({ view: { value: value.messages[0]?.payload[0] ?? 0 } }),
 };
 
@@ -55,6 +56,23 @@ describe("GameClient", () => {
 
     expect(() => client.accept(delta(1, 3))).toThrowError(/does not continue/);
     expect(client.snapshot()).toMatchObject({ stateVersion: 2, connection: "reconnecting", errorCode: "cursor_gap" });
+  });
+
+  it("retains platform projection actions when a delta replaces module actions", () => {
+    const actionReducer: ProjectionReducer<TestView> = {
+      fromProjection: (value) => ({ value: value.view.payload[0] ?? 0 }),
+      moduleActions: () => ["round.roll"],
+      applyDelta: (_current, value) => ({
+        view: { value: value.messages[0]?.payload[0] ?? 0 },
+        allowedActions: ["round.pass"],
+      }),
+    };
+    const client = new GameClient<TestView>({ reducer: actionReducer, dispatch: vi.fn() });
+    client.accept({ ...projection(), allowedActions: ["round.roll", "session.finish"] });
+
+    client.accept(delta(1, 2));
+
+    expect(client.snapshot().allowedActions).toEqual(["round.pass", "session.finish"]);
   });
 
   it("ignores stale projections and deltas already covered by an action response", () => {

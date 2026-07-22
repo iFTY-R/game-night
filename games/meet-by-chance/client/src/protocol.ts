@@ -114,6 +114,7 @@ export const meetByChanceReducer: ProjectionReducer<View> = {
     if (!hasOrderedActionPrefix(view.allowedActions, projection.allowedActions)) throw new Error("meet_by_chance_actions_mismatch");
     return view;
   },
+  moduleActions: (view) => view.allowedActions,
   applyDelta(_current, delta) {
     if (delta.messages.length !== 1) throw new Error("meet_by_chance_delta_invalid");
     const envelope = delta.messages[0];

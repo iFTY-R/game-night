@@ -75,6 +75,7 @@ export const liarsDiceReducer: ProjectionReducer<View> = {
     validateProjectionActions(view.allowedActions, projection.allowedActions);
     return view;
   },
+  moduleActions: (view) => view.allowedActions,
   applyDelta(_current, delta) {
     if (delta.messages.length !== 1) throw new Error("liars_dice_delta_invalid");
     const envelope = delta.messages[0];

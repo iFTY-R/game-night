@@ -45,6 +45,8 @@ export interface ReducedDelta<TView> {
 // ProjectionReducer belongs to one versioned game client and never receives authoritative state or raw events.
 export interface ProjectionReducer<TView> {
   fromProjection(projection: GameProjection): TView;
+  /** Returns the module-owned action prefix so transport-only deltas cannot erase platform commands. */
+  moduleActions(view: TView): AllowedActions;
   applyDelta(current: TView, delta: GameDelta): ReducedDelta<TView>;
 }
 

@@ -23,6 +23,16 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 4173,
+    // Keep browser traffic same-origin in development, matching the public reverse-proxy contract.
+    proxy: {
+      "/platform.identity.v1.IdentityService": "http://127.0.0.1:8080",
+      "/platform.room.v1.RoomService": "http://127.0.0.1:8080",
+      "/platform.game.v1.GameService": "http://127.0.0.1:8080",
+      "/realtime/game": {
+        target: "ws://127.0.0.1:8090",
+        ws: true,
+      },
+    },
   },
   build: {
     target: "es2023",

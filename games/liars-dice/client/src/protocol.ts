@@ -1,5 +1,5 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import type { ActionInput, GameEnvelope, GameProjection, ProjectionReducer } from "@game-night/game-client";
+import { hasOrderedActionPrefix, type ActionInput, type GameEnvelope, type GameProjection, type ProjectionReducer } from "@game-night/game-client";
 
 import {
   BidMode,
@@ -62,10 +62,7 @@ const validateView = (view: View): View => {
  * Requiring an exact match would reject that valid platform authorization.
  */
 const validateProjectionActions = (viewActions: readonly string[], projectionActions: readonly string[]): void => {
-  if (
-    projectionActions.length < viewActions.length ||
-    viewActions.some((action, index) => projectionActions[index] !== action)
-  ) {
+  if (!hasOrderedActionPrefix(viewActions, projectionActions)) {
     throw new Error("liars_dice_actions_mismatch");
   }
 };

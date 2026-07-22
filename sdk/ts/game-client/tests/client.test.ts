@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DispatchFailure, GameClient, SubscriptionFailure, SubscriptionRunner, actionPending } from "../src";
+import { DispatchFailure, GameClient, SubscriptionFailure, SubscriptionRunner, actionPending, hasOrderedActionPrefix } from "../src";
 import type { GameDelta, GameEnvelope, GameProjection, ProjectionReducer, ReconnectAdapter } from "../src";
 
 interface TestView {
@@ -37,6 +37,14 @@ const reducer: ProjectionReducer<TestView> = {
   fromProjection: (value) => ({ value: value.view.payload[0] ?? 0 }),
   applyDelta: (_current, value) => ({ view: { value: value.messages[0]?.payload[0] ?? 0 } }),
 };
+
+describe("projection action composition", () => {
+  it("allows platform actions only after the complete ordered module action set", () => {
+    expect(hasOrderedActionPrefix(["round.roll", "round.pass"], ["round.roll", "round.pass", "session.finish"])).toBe(true);
+    expect(hasOrderedActionPrefix(["round.roll", "round.pass"], ["round.pass"])).toBe(false);
+    expect(hasOrderedActionPrefix(["round.roll", "round.pass"], ["session.finish", "round.roll", "round.pass"])).toBe(false);
+  });
+});
 
 describe("GameClient", () => {
   it("accepts only a continuous viewer cursor", () => {

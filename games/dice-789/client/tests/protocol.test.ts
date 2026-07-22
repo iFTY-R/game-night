@@ -36,6 +36,26 @@ describe("dice789 protocol", () => {
     expect(view.config?.doubleFourEnabled).toBe(true);
   });
 
+  it("accepts platform actions appended after the complete module action set", () => {
+    const hostProjection = projection();
+    expect(dice789Reducer.fromProjection({
+      ...hostProjection,
+      allowedActions: [...hostProjection.allowedActions, "session.finish"],
+    }).allowedActions).toEqual(hostProjection.allowedActions);
+  });
+
+  it("rejects missing or reordered module actions", () => {
+    const playerProjection = projection();
+    expect(() => dice789Reducer.fromProjection({
+      ...playerProjection,
+      allowedActions: playerProjection.allowedActions.slice(1),
+    })).toThrow("dice_789_actions_mismatch");
+    expect(() => dice789Reducer.fromProjection({
+      ...playerProjection,
+      allowedActions: ["session.finish", ...playerProjection.allowedActions],
+    })).toThrow("dice_789_actions_mismatch");
+  });
+
   it("encodes amount, target, and dropped reason inside command digests", () => {
     const add = fromBinary(CommandSchema, createAddAction(5).message.payload);
     const target = fromBinary(CommandSchema, createTargetAction("user-qing").message.payload);

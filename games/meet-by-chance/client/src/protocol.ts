@@ -1,5 +1,5 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import type { ActionInput, GameEnvelope, GameProjection, ProjectionReducer } from "@game-night/game-client";
+import { hasOrderedActionPrefix, type ActionInput, type GameEnvelope, type GameProjection, type ProjectionReducer } from "@game-night/game-client";
 
 import {
   CommandSchema,
@@ -111,7 +111,7 @@ export const meetByChanceReducer: ProjectionReducer<View> = {
   fromProjection(projection): View {
     assertEnvelope(projection.view, MEET_BY_CHANCE_VIEW_MESSAGE);
     const view = validateView(fromBinary(ViewSchema, projection.view.payload));
-    if (view.allowedActions.join("\0") !== projection.allowedActions.join("\0")) throw new Error("meet_by_chance_actions_mismatch");
+    if (!hasOrderedActionPrefix(view.allowedActions, projection.allowedActions)) throw new Error("meet_by_chance_actions_mismatch");
     return view;
   },
   applyDelta(_current, delta) {

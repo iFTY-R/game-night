@@ -31,6 +31,15 @@ export const validateAllowedActions = (actions: AllowedActions): void => {
   }
 };
 
+/**
+ * Confirms that platform authorization preserves every module-owned action in
+ * order while allowing platform-only actions to be appended to the projection.
+ */
+export const hasOrderedActionPrefix = (moduleActions: AllowedActions, projectionActions: AllowedActions): boolean => (
+  projectionActions.length >= moduleActions.length
+  && moduleActions.every((action, index) => projectionActions[index] === action)
+);
+
 export const validateProjection = (projection: GameProjection): void => {
   if (!projection.sessionId || !Number.isSafeInteger(projection.stateVersion) || projection.stateVersion <= 0) {
     throw invalidProjection("Projection cursor is malformed");

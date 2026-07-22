@@ -41,6 +41,26 @@ describe("meet-by-chance protocol", () => {
     expect(() => meetByChanceReducer.fromProjection(projection(transient))).toThrow("meet_by_chance_view_invalid");
   });
 
+  it("accepts platform actions appended after the complete module action set", () => {
+    const hostProjection = projection();
+    expect(meetByChanceReducer.fromProjection({
+      ...hostProjection,
+      allowedActions: [...hostProjection.allowedActions, "session.finish"],
+    }).allowedActions).toEqual(hostProjection.allowedActions);
+  });
+
+  it("rejects missing or reordered module actions", () => {
+    const playerProjection = projection();
+    expect(() => meetByChanceReducer.fromProjection({
+      ...playerProjection,
+      allowedActions: playerProjection.allowedActions.slice(1),
+    })).toThrow("meet_by_chance_actions_mismatch");
+    expect(() => meetByChanceReducer.fromProjection({
+      ...playerProjection,
+      allowedActions: ["session.finish", ...playerProjection.allowedActions],
+    })).toThrow("meet_by_chance_actions_mismatch");
+  });
+
   it("encodes reroll and stand as distinct authoritative commands", () => {
     const reroll = fromBinary(CommandSchema, createRerollAction().message.payload);
     const stand = fromBinary(CommandSchema, createStandAction().message.payload);

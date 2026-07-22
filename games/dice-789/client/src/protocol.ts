@@ -1,5 +1,5 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import type { ActionInput, GameEnvelope, GameProjection, ProjectionReducer } from "@game-night/game-client";
+import { hasOrderedActionPrefix, type ActionInput, type GameEnvelope, type GameProjection, type ProjectionReducer } from "@game-night/game-client";
 
 import {
   AddToPoolSchema,
@@ -67,7 +67,7 @@ export const dice789Reducer: ProjectionReducer<View> = {
   fromProjection(projection): View {
     assertEnvelope(projection.view, DICE_789_VIEW_MESSAGE);
     const view = validateView(fromBinary(ViewSchema, projection.view.payload));
-    if (view.allowedActions.join("\0") !== projection.allowedActions.join("\0")) throw new Error("dice_789_actions_mismatch");
+    if (!hasOrderedActionPrefix(view.allowedActions, projection.allowedActions)) throw new Error("dice_789_actions_mismatch");
     return view;
   },
   applyDelta(_current, delta) {

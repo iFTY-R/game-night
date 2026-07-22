@@ -14,26 +14,37 @@ const roomCode = ref(inviteCode.value);
 const error = ref("");
 const ready = computed(() => room.hasIdentity);
 
-const saveIdentity = (): boolean => {
-  if (!room.setIdentity(displayName.value)) {
-    error.value = "用户名需要 1 到 18 个字符";
+const saveIdentity = async (): Promise<boolean> => {
+  try {
+    await room.ensureIdentity(displayName.value);
+    displayName.value = room.displayName || displayName.value.trim();
+    error.value = "";
+    return true;
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : "用户名需要 1 到 18 个字符";
     return false;
   }
-  displayName.value = room.displayName;
-  error.value = "";
-  return true;
 };
 
 const enterRoom = async (roomId: string, code: string): Promise<void> => {
-  if (!room.hasIdentity && !saveIdentity()) {
-    return;
+  try {
+    if (!room.hasIdentity && !(await saveIdentity())) {
+      return;
+    }
+    const joined = await room.joinRemote(code);
+    const resolvedRoomId = joined?.roomId ?? roomId;
+    room.enterRoom(resolvedRoomId, joined?.roomCode ?? code);
+    if (joined) {
+      room.setRemoteRoom(joined);
+    }
+    await router.push({ name: "room", params: { roomId: resolvedRoomId } });
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : "加入房间失败";
   }
-  room.enterRoom(roomId, code);
-  await router.push({ name: "room", params: { roomId } });
 };
 
 const confirmIdentity = async (): Promise<void> => {
-  if (!saveIdentity()) {
+  if (!(await saveIdentity())) {
     return;
   }
   // Completing onboarding from an invite returns directly to that invite's room.
@@ -51,12 +62,36 @@ const joinRoom = async (): Promise<void> => {
   await enterRoom(code.toLowerCase(), code);
 };
 
-const createRoom = async (): Promise<void> => enterRoom("night-789", "N789");
+const createRoom = async (): Promise<void> => {
+  try {
+    if (!room.hasIdentity && !(await saveIdentity())) {
+      return;
+    }
+    const created = await room.createRemoteRoom();
+    const roomId = created?.roomId ?? "night-789";
+    const code = created?.roomCode ?? "N789";
+    room.enterRoom(roomId, code);
+    if (created) {
+      room.setRemoteRoom(created);
+    }
+    await router.push({ name: "room", params: { roomId } });
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : "创建房间失败";
+  }
+};
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await room.recoverIdentity();
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : "身份恢复失败";
+  }
+  displayName.value = room.displayName || displayName.value;
   // A recognized device can follow an invite without an intermediate form submit.
   if (room.hasIdentity && /^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
-    void enterRoom(inviteCode.value.toLowerCase(), inviteCode.value);
+    void enterRoom(inviteCode.value.toLowerCase(), inviteCode.value).catch((reason: unknown) => {
+      error.value = reason instanceof Error ? reason.message : "加入房间失败";
+    });
   }
 });
 </script>

@@ -7,13 +7,16 @@ import {
   LiarsDiceReplayTable,
   LIARS_DICE_OPEN_ACTION,
   applyLiarsDiceFixtureAction,
+  createFinishAction,
   finishLiarsDiceFixture,
   liarsDiceFixtureContext,
   liarsDiceFixtureView,
   liarsDiceReplayFixture,
   liarsDiceRevealedFixture,
+  liarsDiceReducer,
   liarsDiceSpectatorFixture,
   liarsDiceTimeoutFixture,
+  type GameProjection,
   type LiarsDiceActionInput,
   type LiarsDiceTableContext,
 } from "@game-night/liars-dice-client";
@@ -21,6 +24,7 @@ import { classicTheme, liarsDiceSoundProfile, liarsDiceThemes } from "@game-nigh
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
 import { useRoomStore } from "../stores/room";
+import { ApiError, gameClient } from "../api/client";
 
 type FixtureState = "active" | "revealed" | "spectator" | "reconnecting" | "timeout" | "replay";
 
@@ -38,6 +42,8 @@ const fixtureView = () => {
 const view = ref(fixtureView());
 const replay = liarsDiceReplayFixture();
 const pendingAction = ref<string | null>(null);
+const liveFallback = ref(false);
+const liveStateVersion = ref(0);
 const muted = ref(false);
 const themeIndex = ref(0);
 let pendingTimer: number | undefined;
@@ -53,6 +59,83 @@ const context = ref<LiarsDiceTableContext>({
 if (context.value.viewerRole === "spectator") {
   view.value = liarsDiceSpectatorFixture();
 }
+
+type WireProjection = NonNullable<Awaited<ReturnType<typeof gameClient.getProjection>>["projection"]>;
+
+const fromBase64 = (encoded: string): Uint8Array => {
+  const binary = atob(encoded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const safeStateVersion = (wire: string): number => {
+  if (!/^[1-9]\d*$/.test(wire)) {
+    throw new Error("game_state_version_invalid");
+  }
+  const version = Number(wire);
+  if (!Number.isSafeInteger(version)) {
+    throw new Error("game_state_version_unsupported");
+  }
+  return version;
+};
+
+/** Converts the Connect JSON shape into the versioned game-client contract. */
+const toProjection = (wire: WireProjection): GameProjection => {
+  if (!wire.view) {
+    throw new Error("game_projection_missing");
+  }
+  const viewerRole = wire.viewerKind.includes("SPECTATOR") ? "spectator" : wire.viewerKind.includes("REPLAY") ? "replay" : "player";
+  return {
+    kind: "projection",
+    sessionId: wire.sessionId,
+    stateVersion: safeStateVersion(wire.stateVersion),
+    viewerRole,
+    view: {
+      gameId: wire.view.gameId,
+      version: wire.view.version ?? { engine: "1.0.0", protocol: "1.0.0", client: "1.0.0" },
+      schemaVersion: wire.view.schemaVersion,
+      messageType: wire.view.messageType,
+      payload: fromBase64(wire.view.payload),
+    },
+    allowedActions: wire.allowedActions ?? [],
+  };
+};
+
+const applyLiveProjection = (wire: WireProjection | undefined): void => {
+  if (!wire) {
+    throw new Error("game_projection_missing");
+  }
+  const projection = toProjection(wire);
+  const nextView = liarsDiceReducer.fromProjection(projection);
+  view.value = nextView;
+  liveStateVersion.value = projection.stateVersion;
+  context.value = {
+    ...context.value,
+    selfUserId: room.userId,
+    roomCode: room.roomCode ?? context.value.roomCode,
+    viewerRole: projection.viewerRole,
+    connection: "online",
+    players: nextView.players.map((player) => ({
+      userId: player.userId,
+      displayName: player.userId === room.userId ? room.displayName || "你" : `玩家 ${player.userId.slice(0, 6)}`,
+      avatarText: (player.userId === room.userId ? room.displayName || "你" : player.userId).slice(0, 1),
+      connected: true,
+      host: player.userId === room.remoteRoom?.hostUserId,
+      seatIndex: player.seatIndex,
+    })),
+  };
+};
+
+const loadLiveProjection = async (): Promise<void> => {
+  try {
+    const response = await gameClient.getProjection(props.roomId, props.sessionId);
+    applyLiveProjection(response.projection);
+  } catch (error) {
+    if (import.meta.env.DEV && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
+      liveFallback.value = true;
+    }
+    context.value = { ...context.value, connection: "offline" };
+  }
+};
 
 const applyTheme = (): void => {
   const manifest = liarsDiceThemes[themeIndex.value] ?? classicTheme;
@@ -85,8 +168,13 @@ const playSound = (cue: "bid" | "reveal"): void => {
 onMounted(() => {
   applyTheme();
   if (!fixtureMode.value) {
-    room.enterRoom(props.roomId);
+    if (room.roomId !== props.roomId) {
+      const roomCode = room.remoteRoom?.roomId === props.roomId ? room.remoteRoom.roomCode : props.roomId.toUpperCase().slice(0, 6);
+      room.enterRoom(props.roomId, roomCode);
+    }
     room.setSession(props.sessionId);
+    context.value = { ...context.value, connection: "reconnecting", selfUserId: room.userId };
+    void loadLiveProjection();
   }
 });
 
@@ -97,11 +185,23 @@ onBeforeUnmount(() => {
   document.documentElement.dataset.themeFallback = "true";
 });
 
-// The fixture applies only viewer-safe command effects; production receipts and projections replace this adapter in Task 13.
-const submitAction = (input: LiarsDiceActionInput): void => {
+/** Sends live commands through the authoritative API; fixture routes keep their deterministic preview adapter. */
+const submitAction = async (input: LiarsDiceActionInput): Promise<void> => {
   if (pendingAction.value !== null || context.value.connection !== "online") return;
   pendingAction.value = input.action;
   playSound(input.action === LIARS_DICE_OPEN_ACTION ? "reveal" : "bid");
+  if (!fixtureMode.value && !liveFallback.value) {
+    try {
+      const actionId = crypto.randomUUID();
+      const response = await gameClient.action(props.roomId, props.sessionId, liveStateVersion.value, actionId, input.message);
+      applyLiveProjection(response.projection);
+    } catch {
+      context.value = { ...context.value, connection: "reconnecting" };
+    } finally {
+      pendingAction.value = null;
+    }
+    return;
+  }
   pendingTimer = window.setTimeout(() => {
     view.value = applyLiarsDiceFixtureAction(view.value, input, context.value.selfUserId);
     pendingAction.value = null;
@@ -109,13 +209,30 @@ const submitAction = (input: LiarsDiceActionInput): void => {
   }, 700);
 };
 
-const finishSession = (): void => {
+const finishSession = async (): Promise<void> => {
   if (pendingAction.value !== null) return;
+  if (!fixtureMode.value && !liveFallback.value && room.remoteRoom?.version) {
+    pendingAction.value = "session.finish";
+    try {
+      await room.finishRemoteGame(props.sessionId, liveStateVersion.value, createFinishAction().message);
+      await router.push({ name: "room", params: { roomId: props.roomId } });
+    } catch {
+      context.value = { ...context.value, connection: "reconnecting" };
+    } finally {
+      pendingAction.value = null;
+    }
+    return;
+  }
   view.value = finishLiarsDiceFixture(view.value);
 };
 
 const retry = (): void => {
-  context.value = { ...context.value, connection: "online" };
+  if (fixtureMode.value || liveFallback.value) {
+    context.value = { ...context.value, connection: "online" };
+    return;
+  }
+  context.value = { ...context.value, connection: "reconnecting" };
+  void loadLiveProjection();
 };
 
 const cycleTheme = (): void => {

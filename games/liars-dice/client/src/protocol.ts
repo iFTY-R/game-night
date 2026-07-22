@@ -5,6 +5,7 @@ import {
   BidMode,
   BidSchema,
   CommandSchema,
+  FinishSchema,
   OpenDiceSchema,
   PlaceBidSchema,
   ReplaySchema,
@@ -122,4 +123,11 @@ export const createOpenAction = (): ActionInput => {
   return { action: LIARS_DICE_OPEN_ACTION, message: commandEnvelope(LIARS_DICE_OPEN_ACTION, toBinary(CommandSchema, command)) };
 };
 
+/** Builds the host-only system command used to finish a live session. */
+export const createFinishAction = (): ActionInput => {
+  const command = create(CommandSchema, { command: { case: "finish", value: create(FinishSchema) } });
+  return { action: "session.finish", message: commandEnvelope("session.finish", toBinary(CommandSchema, command)) };
+};
+
+export type { GameProjection };
 export { BidMode };

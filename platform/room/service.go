@@ -75,6 +75,14 @@ type SetAdmissionCommand struct {
 	Expected    Version
 }
 
+// SelectGameCommand changes the synchronized pregame table under host/version authority.
+type SelectGameCommand struct {
+	ActorUserID uuid.UUID
+	RoomID      uuid.UUID
+	GameID      string
+	Expected    Version
+}
+
 // RemoveMemberCommand removes a non-host member and returns any required runtime revocation signal.
 type RemoveMemberCommand struct {
 	ActorUserID uuid.UUID
@@ -281,6 +289,28 @@ func (service *Service) SetAdmission(ctx context.Context, command SetAdmissionCo
 		return Room{}, err
 	}
 	return service.repository.UpdateCAS(ctx, room, next)
+}
+
+// SelectGame commits the selected table while preserving every per-game draft.
+func (service *Service) SelectGame(ctx context.Context, command SelectGameCommand) (Room, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || strings.TrimSpace(command.GameID) == "" {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if !requiredVersion(command.Expected) {
+		return Room{}, ErrRoomVersionConflict
+	}
+	current, err := service.repository.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return Room{}, err
+	}
+	next, err := current.SelectGame(command.ActorUserID, command.GameID, command.Expected, service.clock.Now())
+	if err != nil {
+		return Room{}, err
+	}
+	if next.Version() == current.Version() {
+		return current, nil
+	}
+	return service.repository.UpdateCAS(ctx, current, next)
 }
 
 // RemoveMember commits membership removal before returning any active-session revocation signal.

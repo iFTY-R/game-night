@@ -18,6 +18,13 @@ service RoomService {
   rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
   rpc ApproveMember(ApproveMemberRequest) returns (ApproveMemberResponse);
   rpc SetAdmission(SetAdmissionRequest) returns (SetAdmissionResponse);
+  rpc SelectRoomGame(SelectRoomGameRequest) returns (SelectRoomGameResponse);
+  rpc UpdateGameConfig(UpdateGameConfigRequest) returns (UpdateGameConfigResponse);
+  rpc ListGameRulePresets(ListGameRulePresetsRequest) returns (ListGameRulePresetsResponse);
+  rpc SaveGameRulePreset(SaveGameRulePresetRequest) returns (SaveGameRulePresetResponse);
+  rpc DeleteGameRulePreset(DeleteGameRulePresetRequest) returns (DeleteGameRulePresetResponse);
+  rpc BeginGameStart(BeginGameStartRequest) returns (BeginGameStartResponse);
+  rpc CancelGameStart(CancelGameStartRequest) returns (CancelGameStartResponse);
   rpc StartGame(StartGameRequest) returns (StartGameResponse);
   rpc FinishGame(FinishGameRequest) returns (FinishGameResponse);
   rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
@@ -76,6 +83,39 @@ message RoomVersion {
   uint64 membership_version = 2;
 }
 
+// RoomGameConfigDraft is the server-normalized ruleset for one room/game pair.
+// The platform carries the envelope but never interprets its payload bytes.
+message RoomGameConfigDraft {
+  string game_id = 1;
+  platform.game.v1.GameEnvelope config = 2;
+  uint64 revision = 3;
+  string updated_by = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+// PendingGameStart is durable server state used for reconnect-safe countdowns.
+message PendingGameStart {
+  string pending_start_id = 1;
+  string cancel_token = 2;
+  google.protobuf.Timestamp deadline = 3;
+  string game_id = 4;
+  uint64 config_revision = 5;
+  RoomVersion expected_version = 6;
+  uint64 ownership_epoch = 7;
+}
+
+message GameRulePreset {
+  string preset_id = 1;
+  string game_id = 2;
+  string name = 3;
+  platform.game.v1.GameEnvelope config = 4;
+  uint64 preset_revision = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp last_used_at = 8;
+  bool compatible = 9;
+}
+
 message RoomMember {
   string user_id = 1;
   MemberRole role = 2;
@@ -103,6 +143,12 @@ message Room {
   google.protobuf.Timestamp updated_at = 14;
   string last_finished_session_id = 15;
   string last_finished_game_id = 16;
+  // selected_game_id is the host-selected pregame table. It is independent of
+  // active_game_id so members converge before a session starts.
+  string selected_game_id = 17;
+  repeated RoomGameConfigDraft game_config_drafts = 18;
+  PendingGameStart pending_start = 19;
+  uint64 ownership_epoch = 20;
 }
 
 message CreateRoomRequest {
@@ -234,6 +280,106 @@ message SetAdmissionResponse {
   Room room = 1;
 }
 
+// SelectRoomGame synchronizes the table selected in a lobby without starting a session.
+message SelectRoomGameRequest {
+  string room_id = 1;
+  string game_id = 2;
+  RoomVersion expected_version = 3;
+  uint64 ownership_epoch = 4;
+  string operation_id = 5;
+  bytes request_digest = 6;
+}
+
+message SelectRoomGameResponse {
+  Room room = 1;
+}
+
+message UpdateGameConfigRequest {
+  string room_id = 1;
+  string game_id = 2;
+  platform.game.v1.GameEnvelope config = 3;
+  uint64 expected_revision = 4;
+  RoomVersion expected_version = 5;
+  uint64 ownership_epoch = 6;
+  string operation_id = 7;
+  bytes request_digest = 8;
+}
+
+message UpdateGameConfigResponse {
+  Room room = 1;
+  RoomGameConfigDraft draft = 2;
+}
+
+message ListGameRulePresetsRequest {
+  string game_id = 1;
+}
+
+message ListGameRulePresetsResponse {
+  repeated GameRulePreset presets = 1;
+}
+
+enum GameRulePresetWriteMode {
+  GAME_RULE_PRESET_WRITE_MODE_UNSPECIFIED = 0;
+  GAME_RULE_PRESET_WRITE_MODE_CREATE = 1;
+  GAME_RULE_PRESET_WRITE_MODE_OVERWRITE = 2;
+  GAME_RULE_PRESET_WRITE_MODE_COPY = 3;
+}
+
+message SaveGameRulePresetRequest {
+  string preset_id = 1;
+  string game_id = 2;
+  string name = 3;
+  platform.game.v1.GameEnvelope config = 4;
+  GameRulePresetWriteMode mode = 5;
+  uint64 expected_preset_revision = 6;
+  string operation_id = 7;
+  bytes request_digest = 8;
+}
+
+message SaveGameRulePresetResponse {
+  GameRulePreset preset = 1;
+}
+
+message DeleteGameRulePresetRequest {
+  string preset_id = 1;
+  uint64 expected_preset_revision = 2;
+  string operation_id = 3;
+  bytes request_digest = 4;
+}
+
+message DeleteGameRulePresetResponse {
+  string preset_id = 1;
+}
+
+message BeginGameStartRequest {
+  string room_id = 1;
+  string game_id = 2;
+  uint64 config_revision = 3;
+  RoomVersion expected_version = 4;
+  uint64 ownership_epoch = 5;
+  string operation_id = 6;
+  bytes request_digest = 7;
+}
+
+message BeginGameStartResponse {
+  Room room = 1;
+  PendingGameStart pending_start = 2;
+}
+
+message CancelGameStartRequest {
+  string room_id = 1;
+  string pending_start_id = 2;
+  string cancel_token = 3;
+  RoomVersion expected_version = 4;
+  uint64 ownership_epoch = 5;
+  string operation_id = 6;
+  bytes request_digest = 7;
+}
+
+message CancelGameStartResponse {
+  Room room = 1;
+}
+
 message StartGameRequest {
   string room_id = 1;
   string game_id = 2;
@@ -241,6 +387,10 @@ message StartGameRequest {
   RoomVersion expected_version = 4;
   string operation_id = 5;
   bytes request_digest = 6;
+  string pending_start_id = 7;
+  string cancel_token = 8;
+  uint64 config_revision = 9;
+  uint64 ownership_epoch = 10;
 }
 
 message FrozenParticipant {
@@ -253,6 +403,8 @@ message StartGameResponse {
   string session_id = 2;
   string game_id = 3;
   repeated FrozenParticipant participants = 4;
+  platform.game.v1.GameEnvelope frozen_config = 5;
+  uint64 config_revision = 6;
 }
 
 message FinishGameRequest {

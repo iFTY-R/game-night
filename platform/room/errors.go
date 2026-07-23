@@ -43,4 +43,6 @@ var (
 	ErrRoomIntegrity = errors.New("room persistence integrity failure")
 	// ErrGameUnavailable prevents room state from starting without an authoritative registered game manifest.
 	ErrGameUnavailable = errors.New("game is unavailable")
+	// ErrGameSelectionConflict prevents a session from starting on a table different from the room selection.
+	ErrGameSelectionConflict = errors.New("selected room game does not match start game")
 )

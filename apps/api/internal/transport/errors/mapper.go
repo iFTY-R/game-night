@@ -87,7 +87,7 @@ func classify(err error) descriptor {
 	case stderrors.Is(err, identity.ErrRecoveryInvalid), stderrors.Is(err, secretresult.ErrReplayUnauthorized):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RECOVERY_INVALID, "identity.recovery.invalid"}
 	case stderrors.Is(err, secretresult.ErrIdempotencyConflict), stderrors.Is(err, admin.ErrIdempotencyConflict),
-		stderrors.Is(err, idempotency.ErrConflict):
+		stderrors.Is(err, idempotency.ErrConflict), stderrors.Is(err, room.ErrRuleOperationConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT, "operation.idempotency_conflict"}
 	case stderrors.Is(err, secretresult.ErrSecretNoLongerAvailable):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SECRET_RESULT_NO_LONGER_AVAILABLE, "operation.secret_no_longer_available"}
@@ -95,6 +95,8 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RATE_LIMITED, "request.rate_limited"}
 	case stderrors.Is(err, room.ErrRoomNotFound):
 		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_NOT_FOUND, "room.not_found"}
+	case stderrors.Is(err, room.ErrRuleNotFound):
+		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_NOT_FOUND, "room.rule.not_found"}
 	case stderrors.Is(err, gameruntime.ErrSessionNotFound):
 		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_NOT_FOUND, "game.session.not_found"}
 	case stderrors.Is(err, gameruntime.ErrStateVersionConflict):
@@ -123,19 +125,23 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE, "room.code.unavailable"}
 	case stderrors.Is(err, room.ErrRoomVersionConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.version.conflict"}
+	case stderrors.Is(err, room.ErrRuleRevisionConflict):
+		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.rule.revision_conflict"}
 	case stderrors.Is(err, room.ErrAdmissionClosed):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_ADMISSION_CLOSED, "room.admission.closed"}
 	case stderrors.Is(err, room.ErrRoomFull):
 		return descriptor{connect.CodeResourceExhausted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_FULL, "room.full"}
 	case stderrors.Is(err, room.ErrHostRequired):
 		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED, "room.host.required"}
+	case stderrors.Is(err, room.ErrRulePermission):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_REQUIRED, "room.rule.permission_denied"}
 	case stderrors.Is(err, room.ErrMemberNotFound), stderrors.Is(err, room.ErrWaitingNotFound):
 		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_MEMBER_NOT_FOUND, "room.member.not_found"}
 	case stderrors.Is(err, room.ErrRoomStatus), stderrors.Is(err, room.ErrRoomClosed),
 		stderrors.Is(err, room.ErrSessionActive), stderrors.Is(err, room.ErrSessionNotFound),
 		stderrors.Is(err, room.ErrInsufficientParticipants), stderrors.Is(err, room.ErrParticipantLimitExceeded),
-		stderrors.Is(err, room.ErrCannotRemoveHost),
-		stderrors.Is(err, room.ErrGameUnavailable):
+		stderrors.Is(err, room.ErrCannotRemoveHost), stderrors.Is(err, room.ErrPendingStartInvalid),
+		stderrors.Is(err, room.ErrGameUnavailable), stderrors.Is(err, room.ErrGameSelectionConflict):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_STATUS_INVALID, "room.status.invalid"}
 	case stderrors.Is(err, admin.ErrTOTPInvalid):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_MFA_INVALID, "admin.mfa.invalid"}

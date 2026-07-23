@@ -11,6 +11,270 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelRoomPendingStart = `-- name: CancelRoomPendingStart :one
+UPDATE room_pending_starts
+SET cancelled_at = COALESCE(cancelled_at, $1)
+WHERE room_id = $2
+  AND pending_start_id = $3
+  AND cancel_token = $4
+  AND ownership_epoch = $5
+  AND consumed_at IS NULL
+  AND deadline_at >= $1
+RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+`
+
+type CancelRoomPendingStartParams struct {
+	CancelledAt    pgtype.Timestamptz `json:"cancelled_at"`
+	RoomID         pgtype.UUID        `json:"room_id"`
+	PendingStartID pgtype.UUID        `json:"pending_start_id"`
+	CancelToken    string             `json:"cancel_token"`
+	OwnershipEpoch int64              `json:"ownership_epoch"`
+}
+
+// CancelRoomPendingStart
+//
+//	UPDATE room_pending_starts
+//	SET cancelled_at = COALESCE(cancelled_at, $1)
+//	WHERE room_id = $2
+//	  AND pending_start_id = $3
+//	  AND cancel_token = $4
+//	  AND ownership_epoch = $5
+//	  AND consumed_at IS NULL
+//	  AND deadline_at >= $1
+//	RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+func (q *Queries) CancelRoomPendingStart(ctx context.Context, arg CancelRoomPendingStartParams) (RoomPendingStart, error) {
+	row := q.db.QueryRow(ctx, cancelRoomPendingStart,
+		arg.CancelledAt,
+		arg.RoomID,
+		arg.PendingStartID,
+		arg.CancelToken,
+		arg.OwnershipEpoch,
+	)
+	var i RoomPendingStart
+	err := row.Scan(
+		&i.PendingStartID,
+		&i.RoomID,
+		&i.CancelToken,
+		&i.GameID,
+		&i.ConfigRevision,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.DeadlineAt,
+		&i.CreatedAt,
+		&i.CancelledAt,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
+
+const consumeRoomPendingStart = `-- name: ConsumeRoomPendingStart :one
+UPDATE room_pending_starts
+SET consumed_at = COALESCE(consumed_at, $1)
+WHERE room_id = $2
+  AND pending_start_id = $3
+  AND cancel_token = $4
+  AND operation_id = $5
+  AND request_digest = $6
+  AND cancelled_at IS NULL
+  AND deadline_at <= $1
+RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+`
+
+type ConsumeRoomPendingStartParams struct {
+	ConsumedAt     pgtype.Timestamptz `json:"consumed_at"`
+	RoomID         pgtype.UUID        `json:"room_id"`
+	PendingStartID pgtype.UUID        `json:"pending_start_id"`
+	CancelToken    string             `json:"cancel_token"`
+	OperationID    string             `json:"operation_id"`
+	RequestDigest  []byte             `json:"request_digest"`
+}
+
+// ConsumeRoomPendingStart
+//
+//	UPDATE room_pending_starts
+//	SET consumed_at = COALESCE(consumed_at, $1)
+//	WHERE room_id = $2
+//	  AND pending_start_id = $3
+//	  AND cancel_token = $4
+//	  AND operation_id = $5
+//	  AND request_digest = $6
+//	  AND cancelled_at IS NULL
+//	  AND deadline_at <= $1
+//	RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+func (q *Queries) ConsumeRoomPendingStart(ctx context.Context, arg ConsumeRoomPendingStartParams) (RoomPendingStart, error) {
+	row := q.db.QueryRow(ctx, consumeRoomPendingStart,
+		arg.ConsumedAt,
+		arg.RoomID,
+		arg.PendingStartID,
+		arg.CancelToken,
+		arg.OperationID,
+		arg.RequestDigest,
+	)
+	var i RoomPendingStart
+	err := row.Scan(
+		&i.PendingStartID,
+		&i.RoomID,
+		&i.CancelToken,
+		&i.GameID,
+		&i.ConfigRevision,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.DeadlineAt,
+		&i.CreatedAt,
+		&i.CancelledAt,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
+
+const createGameRulePreset = `-- name: CreateGameRulePreset :one
+INSERT INTO game_rule_presets (
+    preset_id,
+    owner_user_id,
+    game_id,
+    name,
+    engine_version,
+    protocol_version,
+    client_version,
+    config_schema_version,
+    config_message_type,
+    config_payload,
+    revision,
+    compatible,
+    created_at,
+    updated_at,
+    last_used_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15
+)
+RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    revision, compatible, created_at, updated_at, last_used_at
+`
+
+type CreateGameRulePresetParams struct {
+	PresetID            pgtype.UUID        `json:"preset_id"`
+	OwnerUserID         pgtype.UUID        `json:"owner_user_id"`
+	GameID              string             `json:"game_id"`
+	Name                string             `json:"name"`
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	Compatible          bool               `json:"compatible"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	LastUsedAt          pgtype.Timestamptz `json:"last_used_at"`
+}
+
+// CreateGameRulePreset
+//
+//	INSERT INTO game_rule_presets (
+//	    preset_id,
+//	    owner_user_id,
+//	    game_id,
+//	    name,
+//	    engine_version,
+//	    protocol_version,
+//	    client_version,
+//	    config_schema_version,
+//	    config_message_type,
+//	    config_payload,
+//	    revision,
+//	    compatible,
+//	    created_at,
+//	    updated_at,
+//	    last_used_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10,
+//	    $11,
+//	    $12,
+//	    $13,
+//	    $14,
+//	    $15
+//	)
+//	RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    revision, compatible, created_at, updated_at, last_used_at
+func (q *Queries) CreateGameRulePreset(ctx context.Context, arg CreateGameRulePresetParams) (GameRulePreset, error) {
+	row := q.db.QueryRow(ctx, createGameRulePreset,
+		arg.PresetID,
+		arg.OwnerUserID,
+		arg.GameID,
+		arg.Name,
+		arg.EngineVersion,
+		arg.ProtocolVersion,
+		arg.ClientVersion,
+		arg.ConfigSchemaVersion,
+		arg.ConfigMessageType,
+		arg.ConfigPayload,
+		arg.Revision,
+		arg.Compatible,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.LastUsedAt,
+	)
+	var i GameRulePreset
+	err := row.Scan(
+		&i.PresetID,
+		&i.OwnerUserID,
+		&i.GameID,
+		&i.Name,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.Compatible,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastUsedAt,
+	)
+	return i, err
+}
+
 const createPartyRoom = `-- name: CreatePartyRoom :one
 INSERT INTO party_rooms (
     room_id,
@@ -25,6 +289,8 @@ INSERT INTO party_rooms (
     active_game_id,
     last_finished_session_id,
     last_finished_game_id,
+    selected_game_id,
+    ownership_epoch,
     room_version,
     membership_version,
     created_at,
@@ -45,12 +311,14 @@ INSERT INTO party_rooms (
     $13,
     $14,
     $15,
-    $16
+    $16,
+    $17,
+    $18
 )
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 `
 
 type CreatePartyRoomParams struct {
@@ -66,6 +334,8 @@ type CreatePartyRoomParams struct {
 	ActiveGameID          pgtype.Text        `json:"active_game_id"`
 	LastFinishedSessionID pgtype.UUID        `json:"last_finished_session_id"`
 	LastFinishedGameID    pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID        string             `json:"selected_game_id"`
+	OwnershipEpoch        int64              `json:"ownership_epoch"`
 	RoomVersion           int64              `json:"room_version"`
 	MembershipVersion     int64              `json:"membership_version"`
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
@@ -87,6 +357,8 @@ type CreatePartyRoomParams struct {
 //	    active_game_id,
 //	    last_finished_session_id,
 //	    last_finished_game_id,
+//	    selected_game_id,
+//	    ownership_epoch,
 //	    room_version,
 //	    membership_version,
 //	    created_at,
@@ -107,12 +379,14 @@ type CreatePartyRoomParams struct {
 //	    $13,
 //	    $14,
 //	    $15,
-//	    $16
+//	    $16,
+//	    $17,
+//	    $18
 //	)
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, createPartyRoom,
 		arg.RoomID,
@@ -127,6 +401,8 @@ func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams
 		arg.ActiveGameID,
 		arg.LastFinishedSessionID,
 		arg.LastFinishedGameID,
+		arg.SelectedGameID,
+		arg.OwnershipEpoch,
 		arg.RoomVersion,
 		arg.MembershipVersion,
 		arg.CreatedAt,
@@ -150,6 +426,8 @@ func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
 	)
 	return i, err
 }
@@ -171,6 +449,112 @@ type CreateRoomActivityLeaseParams struct {
 func (q *Queries) CreateRoomActivityLease(ctx context.Context, arg CreateRoomActivityLeaseParams) error {
 	_, err := q.db.Exec(ctx, createRoomActivityLease, arg.RoomID, arg.LastSeenAt)
 	return err
+}
+
+const createRoomGameConfigDraft = `-- name: CreateRoomGameConfigDraft :one
+INSERT INTO room_game_config_drafts (
+    room_id,
+    game_id,
+    engine_version,
+    protocol_version,
+    client_version,
+    config_schema_version,
+    config_message_type,
+    config_payload,
+    revision,
+    updated_by,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11
+)
+RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+    config_schema_version, config_message_type, config_payload, revision,
+    updated_by, updated_at
+`
+
+type CreateRoomGameConfigDraftParams struct {
+	RoomID              pgtype.UUID        `json:"room_id"`
+	GameID              string             `json:"game_id"`
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	UpdatedBy           pgtype.UUID        `json:"updated_by"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+// CreateRoomGameConfigDraft
+//
+//	INSERT INTO room_game_config_drafts (
+//	    room_id,
+//	    game_id,
+//	    engine_version,
+//	    protocol_version,
+//	    client_version,
+//	    config_schema_version,
+//	    config_message_type,
+//	    config_payload,
+//	    revision,
+//	    updated_by,
+//	    updated_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10,
+//	    $11
+//	)
+//	RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+//	    config_schema_version, config_message_type, config_payload, revision,
+//	    updated_by, updated_at
+func (q *Queries) CreateRoomGameConfigDraft(ctx context.Context, arg CreateRoomGameConfigDraftParams) (RoomGameConfigDraft, error) {
+	row := q.db.QueryRow(ctx, createRoomGameConfigDraft,
+		arg.RoomID,
+		arg.GameID,
+		arg.EngineVersion,
+		arg.ProtocolVersion,
+		arg.ClientVersion,
+		arg.ConfigSchemaVersion,
+		arg.ConfigMessageType,
+		arg.ConfigPayload,
+		arg.Revision,
+		arg.UpdatedBy,
+		arg.UpdatedAt,
+	)
+	var i RoomGameConfigDraft
+	err := row.Scan(
+		&i.RoomID,
+		&i.GameID,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const createRoomMember = `-- name: CreateRoomMember :exec
@@ -235,6 +619,378 @@ func (q *Queries) CreateRoomMember(ctx context.Context, arg CreateRoomMemberPara
 	return err
 }
 
+const createRoomPendingStart = `-- name: CreateRoomPendingStart :one
+INSERT INTO room_pending_starts (
+    pending_start_id,
+    room_id,
+    cancel_token,
+    game_id,
+    config_revision,
+    expected_room_version,
+    expected_membership_version,
+    ownership_epoch,
+    operation_id,
+    request_digest,
+    deadline_at,
+    created_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12
+)
+RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+`
+
+type CreateRoomPendingStartParams struct {
+	PendingStartID            pgtype.UUID        `json:"pending_start_id"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	CancelToken               string             `json:"cancel_token"`
+	GameID                    string             `json:"game_id"`
+	ConfigRevision            int64              `json:"config_revision"`
+	ExpectedRoomVersion       int64              `json:"expected_room_version"`
+	ExpectedMembershipVersion int64              `json:"expected_membership_version"`
+	OwnershipEpoch            int64              `json:"ownership_epoch"`
+	OperationID               string             `json:"operation_id"`
+	RequestDigest             []byte             `json:"request_digest"`
+	DeadlineAt                pgtype.Timestamptz `json:"deadline_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+}
+
+// CreateRoomPendingStart
+//
+//	INSERT INTO room_pending_starts (
+//	    pending_start_id,
+//	    room_id,
+//	    cancel_token,
+//	    game_id,
+//	    config_revision,
+//	    expected_room_version,
+//	    expected_membership_version,
+//	    ownership_epoch,
+//	    operation_id,
+//	    request_digest,
+//	    deadline_at,
+//	    created_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10,
+//	    $11,
+//	    $12
+//	)
+//	RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+func (q *Queries) CreateRoomPendingStart(ctx context.Context, arg CreateRoomPendingStartParams) (RoomPendingStart, error) {
+	row := q.db.QueryRow(ctx, createRoomPendingStart,
+		arg.PendingStartID,
+		arg.RoomID,
+		arg.CancelToken,
+		arg.GameID,
+		arg.ConfigRevision,
+		arg.ExpectedRoomVersion,
+		arg.ExpectedMembershipVersion,
+		arg.OwnershipEpoch,
+		arg.OperationID,
+		arg.RequestDigest,
+		arg.DeadlineAt,
+		arg.CreatedAt,
+	)
+	var i RoomPendingStart
+	err := row.Scan(
+		&i.PendingStartID,
+		&i.RoomID,
+		&i.CancelToken,
+		&i.GameID,
+		&i.ConfigRevision,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.DeadlineAt,
+		&i.CreatedAt,
+		&i.CancelledAt,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
+
+const createRoomRuleOperationRecord = `-- name: CreateRoomRuleOperationRecord :one
+INSERT INTO room_rule_operation_records (
+    operation_id,
+    operation_kind,
+    request_digest,
+    room_id,
+    owner_user_id,
+    preset_id,
+    pending_start_id,
+    game_id,
+    result_revision,
+    engine_version,
+    protocol_version,
+    client_version,
+    config_schema_version,
+    config_message_type,
+    config_payload,
+    result_name,
+    result_created_at,
+    result_updated_at,
+    result_last_used_at,
+    result_compatible,
+    result_updated_by,
+    cancel_token,
+    deadline_at,
+    expected_room_version,
+    expected_membership_version,
+    ownership_epoch,
+    config_revision,
+    created_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21,
+    $22,
+    $23,
+    $24,
+    $25,
+    $26,
+    $27,
+    $28
+)
+RETURNING operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+    pending_start_id, game_id, result_revision, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    result_name, result_created_at, result_updated_at, result_last_used_at,
+    result_compatible, result_updated_by, cancel_token, deadline_at,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    config_revision, created_at
+`
+
+type CreateRoomRuleOperationRecordParams struct {
+	OperationID               string             `json:"operation_id"`
+	OperationKind             string             `json:"operation_kind"`
+	RequestDigest             []byte             `json:"request_digest"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	OwnerUserID               pgtype.UUID        `json:"owner_user_id"`
+	PresetID                  pgtype.UUID        `json:"preset_id"`
+	PendingStartID            pgtype.UUID        `json:"pending_start_id"`
+	GameID                    pgtype.Text        `json:"game_id"`
+	ResultRevision            pgtype.Int8        `json:"result_revision"`
+	EngineVersion             pgtype.Text        `json:"engine_version"`
+	ProtocolVersion           pgtype.Text        `json:"protocol_version"`
+	ClientVersion             pgtype.Text        `json:"client_version"`
+	ConfigSchemaVersion       pgtype.Int4        `json:"config_schema_version"`
+	ConfigMessageType         pgtype.Text        `json:"config_message_type"`
+	ConfigPayload             []byte             `json:"config_payload"`
+	ResultName                pgtype.Text        `json:"result_name"`
+	ResultCreatedAt           pgtype.Timestamptz `json:"result_created_at"`
+	ResultUpdatedAt           pgtype.Timestamptz `json:"result_updated_at"`
+	ResultLastUsedAt          pgtype.Timestamptz `json:"result_last_used_at"`
+	ResultCompatible          pgtype.Bool        `json:"result_compatible"`
+	ResultUpdatedBy           pgtype.UUID        `json:"result_updated_by"`
+	CancelToken               pgtype.Text        `json:"cancel_token"`
+	DeadlineAt                pgtype.Timestamptz `json:"deadline_at"`
+	ExpectedRoomVersion       pgtype.Int8        `json:"expected_room_version"`
+	ExpectedMembershipVersion pgtype.Int8        `json:"expected_membership_version"`
+	OwnershipEpoch            pgtype.Int8        `json:"ownership_epoch"`
+	ConfigRevision            pgtype.Int8        `json:"config_revision"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+}
+
+// CreateRoomRuleOperationRecord
+//
+//	INSERT INTO room_rule_operation_records (
+//	    operation_id,
+//	    operation_kind,
+//	    request_digest,
+//	    room_id,
+//	    owner_user_id,
+//	    preset_id,
+//	    pending_start_id,
+//	    game_id,
+//	    result_revision,
+//	    engine_version,
+//	    protocol_version,
+//	    client_version,
+//	    config_schema_version,
+//	    config_message_type,
+//	    config_payload,
+//	    result_name,
+//	    result_created_at,
+//	    result_updated_at,
+//	    result_last_used_at,
+//	    result_compatible,
+//	    result_updated_by,
+//	    cancel_token,
+//	    deadline_at,
+//	    expected_room_version,
+//	    expected_membership_version,
+//	    ownership_epoch,
+//	    config_revision,
+//	    created_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10,
+//	    $11,
+//	    $12,
+//	    $13,
+//	    $14,
+//	    $15,
+//	    $16,
+//	    $17,
+//	    $18,
+//	    $19,
+//	    $20,
+//	    $21,
+//	    $22,
+//	    $23,
+//	    $24,
+//	    $25,
+//	    $26,
+//	    $27,
+//	    $28
+//	)
+//	RETURNING operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+//	    pending_start_id, game_id, result_revision, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    result_name, result_created_at, result_updated_at, result_last_used_at,
+//	    result_compatible, result_updated_by, cancel_token, deadline_at,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    config_revision, created_at
+func (q *Queries) CreateRoomRuleOperationRecord(ctx context.Context, arg CreateRoomRuleOperationRecordParams) (RoomRuleOperationRecord, error) {
+	row := q.db.QueryRow(ctx, createRoomRuleOperationRecord,
+		arg.OperationID,
+		arg.OperationKind,
+		arg.RequestDigest,
+		arg.RoomID,
+		arg.OwnerUserID,
+		arg.PresetID,
+		arg.PendingStartID,
+		arg.GameID,
+		arg.ResultRevision,
+		arg.EngineVersion,
+		arg.ProtocolVersion,
+		arg.ClientVersion,
+		arg.ConfigSchemaVersion,
+		arg.ConfigMessageType,
+		arg.ConfigPayload,
+		arg.ResultName,
+		arg.ResultCreatedAt,
+		arg.ResultUpdatedAt,
+		arg.ResultLastUsedAt,
+		arg.ResultCompatible,
+		arg.ResultUpdatedBy,
+		arg.CancelToken,
+		arg.DeadlineAt,
+		arg.ExpectedRoomVersion,
+		arg.ExpectedMembershipVersion,
+		arg.OwnershipEpoch,
+		arg.ConfigRevision,
+		arg.CreatedAt,
+	)
+	var i RoomRuleOperationRecord
+	err := row.Scan(
+		&i.OperationID,
+		&i.OperationKind,
+		&i.RequestDigest,
+		&i.RoomID,
+		&i.OwnerUserID,
+		&i.PresetID,
+		&i.PendingStartID,
+		&i.GameID,
+		&i.ResultRevision,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.ResultName,
+		&i.ResultCreatedAt,
+		&i.ResultUpdatedAt,
+		&i.ResultLastUsedAt,
+		&i.ResultCompatible,
+		&i.ResultUpdatedBy,
+		&i.CancelToken,
+		&i.DeadlineAt,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.ConfigRevision,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteGameRulePreset = `-- name: DeleteGameRulePreset :exec
+DELETE FROM game_rule_presets
+WHERE preset_id = $1
+  AND owner_user_id = $2
+  AND revision = $3
+`
+
+type DeleteGameRulePresetParams struct {
+	PresetID         pgtype.UUID `json:"preset_id"`
+	OwnerUserID      pgtype.UUID `json:"owner_user_id"`
+	ExpectedRevision int64       `json:"expected_revision"`
+}
+
+// DeleteGameRulePreset
+//
+//	DELETE FROM game_rule_presets
+//	WHERE preset_id = $1
+//	  AND owner_user_id = $2
+//	  AND revision = $3
+func (q *Queries) DeleteGameRulePreset(ctx context.Context, arg DeleteGameRulePresetParams) error {
+	_, err := q.db.Exec(ctx, deleteGameRulePreset, arg.PresetID, arg.OwnerUserID, arg.ExpectedRevision)
+	return err
+}
+
 const deleteRoomMembers = `-- name: DeleteRoomMembers :exec
 DELETE FROM room_members WHERE room_id = $1
 `
@@ -248,6 +1004,33 @@ type DeleteRoomMembersParams struct {
 //	DELETE FROM room_members WHERE room_id = $1
 func (q *Queries) DeleteRoomMembers(ctx context.Context, arg DeleteRoomMembersParams) error {
 	_, err := q.db.Exec(ctx, deleteRoomMembers, arg.RoomID)
+	return err
+}
+
+const expireRoomPendingStarts = `-- name: ExpireRoomPendingStarts :exec
+UPDATE room_pending_starts
+SET cancelled_at = $1
+WHERE room_id = $2
+  AND cancelled_at IS NULL
+  AND consumed_at IS NULL
+  AND deadline_at <= $1
+`
+
+type ExpireRoomPendingStartsParams struct {
+	CancelledAt pgtype.Timestamptz `json:"cancelled_at"`
+	RoomID      pgtype.UUID        `json:"room_id"`
+}
+
+// ExpireRoomPendingStarts
+//
+//	UPDATE room_pending_starts
+//	SET cancelled_at = $1
+//	WHERE room_id = $2
+//	  AND cancelled_at IS NULL
+//	  AND consumed_at IS NULL
+//	  AND deadline_at <= $1
+func (q *Queries) ExpireRoomPendingStarts(ctx context.Context, arg ExpireRoomPendingStartsParams) error {
+	_, err := q.db.Exec(ctx, expireRoomPendingStarts, arg.CancelledAt, arg.RoomID)
 	return err
 }
 
@@ -270,7 +1053,7 @@ WHERE room_id = $3
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 `
 
 type FinishPartyRoomCASParams struct {
@@ -303,7 +1086,7 @@ type FinishPartyRoomCASParams struct {
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 func (q *Queries) FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, finishPartyRoomCAS,
 		arg.RoomVersion,
@@ -332,6 +1115,97 @@ func (q *Queries) FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCAS
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
+	)
+	return i, err
+}
+
+const getGameRulePresetForUpdate = `-- name: GetGameRulePresetForUpdate :one
+SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    revision, compatible, created_at, updated_at, last_used_at
+FROM game_rule_presets
+WHERE preset_id = $1
+FOR UPDATE
+`
+
+type GetGameRulePresetForUpdateParams struct {
+	PresetID pgtype.UUID `json:"preset_id"`
+}
+
+// GetGameRulePresetForUpdate
+//
+//	SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    revision, compatible, created_at, updated_at, last_used_at
+//	FROM game_rule_presets
+//	WHERE preset_id = $1
+//	FOR UPDATE
+func (q *Queries) GetGameRulePresetForUpdate(ctx context.Context, arg GetGameRulePresetForUpdateParams) (GameRulePreset, error) {
+	row := q.db.QueryRow(ctx, getGameRulePresetForUpdate, arg.PresetID)
+	var i GameRulePreset
+	err := row.Scan(
+		&i.PresetID,
+		&i.OwnerUserID,
+		&i.GameID,
+		&i.Name,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.Compatible,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastUsedAt,
+	)
+	return i, err
+}
+
+const getLatestRoomPendingStart = `-- name: GetLatestRoomPendingStart :one
+SELECT pending_start_id, room_id, cancel_token, game_id, config_revision,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+FROM room_pending_starts
+WHERE room_id = $1
+ORDER BY created_at DESC, pending_start_id DESC
+LIMIT 1
+`
+
+type GetLatestRoomPendingStartParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+// GetLatestRoomPendingStart
+//
+//	SELECT pending_start_id, room_id, cancel_token, game_id, config_revision,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+//	FROM room_pending_starts
+//	WHERE room_id = $1
+//	ORDER BY created_at DESC, pending_start_id DESC
+//	LIMIT 1
+func (q *Queries) GetLatestRoomPendingStart(ctx context.Context, arg GetLatestRoomPendingStartParams) (RoomPendingStart, error) {
+	row := q.db.QueryRow(ctx, getLatestRoomPendingStart, arg.RoomID)
+	var i RoomPendingStart
+	err := row.Scan(
+		&i.PendingStartID,
+		&i.RoomID,
+		&i.CancelToken,
+		&i.GameID,
+		&i.ConfigRevision,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.DeadlineAt,
+		&i.CreatedAt,
+		&i.CancelledAt,
+		&i.ConsumedAt,
 	)
 	return i, err
 }
@@ -340,7 +1214,7 @@ const getPartyRoomByCodeForShare = `-- name: GetPartyRoomByCodeForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 FROM party_rooms
 WHERE room_code = $1
 FOR SHARE
@@ -355,7 +1229,7 @@ type GetPartyRoomByCodeForShareParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 //	FROM party_rooms
 //	WHERE room_code = $1
 //	FOR SHARE
@@ -379,6 +1253,8 @@ func (q *Queries) GetPartyRoomByCodeForShare(ctx context.Context, arg GetPartyRo
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
 	)
 	return i, err
 }
@@ -387,7 +1263,7 @@ const getPartyRoomForShare = `-- name: GetPartyRoomForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 FROM party_rooms
 WHERE room_id = $1
 FOR SHARE
@@ -402,7 +1278,7 @@ type GetPartyRoomForShareParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 //	FROM party_rooms
 //	WHERE room_id = $1
 //	FOR SHARE
@@ -426,6 +1302,8 @@ func (q *Queries) GetPartyRoomForShare(ctx context.Context, arg GetPartyRoomForS
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
 	)
 	return i, err
 }
@@ -434,7 +1312,7 @@ const getPartyRoomForUpdate = `-- name: GetPartyRoomForUpdate :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 FROM party_rooms
 WHERE room_id = $1
 FOR UPDATE
@@ -449,7 +1327,7 @@ type GetPartyRoomForUpdateParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 //	FROM party_rooms
 //	WHERE room_id = $1
 //	FOR UPDATE
@@ -473,6 +1351,92 @@ func (q *Queries) GetPartyRoomForUpdate(ctx context.Context, arg GetPartyRoomFor
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
+	)
+	return i, err
+}
+
+const getRoomGameConfigDraft = `-- name: GetRoomGameConfigDraft :one
+SELECT room_id, game_id, engine_version, protocol_version, client_version,
+    config_schema_version, config_message_type, config_payload, revision,
+    updated_by, updated_at
+FROM room_game_config_drafts
+WHERE room_id = $1
+  AND game_id = $2
+`
+
+type GetRoomGameConfigDraftParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+	GameID string      `json:"game_id"`
+}
+
+// GetRoomGameConfigDraft
+//
+//	SELECT room_id, game_id, engine_version, protocol_version, client_version,
+//	    config_schema_version, config_message_type, config_payload, revision,
+//	    updated_by, updated_at
+//	FROM room_game_config_drafts
+//	WHERE room_id = $1
+//	  AND game_id = $2
+func (q *Queries) GetRoomGameConfigDraft(ctx context.Context, arg GetRoomGameConfigDraftParams) (RoomGameConfigDraft, error) {
+	row := q.db.QueryRow(ctx, getRoomGameConfigDraft, arg.RoomID, arg.GameID)
+	var i RoomGameConfigDraft
+	err := row.Scan(
+		&i.RoomID,
+		&i.GameID,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getRoomGameConfigDraftForUpdate = `-- name: GetRoomGameConfigDraftForUpdate :one
+SELECT room_id, game_id, engine_version, protocol_version, client_version,
+    config_schema_version, config_message_type, config_payload, revision,
+    updated_by, updated_at
+FROM room_game_config_drafts
+WHERE room_id = $1
+  AND game_id = $2
+FOR UPDATE
+`
+
+type GetRoomGameConfigDraftForUpdateParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+	GameID string      `json:"game_id"`
+}
+
+// GetRoomGameConfigDraftForUpdate
+//
+//	SELECT room_id, game_id, engine_version, protocol_version, client_version,
+//	    config_schema_version, config_message_type, config_payload, revision,
+//	    updated_by, updated_at
+//	FROM room_game_config_drafts
+//	WHERE room_id = $1
+//	  AND game_id = $2
+//	FOR UPDATE
+func (q *Queries) GetRoomGameConfigDraftForUpdate(ctx context.Context, arg GetRoomGameConfigDraftForUpdateParams) (RoomGameConfigDraft, error) {
+	row := q.db.QueryRow(ctx, getRoomGameConfigDraftForUpdate, arg.RoomID, arg.GameID)
+	var i RoomGameConfigDraft
+	err := row.Scan(
+		&i.RoomID,
+		&i.GameID,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -500,6 +1464,132 @@ func (q *Queries) GetRoomMemberRole(ctx context.Context, arg GetRoomMemberRolePa
 	var role string
 	err := row.Scan(&role)
 	return role, err
+}
+
+const getRoomRuleOperationRecord = `-- name: GetRoomRuleOperationRecord :one
+SELECT operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+    pending_start_id, game_id, result_revision, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    result_name, result_created_at, result_updated_at, result_last_used_at,
+    result_compatible, result_updated_by, cancel_token, deadline_at,
+    expected_room_version, expected_membership_version, ownership_epoch,
+    config_revision, created_at
+FROM room_rule_operation_records
+WHERE operation_kind = $1
+  AND operation_id = $2
+`
+
+type GetRoomRuleOperationRecordParams struct {
+	OperationKind string `json:"operation_kind"`
+	OperationID   string `json:"operation_id"`
+}
+
+// GetRoomRuleOperationRecord
+//
+//	SELECT operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+//	    pending_start_id, game_id, result_revision, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    result_name, result_created_at, result_updated_at, result_last_used_at,
+//	    result_compatible, result_updated_by, cancel_token, deadline_at,
+//	    expected_room_version, expected_membership_version, ownership_epoch,
+//	    config_revision, created_at
+//	FROM room_rule_operation_records
+//	WHERE operation_kind = $1
+//	  AND operation_id = $2
+func (q *Queries) GetRoomRuleOperationRecord(ctx context.Context, arg GetRoomRuleOperationRecordParams) (RoomRuleOperationRecord, error) {
+	row := q.db.QueryRow(ctx, getRoomRuleOperationRecord, arg.OperationKind, arg.OperationID)
+	var i RoomRuleOperationRecord
+	err := row.Scan(
+		&i.OperationID,
+		&i.OperationKind,
+		&i.RequestDigest,
+		&i.RoomID,
+		&i.OwnerUserID,
+		&i.PresetID,
+		&i.PendingStartID,
+		&i.GameID,
+		&i.ResultRevision,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.ResultName,
+		&i.ResultCreatedAt,
+		&i.ResultUpdatedAt,
+		&i.ResultLastUsedAt,
+		&i.ResultCompatible,
+		&i.ResultUpdatedBy,
+		&i.CancelToken,
+		&i.DeadlineAt,
+		&i.ExpectedRoomVersion,
+		&i.ExpectedMembershipVersion,
+		&i.OwnershipEpoch,
+		&i.ConfigRevision,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listGameRulePresets = `-- name: ListGameRulePresets :many
+SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    revision, compatible, created_at, updated_at, last_used_at
+FROM game_rule_presets
+WHERE owner_user_id = $1
+  AND ($2::text = '' OR game_id = $2::text)
+ORDER BY updated_at DESC, preset_id DESC
+`
+
+type ListGameRulePresetsParams struct {
+	OwnerUserID pgtype.UUID `json:"owner_user_id"`
+	GameID      string      `json:"game_id"`
+}
+
+// ListGameRulePresets
+//
+//	SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    revision, compatible, created_at, updated_at, last_used_at
+//	FROM game_rule_presets
+//	WHERE owner_user_id = $1
+//	  AND ($2::text = '' OR game_id = $2::text)
+//	ORDER BY updated_at DESC, preset_id DESC
+func (q *Queries) ListGameRulePresets(ctx context.Context, arg ListGameRulePresetsParams) ([]GameRulePreset, error) {
+	rows, err := q.db.Query(ctx, listGameRulePresets, arg.OwnerUserID, arg.GameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GameRulePreset{}
+	for rows.Next() {
+		var i GameRulePreset
+		if err := rows.Scan(
+			&i.PresetID,
+			&i.OwnerUserID,
+			&i.GameID,
+			&i.Name,
+			&i.EngineVersion,
+			&i.ProtocolVersion,
+			&i.ClientVersion,
+			&i.ConfigSchemaVersion,
+			&i.ConfigMessageType,
+			&i.ConfigPayload,
+			&i.Revision,
+			&i.Compatible,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMyRoomCards = `-- name: ListMyRoomCards :many
@@ -850,6 +1940,59 @@ func (q *Queries) ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCar
 	return items, nil
 }
 
+const listRoomGameConfigDrafts = `-- name: ListRoomGameConfigDrafts :many
+SELECT room_id, game_id, engine_version, protocol_version, client_version,
+    config_schema_version, config_message_type, config_payload, revision,
+    updated_by, updated_at
+FROM room_game_config_drafts
+WHERE room_id = $1
+ORDER BY game_id
+`
+
+type ListRoomGameConfigDraftsParams struct {
+	RoomID pgtype.UUID `json:"room_id"`
+}
+
+// ListRoomGameConfigDrafts
+//
+//	SELECT room_id, game_id, engine_version, protocol_version, client_version,
+//	    config_schema_version, config_message_type, config_payload, revision,
+//	    updated_by, updated_at
+//	FROM room_game_config_drafts
+//	WHERE room_id = $1
+//	ORDER BY game_id
+func (q *Queries) ListRoomGameConfigDrafts(ctx context.Context, arg ListRoomGameConfigDraftsParams) ([]RoomGameConfigDraft, error) {
+	rows, err := q.db.Query(ctx, listRoomGameConfigDrafts, arg.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RoomGameConfigDraft{}
+	for rows.Next() {
+		var i RoomGameConfigDraft
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.GameID,
+			&i.EngineVersion,
+			&i.ProtocolVersion,
+			&i.ClientVersion,
+			&i.ConfigSchemaVersion,
+			&i.ConfigMessageType,
+			&i.ConfigPayload,
+			&i.Revision,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRoomMemberUsernames = `-- name: ListRoomMemberUsernames :many
 SELECT member.user_id, users.username
 FROM room_members AS member
@@ -963,6 +2106,23 @@ func (q *Queries) LockRoomActivityLease(ctx context.Context, arg LockRoomActivit
 	return last_seen_at, err
 }
 
+const lockRoomRuleOperationKey = `-- name: LockRoomRuleOperationKey :exec
+SELECT pg_advisory_xact_lock(pg_catalog.hashtextextended($1::text || ':' || $2::text, 0))
+`
+
+type LockRoomRuleOperationKeyParams struct {
+	OperationKind string `json:"operation_kind"`
+	OperationID   string `json:"operation_id"`
+}
+
+// LockRoomRuleOperationKey
+//
+//	SELECT pg_advisory_xact_lock(pg_catalog.hashtextextended($1::text || ':' || $2::text, 0))
+func (q *Queries) LockRoomRuleOperationKey(ctx context.Context, arg LockRoomRuleOperationKeyParams) error {
+	_, err := q.db.Exec(ctx, lockRoomRuleOperationKey, arg.OperationKind, arg.OperationID)
+	return err
+}
+
 const touchRoomActivityLease = `-- name: TouchRoomActivityLease :one
 UPDATE room_activity_leases
 SET last_seen_at = GREATEST(last_seen_at, pg_catalog.clock_timestamp())
@@ -987,6 +2147,98 @@ func (q *Queries) TouchRoomActivityLease(ctx context.Context, arg TouchRoomActiv
 	return last_seen_at, err
 }
 
+const updateGameRulePreset = `-- name: UpdateGameRulePreset :one
+UPDATE game_rule_presets
+SET name = $1,
+    engine_version = $2,
+    protocol_version = $3,
+    client_version = $4,
+    config_schema_version = $5,
+    config_message_type = $6,
+    config_payload = $7,
+    revision = $8,
+    compatible = $9,
+    updated_at = $10,
+    last_used_at = $11
+WHERE preset_id = $12
+  AND revision = $13
+RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+    client_version, config_schema_version, config_message_type, config_payload,
+    revision, compatible, created_at, updated_at, last_used_at
+`
+
+type UpdateGameRulePresetParams struct {
+	Name                string             `json:"name"`
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	Compatible          bool               `json:"compatible"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	LastUsedAt          pgtype.Timestamptz `json:"last_used_at"`
+	PresetID            pgtype.UUID        `json:"preset_id"`
+	ExpectedRevision    int64              `json:"expected_revision"`
+}
+
+// UpdateGameRulePreset
+//
+//	UPDATE game_rule_presets
+//	SET name = $1,
+//	    engine_version = $2,
+//	    protocol_version = $3,
+//	    client_version = $4,
+//	    config_schema_version = $5,
+//	    config_message_type = $6,
+//	    config_payload = $7,
+//	    revision = $8,
+//	    compatible = $9,
+//	    updated_at = $10,
+//	    last_used_at = $11
+//	WHERE preset_id = $12
+//	  AND revision = $13
+//	RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+//	    client_version, config_schema_version, config_message_type, config_payload,
+//	    revision, compatible, created_at, updated_at, last_used_at
+func (q *Queries) UpdateGameRulePreset(ctx context.Context, arg UpdateGameRulePresetParams) (GameRulePreset, error) {
+	row := q.db.QueryRow(ctx, updateGameRulePreset,
+		arg.Name,
+		arg.EngineVersion,
+		arg.ProtocolVersion,
+		arg.ClientVersion,
+		arg.ConfigSchemaVersion,
+		arg.ConfigMessageType,
+		arg.ConfigPayload,
+		arg.Revision,
+		arg.Compatible,
+		arg.UpdatedAt,
+		arg.LastUsedAt,
+		arg.PresetID,
+		arg.ExpectedRevision,
+	)
+	var i GameRulePreset
+	err := row.Scan(
+		&i.PresetID,
+		&i.OwnerUserID,
+		&i.GameID,
+		&i.Name,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.Compatible,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastUsedAt,
+	)
+	return i, err
+}
+
 const updatePartyRoomCAS = `-- name: UpdatePartyRoomCAS :one
 UPDATE party_rooms
 SET visibility = $1,
@@ -999,17 +2251,20 @@ SET visibility = $1,
     active_game_id = $8,
     last_finished_session_id = $9,
     last_finished_game_id = $10,
-    room_version = $11,
-    membership_version = $12,
-    updated_at = $13
-WHERE room_id = $14
-  AND room_code = $15
-  AND room_version = $16
-  AND membership_version = $17
+    selected_game_id = $11,
+    ownership_epoch = $12,
+    room_version = $13,
+    membership_version = $14,
+    updated_at = $15
+WHERE room_id = $16
+  AND room_code = $17
+  AND ownership_epoch = $18
+  AND room_version = $19
+  AND membership_version = $20
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 `
 
 type UpdatePartyRoomCASParams struct {
@@ -1023,11 +2278,14 @@ type UpdatePartyRoomCASParams struct {
 	ActiveGameID              pgtype.Text        `json:"active_game_id"`
 	LastFinishedSessionID     pgtype.UUID        `json:"last_finished_session_id"`
 	LastFinishedGameID        pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID            string             `json:"selected_game_id"`
+	OwnershipEpoch            int64              `json:"ownership_epoch"`
 	RoomVersion               int64              `json:"room_version"`
 	MembershipVersion         int64              `json:"membership_version"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	RoomID                    pgtype.UUID        `json:"room_id"`
 	RoomCode                  string             `json:"room_code"`
+	ExpectedOwnershipEpoch    int64              `json:"expected_ownership_epoch"`
 	ExpectedRoomVersion       int64              `json:"expected_room_version"`
 	ExpectedMembershipVersion int64              `json:"expected_membership_version"`
 }
@@ -1045,17 +2303,20 @@ type UpdatePartyRoomCASParams struct {
 //	    active_game_id = $8,
 //	    last_finished_session_id = $9,
 //	    last_finished_game_id = $10,
-//	    room_version = $11,
-//	    membership_version = $12,
-//	    updated_at = $13
-//	WHERE room_id = $14
-//	  AND room_code = $15
-//	  AND room_version = $16
-//	  AND membership_version = $17
+//	    selected_game_id = $11,
+//	    ownership_epoch = $12,
+//	    room_version = $13,
+//	    membership_version = $14,
+//	    updated_at = $15
+//	WHERE room_id = $16
+//	  AND room_code = $17
+//	  AND ownership_epoch = $18
+//	  AND room_version = $19
+//	  AND membership_version = $20
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, updatePartyRoomCAS,
 		arg.Visibility,
@@ -1068,11 +2329,14 @@ func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCAS
 		arg.ActiveGameID,
 		arg.LastFinishedSessionID,
 		arg.LastFinishedGameID,
+		arg.SelectedGameID,
+		arg.OwnershipEpoch,
 		arg.RoomVersion,
 		arg.MembershipVersion,
 		arg.UpdatedAt,
 		arg.RoomID,
 		arg.RoomCode,
+		arg.ExpectedOwnershipEpoch,
 		arg.ExpectedRoomVersion,
 		arg.ExpectedMembershipVersion,
 	)
@@ -1094,6 +2358,92 @@ func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCAS
 		&i.UpdatedAt,
 		&i.LastFinishedSessionID,
 		&i.LastFinishedGameID,
+		&i.SelectedGameID,
+		&i.OwnershipEpoch,
+	)
+	return i, err
+}
+
+const updateRoomGameConfigDraft = `-- name: UpdateRoomGameConfigDraft :one
+UPDATE room_game_config_drafts
+SET engine_version = $1,
+    protocol_version = $2,
+    client_version = $3,
+    config_schema_version = $4,
+    config_message_type = $5,
+    config_payload = $6,
+    revision = $7,
+    updated_by = $8,
+    updated_at = $9
+WHERE room_id = $10
+  AND game_id = $11
+  AND revision = $12
+RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+    config_schema_version, config_message_type, config_payload, revision,
+    updated_by, updated_at
+`
+
+type UpdateRoomGameConfigDraftParams struct {
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	UpdatedBy           pgtype.UUID        `json:"updated_by"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	RoomID              pgtype.UUID        `json:"room_id"`
+	GameID              string             `json:"game_id"`
+	ExpectedRevision    int64              `json:"expected_revision"`
+}
+
+// UpdateRoomGameConfigDraft
+//
+//	UPDATE room_game_config_drafts
+//	SET engine_version = $1,
+//	    protocol_version = $2,
+//	    client_version = $3,
+//	    config_schema_version = $4,
+//	    config_message_type = $5,
+//	    config_payload = $6,
+//	    revision = $7,
+//	    updated_by = $8,
+//	    updated_at = $9
+//	WHERE room_id = $10
+//	  AND game_id = $11
+//	  AND revision = $12
+//	RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+//	    config_schema_version, config_message_type, config_payload, revision,
+//	    updated_by, updated_at
+func (q *Queries) UpdateRoomGameConfigDraft(ctx context.Context, arg UpdateRoomGameConfigDraftParams) (RoomGameConfigDraft, error) {
+	row := q.db.QueryRow(ctx, updateRoomGameConfigDraft,
+		arg.EngineVersion,
+		arg.ProtocolVersion,
+		arg.ClientVersion,
+		arg.ConfigSchemaVersion,
+		arg.ConfigMessageType,
+		arg.ConfigPayload,
+		arg.Revision,
+		arg.UpdatedBy,
+		arg.UpdatedAt,
+		arg.RoomID,
+		arg.GameID,
+		arg.ExpectedRevision,
+	)
+	var i RoomGameConfigDraft
+	err := row.Scan(
+		&i.RoomID,
+		&i.GameID,
+		&i.EngineVersion,
+		&i.ProtocolVersion,
+		&i.ClientVersion,
+		&i.ConfigSchemaVersion,
+		&i.ConfigMessageType,
+		&i.ConfigPayload,
+		&i.Revision,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

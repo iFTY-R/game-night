@@ -88,10 +88,16 @@ type RoomSnapshot struct {
 	ActiveGameID          string
 	LastFinishedSessionID uuid.UUID
 	LastFinishedGameID    string
-	RoomVersion           uint64
-	MembershipVersion     uint64
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	// SelectedGameID is the synchronized pregame table. It remains stable across
+	// post-game reopening and is distinct from the active session game.
+	SelectedGameID    string
+	RoomVersion       uint64
+	MembershipVersion uint64
+	// OwnershipEpoch fences host-controlled writes and pending starts after a
+	// future host transfer; legacy rows without the column normalize to 1.
+	OwnershipEpoch uint64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // Room is an immutable aggregate. Commands return a new value so repositories can CAS the exact snapshot version.
@@ -165,15 +171,28 @@ func NewWithAdmission(
 			JoinedAt: createdAt, LastSeenAt: createdAt,
 		}},
 		RoomVersion: 1, MembershipVersion: 1, CreatedAt: createdAt, UpdatedAt: createdAt,
+		SelectedGameID: defaultSelectedGameID,
 	})
 }
 
 // Restore validates persisted state and copies member slices so callers cannot mutate aggregate-owned state.
 func Restore(snapshot RoomSnapshot) (Room, error) {
 	snapshot.RoomCode = strings.TrimSpace(snapshot.RoomCode)
+	snapshot.SelectedGameID = strings.TrimSpace(snapshot.SelectedGameID)
+	if snapshot.SelectedGameID == "" {
+		// Legacy rooms predate synchronized table selection; preserve their
+		// existing start behavior with the first registered platform game.
+		snapshot.SelectedGameID = defaultSelectedGameID
+	}
 	snapshot.CreatedAt = canonicalRoomTime(snapshot.CreatedAt)
 	snapshot.UpdatedAt = canonicalRoomTime(snapshot.UpdatedAt)
-	if snapshot.ID == uuid.Nil || snapshot.HostUserID == uuid.Nil || validateRoomCode(snapshot.RoomCode) != nil ||
+	// Ownership fencing was added after the original room schema. Treat a
+	// missing value as the first epoch so old rooms remain readable while all
+	// new commands still carry an explicit non-zero epoch.
+	if snapshot.OwnershipEpoch == 0 {
+		snapshot.OwnershipEpoch = 1
+	}
+	if snapshot.ID == uuid.Nil || snapshot.HostUserID == uuid.Nil || snapshot.SelectedGameID == "" || validateRoomCode(snapshot.RoomCode) != nil ||
 		!snapshot.Visibility.Valid() || !snapshot.Status.Valid() || snapshot.ParticipantCapacity == 0 ||
 		!snapshot.ParticipantAdmission.Valid() || !snapshot.SpectatorAdmission.Valid() || snapshot.RoomVersion == 0 ||
 		snapshot.MembershipVersion == 0 || snapshot.CreatedAt.IsZero() || snapshot.UpdatedAt.Before(snapshot.CreatedAt) {
@@ -256,6 +275,12 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 	snapshot.Members = members
 	return Room{snapshot: snapshot}, nil
 }
+
+// DefaultSelectedGameID is the compatibility table used for rooms created by
+// clients that predate synchronized table selection.
+const DefaultSelectedGameID = "liars-dice"
+
+const defaultSelectedGameID = DefaultSelectedGameID
 
 // Snapshot returns a defensive copy for persistence, event publication, or API projection.
 func (room Room) Snapshot() RoomSnapshot {
@@ -373,6 +398,34 @@ func (room Room) SetAdmission(hostUserID uuid.UUID, participant, spectator Admis
 	}
 	next := room.snapshot
 	next.ParticipantAdmission, next.SpectatorAdmission = participant, spectator
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// SelectGame changes the synchronized pregame table while preserving all
+// per-game drafts. It is intentionally unavailable during an active session.
+func (room Room) SelectGame(hostUserID uuid.UUID, gameID string, expected Version, at time.Time) (Room, error) {
+	gameID = strings.TrimSpace(gameID)
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || gameID == "" || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if !room.snapshot.Status.admissionMutable() {
+		return Room{}, ErrRoomStatus
+	}
+	if room.snapshot.SelectedGameID == gameID {
+		return room, nil
+	}
+	next := room.snapshot
+	next.SelectedGameID = gameID
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}

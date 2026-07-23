@@ -5,19 +5,23 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	gameRules "github.com/iFTY-R/game-night/apps/api/internal/gamerules"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
+	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	identityDomain "github.com/iFTY-R/game-night/platform/identity"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
@@ -73,6 +77,47 @@ type Service struct {
 	authenticator PrincipalAuthenticator
 	origins       *origin.UserValidator
 	csrf          *csrf.UserValidator
+	ruleRepo      roomDomain.RuleRepository
+	ruleCatalog   *gameRules.Catalog
+	ruleClock     clock.Clock
+}
+
+// ServiceOption injects rule persistence and deterministic time without
+// changing the existing room transport constructor call sites.
+type ServiceOption func(*Service) error
+
+// WithRuleRepository replaces the local memory fallback with durable storage.
+func WithRuleRepository(repository roomDomain.RuleRepository) ServiceOption {
+	return func(service *Service) error {
+		if repository == nil {
+			return roomDomain.ErrInvalidRoomInput
+		}
+		service.ruleRepo = repository
+		return nil
+	}
+}
+
+// WithRuleCatalog replaces the built-in three-game codec catalog for tests or
+// future module registration without moving rule semantics into the platform.
+func WithRuleCatalog(catalog *gameRules.Catalog) ServiceOption {
+	return func(service *Service) error {
+		if catalog == nil {
+			return roomDomain.ErrInvalidRoomInput
+		}
+		service.ruleCatalog = catalog
+		return nil
+	}
+}
+
+// WithRuleClock supplies the same calibrated clock used by room persistence.
+func WithRuleClock(source clock.Clock) ServiceOption {
+	return func(service *Service) error {
+		if source == nil {
+			return roomDomain.ErrInvalidRoomInput
+		}
+		service.ruleClock = source
+		return nil
+	}
 }
 
 // NewService validates complete room transport wiring before the generated handler is mounted.
@@ -86,15 +131,26 @@ func NewService(
 	authenticator PrincipalAuthenticator,
 	originValidator *origin.UserValidator,
 	csrfValidator *csrf.UserValidator,
+	options ...ServiceOption,
 ) (*Service, error) {
 	if domainService == nil || catalog == nil || runtime == nil || sessions == nil || rooms == nil || fanout == nil ||
 		authenticator == nil || originValidator == nil || csrfValidator == nil {
 		return nil, roomDomain.ErrInvalidRoomInput
 	}
-	return &Service{
+	service := &Service{
 		domain: domainService, catalog: catalog, runtime: runtime, sessions: sessions, rooms: rooms, fanout: fanout,
 		authenticator: authenticator, origins: originValidator, csrf: csrfValidator,
-	}, nil
+		ruleRepo: roomDomain.NewMemoryRuleRepository(), ruleCatalog: gameRules.NewCatalog(), ruleClock: clock.System{},
+	}
+	for _, option := range options {
+		if option == nil {
+			return nil, roomDomain.ErrInvalidRoomInput
+		}
+		if err := option(service); err != nil {
+			return nil, err
+		}
+	}
+	return service, nil
 }
 
 // CreateRoom creates a server-owned room ID/code after write authorization.
@@ -136,6 +192,13 @@ func (service *Service) GetRoom(ctx context.Context, request *connect.Request[ro
 	wireRoom, err := service.roomWire(ctx, loaded)
 	if err != nil {
 		return nil, err
+	}
+	if _, member := loaded.Member(actor); !member {
+		// Public discovery is intentionally redacted. Rule drafts and pending
+		// tokens are member-only even though the room itself is discoverable.
+		wireRoom.GameConfigDrafts = nil
+		wireRoom.PendingStart = nil
+		wireRoom.OwnershipEpoch = 0
 	}
 	return connect.NewResponse(&roomv1.GetRoomResponse{Room: wireRoom}), nil
 }
@@ -299,7 +362,7 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	gameID, config, operationID, requestDigest, err := startGameInput(request.Msg)
+	gameID, config, operationID, requestDigest, frozenConfig, configRevision, err := service.prepareStart(ctx, actor, roomID, request.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -314,6 +377,25 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	})
 	if err != nil {
 		return nil, err
+	}
+	if usesPendingStart(request.Msg) {
+		pendingID, parseErr := parseUUID(request.Msg.GetPendingStartId())
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		// The session commit is the point of no return. Consuming only afterwards
+		// keeps a failed module/runtime creation retryable with the same countdown.
+		if _, consumeErr := service.ruleRepo.ConsumePendingStart(
+			ctx,
+			roomID,
+			pendingID,
+			request.Msg.GetCancelToken(),
+			operationID.Value(),
+			[32]byte(requestDigest),
+			service.ruleNow(),
+		); consumeErr != nil {
+			return nil, consumeErr
+		}
 	}
 	snapshot := session.Snapshot()
 	roomSnapshot := updated.Snapshot()
@@ -335,7 +417,77 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	}
 	return connect.NewResponse(&roomv1.StartGameResponse{
 		Room: wireRoom, SessionId: snapshot.ID.String(), GameId: string(snapshot.VersionKey.GameID), Participants: participants,
+		FrozenConfig: configEnvelopeToWire(frozenConfig), ConfigRevision: configRevision,
 	}), nil
+}
+
+// prepareStart resolves the authoritative room draft and pending token before
+// the runtime is allowed to mutate room/session state. Empty pending fields are
+// retained as a compatibility path for clients predating the countdown API.
+func (service *Service) prepareStart(ctx context.Context, actor, roomID uuid.UUID, request *roomv1.StartGameRequest) (
+	gameSDK.GameID, gameSDK.Message, idempotency.OperationID, idempotency.Digest, roomDomain.ConfigEnvelope, uint64, error,
+) {
+	usesPending := usesPendingStart(request)
+	if !usesPending {
+		legacyGameID, legacyConfig, operationID, requestDigest, err := startGameInput(request)
+		if err != nil {
+			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+		}
+		return legacyGameID, legacyConfig, operationID, requestDigest, legacyConfigEnvelope(request.GetConfig(), legacyGameID), 0, nil
+	}
+	if request.GetPendingStartId() == "" || request.GetCancelToken() == "" || request.GetConfigRevision() == 0 || request.GetOwnershipEpoch() == 0 {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, gameruntime.ErrInvalidSessionInput
+	}
+	pendingID, err := parseUUID(request.GetPendingStartId())
+	if err != nil {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+	}
+	gameID, err := gameSDK.ParseGameID(strings.TrimSpace(request.GetGameId()))
+	if err != nil {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, gameruntime.ErrInvalidSessionInput
+	}
+	operationID, requestDigest, err := operationBinding(request.GetOperationId(), request.GetRequestDigest())
+	if err != nil {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+	}
+	current, err := service.authorizeRuleHost(ctx, actor, roomID, versionDomain(request.GetExpectedVersion()), request.GetOwnershipEpoch())
+	if err != nil {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+	}
+	if current.Snapshot().SelectedGameID != string(gameID) {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrGameSelectionConflict
+	}
+	pending, err := service.ruleRepo.GetPendingStart(ctx, roomID)
+	if err != nil || pending.ID != pendingID || pending.CancelToken != request.GetCancelToken() || pending.GameID != string(gameID) ||
+		pending.ConfigRevision != request.GetConfigRevision() || pending.Expected != current.Version() || pending.OwnershipEpoch != current.Snapshot().OwnershipEpoch {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrPendingStartInvalid
+	}
+	// A pending record carries a server timestamp, so clients cannot race or
+	// locally shorten the visible countdown by calling StartGame early.
+	if service.ruleNow().Before(pending.Deadline) {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrPendingStartInvalid
+	}
+	draft, err := service.ruleRepo.GetDraft(ctx, roomID, string(gameID))
+	if err != nil || draft.Revision != pending.ConfigRevision {
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrRuleRevisionConflict
+	}
+	config := gameSDK.Message{MessageType: gameSDK.Identifier(draft.Config.MessageType), SchemaVersion: draft.Config.SchemaVersion, Payload: append([]byte(nil), draft.Config.Payload...)}
+	if request.GetConfig() != nil {
+		provided, providedErr := configEnvelopeFromGameConfig(request.GetConfig(), gameID)
+		if providedErr != nil || provided.Digest() != draft.Config.Digest() {
+			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrRuleRevisionConflict
+		}
+	}
+	return gameID, config, operationID, requestDigest, draft.Config, draft.Revision, nil
+}
+
+// usesPendingStart distinguishes the new countdown-fenced contract from the
+// legacy direct-start request without treating a partial new request as legacy.
+func usesPendingStart(request *roomv1.StartGameRequest) bool {
+	if request == nil {
+		return false
+	}
+	return request.GetPendingStartId() != "" || request.GetCancelToken() != "" || request.GetConfigRevision() != 0 || request.GetOwnershipEpoch() != 0
 }
 
 // FinishGame submits the module-owned terminal transition and clears the room pointer in the same transaction.
@@ -660,7 +812,26 @@ func (service *Service) roomWire(ctx context.Context, room roomDomain.Room) (*ro
 	if err != nil {
 		return nil, err
 	}
-	return roomWire(room, usernames), nil
+	wire := roomWire(room, usernames)
+	wire.SelectedGameId = snapshot.SelectedGameID
+	wire.OwnershipEpoch = snapshot.OwnershipEpoch
+	if service.ruleRepo != nil {
+		drafts, draftErr := service.ruleRepo.ListDrafts(ctx, snapshot.ID)
+		if draftErr != nil {
+			return nil, draftErr
+		}
+		wire.GameConfigDrafts = make([]*roomv1.RoomGameConfigDraft, 0, len(drafts))
+		for _, draft := range drafts {
+			wire.GameConfigDrafts = append(wire.GameConfigDrafts, ruleDraftWire(draft))
+		}
+		pending, pendingErr := service.ruleRepo.GetPendingStart(ctx, snapshot.ID)
+		if pendingErr == nil && !pending.Cancelled && !pending.Consumed && pending.Deadline.After(service.ruleNow()) {
+			wire.PendingStart = pendingStartWire(pending)
+		} else if pendingErr != nil && !errors.Is(pendingErr, roomDomain.ErrRuleNotFound) {
+			return nil, pendingErr
+		}
+	}
+	return wire, nil
 }
 
 func roomWire(room roomDomain.Room, usernames map[uuid.UUID]string) *roomv1.Room {
@@ -684,6 +855,7 @@ func roomWire(room roomDomain.Room, usernames map[uuid.UUID]string) *roomv1.Room
 		SpectatorAdmission: admissionWire(snapshot.SpectatorAdmission), Members: members,
 		ActiveSessionId: activeSessionID, ActiveGameId: snapshot.ActiveGameID,
 		LastFinishedSessionId: lastFinishedSessionID, LastFinishedGameId: snapshot.LastFinishedGameID,
+		SelectedGameId: snapshot.SelectedGameID, OwnershipEpoch: snapshot.OwnershipEpoch,
 		Version:   &roomv1.RoomVersion{RoomVersion: snapshot.RoomVersion, MembershipVersion: snapshot.MembershipVersion},
 		CreatedAt: timestamppb.New(snapshot.CreatedAt), UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
 	}

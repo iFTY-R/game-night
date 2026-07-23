@@ -40,6 +40,10 @@ message GameConfig {
   uint32 schema_version = 2;
   string message_type = 3;
   bytes payload = 4;
+  // VersionTuple pins the module artifacts used to decode this configuration.
+  // Field 5 was added after the initial room-start contract; older clients may
+  // omit it and are handled by the server's explicit default/compatibility path.
+  VersionTuple version = 5;
 }
 
 enum GameSessionStatus {

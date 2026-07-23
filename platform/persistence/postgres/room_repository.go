@@ -357,7 +357,8 @@ func createPartyRoomParams(snapshot roomDomain.RoomSnapshot) sqlcgen.CreateParty
 		ParticipantCapacity: int32(snapshot.ParticipantCapacity), ParticipantAdmission: string(snapshot.ParticipantAdmission),
 		SpectatorAdmission: string(snapshot.SpectatorAdmission), ActiveSessionID: optionalUUIDToPG(snapshot.ActiveSessionID),
 		ActiveGameID: textToPG(snapshot.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(snapshot.LastFinishedSessionID),
-		LastFinishedGameID: textToPG(snapshot.LastFinishedGameID), RoomVersion: int64(snapshot.RoomVersion),
+		LastFinishedGameID: textToPG(snapshot.LastFinishedGameID), SelectedGameID: snapshot.SelectedGameID,
+		OwnershipEpoch: int64(snapshot.OwnershipEpoch), RoomVersion: int64(snapshot.RoomVersion),
 		MembershipVersion: int64(snapshot.MembershipVersion), CreatedAt: timeToPG(snapshot.CreatedAt), UpdatedAt: timeToPG(snapshot.UpdatedAt),
 	}
 }
@@ -368,10 +369,11 @@ func updatePartyRoomParams(before, after roomDomain.RoomSnapshot) sqlcgen.Update
 		ParticipantCapacity: int32(after.ParticipantCapacity), ParticipantAdmission: string(after.ParticipantAdmission),
 		SpectatorAdmission: string(after.SpectatorAdmission), ActiveSessionID: optionalUUIDToPG(after.ActiveSessionID),
 		ActiveGameID: textToPG(after.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(after.LastFinishedSessionID),
-		LastFinishedGameID: textToPG(after.LastFinishedGameID), RoomVersion: int64(after.RoomVersion),
+		LastFinishedGameID: textToPG(after.LastFinishedGameID), SelectedGameID: after.SelectedGameID,
+		OwnershipEpoch: int64(after.OwnershipEpoch), RoomVersion: int64(after.RoomVersion),
 		MembershipVersion: int64(after.MembershipVersion), UpdatedAt: timeToPG(after.UpdatedAt),
 		RoomID: uuidToPG(before.ID), RoomCode: before.RoomCode, ExpectedRoomVersion: int64(before.RoomVersion),
-		ExpectedMembershipVersion: int64(before.MembershipVersion),
+		ExpectedMembershipVersion: int64(before.MembershipVersion), ExpectedOwnershipEpoch: int64(before.OwnershipEpoch),
 	}
 }
 
@@ -406,7 +408,8 @@ func createRoomMemberParams(roomID uuid.UUID, member roomDomain.MemberSnapshot) 
 }
 
 func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDomain.Room, error) {
-	if !row.RoomID.Valid || !row.HostUserID.Valid || row.ParticipantCapacity <= 0 || row.RoomVersion <= 0 || row.MembershipVersion <= 0 ||
+	if !row.RoomID.Valid || !row.HostUserID.Valid || row.ParticipantCapacity <= 0 || row.RoomVersion <= 0 ||
+		row.MembershipVersion <= 0 || row.OwnershipEpoch <= 0 ||
 		!row.CreatedAt.Valid || !row.UpdatedAt.Valid {
 		return roomDomain.Room{}, roomDomain.ErrRoomIntegrity
 	}
@@ -418,6 +421,7 @@ func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDoma
 		MembershipVersion: uint64(row.MembershipVersion), CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
 		ActiveSessionID: optionalUUIDFromPG(row.ActiveSessionID), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
 		LastFinishedSessionID: optionalUUIDFromPG(row.LastFinishedSessionID), LastFinishedGameID: optionalTextFromPG(row.LastFinishedGameID),
+		SelectedGameID: row.SelectedGameID, OwnershipEpoch: uint64(row.OwnershipEpoch),
 		Members: make([]roomDomain.MemberSnapshot, 0, len(members)),
 	}
 	for _, member := range members {
@@ -487,6 +491,7 @@ func validateRoomTransition(before, after roomDomain.RoomSnapshot) error {
 		return err
 	}
 	if before.ID != after.ID || before.RoomCode != after.RoomCode || !before.CreatedAt.Equal(after.CreatedAt) ||
+		after.OwnershipEpoch < before.OwnershipEpoch ||
 		after.RoomVersion != before.RoomVersion+1 ||
 		(after.MembershipVersion != before.MembershipVersion && after.MembershipVersion != before.MembershipVersion+1) {
 		return roomDomain.ErrInvalidRoomInput
@@ -495,7 +500,8 @@ func validateRoomTransition(before, after roomDomain.RoomSnapshot) error {
 }
 
 func validateRoomPersistenceWidths(snapshot roomDomain.RoomSnapshot) error {
-	if snapshot.ParticipantCapacity > math.MaxInt32 || snapshot.RoomVersion > math.MaxInt64 || snapshot.MembershipVersion > math.MaxInt64 {
+	if snapshot.ParticipantCapacity > math.MaxInt32 || snapshot.RoomVersion > math.MaxInt64 ||
+		snapshot.MembershipVersion > math.MaxInt64 || snapshot.OwnershipEpoch > math.MaxInt64 {
 		return roomDomain.ErrInvalidRoomInput
 	}
 	for _, member := range snapshot.Members {

@@ -53,6 +53,27 @@ const (
 	// RoomServiceSetAdmissionProcedure is the fully-qualified name of the RoomService's SetAdmission
 	// RPC.
 	RoomServiceSetAdmissionProcedure = "/platform.room.v1.RoomService/SetAdmission"
+	// RoomServiceSelectRoomGameProcedure is the fully-qualified name of the RoomService's
+	// SelectRoomGame RPC.
+	RoomServiceSelectRoomGameProcedure = "/platform.room.v1.RoomService/SelectRoomGame"
+	// RoomServiceUpdateGameConfigProcedure is the fully-qualified name of the RoomService's
+	// UpdateGameConfig RPC.
+	RoomServiceUpdateGameConfigProcedure = "/platform.room.v1.RoomService/UpdateGameConfig"
+	// RoomServiceListGameRulePresetsProcedure is the fully-qualified name of the RoomService's
+	// ListGameRulePresets RPC.
+	RoomServiceListGameRulePresetsProcedure = "/platform.room.v1.RoomService/ListGameRulePresets"
+	// RoomServiceSaveGameRulePresetProcedure is the fully-qualified name of the RoomService's
+	// SaveGameRulePreset RPC.
+	RoomServiceSaveGameRulePresetProcedure = "/platform.room.v1.RoomService/SaveGameRulePreset"
+	// RoomServiceDeleteGameRulePresetProcedure is the fully-qualified name of the RoomService's
+	// DeleteGameRulePreset RPC.
+	RoomServiceDeleteGameRulePresetProcedure = "/platform.room.v1.RoomService/DeleteGameRulePreset"
+	// RoomServiceBeginGameStartProcedure is the fully-qualified name of the RoomService's
+	// BeginGameStart RPC.
+	RoomServiceBeginGameStartProcedure = "/platform.room.v1.RoomService/BeginGameStart"
+	// RoomServiceCancelGameStartProcedure is the fully-qualified name of the RoomService's
+	// CancelGameStart RPC.
+	RoomServiceCancelGameStartProcedure = "/platform.room.v1.RoomService/CancelGameStart"
 	// RoomServiceStartGameProcedure is the fully-qualified name of the RoomService's StartGame RPC.
 	RoomServiceStartGameProcedure = "/platform.room.v1.RoomService/StartGame"
 	// RoomServiceFinishGameProcedure is the fully-qualified name of the RoomService's FinishGame RPC.
@@ -74,6 +95,13 @@ type RoomServiceClient interface {
 	JoinRoom(context.Context, *connect.Request[v1.JoinRoomRequest]) (*connect.Response[v1.JoinRoomResponse], error)
 	ApproveMember(context.Context, *connect.Request[v1.ApproveMemberRequest]) (*connect.Response[v1.ApproveMemberResponse], error)
 	SetAdmission(context.Context, *connect.Request[v1.SetAdmissionRequest]) (*connect.Response[v1.SetAdmissionResponse], error)
+	SelectRoomGame(context.Context, *connect.Request[v1.SelectRoomGameRequest]) (*connect.Response[v1.SelectRoomGameResponse], error)
+	UpdateGameConfig(context.Context, *connect.Request[v1.UpdateGameConfigRequest]) (*connect.Response[v1.UpdateGameConfigResponse], error)
+	ListGameRulePresets(context.Context, *connect.Request[v1.ListGameRulePresetsRequest]) (*connect.Response[v1.ListGameRulePresetsResponse], error)
+	SaveGameRulePreset(context.Context, *connect.Request[v1.SaveGameRulePresetRequest]) (*connect.Response[v1.SaveGameRulePresetResponse], error)
+	DeleteGameRulePreset(context.Context, *connect.Request[v1.DeleteGameRulePresetRequest]) (*connect.Response[v1.DeleteGameRulePresetResponse], error)
+	BeginGameStart(context.Context, *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error)
+	CancelGameStart(context.Context, *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error)
 	StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error)
 	FinishGame(context.Context, *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error)
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
@@ -139,6 +167,48 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roomServiceMethods.ByName("SetAdmission")),
 			connect.WithClientOptions(opts...),
 		),
+		selectRoomGame: connect.NewClient[v1.SelectRoomGameRequest, v1.SelectRoomGameResponse](
+			httpClient,
+			baseURL+RoomServiceSelectRoomGameProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("SelectRoomGame")),
+			connect.WithClientOptions(opts...),
+		),
+		updateGameConfig: connect.NewClient[v1.UpdateGameConfigRequest, v1.UpdateGameConfigResponse](
+			httpClient,
+			baseURL+RoomServiceUpdateGameConfigProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("UpdateGameConfig")),
+			connect.WithClientOptions(opts...),
+		),
+		listGameRulePresets: connect.NewClient[v1.ListGameRulePresetsRequest, v1.ListGameRulePresetsResponse](
+			httpClient,
+			baseURL+RoomServiceListGameRulePresetsProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("ListGameRulePresets")),
+			connect.WithClientOptions(opts...),
+		),
+		saveGameRulePreset: connect.NewClient[v1.SaveGameRulePresetRequest, v1.SaveGameRulePresetResponse](
+			httpClient,
+			baseURL+RoomServiceSaveGameRulePresetProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("SaveGameRulePreset")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteGameRulePreset: connect.NewClient[v1.DeleteGameRulePresetRequest, v1.DeleteGameRulePresetResponse](
+			httpClient,
+			baseURL+RoomServiceDeleteGameRulePresetProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("DeleteGameRulePreset")),
+			connect.WithClientOptions(opts...),
+		),
+		beginGameStart: connect.NewClient[v1.BeginGameStartRequest, v1.BeginGameStartResponse](
+			httpClient,
+			baseURL+RoomServiceBeginGameStartProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("BeginGameStart")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelGameStart: connect.NewClient[v1.CancelGameStartRequest, v1.CancelGameStartResponse](
+			httpClient,
+			baseURL+RoomServiceCancelGameStartProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("CancelGameStart")),
+			connect.WithClientOptions(opts...),
+		),
 		startGame: connect.NewClient[v1.StartGameRequest, v1.StartGameResponse](
 			httpClient,
 			baseURL+RoomServiceStartGameProcedure,
@@ -168,18 +238,25 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // roomServiceClient implements RoomServiceClient.
 type roomServiceClient struct {
-	createRoom      *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
-	getRoom         *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
-	heartbeatRoom   *connect.Client[v1.HeartbeatRoomRequest, v1.HeartbeatRoomResponse]
-	listMyRooms     *connect.Client[v1.ListMyRoomsRequest, v1.ListMyRoomsResponse]
-	listPublicRooms *connect.Client[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse]
-	joinRoom        *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
-	approveMember   *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
-	setAdmission    *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
-	startGame       *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
-	finishGame      *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
-	removeMember    *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
-	closeRoom       *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
+	createRoom           *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
+	getRoom              *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
+	heartbeatRoom        *connect.Client[v1.HeartbeatRoomRequest, v1.HeartbeatRoomResponse]
+	listMyRooms          *connect.Client[v1.ListMyRoomsRequest, v1.ListMyRoomsResponse]
+	listPublicRooms      *connect.Client[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse]
+	joinRoom             *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
+	approveMember        *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
+	setAdmission         *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
+	selectRoomGame       *connect.Client[v1.SelectRoomGameRequest, v1.SelectRoomGameResponse]
+	updateGameConfig     *connect.Client[v1.UpdateGameConfigRequest, v1.UpdateGameConfigResponse]
+	listGameRulePresets  *connect.Client[v1.ListGameRulePresetsRequest, v1.ListGameRulePresetsResponse]
+	saveGameRulePreset   *connect.Client[v1.SaveGameRulePresetRequest, v1.SaveGameRulePresetResponse]
+	deleteGameRulePreset *connect.Client[v1.DeleteGameRulePresetRequest, v1.DeleteGameRulePresetResponse]
+	beginGameStart       *connect.Client[v1.BeginGameStartRequest, v1.BeginGameStartResponse]
+	cancelGameStart      *connect.Client[v1.CancelGameStartRequest, v1.CancelGameStartResponse]
+	startGame            *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
+	finishGame           *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
+	removeMember         *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
+	closeRoom            *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
 }
 
 // CreateRoom calls platform.room.v1.RoomService.CreateRoom.
@@ -222,6 +299,41 @@ func (c *roomServiceClient) SetAdmission(ctx context.Context, req *connect.Reque
 	return c.setAdmission.CallUnary(ctx, req)
 }
 
+// SelectRoomGame calls platform.room.v1.RoomService.SelectRoomGame.
+func (c *roomServiceClient) SelectRoomGame(ctx context.Context, req *connect.Request[v1.SelectRoomGameRequest]) (*connect.Response[v1.SelectRoomGameResponse], error) {
+	return c.selectRoomGame.CallUnary(ctx, req)
+}
+
+// UpdateGameConfig calls platform.room.v1.RoomService.UpdateGameConfig.
+func (c *roomServiceClient) UpdateGameConfig(ctx context.Context, req *connect.Request[v1.UpdateGameConfigRequest]) (*connect.Response[v1.UpdateGameConfigResponse], error) {
+	return c.updateGameConfig.CallUnary(ctx, req)
+}
+
+// ListGameRulePresets calls platform.room.v1.RoomService.ListGameRulePresets.
+func (c *roomServiceClient) ListGameRulePresets(ctx context.Context, req *connect.Request[v1.ListGameRulePresetsRequest]) (*connect.Response[v1.ListGameRulePresetsResponse], error) {
+	return c.listGameRulePresets.CallUnary(ctx, req)
+}
+
+// SaveGameRulePreset calls platform.room.v1.RoomService.SaveGameRulePreset.
+func (c *roomServiceClient) SaveGameRulePreset(ctx context.Context, req *connect.Request[v1.SaveGameRulePresetRequest]) (*connect.Response[v1.SaveGameRulePresetResponse], error) {
+	return c.saveGameRulePreset.CallUnary(ctx, req)
+}
+
+// DeleteGameRulePreset calls platform.room.v1.RoomService.DeleteGameRulePreset.
+func (c *roomServiceClient) DeleteGameRulePreset(ctx context.Context, req *connect.Request[v1.DeleteGameRulePresetRequest]) (*connect.Response[v1.DeleteGameRulePresetResponse], error) {
+	return c.deleteGameRulePreset.CallUnary(ctx, req)
+}
+
+// BeginGameStart calls platform.room.v1.RoomService.BeginGameStart.
+func (c *roomServiceClient) BeginGameStart(ctx context.Context, req *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error) {
+	return c.beginGameStart.CallUnary(ctx, req)
+}
+
+// CancelGameStart calls platform.room.v1.RoomService.CancelGameStart.
+func (c *roomServiceClient) CancelGameStart(ctx context.Context, req *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error) {
+	return c.cancelGameStart.CallUnary(ctx, req)
+}
+
 // StartGame calls platform.room.v1.RoomService.StartGame.
 func (c *roomServiceClient) StartGame(ctx context.Context, req *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error) {
 	return c.startGame.CallUnary(ctx, req)
@@ -252,6 +364,13 @@ type RoomServiceHandler interface {
 	JoinRoom(context.Context, *connect.Request[v1.JoinRoomRequest]) (*connect.Response[v1.JoinRoomResponse], error)
 	ApproveMember(context.Context, *connect.Request[v1.ApproveMemberRequest]) (*connect.Response[v1.ApproveMemberResponse], error)
 	SetAdmission(context.Context, *connect.Request[v1.SetAdmissionRequest]) (*connect.Response[v1.SetAdmissionResponse], error)
+	SelectRoomGame(context.Context, *connect.Request[v1.SelectRoomGameRequest]) (*connect.Response[v1.SelectRoomGameResponse], error)
+	UpdateGameConfig(context.Context, *connect.Request[v1.UpdateGameConfigRequest]) (*connect.Response[v1.UpdateGameConfigResponse], error)
+	ListGameRulePresets(context.Context, *connect.Request[v1.ListGameRulePresetsRequest]) (*connect.Response[v1.ListGameRulePresetsResponse], error)
+	SaveGameRulePreset(context.Context, *connect.Request[v1.SaveGameRulePresetRequest]) (*connect.Response[v1.SaveGameRulePresetResponse], error)
+	DeleteGameRulePreset(context.Context, *connect.Request[v1.DeleteGameRulePresetRequest]) (*connect.Response[v1.DeleteGameRulePresetResponse], error)
+	BeginGameStart(context.Context, *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error)
+	CancelGameStart(context.Context, *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error)
 	StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error)
 	FinishGame(context.Context, *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error)
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
@@ -313,6 +432,48 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roomServiceMethods.ByName("SetAdmission")),
 		connect.WithHandlerOptions(opts...),
 	)
+	roomServiceSelectRoomGameHandler := connect.NewUnaryHandler(
+		RoomServiceSelectRoomGameProcedure,
+		svc.SelectRoomGame,
+		connect.WithSchema(roomServiceMethods.ByName("SelectRoomGame")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceUpdateGameConfigHandler := connect.NewUnaryHandler(
+		RoomServiceUpdateGameConfigProcedure,
+		svc.UpdateGameConfig,
+		connect.WithSchema(roomServiceMethods.ByName("UpdateGameConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceListGameRulePresetsHandler := connect.NewUnaryHandler(
+		RoomServiceListGameRulePresetsProcedure,
+		svc.ListGameRulePresets,
+		connect.WithSchema(roomServiceMethods.ByName("ListGameRulePresets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceSaveGameRulePresetHandler := connect.NewUnaryHandler(
+		RoomServiceSaveGameRulePresetProcedure,
+		svc.SaveGameRulePreset,
+		connect.WithSchema(roomServiceMethods.ByName("SaveGameRulePreset")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceDeleteGameRulePresetHandler := connect.NewUnaryHandler(
+		RoomServiceDeleteGameRulePresetProcedure,
+		svc.DeleteGameRulePreset,
+		connect.WithSchema(roomServiceMethods.ByName("DeleteGameRulePreset")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceBeginGameStartHandler := connect.NewUnaryHandler(
+		RoomServiceBeginGameStartProcedure,
+		svc.BeginGameStart,
+		connect.WithSchema(roomServiceMethods.ByName("BeginGameStart")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceCancelGameStartHandler := connect.NewUnaryHandler(
+		RoomServiceCancelGameStartProcedure,
+		svc.CancelGameStart,
+		connect.WithSchema(roomServiceMethods.ByName("CancelGameStart")),
+		connect.WithHandlerOptions(opts...),
+	)
 	roomServiceStartGameHandler := connect.NewUnaryHandler(
 		RoomServiceStartGameProcedure,
 		svc.StartGame,
@@ -355,6 +516,20 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceApproveMemberHandler.ServeHTTP(w, r)
 		case RoomServiceSetAdmissionProcedure:
 			roomServiceSetAdmissionHandler.ServeHTTP(w, r)
+		case RoomServiceSelectRoomGameProcedure:
+			roomServiceSelectRoomGameHandler.ServeHTTP(w, r)
+		case RoomServiceUpdateGameConfigProcedure:
+			roomServiceUpdateGameConfigHandler.ServeHTTP(w, r)
+		case RoomServiceListGameRulePresetsProcedure:
+			roomServiceListGameRulePresetsHandler.ServeHTTP(w, r)
+		case RoomServiceSaveGameRulePresetProcedure:
+			roomServiceSaveGameRulePresetHandler.ServeHTTP(w, r)
+		case RoomServiceDeleteGameRulePresetProcedure:
+			roomServiceDeleteGameRulePresetHandler.ServeHTTP(w, r)
+		case RoomServiceBeginGameStartProcedure:
+			roomServiceBeginGameStartHandler.ServeHTTP(w, r)
+		case RoomServiceCancelGameStartProcedure:
+			roomServiceCancelGameStartHandler.ServeHTTP(w, r)
 		case RoomServiceStartGameProcedure:
 			roomServiceStartGameHandler.ServeHTTP(w, r)
 		case RoomServiceFinishGameProcedure:
@@ -402,6 +577,34 @@ func (UnimplementedRoomServiceHandler) ApproveMember(context.Context, *connect.R
 
 func (UnimplementedRoomServiceHandler) SetAdmission(context.Context, *connect.Request[v1.SetAdmissionRequest]) (*connect.Response[v1.SetAdmissionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.SetAdmission is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) SelectRoomGame(context.Context, *connect.Request[v1.SelectRoomGameRequest]) (*connect.Response[v1.SelectRoomGameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.SelectRoomGame is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) UpdateGameConfig(context.Context, *connect.Request[v1.UpdateGameConfigRequest]) (*connect.Response[v1.UpdateGameConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.UpdateGameConfig is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) ListGameRulePresets(context.Context, *connect.Request[v1.ListGameRulePresetsRequest]) (*connect.Response[v1.ListGameRulePresetsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.ListGameRulePresets is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) SaveGameRulePreset(context.Context, *connect.Request[v1.SaveGameRulePresetRequest]) (*connect.Response[v1.SaveGameRulePresetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.SaveGameRulePreset is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) DeleteGameRulePreset(context.Context, *connect.Request[v1.DeleteGameRulePresetRequest]) (*connect.Response[v1.DeleteGameRulePresetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.DeleteGameRulePreset is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) BeginGameStart(context.Context, *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.BeginGameStart is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) CancelGameStart(context.Context, *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.CancelGameStart is not implemented"))
 }
 
 func (UnimplementedRoomServiceHandler) StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error) {

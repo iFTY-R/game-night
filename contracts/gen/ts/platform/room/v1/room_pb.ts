@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/room/v1/room.proto.
  */
 export const file_platform_room_v1_room: GenFile = /*@__PURE__*/
-  fileDesc("ChtwbGF0Zm9ybS9yb29tL3YxL3Jvb20ucHJvdG8SEHBsYXRmb3JtLnJvb20udjEiPwoLUm9vbVZlcnNpb24SFAoMcm9vbV92ZXJzaW9uGAEgASgEEhoKEm1lbWJlcnNoaXBfdmVyc2lvbhgCIAEoBCKGAgoKUm9vbU1lbWJlchIPCgd1c2VyX2lkGAEgASgJEioKBHJvbGUYAiABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLk1lbWJlclJvbGUSNAoOcmVxdWVzdGVkX3JvbGUYAyABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLk1lbWJlclJvbGUSEgoKc2VhdF9pbmRleBgEIAEoDRItCglqb2luZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3Rfc2Vlbl9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIdXNlcm5hbWUYByABKAki8wQKBFJvb20SDwoHcm9vbV9pZBgBIAEoCRIRCglyb29tX2NvZGUYAiABKAkSNAoKdmlzaWJpbGl0eRgDIAEoDjIgLnBsYXRmb3JtLnJvb20udjEuUm9vbVZpc2liaWxpdHkSLAoGc3RhdHVzGAQgASgOMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tU3RhdHVzEhQKDGhvc3RfdXNlcl9pZBgFIAEoCRIcChRwYXJ0aWNpcGFudF9jYXBhY2l0eRgGIAEoDRI+ChVwYXJ0aWNpcGFudF9hZG1pc3Npb24YByABKA4yHy5wbGF0Zm9ybS5yb29tLnYxLkFkbWlzc2lvbk1vZGUSPAoTc3BlY3RhdG9yX2FkbWlzc2lvbhgIIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRItCgdtZW1iZXJzGAkgAygLMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tTWVtYmVyEhkKEWFjdGl2ZV9zZXNzaW9uX2lkGAogASgJEhYKDmFjdGl2ZV9nYW1lX2lkGAsgASgJEi4KB3ZlcnNpb24YDCABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEi4KCmNyZWF0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiAKGGxhc3RfZmluaXNoZWRfc2Vzc2lvbl9pZBgPIAEoCRIdChVsYXN0X2ZpbmlzaGVkX2dhbWVfaWQYECABKAki5QEKEUNyZWF0ZVJvb21SZXF1ZXN0EjQKCnZpc2liaWxpdHkYASABKA4yIC5wbGF0Zm9ybS5yb29tLnYxLlJvb21WaXNpYmlsaXR5EhwKFHBhcnRpY2lwYW50X2NhcGFjaXR5GAIgASgNEj4KFXBhcnRpY2lwYW50X2FkbWlzc2lvbhgDIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRI8ChNzcGVjdGF0b3JfYWRtaXNzaW9uGAQgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlIjoKEkNyZWF0ZVJvb21SZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tIjQKDkdldFJvb21SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSEQoJcm9vbV9jb2RlGAIgASgJIjcKD0dldFJvb21SZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tIicKFEhlYXJ0YmVhdFJvb21SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkiSAoVSGVhcnRiZWF0Um9vbVJlc3BvbnNlEi8KC29ic2VydmVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCL6BAoKTXlSb29tQ2FyZBIPCgdyb29tX2lkGAEgASgJEhEKCXJvb21fY29kZRgCIAEoCRI0Cgp2aXNpYmlsaXR5GAMgASgOMiAucGxhdGZvcm0ucm9vbS52MS5Sb29tVmlzaWJpbGl0eRIVCg1ob3N0X3VzZXJuYW1lGAQgASgJEiwKBnN0YXR1cxgFIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuUm9vbVN0YXR1cxIPCgdpc19ob3N0GAYgASgIEhwKFHBhcnRpY2lwYW50X2NhcGFjaXR5GAcgASgNEhkKEXBhcnRpY2lwYW50X2NvdW50GAggASgNEhcKD3NwZWN0YXRvcl9jb3VudBgJIAEoDRIVCg13YWl0aW5nX2NvdW50GAogASgNEj4KFXBhcnRpY2lwYW50X2FkbWlzc2lvbhgLIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRI8ChNzcGVjdGF0b3JfYWRtaXNzaW9uGAwgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEhYKDmFjdGl2ZV9nYW1lX2lkGA0gASgJEh0KFWxhc3RfZmluaXNoZWRfZ2FtZV9pZBgOIAEoCRIxCgt2aWV3ZXJfcm9sZRgPIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuTWVtYmVyUm9sZRI7ChV2aWV3ZXJfcmVxdWVzdGVkX3JvbGUYECABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLk1lbWJlclJvbGUSLgoKdXBkYXRlZF9hdBgRIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiQwoSTGlzdE15Um9vbXNSZXF1ZXN0Ei0KBHBhZ2UYASABKAsyHy5wbGF0Zm9ybS5jb21tb24udjEuUGFnZVJlcXVlc3QibgoTTGlzdE15Um9vbXNSZXNwb25zZRIrCgVyb29tcxgBIAMoCzIcLnBsYXRmb3JtLnJvb20udjEuTXlSb29tQ2FyZBIqCgRwYWdlGAIgASgLMhwucGxhdGZvcm0uY29tbW9uLnYxLlBhZ2VJbmZvInYKEFB1YmxpY1Jvb21GaWx0ZXISLgoIc3RhdHVzZXMYASADKA4yHC5wbGF0Zm9ybS5yb29tLnYxLlJvb21TdGF0dXMSDwoHZ2FtZV9pZBgCIAEoCRIhChlwYXJ0aWNpcGFudF9qb2luYWJsZV9vbmx5GAMgASgIIsgECg5QdWJsaWNSb29tQ2FyZBIPCgdyb29tX2lkGAEgASgJEhUKDWhvc3RfdXNlcm5hbWUYAiABKAkSLAoGc3RhdHVzGAMgASgOMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tU3RhdHVzEhwKFHBhcnRpY2lwYW50X2NhcGFjaXR5GAQgASgNEhkKEXBhcnRpY2lwYW50X2NvdW50GAUgASgNEhcKD3NwZWN0YXRvcl9jb3VudBgGIAEoDRIVCg13YWl0aW5nX2NvdW50GAcgASgNEj4KFXBhcnRpY2lwYW50X2FkbWlzc2lvbhgIIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRI8ChNzcGVjdGF0b3JfYWRtaXNzaW9uGAkgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEhYKDmFjdGl2ZV9nYW1lX2lkGAogASgJEjEKC3ZpZXdlcl9yb2xlGAsgASgOMhwucGxhdGZvcm0ucm9vbS52MS5NZW1iZXJSb2xlEjsKFXZpZXdlcl9yZXF1ZXN0ZWRfcm9sZRgMIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuTWVtYmVyUm9sZRJBCg5wcmltYXJ5X2FjdGlvbhgNIAEoDjIpLnBsYXRmb3JtLnJvb20udjEuUHVibGljUm9vbVByaW1hcnlBY3Rpb24SLgoKdXBkYXRlZF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiewoWTGlzdFB1YmxpY1Jvb21zUmVxdWVzdBIyCgZmaWx0ZXIYASABKAsyIi5wbGF0Zm9ybS5yb29tLnYxLlB1YmxpY1Jvb21GaWx0ZXISLQoEcGFnZRgCIAEoCzIfLnBsYXRmb3JtLmNvbW1vbi52MS5QYWdlUmVxdWVzdCJ2ChdMaXN0UHVibGljUm9vbXNSZXNwb25zZRIvCgVyb29tcxgBIAMoCzIgLnBsYXRmb3JtLnJvb20udjEuUHVibGljUm9vbUNhcmQSKgoEcGFnZRgCIAEoCzIcLnBsYXRmb3JtLmNvbW1vbi52MS5QYWdlSW5mbyKcAQoPSm9pblJvb21SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSLAoGaW50ZW50GAIgASgOMhwucGxhdGZvcm0ucm9vbS52MS5Kb2luSW50ZW50EjcKEGV4cGVjdGVkX3ZlcnNpb24YAyABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEhEKCXJvb21fY29kZRgEIAEoCSKIAQoQSm9pblJvb21SZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tEiwKBm1lbWJlchgCIAEoCzIcLnBsYXRmb3JtLnJvb20udjEuUm9vbU1lbWJlchIPCgdjcmVhdGVkGAMgASgIEg8KB2NoYW5nZWQYBCABKAgicQoUQXBwcm92ZU1lbWJlclJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEjcKEGV4cGVjdGVkX3ZlcnNpb24YAyABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uImsKFUFwcHJvdmVNZW1iZXJSZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tEiwKBm1lbWJlchgCIAEoCzIcLnBsYXRmb3JtLnJvb20udjEuUm9vbU1lbWJlciLdAQoTU2V0QWRtaXNzaW9uUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEj4KFXBhcnRpY2lwYW50X2FkbWlzc2lvbhgCIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRI8ChNzcGVjdGF0b3JfYWRtaXNzaW9uGAMgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEjcKEGV4cGVjdGVkX3ZlcnNpb24YBCABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uIjwKFFNldEFkbWlzc2lvblJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20iyQEKEFN0YXJ0R2FtZVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRIPCgdnYW1lX2lkGAIgASgJEiwKBmNvbmZpZxgDIAEoCzIcLnBsYXRmb3JtLmdhbWUudjEuR2FtZUNvbmZpZxI3ChBleHBlY3RlZF92ZXJzaW9uGAQgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbhIUCgxvcGVyYXRpb25faWQYBSABKAkSFgoOcmVxdWVzdF9kaWdlc3QYBiABKAwiOAoRRnJvemVuUGFydGljaXBhbnQSDwoHdXNlcl9pZBgBIAEoCRISCgpzZWF0X2luZGV4GAIgASgNIpkBChFTdGFydEdhbWVSZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tEhIKCnNlc3Npb25faWQYAiABKAkSDwoHZ2FtZV9pZBgDIAEoCRI5CgxwYXJ0aWNpcGFudHMYBCADKAsyIy5wbGF0Zm9ybS5yb29tLnYxLkZyb3plblBhcnRpY2lwYW50IokCChFGaW5pc2hHYW1lUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSNwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24SFAoMb3BlcmF0aW9uX2lkGAQgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgFIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAYgASgEEi8KB2NvbW1hbmQYByABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIWCg5yZXF1ZXN0X2RpZ2VzdBgIIAEoDCI6ChJGaW5pc2hHYW1lUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbSJwChNSZW1vdmVNZW1iZXJSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSDwoHdXNlcl9pZBgCIAEoCRI3ChBleHBlY3RlZF92ZXJzaW9uGAMgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbiK8AQoUUmVtb3ZlTWVtYmVyUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbRItCgdyZW1vdmVkGAIgASgLMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tTWVtYmVyEhsKE3BhcnRpY2lwYW50X3Jldm9rZWQYAyABKAgSGQoRYWN0aXZlX3Nlc3Npb25faWQYBCABKAkSFwoPc291cmNlX2V2ZW50X2lkGAUgASgJIlwKEENsb3NlUm9vbVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRI3ChBleHBlY3RlZF92ZXJzaW9uGAIgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbiI5ChFDbG9zZVJvb21SZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tKmoKDlJvb21WaXNpYmlsaXR5Eh8KG1JPT01fVklTSUJJTElUWV9VTlNQRUNJRklFRBAAEhsKF1JPT01fVklTSUJJTElUWV9QUklWQVRFEAESGgoWUk9PTV9WSVNJQklMSVRZX1BVQkxJQxACKowBCgpSb29tU3RhdHVzEhsKF1JPT01fU1RBVFVTX1VOU1BFQ0lGSUVEEAASFQoRUk9PTV9TVEFUVVNfTE9CQlkQARIXChNST09NX1NUQVRVU19QTEFZSU5HEAISFgoSUk9PTV9TVEFUVVNfQ0xPU0VEEAMSGQoVUk9PTV9TVEFUVVNfUE9TVF9HQU1FEAQqgAEKDUFkbWlzc2lvbk1vZGUSHgoaQURNSVNTSU9OX01PREVfVU5TUEVDSUZJRUQQABIXChNBRE1JU1NJT05fTU9ERV9PUEVOEAESGwoXQURNSVNTSU9OX01PREVfQVBQUk9WQUwQAhIZChVBRE1JU1NJT05fTU9ERV9DTE9TRUQQAyp6CgpNZW1iZXJSb2xlEhsKF01FTUJFUl9ST0xFX1VOU1BFQ0lGSUVEEAASGwoXTUVNQkVSX1JPTEVfUEFSVElDSVBBTlQQARIZChVNRU1CRVJfUk9MRV9TUEVDVEFUT1IQAhIXChNNRU1CRVJfUk9MRV9XQUlUSU5HEAMqYQoKSm9pbkludGVudBIbChdKT0lOX0lOVEVOVF9VTlNQRUNJRklFRBAAEhsKF0pPSU5fSU5URU5UX1BBUlRJQ0lQQU5UEAESGQoVSk9JTl9JTlRFTlRfU1BFQ1RBVE9SEAIqmwMKF1B1YmxpY1Jvb21QcmltYXJ5QWN0aW9uEioKJlBVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX1VOU1BFQ0lGSUVEEAASKQolUFVCTElDX1JPT01fUFJJTUFSWV9BQ1RJT05fRU5URVJfUk9PTRABEiMKH1BVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX0pPSU4QAhIrCidQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9SRVFVRVNUX0pPSU4QAxInCiNQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9TUEVDVEFURRAEEi8KK1BVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX1JFUVVFU1RfU1BFQ1RBVEUQBRIsCihQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9XQUlUX0ZPUl9IT1NUEAYSKgomUFVCTElDX1JPT01fUFJJTUFSWV9BQ1RJT05fSU5fUFJPR1JFU1MQBxIjCh9QVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9GVUxMEAgy1AgKC1Jvb21TZXJ2aWNlElcKCkNyZWF0ZVJvb20SIy5wbGF0Zm9ybS5yb29tLnYxLkNyZWF0ZVJvb21SZXF1ZXN0GiQucGxhdGZvcm0ucm9vbS52MS5DcmVhdGVSb29tUmVzcG9uc2USTgoHR2V0Um9vbRIgLnBsYXRmb3JtLnJvb20udjEuR2V0Um9vbVJlcXVlc3QaIS5wbGF0Zm9ybS5yb29tLnYxLkdldFJvb21SZXNwb25zZRJgCg1IZWFydGJlYXRSb29tEiYucGxhdGZvcm0ucm9vbS52MS5IZWFydGJlYXRSb29tUmVxdWVzdBonLnBsYXRmb3JtLnJvb20udjEuSGVhcnRiZWF0Um9vbVJlc3BvbnNlEloKC0xpc3RNeVJvb21zEiQucGxhdGZvcm0ucm9vbS52MS5MaXN0TXlSb29tc1JlcXVlc3QaJS5wbGF0Zm9ybS5yb29tLnYxLkxpc3RNeVJvb21zUmVzcG9uc2USZgoPTGlzdFB1YmxpY1Jvb21zEigucGxhdGZvcm0ucm9vbS52MS5MaXN0UHVibGljUm9vbXNSZXF1ZXN0GikucGxhdGZvcm0ucm9vbS52MS5MaXN0UHVibGljUm9vbXNSZXNwb25zZRJRCghKb2luUm9vbRIhLnBsYXRmb3JtLnJvb20udjEuSm9pblJvb21SZXF1ZXN0GiIucGxhdGZvcm0ucm9vbS52MS5Kb2luUm9vbVJlc3BvbnNlEmAKDUFwcHJvdmVNZW1iZXISJi5wbGF0Zm9ybS5yb29tLnYxLkFwcHJvdmVNZW1iZXJSZXF1ZXN0GicucGxhdGZvcm0ucm9vbS52MS5BcHByb3ZlTWVtYmVyUmVzcG9uc2USXQoMU2V0QWRtaXNzaW9uEiUucGxhdGZvcm0ucm9vbS52MS5TZXRBZG1pc3Npb25SZXF1ZXN0GiYucGxhdGZvcm0ucm9vbS52MS5TZXRBZG1pc3Npb25SZXNwb25zZRJUCglTdGFydEdhbWUSIi5wbGF0Zm9ybS5yb29tLnYxLlN0YXJ0R2FtZVJlcXVlc3QaIy5wbGF0Zm9ybS5yb29tLnYxLlN0YXJ0R2FtZVJlc3BvbnNlElcKCkZpbmlzaEdhbWUSIy5wbGF0Zm9ybS5yb29tLnYxLkZpbmlzaEdhbWVSZXF1ZXN0GiQucGxhdGZvcm0ucm9vbS52MS5GaW5pc2hHYW1lUmVzcG9uc2USXQoMUmVtb3ZlTWVtYmVyEiUucGxhdGZvcm0ucm9vbS52MS5SZW1vdmVNZW1iZXJSZXF1ZXN0GiYucGxhdGZvcm0ucm9vbS52MS5SZW1vdmVNZW1iZXJSZXNwb25zZRJUCglDbG9zZVJvb20SIi5wbGF0Zm9ybS5yb29tLnYxLkNsb3NlUm9vbVJlcXVlc3QaIy5wbGF0Zm9ybS5yb29tLnYxLkNsb3NlUm9vbVJlc3BvbnNlQkdaRWdpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9yb29tL3YxO3Jvb212MWIGcHJvdG8z", [file_google_protobuf_timestamp, file_platform_common_v1_common, file_platform_game_v1_game]);
+  fileDesc("ChtwbGF0Zm9ybS9yb29tL3YxL3Jvb20ucHJvdG8SEHBsYXRmb3JtLnJvb20udjEiPwoLUm9vbVZlcnNpb24SFAoMcm9vbV92ZXJzaW9uGAEgASgEEhoKEm1lbWJlcnNoaXBfdmVyc2lvbhgCIAEoBCKsAQoTUm9vbUdhbWVDb25maWdEcmFmdBIPCgdnYW1lX2lkGAEgASgJEi4KBmNvbmZpZxgCIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhAKCHJldmlzaW9uGAMgASgEEhIKCnVwZGF0ZWRfYnkYBCABKAkSLgoKdXBkYXRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi7AEKEFBlbmRpbmdHYW1lU3RhcnQSGAoQcGVuZGluZ19zdGFydF9pZBgBIAEoCRIUCgxjYW5jZWxfdG9rZW4YAiABKAkSLAoIZGVhZGxpbmUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2dhbWVfaWQYBCABKAkSFwoPY29uZmlnX3JldmlzaW9uGAUgASgEEjcKEGV4cGVjdGVkX3ZlcnNpb24YBiABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEhcKD293bmVyc2hpcF9lcG9jaBgHIAEoBCKxAgoOR2FtZVJ1bGVQcmVzZXQSEQoJcHJlc2V0X2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRIuCgZjb25maWcYBCABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIXCg9wcmVzZXRfcmV2aXNpb24YBSABKAQSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjb21wYXRpYmxlGAkgASgIIoYCCgpSb29tTWVtYmVyEg8KB3VzZXJfaWQYASABKAkSKgoEcm9sZRgCIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuTWVtYmVyUm9sZRI0Cg5yZXF1ZXN0ZWRfcm9sZRgDIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuTWVtYmVyUm9sZRISCgpzZWF0X2luZGV4GAQgASgNEi0KCWpvaW5lZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCgh1c2VybmFtZRgHIAEoCSKkBgoEUm9vbRIPCgdyb29tX2lkGAEgASgJEhEKCXJvb21fY29kZRgCIAEoCRI0Cgp2aXNpYmlsaXR5GAMgASgOMiAucGxhdGZvcm0ucm9vbS52MS5Sb29tVmlzaWJpbGl0eRIsCgZzdGF0dXMYBCABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLlJvb21TdGF0dXMSFAoMaG9zdF91c2VyX2lkGAUgASgJEhwKFHBhcnRpY2lwYW50X2NhcGFjaXR5GAYgASgNEj4KFXBhcnRpY2lwYW50X2FkbWlzc2lvbhgHIAEoDjIfLnBsYXRmb3JtLnJvb20udjEuQWRtaXNzaW9uTW9kZRI8ChNzcGVjdGF0b3JfYWRtaXNzaW9uGAggASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEi0KB21lbWJlcnMYCSADKAsyHC5wbGF0Zm9ybS5yb29tLnYxLlJvb21NZW1iZXISGQoRYWN0aXZlX3Nlc3Npb25faWQYCiABKAkSFgoOYWN0aXZlX2dhbWVfaWQYCyABKAkSLgoHdmVyc2lvbhgMIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24SLgoKY3JlYXRlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASIAoYbGFzdF9maW5pc2hlZF9zZXNzaW9uX2lkGA8gASgJEh0KFWxhc3RfZmluaXNoZWRfZ2FtZV9pZBgQIAEoCRIYChBzZWxlY3RlZF9nYW1lX2lkGBEgASgJEkEKEmdhbWVfY29uZmlnX2RyYWZ0cxgSIAMoCzIlLnBsYXRmb3JtLnJvb20udjEuUm9vbUdhbWVDb25maWdEcmFmdBI5Cg1wZW5kaW5nX3N0YXJ0GBMgASgLMiIucGxhdGZvcm0ucm9vbS52MS5QZW5kaW5nR2FtZVN0YXJ0EhcKD293bmVyc2hpcF9lcG9jaBgUIAEoBCLlAQoRQ3JlYXRlUm9vbVJlcXVlc3QSNAoKdmlzaWJpbGl0eRgBIAEoDjIgLnBsYXRmb3JtLnJvb20udjEuUm9vbVZpc2liaWxpdHkSHAoUcGFydGljaXBhbnRfY2FwYWNpdHkYAiABKA0SPgoVcGFydGljaXBhbnRfYWRtaXNzaW9uGAMgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEjwKE3NwZWN0YXRvcl9hZG1pc3Npb24YBCABKA4yHy5wbGF0Zm9ybS5yb29tLnYxLkFkbWlzc2lvbk1vZGUiOgoSQ3JlYXRlUm9vbVJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20iNAoOR2V0Um9vbVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRIRCglyb29tX2NvZGUYAiABKAkiNwoPR2V0Um9vbVJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20iJwoUSGVhcnRiZWF0Um9vbVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCSJIChVIZWFydGJlYXRSb29tUmVzcG9uc2USLwoLb2JzZXJ2ZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIvoECgpNeVJvb21DYXJkEg8KB3Jvb21faWQYASABKAkSEQoJcm9vbV9jb2RlGAIgASgJEjQKCnZpc2liaWxpdHkYAyABKA4yIC5wbGF0Zm9ybS5yb29tLnYxLlJvb21WaXNpYmlsaXR5EhUKDWhvc3RfdXNlcm5hbWUYBCABKAkSLAoGc3RhdHVzGAUgASgOMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tU3RhdHVzEg8KB2lzX2hvc3QYBiABKAgSHAoUcGFydGljaXBhbnRfY2FwYWNpdHkYByABKA0SGQoRcGFydGljaXBhbnRfY291bnQYCCABKA0SFwoPc3BlY3RhdG9yX2NvdW50GAkgASgNEhUKDXdhaXRpbmdfY291bnQYCiABKA0SPgoVcGFydGljaXBhbnRfYWRtaXNzaW9uGAsgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEjwKE3NwZWN0YXRvcl9hZG1pc3Npb24YDCABKA4yHy5wbGF0Zm9ybS5yb29tLnYxLkFkbWlzc2lvbk1vZGUSFgoOYWN0aXZlX2dhbWVfaWQYDSABKAkSHQoVbGFzdF9maW5pc2hlZF9nYW1lX2lkGA4gASgJEjEKC3ZpZXdlcl9yb2xlGA8gASgOMhwucGxhdGZvcm0ucm9vbS52MS5NZW1iZXJSb2xlEjsKFXZpZXdlcl9yZXF1ZXN0ZWRfcm9sZRgQIAEoDjIcLnBsYXRmb3JtLnJvb20udjEuTWVtYmVyUm9sZRIuCgp1cGRhdGVkX2F0GBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJDChJMaXN0TXlSb29tc1JlcXVlc3QSLQoEcGFnZRgBIAEoCzIfLnBsYXRmb3JtLmNvbW1vbi52MS5QYWdlUmVxdWVzdCJuChNMaXN0TXlSb29tc1Jlc3BvbnNlEisKBXJvb21zGAEgAygLMhwucGxhdGZvcm0ucm9vbS52MS5NeVJvb21DYXJkEioKBHBhZ2UYAiABKAsyHC5wbGF0Zm9ybS5jb21tb24udjEuUGFnZUluZm8idgoQUHVibGljUm9vbUZpbHRlchIuCghzdGF0dXNlcxgBIAMoDjIcLnBsYXRmb3JtLnJvb20udjEuUm9vbVN0YXR1cxIPCgdnYW1lX2lkGAIgASgJEiEKGXBhcnRpY2lwYW50X2pvaW5hYmxlX29ubHkYAyABKAgiyAQKDlB1YmxpY1Jvb21DYXJkEg8KB3Jvb21faWQYASABKAkSFQoNaG9zdF91c2VybmFtZRgCIAEoCRIsCgZzdGF0dXMYAyABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLlJvb21TdGF0dXMSHAoUcGFydGljaXBhbnRfY2FwYWNpdHkYBCABKA0SGQoRcGFydGljaXBhbnRfY291bnQYBSABKA0SFwoPc3BlY3RhdG9yX2NvdW50GAYgASgNEhUKDXdhaXRpbmdfY291bnQYByABKA0SPgoVcGFydGljaXBhbnRfYWRtaXNzaW9uGAggASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEjwKE3NwZWN0YXRvcl9hZG1pc3Npb24YCSABKA4yHy5wbGF0Zm9ybS5yb29tLnYxLkFkbWlzc2lvbk1vZGUSFgoOYWN0aXZlX2dhbWVfaWQYCiABKAkSMQoLdmlld2VyX3JvbGUYCyABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLk1lbWJlclJvbGUSOwoVdmlld2VyX3JlcXVlc3RlZF9yb2xlGAwgASgOMhwucGxhdGZvcm0ucm9vbS52MS5NZW1iZXJSb2xlEkEKDnByaW1hcnlfYWN0aW9uGA0gASgOMikucGxhdGZvcm0ucm9vbS52MS5QdWJsaWNSb29tUHJpbWFyeUFjdGlvbhIuCgp1cGRhdGVkX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJ7ChZMaXN0UHVibGljUm9vbXNSZXF1ZXN0EjIKBmZpbHRlchgBIAEoCzIiLnBsYXRmb3JtLnJvb20udjEuUHVibGljUm9vbUZpbHRlchItCgRwYWdlGAIgASgLMh8ucGxhdGZvcm0uY29tbW9uLnYxLlBhZ2VSZXF1ZXN0InYKF0xpc3RQdWJsaWNSb29tc1Jlc3BvbnNlEi8KBXJvb21zGAEgAygLMiAucGxhdGZvcm0ucm9vbS52MS5QdWJsaWNSb29tQ2FyZBIqCgRwYWdlGAIgASgLMhwucGxhdGZvcm0uY29tbW9uLnYxLlBhZ2VJbmZvIpwBCg9Kb2luUm9vbVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRIsCgZpbnRlbnQYAiABKA4yHC5wbGF0Zm9ybS5yb29tLnYxLkpvaW5JbnRlbnQSNwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24SEQoJcm9vbV9jb2RlGAQgASgJIogBChBKb2luUm9vbVJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20SLAoGbWVtYmVyGAIgASgLMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tTWVtYmVyEg8KB2NyZWF0ZWQYAyABKAgSDwoHY2hhbmdlZBgEIAEoCCJxChRBcHByb3ZlTWVtYmVyUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEg8KB3VzZXJfaWQYAiABKAkSNwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24iawoVQXBwcm92ZU1lbWJlclJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20SLAoGbWVtYmVyGAIgASgLMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tTWVtYmVyIt0BChNTZXRBZG1pc3Npb25SZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSPgoVcGFydGljaXBhbnRfYWRtaXNzaW9uGAIgASgOMh8ucGxhdGZvcm0ucm9vbS52MS5BZG1pc3Npb25Nb2RlEjwKE3NwZWN0YXRvcl9hZG1pc3Npb24YAyABKA4yHy5wbGF0Zm9ybS5yb29tLnYxLkFkbWlzc2lvbk1vZGUSNwoQZXhwZWN0ZWRfdmVyc2lvbhgEIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24iPAoUU2V0QWRtaXNzaW9uUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbSK5AQoVU2VsZWN0Um9vbUdhbWVSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSDwoHZ2FtZV9pZBgCIAEoCRI3ChBleHBlY3RlZF92ZXJzaW9uGAMgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbhIXCg9vd25lcnNoaXBfZXBvY2gYBCABKAQSFAoMb3BlcmF0aW9uX2lkGAUgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAYgASgMIj4KFlNlbGVjdFJvb21HYW1lUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbSKGAgoXVXBkYXRlR2FtZUNvbmZpZ1JlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRIPCgdnYW1lX2lkGAIgASgJEi4KBmNvbmZpZxgDIAEoCzIeLnBsYXRmb3JtLmdhbWUudjEuR2FtZUVudmVsb3BlEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgEEjcKEGV4cGVjdGVkX3ZlcnNpb24YBSABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEhcKD293bmVyc2hpcF9lcG9jaBgGIAEoBBIUCgxvcGVyYXRpb25faWQYByABKAkSFgoOcmVxdWVzdF9kaWdlc3QYCCABKAwidgoYVXBkYXRlR2FtZUNvbmZpZ1Jlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20SNAoFZHJhZnQYAiABKAsyJS5wbGF0Zm9ybS5yb29tLnYxLlJvb21HYW1lQ29uZmlnRHJhZnQiLQoaTGlzdEdhbWVSdWxlUHJlc2V0c1JlcXVlc3QSDwoHZ2FtZV9pZBgBIAEoCSJQChtMaXN0R2FtZVJ1bGVQcmVzZXRzUmVzcG9uc2USMQoHcHJlc2V0cxgBIAMoCzIgLnBsYXRmb3JtLnJvb20udjEuR2FtZVJ1bGVQcmVzZXQihgIKGVNhdmVHYW1lUnVsZVByZXNldFJlcXVlc3QSEQoJcHJlc2V0X2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRIuCgZjb25maWcYBCABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRI3CgRtb2RlGAUgASgOMikucGxhdGZvcm0ucm9vbS52MS5HYW1lUnVsZVByZXNldFdyaXRlTW9kZRIgChhleHBlY3RlZF9wcmVzZXRfcmV2aXNpb24YBiABKAQSFAoMb3BlcmF0aW9uX2lkGAcgASgJEhYKDnJlcXVlc3RfZGlnZXN0GAggASgMIk4KGlNhdmVHYW1lUnVsZVByZXNldFJlc3BvbnNlEjAKBnByZXNldBgBIAEoCzIgLnBsYXRmb3JtLnJvb20udjEuR2FtZVJ1bGVQcmVzZXQigAEKG0RlbGV0ZUdhbWVSdWxlUHJlc2V0UmVxdWVzdBIRCglwcmVzZXRfaWQYASABKAkSIAoYZXhwZWN0ZWRfcHJlc2V0X3JldmlzaW9uGAIgASgEEhQKDG9wZXJhdGlvbl9pZBgDIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgEIAEoDCIxChxEZWxldGVHYW1lUnVsZVByZXNldFJlc3BvbnNlEhEKCXByZXNldF9pZBgBIAEoCSLSAQoVQmVnaW5HYW1lU3RhcnRSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSDwoHZ2FtZV9pZBgCIAEoCRIXCg9jb25maWdfcmV2aXNpb24YAyABKAQSNwoQZXhwZWN0ZWRfdmVyc2lvbhgEIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24SFwoPb3duZXJzaGlwX2Vwb2NoGAUgASgEEhQKDG9wZXJhdGlvbl9pZBgGIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgHIAEoDCJ5ChZCZWdpbkdhbWVTdGFydFJlc3BvbnNlEiQKBHJvb20YASABKAsyFi5wbGF0Zm9ybS5yb29tLnYxLlJvb20SOQoNcGVuZGluZ19zdGFydBgCIAEoCzIiLnBsYXRmb3JtLnJvb20udjEuUGVuZGluZ0dhbWVTdGFydCLZAQoWQ2FuY2VsR2FtZVN0YXJ0UmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhgKEHBlbmRpbmdfc3RhcnRfaWQYAiABKAkSFAoMY2FuY2VsX3Rva2VuGAMgASgJEjcKEGV4cGVjdGVkX3ZlcnNpb24YBCABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEhcKD293bmVyc2hpcF9lcG9jaBgFIAEoBBIUCgxvcGVyYXRpb25faWQYBiABKAkSFgoOcmVxdWVzdF9kaWdlc3QYByABKAwiPwoXQ2FuY2VsR2FtZVN0YXJ0UmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbSKrAgoQU3RhcnRHYW1lUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEg8KB2dhbWVfaWQYAiABKAkSLAoGY29uZmlnGAMgASgLMhwucGxhdGZvcm0uZ2FtZS52MS5HYW1lQ29uZmlnEjcKEGV4cGVjdGVkX3ZlcnNpb24YBCABKAsyHS5wbGF0Zm9ybS5yb29tLnYxLlJvb21WZXJzaW9uEhQKDG9wZXJhdGlvbl9pZBgFIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgGIAEoDBIYChBwZW5kaW5nX3N0YXJ0X2lkGAcgASgJEhQKDGNhbmNlbF90b2tlbhgIIAEoCRIXCg9jb25maWdfcmV2aXNpb24YCSABKAQSFwoPb3duZXJzaGlwX2Vwb2NoGAogASgEIjgKEUZyb3plblBhcnRpY2lwYW50Eg8KB3VzZXJfaWQYASABKAkSEgoKc2VhdF9pbmRleBgCIAEoDSLpAQoRU3RhcnRHYW1lUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbRISCgpzZXNzaW9uX2lkGAIgASgJEg8KB2dhbWVfaWQYAyABKAkSOQoMcGFydGljaXBhbnRzGAQgAygLMiMucGxhdGZvcm0ucm9vbS52MS5Gcm96ZW5QYXJ0aWNpcGFudBI1Cg1mcm96ZW5fY29uZmlnGAUgASgLMh4ucGxhdGZvcm0uZ2FtZS52MS5HYW1lRW52ZWxvcGUSFwoPY29uZmlnX3JldmlzaW9uGAYgASgEIokCChFGaW5pc2hHYW1lUmVxdWVzdBIPCgdyb29tX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSNwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoCzIdLnBsYXRmb3JtLnJvb20udjEuUm9vbVZlcnNpb24SFAoMb3BlcmF0aW9uX2lkGAQgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgFIAEoCRIeChZleHBlY3RlZF9zdGF0ZV92ZXJzaW9uGAYgASgEEi8KB2NvbW1hbmQYByABKAsyHi5wbGF0Zm9ybS5nYW1lLnYxLkdhbWVFbnZlbG9wZRIWCg5yZXF1ZXN0X2RpZ2VzdBgIIAEoDCI6ChJGaW5pc2hHYW1lUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbSJwChNSZW1vdmVNZW1iZXJSZXF1ZXN0Eg8KB3Jvb21faWQYASABKAkSDwoHdXNlcl9pZBgCIAEoCRI3ChBleHBlY3RlZF92ZXJzaW9uGAMgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbiK8AQoUUmVtb3ZlTWVtYmVyUmVzcG9uc2USJAoEcm9vbRgBIAEoCzIWLnBsYXRmb3JtLnJvb20udjEuUm9vbRItCgdyZW1vdmVkGAIgASgLMhwucGxhdGZvcm0ucm9vbS52MS5Sb29tTWVtYmVyEhsKE3BhcnRpY2lwYW50X3Jldm9rZWQYAyABKAgSGQoRYWN0aXZlX3Nlc3Npb25faWQYBCABKAkSFwoPc291cmNlX2V2ZW50X2lkGAUgASgJIlwKEENsb3NlUm9vbVJlcXVlc3QSDwoHcm9vbV9pZBgBIAEoCRI3ChBleHBlY3RlZF92ZXJzaW9uGAIgASgLMh0ucGxhdGZvcm0ucm9vbS52MS5Sb29tVmVyc2lvbiI5ChFDbG9zZVJvb21SZXNwb25zZRIkCgRyb29tGAEgASgLMhYucGxhdGZvcm0ucm9vbS52MS5Sb29tKmoKDlJvb21WaXNpYmlsaXR5Eh8KG1JPT01fVklTSUJJTElUWV9VTlNQRUNJRklFRBAAEhsKF1JPT01fVklTSUJJTElUWV9QUklWQVRFEAESGgoWUk9PTV9WSVNJQklMSVRZX1BVQkxJQxACKowBCgpSb29tU3RhdHVzEhsKF1JPT01fU1RBVFVTX1VOU1BFQ0lGSUVEEAASFQoRUk9PTV9TVEFUVVNfTE9CQlkQARIXChNST09NX1NUQVRVU19QTEFZSU5HEAISFgoSUk9PTV9TVEFUVVNfQ0xPU0VEEAMSGQoVUk9PTV9TVEFUVVNfUE9TVF9HQU1FEAQqgAEKDUFkbWlzc2lvbk1vZGUSHgoaQURNSVNTSU9OX01PREVfVU5TUEVDSUZJRUQQABIXChNBRE1JU1NJT05fTU9ERV9PUEVOEAESGwoXQURNSVNTSU9OX01PREVfQVBQUk9WQUwQAhIZChVBRE1JU1NJT05fTU9ERV9DTE9TRUQQAyp6CgpNZW1iZXJSb2xlEhsKF01FTUJFUl9ST0xFX1VOU1BFQ0lGSUVEEAASGwoXTUVNQkVSX1JPTEVfUEFSVElDSVBBTlQQARIZChVNRU1CRVJfUk9MRV9TUEVDVEFUT1IQAhIXChNNRU1CRVJfUk9MRV9XQUlUSU5HEAMqYQoKSm9pbkludGVudBIbChdKT0lOX0lOVEVOVF9VTlNQRUNJRklFRBAAEhsKF0pPSU5fSU5URU5UX1BBUlRJQ0lQQU5UEAESGQoVSk9JTl9JTlRFTlRfU1BFQ1RBVE9SEAIqmwMKF1B1YmxpY1Jvb21QcmltYXJ5QWN0aW9uEioKJlBVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX1VOU1BFQ0lGSUVEEAASKQolUFVCTElDX1JPT01fUFJJTUFSWV9BQ1RJT05fRU5URVJfUk9PTRABEiMKH1BVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX0pPSU4QAhIrCidQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9SRVFVRVNUX0pPSU4QAxInCiNQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9TUEVDVEFURRAEEi8KK1BVQkxJQ19ST09NX1BSSU1BUllfQUNUSU9OX1JFUVVFU1RfU1BFQ1RBVEUQBRIsCihQVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9XQUlUX0ZPUl9IT1NUEAYSKgomUFVCTElDX1JPT01fUFJJTUFSWV9BQ1RJT05fSU5fUFJPR1JFU1MQBxIjCh9QVUJMSUNfUk9PTV9QUklNQVJZX0FDVElPTl9GVUxMEAgqvwEKF0dhbWVSdWxlUHJlc2V0V3JpdGVNb2RlEisKJ0dBTUVfUlVMRV9QUkVTRVRfV1JJVEVfTU9ERV9VTlNQRUNJRklFRBAAEiYKIkdBTUVfUlVMRV9QUkVTRVRfV1JJVEVfTU9ERV9DUkVBVEUQARIpCiVHQU1FX1JVTEVfUFJFU0VUX1dSSVRFX01PREVfT1ZFUldSSVRFEAISJAogR0FNRV9SVUxFX1BSRVNFVF9XUklURV9NT0RFX0NPUFkQAzLNDgoLUm9vbVNlcnZpY2USVwoKQ3JlYXRlUm9vbRIjLnBsYXRmb3JtLnJvb20udjEuQ3JlYXRlUm9vbVJlcXVlc3QaJC5wbGF0Zm9ybS5yb29tLnYxLkNyZWF0ZVJvb21SZXNwb25zZRJOCgdHZXRSb29tEiAucGxhdGZvcm0ucm9vbS52MS5HZXRSb29tUmVxdWVzdBohLnBsYXRmb3JtLnJvb20udjEuR2V0Um9vbVJlc3BvbnNlEmAKDUhlYXJ0YmVhdFJvb20SJi5wbGF0Zm9ybS5yb29tLnYxLkhlYXJ0YmVhdFJvb21SZXF1ZXN0GicucGxhdGZvcm0ucm9vbS52MS5IZWFydGJlYXRSb29tUmVzcG9uc2USWgoLTGlzdE15Um9vbXMSJC5wbGF0Zm9ybS5yb29tLnYxLkxpc3RNeVJvb21zUmVxdWVzdBolLnBsYXRmb3JtLnJvb20udjEuTGlzdE15Um9vbXNSZXNwb25zZRJmCg9MaXN0UHVibGljUm9vbXMSKC5wbGF0Zm9ybS5yb29tLnYxLkxpc3RQdWJsaWNSb29tc1JlcXVlc3QaKS5wbGF0Zm9ybS5yb29tLnYxLkxpc3RQdWJsaWNSb29tc1Jlc3BvbnNlElEKCEpvaW5Sb29tEiEucGxhdGZvcm0ucm9vbS52MS5Kb2luUm9vbVJlcXVlc3QaIi5wbGF0Zm9ybS5yb29tLnYxLkpvaW5Sb29tUmVzcG9uc2USYAoNQXBwcm92ZU1lbWJlchImLnBsYXRmb3JtLnJvb20udjEuQXBwcm92ZU1lbWJlclJlcXVlc3QaJy5wbGF0Zm9ybS5yb29tLnYxLkFwcHJvdmVNZW1iZXJSZXNwb25zZRJdCgxTZXRBZG1pc3Npb24SJS5wbGF0Zm9ybS5yb29tLnYxLlNldEFkbWlzc2lvblJlcXVlc3QaJi5wbGF0Zm9ybS5yb29tLnYxLlNldEFkbWlzc2lvblJlc3BvbnNlEmMKDlNlbGVjdFJvb21HYW1lEicucGxhdGZvcm0ucm9vbS52MS5TZWxlY3RSb29tR2FtZVJlcXVlc3QaKC5wbGF0Zm9ybS5yb29tLnYxLlNlbGVjdFJvb21HYW1lUmVzcG9uc2USaQoQVXBkYXRlR2FtZUNvbmZpZxIpLnBsYXRmb3JtLnJvb20udjEuVXBkYXRlR2FtZUNvbmZpZ1JlcXVlc3QaKi5wbGF0Zm9ybS5yb29tLnYxLlVwZGF0ZUdhbWVDb25maWdSZXNwb25zZRJyChNMaXN0R2FtZVJ1bGVQcmVzZXRzEiwucGxhdGZvcm0ucm9vbS52MS5MaXN0R2FtZVJ1bGVQcmVzZXRzUmVxdWVzdBotLnBsYXRmb3JtLnJvb20udjEuTGlzdEdhbWVSdWxlUHJlc2V0c1Jlc3BvbnNlEm8KElNhdmVHYW1lUnVsZVByZXNldBIrLnBsYXRmb3JtLnJvb20udjEuU2F2ZUdhbWVSdWxlUHJlc2V0UmVxdWVzdBosLnBsYXRmb3JtLnJvb20udjEuU2F2ZUdhbWVSdWxlUHJlc2V0UmVzcG9uc2USdQoURGVsZXRlR2FtZVJ1bGVQcmVzZXQSLS5wbGF0Zm9ybS5yb29tLnYxLkRlbGV0ZUdhbWVSdWxlUHJlc2V0UmVxdWVzdBouLnBsYXRmb3JtLnJvb20udjEuRGVsZXRlR2FtZVJ1bGVQcmVzZXRSZXNwb25zZRJjCg5CZWdpbkdhbWVTdGFydBInLnBsYXRmb3JtLnJvb20udjEuQmVnaW5HYW1lU3RhcnRSZXF1ZXN0GigucGxhdGZvcm0ucm9vbS52MS5CZWdpbkdhbWVTdGFydFJlc3BvbnNlEmYKD0NhbmNlbEdhbWVTdGFydBIoLnBsYXRmb3JtLnJvb20udjEuQ2FuY2VsR2FtZVN0YXJ0UmVxdWVzdBopLnBsYXRmb3JtLnJvb20udjEuQ2FuY2VsR2FtZVN0YXJ0UmVzcG9uc2USVAoJU3RhcnRHYW1lEiIucGxhdGZvcm0ucm9vbS52MS5TdGFydEdhbWVSZXF1ZXN0GiMucGxhdGZvcm0ucm9vbS52MS5TdGFydEdhbWVSZXNwb25zZRJXCgpGaW5pc2hHYW1lEiMucGxhdGZvcm0ucm9vbS52MS5GaW5pc2hHYW1lUmVxdWVzdBokLnBsYXRmb3JtLnJvb20udjEuRmluaXNoR2FtZVJlc3BvbnNlEl0KDFJlbW92ZU1lbWJlchIlLnBsYXRmb3JtLnJvb20udjEuUmVtb3ZlTWVtYmVyUmVxdWVzdBomLnBsYXRmb3JtLnJvb20udjEuUmVtb3ZlTWVtYmVyUmVzcG9uc2USVAoJQ2xvc2VSb29tEiIucGxhdGZvcm0ucm9vbS52MS5DbG9zZVJvb21SZXF1ZXN0GiMucGxhdGZvcm0ucm9vbS52MS5DbG9zZVJvb21SZXNwb25zZUJHWkVnaXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2NvbnRyYWN0cy9nZW4vZ28vcGxhdGZvcm0vcm9vbS92MTtyb29tdjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_platform_common_v1_common, file_platform_game_v1_game]);
 
 /**
  * @generated from message platform.room.v1.RoomVersion
@@ -39,6 +39,152 @@ export type RoomVersion = Message<"platform.room.v1.RoomVersion"> & {
  */
 export const RoomVersionSchema: GenMessage<RoomVersion> = /*@__PURE__*/
   messageDesc(file_platform_room_v1_room, 0);
+
+/**
+ * RoomGameConfigDraft is the server-normalized ruleset for one room/game pair.
+ * The platform carries the envelope but never interprets its payload bytes.
+ *
+ * @generated from message platform.room.v1.RoomGameConfigDraft
+ */
+export type RoomGameConfigDraft = Message<"platform.room.v1.RoomGameConfigDraft"> & {
+  /**
+   * @generated from field: string game_id = 1;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope config = 2;
+   */
+  config?: GameEnvelope;
+
+  /**
+   * @generated from field: uint64 revision = 3;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: string updated_by = 4;
+   */
+  updatedBy: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 5;
+   */
+  updatedAt?: Timestamp;
+};
+
+/**
+ * Describes the message platform.room.v1.RoomGameConfigDraft.
+ * Use `create(RoomGameConfigDraftSchema)` to create a new message.
+ */
+export const RoomGameConfigDraftSchema: GenMessage<RoomGameConfigDraft> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 1);
+
+/**
+ * PendingGameStart is durable server state used for reconnect-safe countdowns.
+ *
+ * @generated from message platform.room.v1.PendingGameStart
+ */
+export type PendingGameStart = Message<"platform.room.v1.PendingGameStart"> & {
+  /**
+   * @generated from field: string pending_start_id = 1;
+   */
+  pendingStartId: string;
+
+  /**
+   * @generated from field: string cancel_token = 2;
+   */
+  cancelToken: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp deadline = 3;
+   */
+  deadline?: Timestamp;
+
+  /**
+   * @generated from field: string game_id = 4;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: uint64 config_revision = 5;
+   */
+  configRevision: bigint;
+
+  /**
+   * @generated from field: platform.room.v1.RoomVersion expected_version = 6;
+   */
+  expectedVersion?: RoomVersion;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 7;
+   */
+  ownershipEpoch: bigint;
+};
+
+/**
+ * Describes the message platform.room.v1.PendingGameStart.
+ * Use `create(PendingGameStartSchema)` to create a new message.
+ */
+export const PendingGameStartSchema: GenMessage<PendingGameStart> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 2);
+
+/**
+ * @generated from message platform.room.v1.GameRulePreset
+ */
+export type GameRulePreset = Message<"platform.room.v1.GameRulePreset"> & {
+  /**
+   * @generated from field: string preset_id = 1;
+   */
+  presetId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope config = 4;
+   */
+  config?: GameEnvelope;
+
+  /**
+   * @generated from field: uint64 preset_revision = 5;
+   */
+  presetRevision: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 6;
+   */
+  createdAt?: Timestamp;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 7;
+   */
+  updatedAt?: Timestamp;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_used_at = 8;
+   */
+  lastUsedAt?: Timestamp;
+
+  /**
+   * @generated from field: bool compatible = 9;
+   */
+  compatible: boolean;
+};
+
+/**
+ * Describes the message platform.room.v1.GameRulePreset.
+ * Use `create(GameRulePresetSchema)` to create a new message.
+ */
+export const GameRulePresetSchema: GenMessage<GameRulePreset> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 3);
 
 /**
  * @generated from message platform.room.v1.RoomMember
@@ -85,7 +231,7 @@ export type RoomMember = Message<"platform.room.v1.RoomMember"> & {
  * Use `create(RoomMemberSchema)` to create a new message.
  */
 export const RoomMemberSchema: GenMessage<RoomMember> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 1);
+  messageDesc(file_platform_room_v1_room, 4);
 
 /**
  * @generated from message platform.room.v1.Room
@@ -170,6 +316,29 @@ export type Room = Message<"platform.room.v1.Room"> & {
    * @generated from field: string last_finished_game_id = 16;
    */
   lastFinishedGameId: string;
+
+  /**
+   * selected_game_id is the host-selected pregame table. It is independent of
+   * active_game_id so members converge before a session starts.
+   *
+   * @generated from field: string selected_game_id = 17;
+   */
+  selectedGameId: string;
+
+  /**
+   * @generated from field: repeated platform.room.v1.RoomGameConfigDraft game_config_drafts = 18;
+   */
+  gameConfigDrafts: RoomGameConfigDraft[];
+
+  /**
+   * @generated from field: platform.room.v1.PendingGameStart pending_start = 19;
+   */
+  pendingStart?: PendingGameStart;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 20;
+   */
+  ownershipEpoch: bigint;
 };
 
 /**
@@ -177,7 +346,7 @@ export type Room = Message<"platform.room.v1.Room"> & {
  * Use `create(RoomSchema)` to create a new message.
  */
 export const RoomSchema: GenMessage<Room> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 2);
+  messageDesc(file_platform_room_v1_room, 5);
 
 /**
  * @generated from message platform.room.v1.CreateRoomRequest
@@ -209,7 +378,7 @@ export type CreateRoomRequest = Message<"platform.room.v1.CreateRoomRequest"> & 
  * Use `create(CreateRoomRequestSchema)` to create a new message.
  */
 export const CreateRoomRequestSchema: GenMessage<CreateRoomRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 3);
+  messageDesc(file_platform_room_v1_room, 6);
 
 /**
  * @generated from message platform.room.v1.CreateRoomResponse
@@ -226,7 +395,7 @@ export type CreateRoomResponse = Message<"platform.room.v1.CreateRoomResponse"> 
  * Use `create(CreateRoomResponseSchema)` to create a new message.
  */
 export const CreateRoomResponseSchema: GenMessage<CreateRoomResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 4);
+  messageDesc(file_platform_room_v1_room, 7);
 
 /**
  * @generated from message platform.room.v1.GetRoomRequest
@@ -248,7 +417,7 @@ export type GetRoomRequest = Message<"platform.room.v1.GetRoomRequest"> & {
  * Use `create(GetRoomRequestSchema)` to create a new message.
  */
 export const GetRoomRequestSchema: GenMessage<GetRoomRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 5);
+  messageDesc(file_platform_room_v1_room, 8);
 
 /**
  * @generated from message platform.room.v1.GetRoomResponse
@@ -265,7 +434,7 @@ export type GetRoomResponse = Message<"platform.room.v1.GetRoomResponse"> & {
  * Use `create(GetRoomResponseSchema)` to create a new message.
  */
 export const GetRoomResponseSchema: GenMessage<GetRoomResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 6);
+  messageDesc(file_platform_room_v1_room, 9);
 
 /**
  * @generated from message platform.room.v1.HeartbeatRoomRequest
@@ -282,7 +451,7 @@ export type HeartbeatRoomRequest = Message<"platform.room.v1.HeartbeatRoomReques
  * Use `create(HeartbeatRoomRequestSchema)` to create a new message.
  */
 export const HeartbeatRoomRequestSchema: GenMessage<HeartbeatRoomRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 7);
+  messageDesc(file_platform_room_v1_room, 10);
 
 /**
  * @generated from message platform.room.v1.HeartbeatRoomResponse
@@ -299,7 +468,7 @@ export type HeartbeatRoomResponse = Message<"platform.room.v1.HeartbeatRoomRespo
  * Use `create(HeartbeatRoomResponseSchema)` to create a new message.
  */
 export const HeartbeatRoomResponseSchema: GenMessage<HeartbeatRoomResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 8);
+  messageDesc(file_platform_room_v1_room, 11);
 
 /**
  * MyRoomCard includes invitation and membership fields because the authenticated viewer already belongs to the room.
@@ -398,7 +567,7 @@ export type MyRoomCard = Message<"platform.room.v1.MyRoomCard"> & {
  * Use `create(MyRoomCardSchema)` to create a new message.
  */
 export const MyRoomCardSchema: GenMessage<MyRoomCard> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 9);
+  messageDesc(file_platform_room_v1_room, 12);
 
 /**
  * @generated from message platform.room.v1.ListMyRoomsRequest
@@ -415,7 +584,7 @@ export type ListMyRoomsRequest = Message<"platform.room.v1.ListMyRoomsRequest"> 
  * Use `create(ListMyRoomsRequestSchema)` to create a new message.
  */
 export const ListMyRoomsRequestSchema: GenMessage<ListMyRoomsRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 10);
+  messageDesc(file_platform_room_v1_room, 13);
 
 /**
  * @generated from message platform.room.v1.ListMyRoomsResponse
@@ -437,7 +606,7 @@ export type ListMyRoomsResponse = Message<"platform.room.v1.ListMyRoomsResponse"
  * Use `create(ListMyRoomsResponseSchema)` to create a new message.
  */
 export const ListMyRoomsResponseSchema: GenMessage<ListMyRoomsResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 11);
+  messageDesc(file_platform_room_v1_room, 14);
 
 /**
  * PublicRoomFilter supports the stable discovery facets currently backed by authoritative room state.
@@ -466,7 +635,7 @@ export type PublicRoomFilter = Message<"platform.room.v1.PublicRoomFilter"> & {
  * Use `create(PublicRoomFilterSchema)` to create a new message.
  */
 export const PublicRoomFilterSchema: GenMessage<PublicRoomFilter> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 12);
+  messageDesc(file_platform_room_v1_room, 15);
 
 /**
  * PublicRoomCard excludes invitation codes, real names, and other players' membership details.
@@ -550,7 +719,7 @@ export type PublicRoomCard = Message<"platform.room.v1.PublicRoomCard"> & {
  * Use `create(PublicRoomCardSchema)` to create a new message.
  */
 export const PublicRoomCardSchema: GenMessage<PublicRoomCard> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 13);
+  messageDesc(file_platform_room_v1_room, 16);
 
 /**
  * @generated from message platform.room.v1.ListPublicRoomsRequest
@@ -572,7 +741,7 @@ export type ListPublicRoomsRequest = Message<"platform.room.v1.ListPublicRoomsRe
  * Use `create(ListPublicRoomsRequestSchema)` to create a new message.
  */
 export const ListPublicRoomsRequestSchema: GenMessage<ListPublicRoomsRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 14);
+  messageDesc(file_platform_room_v1_room, 17);
 
 /**
  * @generated from message platform.room.v1.ListPublicRoomsResponse
@@ -594,7 +763,7 @@ export type ListPublicRoomsResponse = Message<"platform.room.v1.ListPublicRoomsR
  * Use `create(ListPublicRoomsResponseSchema)` to create a new message.
  */
 export const ListPublicRoomsResponseSchema: GenMessage<ListPublicRoomsResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 15);
+  messageDesc(file_platform_room_v1_room, 18);
 
 /**
  * @generated from message platform.room.v1.JoinRoomRequest
@@ -626,7 +795,7 @@ export type JoinRoomRequest = Message<"platform.room.v1.JoinRoomRequest"> & {
  * Use `create(JoinRoomRequestSchema)` to create a new message.
  */
 export const JoinRoomRequestSchema: GenMessage<JoinRoomRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 16);
+  messageDesc(file_platform_room_v1_room, 19);
 
 /**
  * @generated from message platform.room.v1.JoinRoomResponse
@@ -658,7 +827,7 @@ export type JoinRoomResponse = Message<"platform.room.v1.JoinRoomResponse"> & {
  * Use `create(JoinRoomResponseSchema)` to create a new message.
  */
 export const JoinRoomResponseSchema: GenMessage<JoinRoomResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 17);
+  messageDesc(file_platform_room_v1_room, 20);
 
 /**
  * @generated from message platform.room.v1.ApproveMemberRequest
@@ -685,7 +854,7 @@ export type ApproveMemberRequest = Message<"platform.room.v1.ApproveMemberReques
  * Use `create(ApproveMemberRequestSchema)` to create a new message.
  */
 export const ApproveMemberRequestSchema: GenMessage<ApproveMemberRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 18);
+  messageDesc(file_platform_room_v1_room, 21);
 
 /**
  * @generated from message platform.room.v1.ApproveMemberResponse
@@ -707,7 +876,7 @@ export type ApproveMemberResponse = Message<"platform.room.v1.ApproveMemberRespo
  * Use `create(ApproveMemberResponseSchema)` to create a new message.
  */
 export const ApproveMemberResponseSchema: GenMessage<ApproveMemberResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 19);
+  messageDesc(file_platform_room_v1_room, 22);
 
 /**
  * @generated from message platform.room.v1.SetAdmissionRequest
@@ -739,7 +908,7 @@ export type SetAdmissionRequest = Message<"platform.room.v1.SetAdmissionRequest"
  * Use `create(SetAdmissionRequestSchema)` to create a new message.
  */
 export const SetAdmissionRequestSchema: GenMessage<SetAdmissionRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 20);
+  messageDesc(file_platform_room_v1_room, 23);
 
 /**
  * @generated from message platform.room.v1.SetAdmissionResponse
@@ -756,7 +925,427 @@ export type SetAdmissionResponse = Message<"platform.room.v1.SetAdmissionRespons
  * Use `create(SetAdmissionResponseSchema)` to create a new message.
  */
 export const SetAdmissionResponseSchema: GenMessage<SetAdmissionResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 21);
+  messageDesc(file_platform_room_v1_room, 24);
+
+/**
+ * SelectRoomGame synchronizes the table selected in a lobby without starting a session.
+ *
+ * @generated from message platform.room.v1.SelectRoomGameRequest
+ */
+export type SelectRoomGameRequest = Message<"platform.room.v1.SelectRoomGameRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: platform.room.v1.RoomVersion expected_version = 3;
+   */
+  expectedVersion?: RoomVersion;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 4;
+   */
+  ownershipEpoch: bigint;
+
+  /**
+   * @generated from field: string operation_id = 5;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 6;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.SelectRoomGameRequest.
+ * Use `create(SelectRoomGameRequestSchema)` to create a new message.
+ */
+export const SelectRoomGameRequestSchema: GenMessage<SelectRoomGameRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 25);
+
+/**
+ * @generated from message platform.room.v1.SelectRoomGameResponse
+ */
+export type SelectRoomGameResponse = Message<"platform.room.v1.SelectRoomGameResponse"> & {
+  /**
+   * @generated from field: platform.room.v1.Room room = 1;
+   */
+  room?: Room;
+};
+
+/**
+ * Describes the message platform.room.v1.SelectRoomGameResponse.
+ * Use `create(SelectRoomGameResponseSchema)` to create a new message.
+ */
+export const SelectRoomGameResponseSchema: GenMessage<SelectRoomGameResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 26);
+
+/**
+ * @generated from message platform.room.v1.UpdateGameConfigRequest
+ */
+export type UpdateGameConfigRequest = Message<"platform.room.v1.UpdateGameConfigRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope config = 3;
+   */
+  config?: GameEnvelope;
+
+  /**
+   * @generated from field: uint64 expected_revision = 4;
+   */
+  expectedRevision: bigint;
+
+  /**
+   * @generated from field: platform.room.v1.RoomVersion expected_version = 5;
+   */
+  expectedVersion?: RoomVersion;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 6;
+   */
+  ownershipEpoch: bigint;
+
+  /**
+   * @generated from field: string operation_id = 7;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 8;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.UpdateGameConfigRequest.
+ * Use `create(UpdateGameConfigRequestSchema)` to create a new message.
+ */
+export const UpdateGameConfigRequestSchema: GenMessage<UpdateGameConfigRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 27);
+
+/**
+ * @generated from message platform.room.v1.UpdateGameConfigResponse
+ */
+export type UpdateGameConfigResponse = Message<"platform.room.v1.UpdateGameConfigResponse"> & {
+  /**
+   * @generated from field: platform.room.v1.Room room = 1;
+   */
+  room?: Room;
+
+  /**
+   * @generated from field: platform.room.v1.RoomGameConfigDraft draft = 2;
+   */
+  draft?: RoomGameConfigDraft;
+};
+
+/**
+ * Describes the message platform.room.v1.UpdateGameConfigResponse.
+ * Use `create(UpdateGameConfigResponseSchema)` to create a new message.
+ */
+export const UpdateGameConfigResponseSchema: GenMessage<UpdateGameConfigResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 28);
+
+/**
+ * @generated from message platform.room.v1.ListGameRulePresetsRequest
+ */
+export type ListGameRulePresetsRequest = Message<"platform.room.v1.ListGameRulePresetsRequest"> & {
+  /**
+   * @generated from field: string game_id = 1;
+   */
+  gameId: string;
+};
+
+/**
+ * Describes the message platform.room.v1.ListGameRulePresetsRequest.
+ * Use `create(ListGameRulePresetsRequestSchema)` to create a new message.
+ */
+export const ListGameRulePresetsRequestSchema: GenMessage<ListGameRulePresetsRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 29);
+
+/**
+ * @generated from message platform.room.v1.ListGameRulePresetsResponse
+ */
+export type ListGameRulePresetsResponse = Message<"platform.room.v1.ListGameRulePresetsResponse"> & {
+  /**
+   * @generated from field: repeated platform.room.v1.GameRulePreset presets = 1;
+   */
+  presets: GameRulePreset[];
+};
+
+/**
+ * Describes the message platform.room.v1.ListGameRulePresetsResponse.
+ * Use `create(ListGameRulePresetsResponseSchema)` to create a new message.
+ */
+export const ListGameRulePresetsResponseSchema: GenMessage<ListGameRulePresetsResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 30);
+
+/**
+ * @generated from message platform.room.v1.SaveGameRulePresetRequest
+ */
+export type SaveGameRulePresetRequest = Message<"platform.room.v1.SaveGameRulePresetRequest"> & {
+  /**
+   * @generated from field: string preset_id = 1;
+   */
+  presetId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope config = 4;
+   */
+  config?: GameEnvelope;
+
+  /**
+   * @generated from field: platform.room.v1.GameRulePresetWriteMode mode = 5;
+   */
+  mode: GameRulePresetWriteMode;
+
+  /**
+   * @generated from field: uint64 expected_preset_revision = 6;
+   */
+  expectedPresetRevision: bigint;
+
+  /**
+   * @generated from field: string operation_id = 7;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 8;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.SaveGameRulePresetRequest.
+ * Use `create(SaveGameRulePresetRequestSchema)` to create a new message.
+ */
+export const SaveGameRulePresetRequestSchema: GenMessage<SaveGameRulePresetRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 31);
+
+/**
+ * @generated from message platform.room.v1.SaveGameRulePresetResponse
+ */
+export type SaveGameRulePresetResponse = Message<"platform.room.v1.SaveGameRulePresetResponse"> & {
+  /**
+   * @generated from field: platform.room.v1.GameRulePreset preset = 1;
+   */
+  preset?: GameRulePreset;
+};
+
+/**
+ * Describes the message platform.room.v1.SaveGameRulePresetResponse.
+ * Use `create(SaveGameRulePresetResponseSchema)` to create a new message.
+ */
+export const SaveGameRulePresetResponseSchema: GenMessage<SaveGameRulePresetResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 32);
+
+/**
+ * @generated from message platform.room.v1.DeleteGameRulePresetRequest
+ */
+export type DeleteGameRulePresetRequest = Message<"platform.room.v1.DeleteGameRulePresetRequest"> & {
+  /**
+   * @generated from field: string preset_id = 1;
+   */
+  presetId: string;
+
+  /**
+   * @generated from field: uint64 expected_preset_revision = 2;
+   */
+  expectedPresetRevision: bigint;
+
+  /**
+   * @generated from field: string operation_id = 3;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 4;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.DeleteGameRulePresetRequest.
+ * Use `create(DeleteGameRulePresetRequestSchema)` to create a new message.
+ */
+export const DeleteGameRulePresetRequestSchema: GenMessage<DeleteGameRulePresetRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 33);
+
+/**
+ * @generated from message platform.room.v1.DeleteGameRulePresetResponse
+ */
+export type DeleteGameRulePresetResponse = Message<"platform.room.v1.DeleteGameRulePresetResponse"> & {
+  /**
+   * @generated from field: string preset_id = 1;
+   */
+  presetId: string;
+};
+
+/**
+ * Describes the message platform.room.v1.DeleteGameRulePresetResponse.
+ * Use `create(DeleteGameRulePresetResponseSchema)` to create a new message.
+ */
+export const DeleteGameRulePresetResponseSchema: GenMessage<DeleteGameRulePresetResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 34);
+
+/**
+ * @generated from message platform.room.v1.BeginGameStartRequest
+ */
+export type BeginGameStartRequest = Message<"platform.room.v1.BeginGameStartRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string game_id = 2;
+   */
+  gameId: string;
+
+  /**
+   * @generated from field: uint64 config_revision = 3;
+   */
+  configRevision: bigint;
+
+  /**
+   * @generated from field: platform.room.v1.RoomVersion expected_version = 4;
+   */
+  expectedVersion?: RoomVersion;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 5;
+   */
+  ownershipEpoch: bigint;
+
+  /**
+   * @generated from field: string operation_id = 6;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 7;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.BeginGameStartRequest.
+ * Use `create(BeginGameStartRequestSchema)` to create a new message.
+ */
+export const BeginGameStartRequestSchema: GenMessage<BeginGameStartRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 35);
+
+/**
+ * @generated from message platform.room.v1.BeginGameStartResponse
+ */
+export type BeginGameStartResponse = Message<"platform.room.v1.BeginGameStartResponse"> & {
+  /**
+   * @generated from field: platform.room.v1.Room room = 1;
+   */
+  room?: Room;
+
+  /**
+   * @generated from field: platform.room.v1.PendingGameStart pending_start = 2;
+   */
+  pendingStart?: PendingGameStart;
+};
+
+/**
+ * Describes the message platform.room.v1.BeginGameStartResponse.
+ * Use `create(BeginGameStartResponseSchema)` to create a new message.
+ */
+export const BeginGameStartResponseSchema: GenMessage<BeginGameStartResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 36);
+
+/**
+ * @generated from message platform.room.v1.CancelGameStartRequest
+ */
+export type CancelGameStartRequest = Message<"platform.room.v1.CancelGameStartRequest"> & {
+  /**
+   * @generated from field: string room_id = 1;
+   */
+  roomId: string;
+
+  /**
+   * @generated from field: string pending_start_id = 2;
+   */
+  pendingStartId: string;
+
+  /**
+   * @generated from field: string cancel_token = 3;
+   */
+  cancelToken: string;
+
+  /**
+   * @generated from field: platform.room.v1.RoomVersion expected_version = 4;
+   */
+  expectedVersion?: RoomVersion;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 5;
+   */
+  ownershipEpoch: bigint;
+
+  /**
+   * @generated from field: string operation_id = 6;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: bytes request_digest = 7;
+   */
+  requestDigest: Uint8Array;
+};
+
+/**
+ * Describes the message platform.room.v1.CancelGameStartRequest.
+ * Use `create(CancelGameStartRequestSchema)` to create a new message.
+ */
+export const CancelGameStartRequestSchema: GenMessage<CancelGameStartRequest> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 37);
+
+/**
+ * @generated from message platform.room.v1.CancelGameStartResponse
+ */
+export type CancelGameStartResponse = Message<"platform.room.v1.CancelGameStartResponse"> & {
+  /**
+   * @generated from field: platform.room.v1.Room room = 1;
+   */
+  room?: Room;
+};
+
+/**
+ * Describes the message platform.room.v1.CancelGameStartResponse.
+ * Use `create(CancelGameStartResponseSchema)` to create a new message.
+ */
+export const CancelGameStartResponseSchema: GenMessage<CancelGameStartResponse> = /*@__PURE__*/
+  messageDesc(file_platform_room_v1_room, 38);
 
 /**
  * @generated from message platform.room.v1.StartGameRequest
@@ -791,6 +1380,26 @@ export type StartGameRequest = Message<"platform.room.v1.StartGameRequest"> & {
    * @generated from field: bytes request_digest = 6;
    */
   requestDigest: Uint8Array;
+
+  /**
+   * @generated from field: string pending_start_id = 7;
+   */
+  pendingStartId: string;
+
+  /**
+   * @generated from field: string cancel_token = 8;
+   */
+  cancelToken: string;
+
+  /**
+   * @generated from field: uint64 config_revision = 9;
+   */
+  configRevision: bigint;
+
+  /**
+   * @generated from field: uint64 ownership_epoch = 10;
+   */
+  ownershipEpoch: bigint;
 };
 
 /**
@@ -798,7 +1407,7 @@ export type StartGameRequest = Message<"platform.room.v1.StartGameRequest"> & {
  * Use `create(StartGameRequestSchema)` to create a new message.
  */
 export const StartGameRequestSchema: GenMessage<StartGameRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 22);
+  messageDesc(file_platform_room_v1_room, 39);
 
 /**
  * @generated from message platform.room.v1.FrozenParticipant
@@ -820,7 +1429,7 @@ export type FrozenParticipant = Message<"platform.room.v1.FrozenParticipant"> & 
  * Use `create(FrozenParticipantSchema)` to create a new message.
  */
 export const FrozenParticipantSchema: GenMessage<FrozenParticipant> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 23);
+  messageDesc(file_platform_room_v1_room, 40);
 
 /**
  * @generated from message platform.room.v1.StartGameResponse
@@ -845,6 +1454,16 @@ export type StartGameResponse = Message<"platform.room.v1.StartGameResponse"> & 
    * @generated from field: repeated platform.room.v1.FrozenParticipant participants = 4;
    */
   participants: FrozenParticipant[];
+
+  /**
+   * @generated from field: platform.game.v1.GameEnvelope frozen_config = 5;
+   */
+  frozenConfig?: GameEnvelope;
+
+  /**
+   * @generated from field: uint64 config_revision = 6;
+   */
+  configRevision: bigint;
 };
 
 /**
@@ -852,7 +1471,7 @@ export type StartGameResponse = Message<"platform.room.v1.StartGameResponse"> & 
  * Use `create(StartGameResponseSchema)` to create a new message.
  */
 export const StartGameResponseSchema: GenMessage<StartGameResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 24);
+  messageDesc(file_platform_room_v1_room, 41);
 
 /**
  * @generated from message platform.room.v1.FinishGameRequest
@@ -904,7 +1523,7 @@ export type FinishGameRequest = Message<"platform.room.v1.FinishGameRequest"> & 
  * Use `create(FinishGameRequestSchema)` to create a new message.
  */
 export const FinishGameRequestSchema: GenMessage<FinishGameRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 25);
+  messageDesc(file_platform_room_v1_room, 42);
 
 /**
  * @generated from message platform.room.v1.FinishGameResponse
@@ -921,7 +1540,7 @@ export type FinishGameResponse = Message<"platform.room.v1.FinishGameResponse"> 
  * Use `create(FinishGameResponseSchema)` to create a new message.
  */
 export const FinishGameResponseSchema: GenMessage<FinishGameResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 26);
+  messageDesc(file_platform_room_v1_room, 43);
 
 /**
  * @generated from message platform.room.v1.RemoveMemberRequest
@@ -948,7 +1567,7 @@ export type RemoveMemberRequest = Message<"platform.room.v1.RemoveMemberRequest"
  * Use `create(RemoveMemberRequestSchema)` to create a new message.
  */
 export const RemoveMemberRequestSchema: GenMessage<RemoveMemberRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 27);
+  messageDesc(file_platform_room_v1_room, 44);
 
 /**
  * @generated from message platform.room.v1.RemoveMemberResponse
@@ -985,7 +1604,7 @@ export type RemoveMemberResponse = Message<"platform.room.v1.RemoveMemberRespons
  * Use `create(RemoveMemberResponseSchema)` to create a new message.
  */
 export const RemoveMemberResponseSchema: GenMessage<RemoveMemberResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 28);
+  messageDesc(file_platform_room_v1_room, 45);
 
 /**
  * @generated from message platform.room.v1.CloseRoomRequest
@@ -1007,7 +1626,7 @@ export type CloseRoomRequest = Message<"platform.room.v1.CloseRoomRequest"> & {
  * Use `create(CloseRoomRequestSchema)` to create a new message.
  */
 export const CloseRoomRequestSchema: GenMessage<CloseRoomRequest> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 29);
+  messageDesc(file_platform_room_v1_room, 46);
 
 /**
  * @generated from message platform.room.v1.CloseRoomResponse
@@ -1024,7 +1643,7 @@ export type CloseRoomResponse = Message<"platform.room.v1.CloseRoomResponse"> & 
  * Use `create(CloseRoomResponseSchema)` to create a new message.
  */
 export const CloseRoomResponseSchema: GenMessage<CloseRoomResponse> = /*@__PURE__*/
-  messageDesc(file_platform_room_v1_room, 30);
+  messageDesc(file_platform_room_v1_room, 47);
 
 /**
  * @generated from enum platform.room.v1.RoomVisibility
@@ -1235,6 +1854,37 @@ export const PublicRoomPrimaryActionSchema: GenEnum<PublicRoomPrimaryAction> = /
   enumDesc(file_platform_room_v1_room, 5);
 
 /**
+ * @generated from enum platform.room.v1.GameRulePresetWriteMode
+ */
+export enum GameRulePresetWriteMode {
+  /**
+   * @generated from enum value: GAME_RULE_PRESET_WRITE_MODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: GAME_RULE_PRESET_WRITE_MODE_CREATE = 1;
+   */
+  CREATE = 1,
+
+  /**
+   * @generated from enum value: GAME_RULE_PRESET_WRITE_MODE_OVERWRITE = 2;
+   */
+  OVERWRITE = 2,
+
+  /**
+   * @generated from enum value: GAME_RULE_PRESET_WRITE_MODE_COPY = 3;
+   */
+  COPY = 3,
+}
+
+/**
+ * Describes the enum platform.room.v1.GameRulePresetWriteMode.
+ */
+export const GameRulePresetWriteModeSchema: GenEnum<GameRulePresetWriteMode> = /*@__PURE__*/
+  enumDesc(file_platform_room_v1_room, 6);
+
+/**
  * RoomService owns continuous PartyRoom membership and host-controlled admission.
  *
  * @generated from service platform.room.v1.RoomService
@@ -1303,6 +1953,62 @@ export const RoomService: GenService<{
     methodKind: "unary";
     input: typeof SetAdmissionRequestSchema;
     output: typeof SetAdmissionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.SelectRoomGame
+   */
+  selectRoomGame: {
+    methodKind: "unary";
+    input: typeof SelectRoomGameRequestSchema;
+    output: typeof SelectRoomGameResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.UpdateGameConfig
+   */
+  updateGameConfig: {
+    methodKind: "unary";
+    input: typeof UpdateGameConfigRequestSchema;
+    output: typeof UpdateGameConfigResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.ListGameRulePresets
+   */
+  listGameRulePresets: {
+    methodKind: "unary";
+    input: typeof ListGameRulePresetsRequestSchema;
+    output: typeof ListGameRulePresetsResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.SaveGameRulePreset
+   */
+  saveGameRulePreset: {
+    methodKind: "unary";
+    input: typeof SaveGameRulePresetRequestSchema;
+    output: typeof SaveGameRulePresetResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.DeleteGameRulePreset
+   */
+  deleteGameRulePreset: {
+    methodKind: "unary";
+    input: typeof DeleteGameRulePresetRequestSchema;
+    output: typeof DeleteGameRulePresetResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.BeginGameStart
+   */
+  beginGameStart: {
+    methodKind: "unary";
+    input: typeof BeginGameStartRequestSchema;
+    output: typeof BeginGameStartResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.room.v1.RoomService.CancelGameStart
+   */
+  cancelGameStart: {
+    methodKind: "unary";
+    input: typeof CancelGameStartRequestSchema;
+    output: typeof CancelGameStartResponseSchema;
   },
   /**
    * @generated from rpc platform.room.v1.RoomService.StartGame

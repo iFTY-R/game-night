@@ -193,6 +193,20 @@ type Querier interface {
 	//    AND admin_version = $5
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	BootstrapAdminPasswordCAS(ctx context.Context, arg BootstrapAdminPasswordCASParams) (BootstrapAdminPasswordCASRow, error)
+	//CancelRoomPendingStart
+	//
+	//  UPDATE room_pending_starts
+	//  SET cancelled_at = COALESCE(cancelled_at, $1)
+	//  WHERE room_id = $2
+	//    AND pending_start_id = $3
+	//    AND cancel_token = $4
+	//    AND ownership_epoch = $5
+	//    AND consumed_at IS NULL
+	//    AND deadline_at >= $1
+	//  RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+	CancelRoomPendingStart(ctx context.Context, arg CancelRoomPendingStartParams) (RoomPendingStart, error)
 	//CaptureGameSessionReplayMembers
 	//
 	//  INSERT INTO game_session_replay_members (session_id, user_id, role)
@@ -433,6 +447,21 @@ type Querier interface {
 	//    AND attempt_count < max_attempts
 	//  RETURNING challenge_id, consumed_at
 	ConsumeAnonymousChallengeWithoutReplayCAS(ctx context.Context, arg ConsumeAnonymousChallengeWithoutReplayCASParams) (ConsumeAnonymousChallengeWithoutReplayCASRow, error)
+	//ConsumeRoomPendingStart
+	//
+	//  UPDATE room_pending_starts
+	//  SET consumed_at = COALESCE(consumed_at, $1)
+	//  WHERE room_id = $2
+	//    AND pending_start_id = $3
+	//    AND cancel_token = $4
+	//    AND operation_id = $5
+	//    AND request_digest = $6
+	//    AND cancelled_at IS NULL
+	//    AND deadline_at <= $1
+	//  RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+	ConsumeRoomPendingStart(ctx context.Context, arg ConsumeRoomPendingStartParams) (RoomPendingStart, error)
 	//ConsumeUserRecoveryAttemptCAS
 	//
 	//  UPDATE user_recovery_attempts
@@ -703,6 +732,45 @@ type Querier interface {
 	//  RETURNING session_id, actor_user_id, action_id, request_digest, result_code,
 	//      result_digest, committed_state_version, committed_at
 	CreateGameActionReceipt(ctx context.Context, arg CreateGameActionReceiptParams) (GameActionReceipt, error)
+	//CreateGameRulePreset
+	//
+	//  INSERT INTO game_rule_presets (
+	//      preset_id,
+	//      owner_user_id,
+	//      game_id,
+	//      name,
+	//      engine_version,
+	//      protocol_version,
+	//      client_version,
+	//      config_schema_version,
+	//      config_message_type,
+	//      config_payload,
+	//      revision,
+	//      compatible,
+	//      created_at,
+	//      updated_at,
+	//      last_used_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12,
+	//      $13,
+	//      $14,
+	//      $15
+	//  )
+	//  RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      revision, compatible, created_at, updated_at, last_used_at
+	CreateGameRulePreset(ctx context.Context, arg CreateGameRulePresetParams) (GameRulePreset, error)
 	//CreateGameSession
 	//
 	//  INSERT INTO game_sessions (
@@ -955,6 +1023,8 @@ type Querier interface {
 	//      active_game_id,
 	//      last_finished_session_id,
 	//      last_finished_game_id,
+	//      selected_game_id,
+	//      ownership_epoch,
 	//      room_version,
 	//      membership_version,
 	//      created_at,
@@ -975,12 +1045,14 @@ type Querier interface {
 	//      $13,
 	//      $14,
 	//      $15,
-	//      $16
+	//      $16,
+	//      $17,
+	//      $18
 	//  )
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error)
 	//CreatePendingAdminTotpEnrollment
 	//
@@ -1068,6 +1140,37 @@ type Querier interface {
 	//  INSERT INTO room_activity_leases (room_id, last_seen_at)
 	//  VALUES ($1, $2)
 	CreateRoomActivityLease(ctx context.Context, arg CreateRoomActivityLeaseParams) error
+	//CreateRoomGameConfigDraft
+	//
+	//  INSERT INTO room_game_config_drafts (
+	//      room_id,
+	//      game_id,
+	//      engine_version,
+	//      protocol_version,
+	//      client_version,
+	//      config_schema_version,
+	//      config_message_type,
+	//      config_payload,
+	//      revision,
+	//      updated_by,
+	//      updated_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11
+	//  )
+	//  RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+	//      config_schema_version, config_message_type, config_payload, revision,
+	//      updated_by, updated_at
+	CreateRoomGameConfigDraft(ctx context.Context, arg CreateRoomGameConfigDraftParams) (RoomGameConfigDraft, error)
 	//CreateRoomMember
 	//
 	//  INSERT INTO room_members (
@@ -1088,6 +1191,108 @@ type Querier interface {
 	//      $7
 	//  )
 	CreateRoomMember(ctx context.Context, arg CreateRoomMemberParams) error
+	//CreateRoomPendingStart
+	//
+	//  INSERT INTO room_pending_starts (
+	//      pending_start_id,
+	//      room_id,
+	//      cancel_token,
+	//      game_id,
+	//      config_revision,
+	//      expected_room_version,
+	//      expected_membership_version,
+	//      ownership_epoch,
+	//      operation_id,
+	//      request_digest,
+	//      deadline_at,
+	//      created_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12
+	//  )
+	//  RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+	CreateRoomPendingStart(ctx context.Context, arg CreateRoomPendingStartParams) (RoomPendingStart, error)
+	//CreateRoomRuleOperationRecord
+	//
+	//  INSERT INTO room_rule_operation_records (
+	//      operation_id,
+	//      operation_kind,
+	//      request_digest,
+	//      room_id,
+	//      owner_user_id,
+	//      preset_id,
+	//      pending_start_id,
+	//      game_id,
+	//      result_revision,
+	//      engine_version,
+	//      protocol_version,
+	//      client_version,
+	//      config_schema_version,
+	//      config_message_type,
+	//      config_payload,
+	//      result_name,
+	//      result_created_at,
+	//      result_updated_at,
+	//      result_last_used_at,
+	//      result_compatible,
+	//      result_updated_by,
+	//      cancel_token,
+	//      deadline_at,
+	//      expected_room_version,
+	//      expected_membership_version,
+	//      ownership_epoch,
+	//      config_revision,
+	//      created_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12,
+	//      $13,
+	//      $14,
+	//      $15,
+	//      $16,
+	//      $17,
+	//      $18,
+	//      $19,
+	//      $20,
+	//      $21,
+	//      $22,
+	//      $23,
+	//      $24,
+	//      $25,
+	//      $26,
+	//      $27,
+	//      $28
+	//  )
+	//  RETURNING operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+	//      pending_start_id, game_id, result_revision, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      result_name, result_created_at, result_updated_at, result_last_used_at,
+	//      result_compatible, result_updated_by, cancel_token, deadline_at,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      config_revision, created_at
+	CreateRoomRuleOperationRecord(ctx context.Context, arg CreateRoomRuleOperationRecordParams) (RoomRuleOperationRecord, error)
 	//CreateSecretOperationResult
 	//
 	//  INSERT INTO secret_operation_results (
@@ -1230,6 +1435,13 @@ type Querier interface {
 	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
 	//            created_at, consumed_at, revoked_at, revoke_reason
 	CreateUserRecoveryCredential(ctx context.Context, arg CreateUserRecoveryCredentialParams) (UserRecoveryCredential, error)
+	//DeleteGameRulePreset
+	//
+	//  DELETE FROM game_rule_presets
+	//  WHERE preset_id = $1
+	//    AND owner_user_id = $2
+	//    AND revision = $3
+	DeleteGameRulePreset(ctx context.Context, arg DeleteGameRulePresetParams) error
 	//DeleteGameSessionTimers
 	//
 	//  DELETE FROM game_session_timers WHERE session_id = $1
@@ -1261,6 +1473,15 @@ type Querier interface {
 	//    AND expires_at <= $1
 	//  RETURNING export_id, status, expired_at
 	ExpireProfileExportContextCAS(ctx context.Context, arg ExpireProfileExportContextCASParams) (ExpireProfileExportContextCASRow, error)
+	//ExpireRoomPendingStarts
+	//
+	//  UPDATE room_pending_starts
+	//  SET cancelled_at = $1
+	//  WHERE room_id = $2
+	//    AND cancelled_at IS NULL
+	//    AND consumed_at IS NULL
+	//    AND deadline_at <= $1
+	ExpireRoomPendingStarts(ctx context.Context, arg ExpireRoomPendingStartsParams) error
 	//ExpireSecretOperationResultCAS
 	//
 	//  UPDATE secret_operation_results
@@ -1306,7 +1527,7 @@ type Querier interface {
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error)
 	//GetActiveAdminTotpEnrollmentForUpdate
 	//
@@ -1469,6 +1690,15 @@ type Querier interface {
 	//    AND actor_user_id = $2
 	//    AND action_id = $3
 	GetGameActionReceipt(ctx context.Context, arg GetGameActionReceiptParams) (GameActionReceipt, error)
+	//GetGameRulePresetForUpdate
+	//
+	//  SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      revision, compatible, created_at, updated_at, last_used_at
+	//  FROM game_rule_presets
+	//  WHERE preset_id = $1
+	//  FOR UPDATE
+	GetGameRulePresetForUpdate(ctx context.Context, arg GetGameRulePresetForUpdateParams) (GameRulePreset, error)
 	//GetGameSessionForShare
 	//
 	//  SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
@@ -1600,6 +1830,16 @@ type Querier interface {
 	//  ORDER BY event.event_sequence DESC
 	//  LIMIT 1
 	GetLatestAckedOutboxEventByType(ctx context.Context, arg GetLatestAckedOutboxEventByTypeParams) (OutboxEvent, error)
+	//GetLatestRoomPendingStart
+	//
+	//  SELECT pending_start_id, room_id, cancel_token, game_id, config_revision,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
+	//  FROM room_pending_starts
+	//  WHERE room_id = $1
+	//  ORDER BY created_at DESC, pending_start_id DESC
+	//  LIMIT 1
+	GetLatestRoomPendingStart(ctx context.Context, arg GetLatestRoomPendingStartParams) (RoomPendingStart, error)
 	//GetOutboxConsumer
 	//
 	//  SELECT consumer_id, subscriptions, last_acked_sequence, lease_owner, lease_until,
@@ -1619,7 +1859,7 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	//  FROM party_rooms
 	//  WHERE room_code = $1
 	//  FOR SHARE
@@ -1629,7 +1869,7 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR SHARE
@@ -1639,7 +1879,7 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR UPDATE
@@ -1661,6 +1901,25 @@ type Querier interface {
 	//  WHERE export_id = $1
 	//  FOR UPDATE
 	GetProfileExportContextForUpdate(ctx context.Context, arg GetProfileExportContextForUpdateParams) (ProfileExportContext, error)
+	//GetRoomGameConfigDraft
+	//
+	//  SELECT room_id, game_id, engine_version, protocol_version, client_version,
+	//      config_schema_version, config_message_type, config_payload, revision,
+	//      updated_by, updated_at
+	//  FROM room_game_config_drafts
+	//  WHERE room_id = $1
+	//    AND game_id = $2
+	GetRoomGameConfigDraft(ctx context.Context, arg GetRoomGameConfigDraftParams) (RoomGameConfigDraft, error)
+	//GetRoomGameConfigDraftForUpdate
+	//
+	//  SELECT room_id, game_id, engine_version, protocol_version, client_version,
+	//      config_schema_version, config_message_type, config_payload, revision,
+	//      updated_by, updated_at
+	//  FROM room_game_config_drafts
+	//  WHERE room_id = $1
+	//    AND game_id = $2
+	//  FOR UPDATE
+	GetRoomGameConfigDraftForUpdate(ctx context.Context, arg GetRoomGameConfigDraftForUpdateParams) (RoomGameConfigDraft, error)
 	//GetRoomMemberRole
 	//
 	//  SELECT role
@@ -1668,6 +1927,19 @@ type Querier interface {
 	//  WHERE room_id = $1
 	//    AND user_id = $2
 	GetRoomMemberRole(ctx context.Context, arg GetRoomMemberRoleParams) (string, error)
+	//GetRoomRuleOperationRecord
+	//
+	//  SELECT operation_id, operation_kind, request_digest, room_id, owner_user_id, preset_id,
+	//      pending_start_id, game_id, result_revision, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      result_name, result_created_at, result_updated_at, result_last_used_at,
+	//      result_compatible, result_updated_by, cancel_token, deadline_at,
+	//      expected_room_version, expected_membership_version, ownership_epoch,
+	//      config_revision, created_at
+	//  FROM room_rule_operation_records
+	//  WHERE operation_kind = $1
+	//    AND operation_id = $2
+	GetRoomRuleOperationRecord(ctx context.Context, arg GetRoomRuleOperationRecordParams) (RoomRuleOperationRecord, error)
 	//GetSecretOperationResultByIDForUpdate
 	//
 	//  SELECT result_id, operation_scope, actor_or_challenge_id, operation_id, request_digest,
@@ -1862,6 +2134,16 @@ type Querier interface {
 	//  ORDER BY timer.due_at, timer.session_id, timer.timer_id
 	//  LIMIT $2
 	ListDueGameSessionTimerCandidates(ctx context.Context, arg ListDueGameSessionTimerCandidatesParams) ([]GameSessionTimer, error)
+	//ListGameRulePresets
+	//
+	//  SELECT preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      revision, compatible, created_at, updated_at, last_used_at
+	//  FROM game_rule_presets
+	//  WHERE owner_user_id = $1
+	//    AND ($2::text = '' OR game_id = $2::text)
+	//  ORDER BY updated_at DESC, preset_id DESC
+	ListGameRulePresets(ctx context.Context, arg ListGameRulePresetsParams) ([]GameRulePreset, error)
 	//ListGameSessionEventBatchesAfter
 	//
 	//  SELECT batch_id, session_id, state_version, ownership_epoch, cause, actor_user_id,
@@ -2080,6 +2362,15 @@ type Querier interface {
 	//  ORDER BY room.updated_at DESC, room.room_id DESC
 	//  LIMIT $10
 	ListPublicRoomCards(ctx context.Context, arg ListPublicRoomCardsParams) ([]ListPublicRoomCardsRow, error)
+	//ListRoomGameConfigDrafts
+	//
+	//  SELECT room_id, game_id, engine_version, protocol_version, client_version,
+	//      config_schema_version, config_message_type, config_payload, revision,
+	//      updated_by, updated_at
+	//  FROM room_game_config_drafts
+	//  WHERE room_id = $1
+	//  ORDER BY game_id
+	ListRoomGameConfigDrafts(ctx context.Context, arg ListRoomGameConfigDraftsParams) ([]RoomGameConfigDraft, error)
 	//ListRoomMemberUsernames
 	//
 	//  SELECT member.user_id, users.username
@@ -2134,6 +2425,10 @@ type Querier interface {
 	//  WHERE room_id = $1
 	//  FOR UPDATE
 	LockRoomActivityLease(ctx context.Context, arg LockRoomActivityLeaseParams) (pgtype.Timestamptz, error)
+	//LockRoomRuleOperationKey
+	//
+	//  SELECT pg_advisory_xact_lock(pg_catalog.hashtextextended($1::text || ':' || $2::text, 0))
+	LockRoomRuleOperationKey(ctx context.Context, arg LockRoomRuleOperationKeyParams) error
 	//ReadAuditAnchor
 	//
 	//  WITH result AS (
@@ -2609,6 +2904,26 @@ type Querier interface {
 	//    AND admin_version = $8
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	UpdateAdminPasswordCAS(ctx context.Context, arg UpdateAdminPasswordCASParams) (UpdateAdminPasswordCASRow, error)
+	//UpdateGameRulePreset
+	//
+	//  UPDATE game_rule_presets
+	//  SET name = $1,
+	//      engine_version = $2,
+	//      protocol_version = $3,
+	//      client_version = $4,
+	//      config_schema_version = $5,
+	//      config_message_type = $6,
+	//      config_payload = $7,
+	//      revision = $8,
+	//      compatible = $9,
+	//      updated_at = $10,
+	//      last_used_at = $11
+	//  WHERE preset_id = $12
+	//    AND revision = $13
+	//  RETURNING preset_id, owner_user_id, game_id, name, engine_version, protocol_version,
+	//      client_version, config_schema_version, config_message_type, config_payload,
+	//      revision, compatible, created_at, updated_at, last_used_at
+	UpdateGameRulePreset(ctx context.Context, arg UpdateGameRulePresetParams) (GameRulePreset, error)
 	//UpdateGameSessionLifecycleCAS
 	//
 	//  UPDATE game_sessions
@@ -2657,18 +2972,40 @@ type Querier interface {
 	//      active_game_id = $8,
 	//      last_finished_session_id = $9,
 	//      last_finished_game_id = $10,
-	//      room_version = $11,
-	//      membership_version = $12,
-	//      updated_at = $13
-	//  WHERE room_id = $14
-	//    AND room_code = $15
-	//    AND room_version = $16
-	//    AND membership_version = $17
+	//      selected_game_id = $11,
+	//      ownership_epoch = $12,
+	//      room_version = $13,
+	//      membership_version = $14,
+	//      updated_at = $15
+	//  WHERE room_id = $16
+	//    AND room_code = $17
+	//    AND ownership_epoch = $18
+	//    AND room_version = $19
+	//    AND membership_version = $20
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
 	UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error)
+	//UpdateRoomGameConfigDraft
+	//
+	//  UPDATE room_game_config_drafts
+	//  SET engine_version = $1,
+	//      protocol_version = $2,
+	//      client_version = $3,
+	//      config_schema_version = $4,
+	//      config_message_type = $5,
+	//      config_payload = $6,
+	//      revision = $7,
+	//      updated_by = $8,
+	//      updated_at = $9
+	//  WHERE room_id = $10
+	//    AND game_id = $11
+	//    AND revision = $12
+	//  RETURNING room_id, game_id, engine_version, protocol_version, client_version,
+	//      config_schema_version, config_message_type, config_payload, revision,
+	//      updated_by, updated_at
+	UpdateRoomGameConfigDraft(ctx context.Context, arg UpdateRoomGameConfigDraftParams) (RoomGameConfigDraft, error)
 	//UpdateUserProfileCAS
 	//
 	//  UPDATE user_profiles

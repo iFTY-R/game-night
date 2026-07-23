@@ -194,6 +194,24 @@ type GameActionReceipt struct {
 	CommittedAt           pgtype.Timestamptz `json:"committed_at"`
 }
 
+type GameRulePreset struct {
+	PresetID            pgtype.UUID        `json:"preset_id"`
+	OwnerUserID         pgtype.UUID        `json:"owner_user_id"`
+	GameID              string             `json:"game_id"`
+	Name                string             `json:"name"`
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	Compatible          bool               `json:"compatible"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	LastUsedAt          pgtype.Timestamptz `json:"last_used_at"`
+}
+
 type GameSession struct {
 	SessionID          pgtype.UUID        `json:"session_id"`
 	RoomID             pgtype.UUID        `json:"room_id"`
@@ -386,6 +404,8 @@ type PartyRoom struct {
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 	LastFinishedSessionID pgtype.UUID        `json:"last_finished_session_id"`
 	LastFinishedGameID    pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID        string             `json:"selected_game_id"`
+	OwnershipEpoch        int64              `json:"ownership_epoch"`
 }
 
 type ProfileExportContext struct {
@@ -420,6 +440,20 @@ type RoomActivityLease struct {
 	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
 }
 
+type RoomGameConfigDraft struct {
+	RoomID              pgtype.UUID        `json:"room_id"`
+	GameID              string             `json:"game_id"`
+	EngineVersion       string             `json:"engine_version"`
+	ProtocolVersion     string             `json:"protocol_version"`
+	ClientVersion       string             `json:"client_version"`
+	ConfigSchemaVersion int32              `json:"config_schema_version"`
+	ConfigMessageType   string             `json:"config_message_type"`
+	ConfigPayload       []byte             `json:"config_payload"`
+	Revision            int64              `json:"revision"`
+	UpdatedBy           pgtype.UUID        `json:"updated_by"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RoomMember struct {
 	RoomID        pgtype.UUID        `json:"room_id"`
 	UserID        pgtype.UUID        `json:"user_id"`
@@ -428,6 +462,54 @@ type RoomMember struct {
 	SeatIndex     pgtype.Int4        `json:"seat_index"`
 	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
 	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
+}
+
+type RoomPendingStart struct {
+	PendingStartID            pgtype.UUID        `json:"pending_start_id"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	CancelToken               string             `json:"cancel_token"`
+	GameID                    string             `json:"game_id"`
+	ConfigRevision            int64              `json:"config_revision"`
+	ExpectedRoomVersion       int64              `json:"expected_room_version"`
+	ExpectedMembershipVersion int64              `json:"expected_membership_version"`
+	OwnershipEpoch            int64              `json:"ownership_epoch"`
+	OperationID               string             `json:"operation_id"`
+	RequestDigest             []byte             `json:"request_digest"`
+	DeadlineAt                pgtype.Timestamptz `json:"deadline_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	CancelledAt               pgtype.Timestamptz `json:"cancelled_at"`
+	ConsumedAt                pgtype.Timestamptz `json:"consumed_at"`
+}
+
+type RoomRuleOperationRecord struct {
+	OperationID               string             `json:"operation_id"`
+	OperationKind             string             `json:"operation_kind"`
+	RequestDigest             []byte             `json:"request_digest"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	OwnerUserID               pgtype.UUID        `json:"owner_user_id"`
+	PresetID                  pgtype.UUID        `json:"preset_id"`
+	PendingStartID            pgtype.UUID        `json:"pending_start_id"`
+	GameID                    pgtype.Text        `json:"game_id"`
+	ResultRevision            pgtype.Int8        `json:"result_revision"`
+	EngineVersion             pgtype.Text        `json:"engine_version"`
+	ProtocolVersion           pgtype.Text        `json:"protocol_version"`
+	ClientVersion             pgtype.Text        `json:"client_version"`
+	ConfigSchemaVersion       pgtype.Int4        `json:"config_schema_version"`
+	ConfigMessageType         pgtype.Text        `json:"config_message_type"`
+	ConfigPayload             []byte             `json:"config_payload"`
+	ResultName                pgtype.Text        `json:"result_name"`
+	ResultCreatedAt           pgtype.Timestamptz `json:"result_created_at"`
+	ResultUpdatedAt           pgtype.Timestamptz `json:"result_updated_at"`
+	ResultLastUsedAt          pgtype.Timestamptz `json:"result_last_used_at"`
+	ResultCompatible          pgtype.Bool        `json:"result_compatible"`
+	ResultUpdatedBy           pgtype.UUID        `json:"result_updated_by"`
+	CancelToken               pgtype.Text        `json:"cancel_token"`
+	DeadlineAt                pgtype.Timestamptz `json:"deadline_at"`
+	ExpectedRoomVersion       pgtype.Int8        `json:"expected_room_version"`
+	ExpectedMembershipVersion pgtype.Int8        `json:"expected_membership_version"`
+	OwnershipEpoch            pgtype.Int8        `json:"ownership_epoch"`
+	ConfigRevision            pgtype.Int8        `json:"config_revision"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 }
 
 type SecretOperationResult struct {

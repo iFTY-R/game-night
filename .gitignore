@@ -186,3 +186,4 @@ yarn.lock
 .superpowers/
 .worktrees/
 .tmp
+.turbo

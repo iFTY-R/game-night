@@ -71,18 +71,17 @@ if ($LASTEXITCODE -ne 0) { throw 'frozen pnpm install failed' }
 
 ## Docker Compose 本地部署
 
-默认 `compose.yaml` 只启动一个长期应用服务 `app`，镜像内的 `serve-all` 管理 edge、API、realtime 和 worker；对宿主机只发布 `8080`。准备 `infra/compose/.env` 和只读 keyring 文件后执行：
+默认 `docker-compose.yaml` 只定义一个长期应用服务 `app`，镜像内的 `serve-all` 在同一容器内管理 edge、API、realtime 和 worker；对宿主机只发布 `8080`。它不创建 PostgreSQL、Redis、MinIO 或 init 容器，启动前需要在 `infra/compose/.env` 中配置外部依赖 URL 和只读 keyring 目录。
 
 ```powershell
 Copy-Item infra/compose/.env.example infra/compose/.env
-# 编辑 infra/compose/.env，替换所有 change-me 值并准备 GAME_NIGHT_SECRETS_DIR
+# 编辑 infra/compose/.env，替换所有 change-me 值并准备 GAME_NIGHT_API_SECRETS_DIR/GAME_NIGHT_WORKER_SECRETS_DIR
 
-docker compose --env-file infra/compose/.env up -d postgres redis minio secrets-init minio-init postgres-init
-docker compose --env-file infra/compose/.env --profile migration run --rm migrate
+docker compose --env-file infra/compose/.env run --rm --no-deps app migrate up
 docker compose --env-file infra/compose/.env up -d app
 ```
 
-需要独立容器重启边界时，额外使用 `compose.multi.yaml`：将上述命令中的 `docker compose` 替换为 `docker compose -f compose.multi.yaml`，最后启动 `api realtime worker edge`。两种模式择一运行，完整变量和 secret staging 说明见 [`infra/compose/README.md`](../../infra/compose/README.md)。
+需要 Compose 一并创建 PostgreSQL、Redis、MinIO 和独立应用容器时，额外使用 `docker-compose.multi.yaml`：先启动 `postgres redis minio secrets-init minio-init postgres-init`，再运行 `--profile migration run --rm migrate`，最后启动 `api realtime worker edge`。两种模式择一运行，完整变量和 secret staging 说明见 [`infra/compose/README.md`](../../infra/compose/README.md)。
 
 ## 仓库验证
 

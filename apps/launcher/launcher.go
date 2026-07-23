@@ -26,11 +26,12 @@ const (
 	commandServeAll    = "serve-all"
 	commandHealthcheck = "healthcheck"
 
-	environmentBinDirectory       = "GAME_NIGHT_BIN_DIRECTORY"
-	environmentShutdownTimeout    = "GAME_NIGHT_SHUTDOWN_TIMEOUT"
-	environmentHealthcheckURL     = "GAME_NIGHT_HEALTHCHECK_URL"
-	environmentHealthcheckTimeout = "GAME_NIGHT_HEALTHCHECK_TIMEOUT"
-	environmentDatabaseURL        = "GAME_NIGHT_DATABASE_URL"
+	environmentBinDirectory         = "GAME_NIGHT_BIN_DIRECTORY"
+	environmentShutdownTimeout      = "GAME_NIGHT_SHUTDOWN_TIMEOUT"
+	environmentHealthcheckURL       = "GAME_NIGHT_HEALTHCHECK_URL"
+	environmentHealthcheckTimeout   = "GAME_NIGHT_HEALTHCHECK_TIMEOUT"
+	environmentDatabaseURL          = "GAME_NIGHT_DATABASE_URL"
+	environmentMigrationDatabaseURL = "GAME_NIGHT_MIGRATION_DATABASE_URL"
 
 	environmentAPIDatabaseURL      = "GAME_NIGHT_API_DATABASE_URL"
 	environmentRealtimeDatabaseURL = "GAME_NIGHT_REALTIME_DATABASE_URL"
@@ -61,6 +62,7 @@ var (
 // The launcher strips shared secret mounts first, then adds back only the minimal authority each child needs.
 var secretEnvironmentNames = []string{
 	environmentDatabaseURL,
+	environmentMigrationDatabaseURL,
 	environmentAPIDatabaseURL,
 	environmentRealtimeDatabaseURL,
 	environmentWorkerDatabaseURL,

@@ -39,11 +39,11 @@ go run ./apps/realtime
 
 ```powershell
 $env:GAME_NIGHT_IMAGE = 'ghcr.io/<owner>/<repository>@sha256:<digest>'
-docker compose --env-file infra/compose/.env --profile migration run --rm migrate
+docker compose --env-file infra/compose/.env run --rm --no-deps app migrate up
 docker compose --env-file infra/compose/.env up -d app
 ```
 
-额外多服务模式使用 `docker compose -f compose.multi.yaml --env-file infra/compose/.env`，migration 成功后启动 `api realtime worker edge`。两种模式都只发布 `127.0.0.1:8080`；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。单服务模式中任一关键子进程退出会重启整个 `app` 容器，多服务模式只重启对应服务。
+默认主编排只创建 `app` 一个长期容器，PostgreSQL、Redis、对象存储和 keyring 目录必须由外部部署提供。额外多服务模式使用 `docker compose -f docker-compose.multi.yaml --env-file infra/compose/.env`，migration 成功后启动 `api realtime worker edge`。两种模式都只发布 `127.0.0.1:8080`；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。单服务模式中任一关键子进程退出会重启整个 `app` 容器，多服务模式只重启对应服务。
 
 ## 滚动发布
 

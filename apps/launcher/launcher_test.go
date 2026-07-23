@@ -31,6 +31,7 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 		environmentWorkerKeyringDirectory + "=" + workerSecrets,
 		environmentAPIBootstrapSecretFile + "=" + filepath.Join(apiSecrets, "admin-bootstrap.txt"),
 		environmentDatabaseURL + "=postgres://should-not-leak",
+		environmentMigrationDatabaseURL + "=postgres://migration-should-not-leak",
 		environmentPIIKeyringFile + "=should-not-leak",
 	}, defaultBinDirectory)
 	if err != nil {
@@ -52,6 +53,9 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	if _, leaked := apiEnv[environmentAPIDatabaseURL]; leaked {
 		t.Fatal("api retained process-specific database environment")
 	}
+	if _, leaked := apiEnv[environmentMigrationDatabaseURL]; leaked {
+		t.Fatal("api retained migration database environment")
+	}
 
 	realtimeEnv := environmentFromList(t, specs[1].env)
 	if realtimeEnv[environmentDatabaseURL] != "postgres://realtime" {
@@ -59,6 +63,9 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	}
 	if _, leaked := realtimeEnv[environmentPIIKeyringFile]; leaked {
 		t.Fatal("realtime inherited secret keyring material")
+	}
+	if _, leaked := realtimeEnv[environmentMigrationDatabaseURL]; leaked {
+		t.Fatal("realtime retained migration database environment")
 	}
 
 	workerEnv := environmentFromList(t, specs[2].env)
@@ -72,10 +79,16 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	if _, leaked := workerEnv[environmentResultEnvelopeKeyringFile]; leaked {
 		t.Fatal("worker received API-only keyring material")
 	}
+	if _, leaked := workerEnv[environmentMigrationDatabaseURL]; leaked {
+		t.Fatal("worker retained migration database environment")
+	}
 
 	edgeEnv := environmentFromList(t, specs[3].env)
 	if _, mapped := edgeEnv[environmentDatabaseURL]; mapped {
 		t.Fatal("edge unexpectedly received a database url")
+	}
+	if _, leaked := edgeEnv[environmentMigrationDatabaseURL]; leaked {
+		t.Fatal("edge retained migration database environment")
 	}
 }
 

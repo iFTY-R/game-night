@@ -33,17 +33,18 @@ go run ./apps/realtime
 
 ## 镜像与 Compose 发布
 
-`.github/workflows/image.yml` 在 PR 中只验证 Docker build；向 `master` 或 `v*` tag 推送时发布 `ghcr.io/<owner>/<repository>`，应优先部署 workflow 输出的 digest 或 `sha-<commit>` 标签。镜像包含 edge、API、realtime、worker、migration 和前端静态产物，但不包含数据库、Redis、MinIO、TLS 证书或运行时 secret。
+`.github/workflows/image.yml` 仅在推送 `vX.Y.Z` 格式的 Git tag 时构建并发布 `ghcr.io/<owner>/<repository>`；PR、`master`/默认分支及其他分支提交都不会触发镜像构建。发布时应优先部署 workflow 输出的 digest 或 `sha-<commit>` 标签。镜像包含 edge、API、realtime、worker、migration 和前端静态产物，但不包含数据库、Redis、MinIO、TLS 证书或运行时 secret。
 
-默认发布使用单服务主编排：
+生产发布优先使用 standalone 编排连接启用 TLS 的托管依赖：
 
 ```powershell
 $env:GAME_NIGHT_IMAGE = 'ghcr.io/<owner>/<repository>@sha256:<digest>'
-docker compose --env-file infra/compose/.env run --rm --no-deps app migrate up
-docker compose --env-file infra/compose/.env up -d app
+docker compose -f deploy/docker-compose.standalone.yml --env-file deploy/.env pull
+docker compose -f deploy/docker-compose.standalone.yml --env-file deploy/.env run --rm --no-deps game-night migrate up
+docker compose -f deploy/docker-compose.standalone.yml --env-file deploy/.env up -d game-night
 ```
 
-默认主编排只创建 `app` 一个长期容器，PostgreSQL、Redis、对象存储和 keyring 目录必须由外部部署提供。额外多服务模式使用 `docker compose -f docker-compose.multi.yaml --env-file infra/compose/.env`，migration 成功后启动 `api realtime worker edge`。两种模式都只发布 `127.0.0.1:8080`；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。单服务模式中任一关键子进程退出会重启整个 `app` 容器，多服务模式只重启对应服务。
+`deploy/docker-compose.standalone.yml` 只创建一个 `game-night` 容器，PostgreSQL、Redis、对象存储和 keyring 目录由外部部署提供。`deploy/docker-compose.yml` 使用同一个应用容器，但额外创建本地依赖与初始化容器，适合开发或单机演示。两种模式都只发布 `127.0.0.1:8080`；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。任一关键应用子进程退出都会结束并重启整个 `game-night` 容器。
 
 ## 滚动发布
 

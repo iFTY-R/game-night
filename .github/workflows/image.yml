@@ -1,12 +1,13 @@
 name: image
 
 on:
-  pull_request:
   push:
-    branches:
-      - master
     tags:
-      - "v*"
+      - "v*.*.*"
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -47,12 +48,15 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
             type=sha,prefix=sha-,format=short
+          flavor: |
+            latest=false
 
       - name: Log in to GHCR
-        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -66,7 +70,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
-          push: ${{ github.event_name == 'push' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -80,7 +84,6 @@ jobs:
             CREATED=${{ env.IMAGE_CREATED }}
 
       - name: Publish digest
-        if: github.event_name == 'push'
         run: |
           {
             echo '### Image'

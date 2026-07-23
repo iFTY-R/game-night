@@ -1,0 +1,292 @@
+# Game Night full deployment
+# Runs one application container plus PostgreSQL, Redis, and MinIO dependencies.
+
+services:
+  game-night:
+    image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:latest}
+    container_name: game-night
+    command: ["serve-all"]
+    restart: unless-stopped
+    stop_grace_period: ${GAME_NIGHT_STOP_GRACE_PERIOD:-65s}
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      secrets-init:
+        condition: service_completed_successfully
+    ports:
+      - "${GAME_NIGHT_HTTP_BIND_ADDRESS:-127.0.0.1}:${GAME_NIGHT_HTTP_PUBLISHED_PORT:-8080}:8080"
+    volumes:
+      - game_night_api_secrets:/run/game-night/api-secrets:ro
+      - game_night_worker_secrets:/run/game-night/worker-secrets:ro
+    environment:
+      GAME_NIGHT_ENVIRONMENT: ${GAME_NIGHT_ENVIRONMENT:-development}
+      GAME_NIGHT_DATABASE_SCHEMA: ${GAME_NIGHT_DATABASE_SCHEMA:-game_night}
+      GAME_NIGHT_REDIS_URL: "redis://:${GAME_NIGHT_REDIS_PASSWORD:?GAME_NIGHT_REDIS_PASSWORD is required}@redis:6379/0"
+      GAME_NIGHT_REDIS_KEY_PREFIX: ${GAME_NIGHT_REDIS_KEY_PREFIX:-game-night:compose:}
+      GAME_NIGHT_REDIS_TIMEOUT: ${GAME_NIGHT_REDIS_TIMEOUT:-1s}
+      GAME_NIGHT_USER_ORIGINS: ${GAME_NIGHT_USER_ORIGINS:-http://localhost:8080}
+      GAME_NIGHT_ADMIN_ORIGINS: ${GAME_NIGHT_ADMIN_ORIGINS:-http://admin.localhost:8080}
+      GAME_NIGHT_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
+      GAME_NIGHT_COOKIE_SECURE: ${GAME_NIGHT_COOKIE_SECURE:-false}
+
+      GAME_NIGHT_CHECKPOINT_SINK: s3
+      GAME_NIGHT_CHECKPOINT_S3_REGION: us-east-1
+      GAME_NIGHT_CHECKPOINT_S3_BUCKET: game-night-audit
+      GAME_NIGHT_CHECKPOINT_S3_ENDPOINT: http://minio:9000
+      GAME_NIGHT_CHECKPOINT_S3_RETENTION: ${GAME_NIGHT_CHECKPOINT_S3_RETENTION:-8760h}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${GAME_NIGHT_MINIO_APP_ACCESS_KEY:?GAME_NIGHT_MINIO_APP_ACCESS_KEY is required}
+      AWS_SECRET_ACCESS_KEY: ${GAME_NIGHT_MINIO_APP_SECRET_KEY:?GAME_NIGHT_MINIO_APP_SECRET_KEY is required}
+
+      # serve-all keeps database roles separate inside the application container.
+      GAME_NIGHT_API_DATABASE_URL: "postgresql://${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN:-game_night_runtime_login}:${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD:?GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable"
+      GAME_NIGHT_REALTIME_DATABASE_URL: "postgresql://${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN:-game_night_runtime_login}:${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD:?GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable"
+      GAME_NIGHT_WORKER_DATABASE_URL: "postgresql://${GAME_NIGHT_POSTGRES_WORKER_LOGIN:-game_night_worker_login}:${GAME_NIGHT_POSTGRES_WORKER_PASSWORD:?GAME_NIGHT_POSTGRES_WORKER_PASSWORD is required}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable"
+      GAME_NIGHT_MIGRATION_DATABASE_URL: "postgresql://${GAME_NIGHT_POSTGRES_MIGRATION_LOGIN:-game_night_migration_login}:${GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD:?GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD is required}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable"
+      GAME_NIGHT_API_KEYRING_DIRECTORY: /run/game-night/api-secrets
+      GAME_NIGHT_WORKER_KEYRING_DIRECTORY: /run/game-night/worker-secrets
+      GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE: /run/game-night/api-secrets/admin-bootstrap.txt
+
+      GAME_NIGHT_API_LISTEN_ADDRESS: 127.0.0.1:8081
+      GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL: http://127.0.0.1:8091
+      GAME_NIGHT_API_REALTIME_PEER_URLS: http://127.0.0.1:8091
+      GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?GAME_NIGHT_REALTIME_INTERNAL_TOKEN is required}
+      GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS:-100}
+      GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL:-5m}
+
+      GAME_NIGHT_REALTIME_PUBLIC_LISTEN_ADDRESS: 127.0.0.1:8090
+      GAME_NIGHT_REALTIME_INTERNAL_LISTEN_ADDRESS: 127.0.0.1:8091
+      GAME_NIGHT_REALTIME_ADVERTISED_URL: http://127.0.0.1:8091
+      GAME_NIGHT_REALTIME_INSTANCE_ID: ${GAME_NIGHT_REALTIME_INSTANCE_ID:-realtime-compose}
+      GAME_NIGHT_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?GAME_NIGHT_REALTIME_INTERNAL_TOKEN is required}
+
+      GAME_NIGHT_EDGE_LISTEN_ADDRESS: ":8080"
+      GAME_NIGHT_EDGE_API_UPSTREAM_URL: http://127.0.0.1:8081
+      GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL: http://127.0.0.1:8090
+      GAME_NIGHT_EDGE_STATIC_DIRECTORY: /app/web
+      GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
+
+      GAME_NIGHT_WORKER_INSTANCE_ID: ${GAME_NIGHT_WORKER_INSTANCE_ID:-worker-compose}
+      GAME_NIGHT_WORKER_LEASE_DURATION: ${GAME_NIGHT_WORKER_LEASE_DURATION:-1m}
+      GAME_NIGHT_WORKER_BATCH_SIZE: ${GAME_NIGHT_WORKER_BATCH_SIZE:-10}
+      GAME_NIGHT_WORKER_POLL_INTERVAL: ${GAME_NIGHT_WORKER_POLL_INTERVAL:-1s}
+      GAME_NIGHT_ROOM_IDLE_TIMEOUT: ${GAME_NIGHT_ROOM_IDLE_TIMEOUT:-10m}
+    healthcheck:
+      test: ["CMD", "game-night", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: game-night-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${GAME_NIGHT_POSTGRES_DB:-game_night}
+      POSTGRES_USER: ${GAME_NIGHT_POSTGRES_ADMIN_USER:-game_night_admin}
+      POSTGRES_PASSWORD: ${GAME_NIGHT_POSTGRES_ADMIN_PASSWORD:?GAME_NIGHT_POSTGRES_ADMIN_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  postgres-init:
+    image: postgres:17-alpine
+    container_name: game-night-postgres-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${GAME_NIGHT_POSTGRES_DB:-game_night}
+      POSTGRES_ADMIN_USER: ${GAME_NIGHT_POSTGRES_ADMIN_USER:-game_night_admin}
+      POSTGRES_ADMIN_PASSWORD: ${GAME_NIGHT_POSTGRES_ADMIN_PASSWORD:?GAME_NIGHT_POSTGRES_ADMIN_PASSWORD is required}
+      GAME_NIGHT_DATABASE_SCHEMA: ${GAME_NIGHT_DATABASE_SCHEMA:-game_night}
+      GAME_NIGHT_DATABASE_OWNER_ROLE: ${GAME_NIGHT_DATABASE_OWNER_ROLE:-game_night_owner}
+      GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE: ${GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE:-game_night_audit_writer}
+      GAME_NIGHT_DATABASE_MIGRATION_ROLE: ${GAME_NIGHT_DATABASE_MIGRATION_ROLE:-game_night_migration}
+      GAME_NIGHT_DATABASE_RUNTIME_ROLE: ${GAME_NIGHT_DATABASE_RUNTIME_ROLE:-game_night_runtime}
+      GAME_NIGHT_DATABASE_WORKER_ROLE: ${GAME_NIGHT_DATABASE_WORKER_ROLE:-game_night_worker}
+      GAME_NIGHT_POSTGRES_MIGRATION_LOGIN: ${GAME_NIGHT_POSTGRES_MIGRATION_LOGIN:-game_night_migration_login}
+      GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD: ${GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD:?GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD is required}
+      GAME_NIGHT_POSTGRES_RUNTIME_LOGIN: ${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN:-game_night_runtime_login}
+      GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD: ${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD:?GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD is required}
+      GAME_NIGHT_POSTGRES_WORKER_LOGIN: ${GAME_NIGHT_POSTGRES_WORKER_LOGIN:-game_night_worker_login}
+      GAME_NIGHT_POSTGRES_WORKER_PASSWORD: ${GAME_NIGHT_POSTGRES_WORKER_PASSWORD:?GAME_NIGHT_POSTGRES_WORKER_PASSWORD is required}
+    entrypoint: ["/bin/sh", "-euc"]
+    command: |
+      export PGPASSWORD="$${POSTGRES_ADMIN_PASSWORD}"
+      psql --host postgres --username "$${POSTGRES_ADMIN_USER}" --dbname "$${POSTGRES_DB}" --set=ON_ERROR_STOP=1 \
+        -v owner_role="$${GAME_NIGHT_DATABASE_OWNER_ROLE}" \
+        -v audit_writer_role="$${GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE}" \
+        -v migration_role="$${GAME_NIGHT_DATABASE_MIGRATION_ROLE}" \
+        -v runtime_role="$${GAME_NIGHT_DATABASE_RUNTIME_ROLE}" \
+        -v worker_role="$${GAME_NIGHT_DATABASE_WORKER_ROLE}" \
+        -f /roles.sql
+
+      psql --host postgres --username "$${POSTGRES_ADMIN_USER}" --dbname "$${POSTGRES_DB}" --set=ON_ERROR_STOP=1 \
+        -v schema_name="$${GAME_NIGHT_DATABASE_SCHEMA}" \
+        -v owner_role="$${GAME_NIGHT_DATABASE_OWNER_ROLE}" \
+        -v migration_role="$${GAME_NIGHT_DATABASE_MIGRATION_ROLE}" \
+        -v runtime_role="$${GAME_NIGHT_DATABASE_RUNTIME_ROLE}" \
+        -v worker_role="$${GAME_NIGHT_DATABASE_WORKER_ROLE}" \
+        -v migration_login="$${GAME_NIGHT_POSTGRES_MIGRATION_LOGIN}" \
+        -v migration_password="$${GAME_NIGHT_POSTGRES_MIGRATION_PASSWORD}" \
+        -v runtime_login="$${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN}" \
+        -v runtime_password="$${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD}" \
+        -v worker_login="$${GAME_NIGHT_POSTGRES_WORKER_LOGIN}" \
+        -v worker_password="$${GAME_NIGHT_POSTGRES_WORKER_PASSWORD}" <<'SQL'
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'migration_login', :'migration_password')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'migration_login') \gexec
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'runtime_login', :'runtime_password')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'runtime_login') \gexec
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'worker_login', :'worker_password')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'worker_login') \gexec
+
+      SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'migration_login', :'migration_password') \gexec
+      SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'runtime_login', :'runtime_password') \gexec
+      SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'worker_login', :'worker_password') \gexec
+
+      SELECT format('GRANT %I TO %I', :'migration_role', :'migration_login') \gexec
+      SELECT format('GRANT %I TO %I', :'runtime_role', :'runtime_login') \gexec
+      SELECT format('GRANT %I TO %I', :'worker_role', :'worker_login') \gexec
+      SELECT format('ALTER DATABASE %I OWNER TO %I', current_database(), :'owner_role') \gexec
+      SELECT format('CREATE SCHEMA %I AUTHORIZATION %I', :'schema_name', :'owner_role')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = :'schema_name') \gexec
+      SELECT format('ALTER SCHEMA %I OWNER TO %I', :'schema_name', :'owner_role') \gexec
+      SELECT format('GRANT CONNECT, TEMPORARY ON DATABASE %I TO %I, %I, %I', current_database(), :'migration_role', :'runtime_role', :'worker_role') \gexec
+      SELECT format('GRANT CREATE ON DATABASE %I TO %I', current_database(), :'migration_role') \gexec
+      SELECT format('GRANT USAGE, CREATE ON SCHEMA %I TO %I', :'schema_name', :'migration_role') \gexec
+      SQL
+    volumes:
+      - ../infra/postgres/roles.sql:/roles.sql:ro
+
+  redis:
+    image: redis:8-alpine
+    container_name: game-night-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${GAME_NIGHT_REDIS_PASSWORD:?GAME_NIGHT_REDIS_PASSWORD is required}"]
+    environment:
+      REDISCLI_AUTH: ${GAME_NIGHT_REDIS_PASSWORD:?GAME_NIGHT_REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: game-night-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${GAME_NIGHT_MINIO_ROOT_USER:?GAME_NIGHT_MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${GAME_NIGHT_MINIO_ROOT_PASSWORD:?GAME_NIGHT_MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/ready >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: game-night-minio-init
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${GAME_NIGHT_MINIO_ROOT_USER:?GAME_NIGHT_MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${GAME_NIGHT_MINIO_ROOT_PASSWORD:?GAME_NIGHT_MINIO_ROOT_PASSWORD is required}
+      MINIO_APP_ACCESS_KEY: ${GAME_NIGHT_MINIO_APP_ACCESS_KEY:?GAME_NIGHT_MINIO_APP_ACCESS_KEY is required}
+      MINIO_APP_SECRET_KEY: ${GAME_NIGHT_MINIO_APP_SECRET_KEY:?GAME_NIGHT_MINIO_APP_SECRET_KEY is required}
+    entrypoint: ["/bin/sh", "-euc"]
+    command: |
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null
+      mc mb --with-lock --ignore-existing local/game-night-audit
+      mc retention set --default COMPLIANCE 8760h local/game-night-audit
+      if ! mc admin policy info local game-night-audit >/dev/null 2>&1; then
+        mc admin policy create local game-night-audit /policy.json
+      fi
+      if ! mc admin user info local "$${MINIO_APP_ACCESS_KEY}" >/dev/null 2>&1; then
+        mc admin user add local "$${MINIO_APP_ACCESS_KEY}" "$${MINIO_APP_SECRET_KEY}"
+      fi
+      mc admin policy attach local game-night-audit --user "$${MINIO_APP_ACCESS_KEY}"
+    volumes:
+      - ../infra/minio/game-night-audit-policy.json:/policy.json:ro
+
+  secrets-init:
+    image: alpine:3.22
+    container_name: game-night-secrets-init
+    restart: "no"
+    entrypoint: ["/bin/sh", "-euc"]
+    command: |
+      source_dir=/source
+      api_target_dir=/api-target
+      worker_target_dir=/worker-target
+      runtime_owner=10001:10001
+      all_files="\
+        admin-bootstrap.txt \
+        admin-challenge.json \
+        admin-session.json \
+        audit.json \
+        device.json \
+        pii.json \
+        rate-limit.json \
+        result-envelope.json \
+        totp.json \
+        user-challenge.json"
+      worker_files="pii.json totp.json audit.json"
+
+      for file in $${all_files}; do
+        if [ -L "$${source_dir}/$${file}" ] || [ ! -f "$${source_dir}/$${file}" ]; then
+          echo "missing or symbolic-link secret: $${file}" >&2
+          exit 1
+        fi
+      done
+
+      for file in $${all_files}; do
+        cp "$${source_dir}/$${file}" "$${api_target_dir}/$${file}"
+        chown "$${runtime_owner}" "$${api_target_dir}/$${file}"
+        chmod 0400 "$${api_target_dir}/$${file}"
+      done
+
+      for file in $${worker_files}; do
+        cp "$${source_dir}/$${file}" "$${worker_target_dir}/$${file}"
+        chown "$${runtime_owner}" "$${worker_target_dir}/$${file}"
+        chmod 0400 "$${worker_target_dir}/$${file}"
+      done
+    volumes:
+      - type: bind
+        source: ${GAME_NIGHT_SECRETS_DIR:-./secrets}
+        target: /source
+        read_only: true
+      - game_night_api_secrets:/api-target
+      - game_night_worker_secrets:/worker-target
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  game_night_api_secrets:
+    driver: local
+  game_night_worker_secrets:
+    driver: local

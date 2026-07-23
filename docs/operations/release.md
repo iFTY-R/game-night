@@ -31,6 +31,20 @@ go run ./apps/realtime
 
 迁移失败时停止发布，不启动新版本 API/realtime。迁移脚本必须保持幂等；回滚应用版本前先确认旧版本能读取新 schema，不能通过删除 migration 或手工改表恢复。
 
+## 镜像与 Compose 发布
+
+`.github/workflows/image.yml` 在 PR 中只验证 Docker build；向 `master` 或 `v*` tag 推送时发布 `ghcr.io/<owner>/<repository>`，应优先部署 workflow 输出的 digest 或 `sha-<commit>` 标签。镜像包含 edge、API、realtime、worker、migration 和前端静态产物，但不包含数据库、Redis、MinIO、TLS 证书或运行时 secret。
+
+默认发布使用单服务主编排：
+
+```powershell
+$env:GAME_NIGHT_IMAGE = 'ghcr.io/<owner>/<repository>@sha256:<digest>'
+docker compose --env-file infra/compose/.env --profile migration run --rm migrate
+docker compose --env-file infra/compose/.env up -d app
+```
+
+额外多服务模式使用 `docker compose -f compose.multi.yaml --env-file infra/compose/.env`，migration 成功后启动 `api realtime worker edge`。两种模式都只发布 `127.0.0.1:8080`；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。单服务模式中任一关键子进程退出会重启整个 `app` 容器，多服务模式只重启对应服务。
+
 ## 滚动发布
 
 1. 先发布数据库 migration 和兼容的 API。

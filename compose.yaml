@@ -1,0 +1,135 @@
+name: game-night
+
+x-app-image: &app-image ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:latest}
+x-app-user: &app-user "${GAME_NIGHT_RUNTIME_UID:-10001}:${GAME_NIGHT_RUNTIME_GID:-10001}"
+
+services:
+  # Keep dependency service definitions shared with the optional multi-service file.
+  postgres:
+    extends:
+      file: compose.multi.yaml
+      service: postgres
+
+  postgres-init:
+    extends:
+      file: compose.multi.yaml
+      service: postgres-init
+
+  redis:
+    extends:
+      file: compose.multi.yaml
+      service: redis
+
+  minio:
+    extends:
+      file: compose.multi.yaml
+      service: minio
+
+  minio-init:
+    extends:
+      file: compose.multi.yaml
+      service: minio-init
+
+  secrets-init:
+    extends:
+      file: compose.multi.yaml
+      service: secrets-init
+
+  app:
+    image: *app-image
+    command: ["serve-all"]
+    user: *app-user
+    restart: unless-stopped
+    stop_grace_period: ${GAME_NIGHT_STOP_GRACE_PERIOD:-65s}
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      secrets-init:
+        condition: service_completed_successfully
+    environment:
+      GAME_NIGHT_ENVIRONMENT: ${GAME_NIGHT_ENVIRONMENT:-development}
+      GAME_NIGHT_DATABASE_SCHEMA: ${GAME_NIGHT_DATABASE_SCHEMA:-game_night}
+      GAME_NIGHT_REDIS_URL: redis://:${GAME_NIGHT_REDIS_PASSWORD:?set GAME_NIGHT_REDIS_PASSWORD}@redis:6379/0
+      GAME_NIGHT_REDIS_KEY_PREFIX: ${GAME_NIGHT_REDIS_KEY_PREFIX:-game-night:compose:}
+      GAME_NIGHT_REDIS_TIMEOUT: ${GAME_NIGHT_REDIS_TIMEOUT:-1s}
+      GAME_NIGHT_USER_ORIGINS: ${GAME_NIGHT_USER_ORIGINS:-http://localhost:8080}
+      GAME_NIGHT_ADMIN_ORIGINS: ${GAME_NIGHT_ADMIN_ORIGINS:-http://admin.localhost:8080}
+      GAME_NIGHT_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_TRUSTED_PROXY_CIDRS:-172.30.0.0/16,127.0.0.1/32,::1/128}
+      GAME_NIGHT_COOKIE_SECURE: ${GAME_NIGHT_COOKIE_SECURE:-false}
+
+      GAME_NIGHT_CHECKPOINT_SINK: s3
+      GAME_NIGHT_CHECKPOINT_S3_REGION: us-east-1
+      GAME_NIGHT_CHECKPOINT_S3_BUCKET: game-night-audit
+      GAME_NIGHT_CHECKPOINT_S3_ENDPOINT: http://minio:9000
+      GAME_NIGHT_CHECKPOINT_S3_RETENTION: ${GAME_NIGHT_CHECKPOINT_S3_RETENTION:-8760h}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${GAME_NIGHT_MINIO_APP_ACCESS_KEY:?set GAME_NIGHT_MINIO_APP_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${GAME_NIGHT_MINIO_APP_SECRET_KEY:?set GAME_NIGHT_MINIO_APP_SECRET_KEY}
+
+      # serve-all maps these process-specific values to GAME_NIGHT_DATABASE_URL before exec.
+      GAME_NIGHT_API_DATABASE_URL: postgresql://${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN:-game_night_runtime_login}:${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD:?set GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable
+      GAME_NIGHT_REALTIME_DATABASE_URL: postgresql://${GAME_NIGHT_POSTGRES_RUNTIME_LOGIN:-game_night_runtime_login}:${GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD:?set GAME_NIGHT_POSTGRES_RUNTIME_PASSWORD}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable
+      GAME_NIGHT_WORKER_DATABASE_URL: postgresql://${GAME_NIGHT_POSTGRES_WORKER_LOGIN:-game_night_worker_login}:${GAME_NIGHT_POSTGRES_WORKER_PASSWORD:?set GAME_NIGHT_POSTGRES_WORKER_PASSWORD}@postgres:5432/${GAME_NIGHT_POSTGRES_DB:-game_night}?sslmode=disable
+      GAME_NIGHT_API_KEYRING_DIRECTORY: /run/game-night/api-secrets
+      GAME_NIGHT_WORKER_KEYRING_DIRECTORY: /run/game-night/worker-secrets
+      GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE: /run/game-night/api-secrets/admin-bootstrap.txt
+
+      GAME_NIGHT_API_LISTEN_ADDRESS: 127.0.0.1:8081
+      GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL: http://127.0.0.1:8091
+      GAME_NIGHT_API_REALTIME_PEER_URLS: http://127.0.0.1:8091
+      GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?set GAME_NIGHT_REALTIME_INTERNAL_TOKEN}
+      GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS:-100}
+      GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL:-5m}
+
+      GAME_NIGHT_REALTIME_PUBLIC_LISTEN_ADDRESS: 127.0.0.1:8090
+      GAME_NIGHT_REALTIME_INTERNAL_LISTEN_ADDRESS: 127.0.0.1:8091
+      GAME_NIGHT_REALTIME_ADVERTISED_URL: http://127.0.0.1:8091
+      GAME_NIGHT_REALTIME_INSTANCE_ID: ${GAME_NIGHT_REALTIME_INSTANCE_ID:-realtime-single}
+      GAME_NIGHT_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?set GAME_NIGHT_REALTIME_INTERNAL_TOKEN}
+
+      GAME_NIGHT_EDGE_LISTEN_ADDRESS: :8080
+      GAME_NIGHT_EDGE_API_UPSTREAM_URL: http://127.0.0.1:8081
+      GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL: http://127.0.0.1:8090
+      GAME_NIGHT_EDGE_STATIC_DIRECTORY: /app/web
+      GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS:-172.30.0.0/16,127.0.0.1/32,::1/128}
+
+      GAME_NIGHT_WORKER_INSTANCE_ID: ${GAME_NIGHT_WORKER_INSTANCE_ID:-worker-single}
+      GAME_NIGHT_WORKER_LEASE_DURATION: ${GAME_NIGHT_WORKER_LEASE_DURATION:-1m}
+      GAME_NIGHT_WORKER_BATCH_SIZE: ${GAME_NIGHT_WORKER_BATCH_SIZE:-10}
+      GAME_NIGHT_WORKER_POLL_INTERVAL: ${GAME_NIGHT_WORKER_POLL_INTERVAL:-1s}
+      GAME_NIGHT_ROOM_IDLE_TIMEOUT: ${GAME_NIGHT_ROOM_IDLE_TIMEOUT:-10m}
+    volumes:
+      - game_night_api_secrets:/run/game-night/api-secrets:ro
+      - game_night_worker_secrets:/run/game-night/worker-secrets:ro
+    ports:
+      - "${GAME_NIGHT_HTTP_BIND_ADDRESS:-127.0.0.1}:${GAME_NIGHT_HTTP_PUBLISHED_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "game-night", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    networks:
+      - game-night
+
+  migrate:
+    extends:
+      file: compose.multi.yaml
+      service: migrate
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  game_night_api_secrets:
+  game_night_worker_secrets:
+
+networks:
+  game-night:
+    name: ${GAME_NIGHT_NETWORK_NAME:-game-night}
+    ipam:
+      config:
+        - subnet: ${GAME_NIGHT_NETWORK_SUBNET:-172.30.0.0/16}

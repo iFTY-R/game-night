@@ -69,6 +69,21 @@ pnpm install --frozen-lockfile
 if ($LASTEXITCODE -ne 0) { throw 'frozen pnpm install failed' }
 ```
 
+## Docker Compose 本地部署
+
+默认 `compose.yaml` 只启动一个长期应用服务 `app`，镜像内的 `serve-all` 管理 edge、API、realtime 和 worker；对宿主机只发布 `8080`。准备 `infra/compose/.env` 和只读 keyring 文件后执行：
+
+```powershell
+Copy-Item infra/compose/.env.example infra/compose/.env
+# 编辑 infra/compose/.env，替换所有 change-me 值并准备 GAME_NIGHT_SECRETS_DIR
+
+docker compose --env-file infra/compose/.env up -d postgres redis minio secrets-init minio-init postgres-init
+docker compose --env-file infra/compose/.env --profile migration run --rm migrate
+docker compose --env-file infra/compose/.env up -d app
+```
+
+需要独立容器重启边界时，额外使用 `compose.multi.yaml`：将上述命令中的 `docker compose` 替换为 `docker compose -f compose.multi.yaml`，最后启动 `api realtime worker edge`。两种模式择一运行，完整变量和 secret staging 说明见 [`infra/compose/README.md`](../../infra/compose/README.md)。
+
 ## 仓库验证
 
 以下命令与根 `package.json` scripts 和 CI repository job 保持一致：
@@ -131,7 +146,7 @@ $env:GAME_NIGHT_REALTIME_ADVERTISED_URL = 'http://127.0.0.1:8091'
 go run ./apps/realtime
 ```
 
-公网监听默认 `:8090`，私网 owner RPC 默认 `:8091`。生产环境必须给 Nginx 提供 `GAME_NIGHT_REALTIME_UPSTREAM=<realtime-host>:8090`，且只通过用户域的精确 `/realtime/game` 路径暴露公网连接；`:8091` 不得接入公网代理。
+公网监听默认 `:8090`，私网 owner RPC 默认 `:8091`。部署编排中由 edge 将精确 `/realtime/game` 路径转发给 realtime；外部 Nginx 只反代应用入口 `127.0.0.1:8080`，不直接配置 realtime upstream，`:8091` 绝不能接入公网代理。
 
 权威 timer 默认每 `250ms` 扫描 128 条候选、单条超时 `5s`，可通过 `GAME_NIGHT_REALTIME_TIMER_SCAN_INTERVAL`、`GAME_NIGHT_REALTIME_TIMER_BATCH_SIZE`、`GAME_NIGHT_REALTIME_TIMER_OPERATION_TIMEOUT` 调整。durable fanout consumer 默认使用 `15s` lease、每 `250ms` 读取 128 条，可通过 `GAME_NIGHT_REALTIME_OUTBOX_LEASE_DURATION`、`GAME_NIGHT_REALTIME_OUTBOX_POLL_INTERVAL`、`GAME_NIGHT_REALTIME_OUTBOX_BATCH_SIZE` 调整；所有值均受进程配置硬上限约束。
 

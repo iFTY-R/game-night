@@ -2,6 +2,7 @@ package gameruntime
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"math"
 	"sort"
 	"time"
@@ -19,6 +20,13 @@ const (
 	StatusSuspended Status = "suspended"
 	StatusFinished  Status = "finished"
 	StatusCancelled Status = "cancelled"
+)
+
+const (
+	// CancelReasonPlatformCancelled is the normalized runtime-owned reason for ordinary platform/session cancellation.
+	CancelReasonPlatformCancelled game.Identifier = "platform_cancelled"
+	// CancelReasonLegacyCancelled preserves pre-v2 cancelled rows that had no persisted reason before migration 26.
+	CancelReasonLegacyCancelled game.Identifier = "legacy_cancelled"
 )
 
 // Valid reports whether the status has defined recovery and terminal semantics.
@@ -45,6 +53,27 @@ type TimerSnapshot struct {
 	Message              game.Message
 }
 
+// FrozenStartConfig keeps the exact config envelope and the room fences that authorized one durable start.
+type FrozenStartConfig struct {
+	Config             game.Message
+	ConfigDigest       idempotency.Digest
+	ConfigRevision     uint64
+	RoomVersion        uint64
+	MembershipVersion  uint64
+	RoomOwnershipEpoch uint64
+}
+
+// Valid reports whether the frozen config is complete enough to restore a new-style start or an old config-only start.
+func (start FrozenStartConfig) Valid() bool {
+	if !start.Config.Valid() || start.ConfigDigest == (idempotency.Digest{}) {
+		return false
+	}
+	if start.RoomVersion == 0 && start.MembershipVersion == 0 && start.RoomOwnershipEpoch == 0 {
+		return start.ConfigRevision == 0
+	}
+	return start.RoomVersion > 0 && start.MembershipVersion > 0 && start.RoomOwnershipEpoch > 0
+}
+
 // SessionSnapshot is the persistence-neutral authoritative state of one exact game release.
 type SessionSnapshot struct {
 	ID             uuid.UUID
@@ -52,6 +81,7 @@ type SessionSnapshot struct {
 	VersionKey     game.VersionKey
 	OwnershipEpoch uint64
 	Participants   []Participant
+	Start          FrozenStartConfig
 	State          game.Snapshot
 	Timers         []TimerSnapshot
 	NextDeadlineAt time.Time
@@ -59,6 +89,7 @@ type SessionSnapshot struct {
 	StartedAt      time.Time
 	UpdatedAt      time.Time
 	EndedAt        time.Time
+	CancelReason   game.Identifier
 }
 
 // Session is immutable; every accepted command returns a new snapshot for one CAS commit.
@@ -72,6 +103,7 @@ type CreateRequest struct {
 	RoomID       uuid.UUID
 	VersionKey   game.VersionKey
 	Participants []Participant
+	Start        FrozenStartConfig
 	BatchID      uuid.UUID
 	Execution    game.DeterministicContext
 	Input        game.Message
@@ -136,9 +168,13 @@ func NewSession(request CreateRequest) (Session, EventBatch, error) {
 	if request.Transition.Finished {
 		status, endedAt = StatusFinished, request.Execution.Now
 	}
+	start, err := canonicalFrozenStartConfig(request.Start, request.Input, request.VersionKey)
+	if err != nil {
+		return Session{}, EventBatch{}, err
+	}
 	session, err := RestoreSession(SessionSnapshot{
 		ID: request.SessionID, RoomID: request.RoomID, VersionKey: request.VersionKey,
-		Participants: participants, State: request.Transition.Snapshot, Timers: timers,
+		Participants: participants, Start: start, State: request.Transition.Snapshot, Timers: timers,
 		NextDeadlineAt: deadline, Status: status, StartedAt: request.Execution.Now,
 		UpdatedAt: request.Execution.Now, EndedAt: endedAt,
 	})
@@ -162,6 +198,18 @@ func RestoreSession(snapshot SessionSnapshot) (Session, error) {
 	snapshot.UpdatedAt = canonicalRuntimeTime(snapshot.UpdatedAt)
 	snapshot.EndedAt = canonicalRuntimeTime(snapshot.EndedAt)
 	snapshot.NextDeadlineAt = canonicalRuntimeTime(snapshot.NextDeadlineAt)
+	var err error
+	snapshot.CancelReason, err = canonicalCancelReason(snapshot.Status, snapshot.CancelReason)
+	if err != nil {
+		return Session{}, ErrInvalidSessionInput
+	}
+	if !frozenStartConfigZero(snapshot.Start) {
+		start, err := canonicalFrozenStartConfig(snapshot.Start, snapshot.Start.Config, snapshot.VersionKey)
+		if err != nil {
+			return Session{}, ErrInvalidSessionInput
+		}
+		snapshot.Start = start
+	}
 	if snapshot.ID == uuid.Nil || snapshot.RoomID == uuid.Nil || !snapshot.VersionKey.Valid() || !snapshot.State.Valid() ||
 		!snapshot.Status.Valid() || snapshot.StartedAt.IsZero() || snapshot.UpdatedAt.Before(snapshot.StartedAt) ||
 		len(snapshot.Participants) == 0 || len(snapshot.Participants) > int(game.MaximumParticipants) ||
@@ -180,7 +228,7 @@ func RestoreSession(snapshot SessionSnapshot) (Session, error) {
 		if snapshot.EndedAt.IsZero() || !snapshot.EndedAt.Equal(snapshot.UpdatedAt) || len(timers) != 0 || !deadline.IsZero() {
 			return Session{}, ErrInvalidSessionInput
 		}
-	} else if !snapshot.EndedAt.IsZero() {
+	} else if !snapshot.EndedAt.IsZero() || snapshot.CancelReason != "" {
 		return Session{}, ErrInvalidSessionInput
 	}
 	snapshot.Participants = participants
@@ -383,7 +431,7 @@ func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, erro
 }
 
 // Cancel terminates an active or suspended session without manufacturing an engine finish transition.
-func (session Session) Cancel(expectedEpoch uint64, at time.Time) (Session, error) {
+func (session Session) Cancel(expectedEpoch uint64, at time.Time, reason game.Identifier) (Session, error) {
 	if session.snapshot.Status.Terminal() {
 		return Session{}, ErrSessionTerminal
 	}
@@ -400,6 +448,7 @@ func (session Session) Cancel(expectedEpoch uint64, at time.Time) (Session, erro
 	next.NextDeadlineAt = time.Time{}
 	next.UpdatedAt = at
 	next.EndedAt = at
+	next.CancelReason = reason
 	return RestoreSession(next)
 }
 
@@ -472,6 +521,12 @@ func sameGameMessage(left, right game.Message) bool {
 	return left.MessageType == right.MessageType && left.SchemaVersion == right.SchemaVersion && bytes.Equal(left.Payload, right.Payload)
 }
 
+func sameFrozenStartConfig(left, right FrozenStartConfig) bool {
+	return sameGameMessage(left.Config, right.Config) && left.ConfigDigest == right.ConfigDigest &&
+		left.ConfigRevision == right.ConfigRevision && left.RoomVersion == right.RoomVersion &&
+		left.MembershipVersion == right.MembershipVersion && left.RoomOwnershipEpoch == right.RoomOwnershipEpoch
+}
+
 func canonicalParticipants(values []Participant) ([]Participant, error) {
 	participants := append([]Participant(nil), values...)
 	sort.Slice(participants, func(left, right int) bool {
@@ -537,9 +592,15 @@ func canonicalTimers(values []TimerSnapshot, stateVersion uint64) ([]TimerSnapsh
 
 func cloneSessionSnapshot(snapshot SessionSnapshot) SessionSnapshot {
 	snapshot.Participants = append([]Participant(nil), snapshot.Participants...)
+	snapshot.Start = cloneFrozenStartConfig(snapshot.Start)
 	snapshot.State = cloneGameSnapshot(snapshot.State)
 	snapshot.Timers = cloneTimers(snapshot.Timers)
 	return snapshot
+}
+
+func cloneFrozenStartConfig(start FrozenStartConfig) FrozenStartConfig {
+	start.Config = start.Config.Clone()
+	return start
 }
 
 func cloneGameSnapshot(snapshot game.Snapshot) game.Snapshot {
@@ -563,4 +624,60 @@ func canonicalRuntimeTime(value time.Time) time.Time {
 	// PostgreSQL timestamptz and the shared outbox both retain microseconds.
 	// Canonicalizing here keeps aggregate, receipt, batch, and outbox equality stable.
 	return value.UTC().Truncate(time.Microsecond)
+}
+
+func canonicalCancelReason(status Status, reason game.Identifier) (game.Identifier, error) {
+	if status != StatusCancelled {
+		if reason != "" {
+			return "", ErrInvalidSessionInput
+		}
+		return "", nil
+	}
+	if reason == "" {
+		return CancelReasonPlatformCancelled, nil
+	}
+	parsed, err := game.ParseIdentifier(string(reason))
+	if err != nil {
+		return "", ErrInvalidSessionInput
+	}
+	return parsed, nil
+}
+
+func canonicalFrozenStartConfig(start FrozenStartConfig, config game.Message, versionKey game.VersionKey) (FrozenStartConfig, error) {
+	config = config.Clone()
+	if !config.Valid() || !versionKey.Valid() {
+		return FrozenStartConfig{}, ErrInvalidSessionInput
+	}
+	if start.Config.Valid() && !sameGameMessage(start.Config, config) {
+		return FrozenStartConfig{}, ErrInvalidSessionInput
+	}
+	start.Config = config
+	if start.ConfigDigest == (idempotency.Digest{}) {
+		start.ConfigDigest = startConfigDigest(versionKey, config)
+	} else if start.ConfigDigest != startConfigDigest(versionKey, config) {
+		return FrozenStartConfig{}, ErrInvalidSessionInput
+	}
+	if start.RoomVersion == 0 && start.MembershipVersion == 0 && start.RoomOwnershipEpoch == 0 {
+		if start.ConfigRevision != 0 {
+			return FrozenStartConfig{}, ErrInvalidSessionInput
+		}
+		return start, nil
+	}
+	if start.RoomVersion == 0 || start.MembershipVersion == 0 || start.RoomOwnershipEpoch == 0 {
+		return FrozenStartConfig{}, ErrInvalidSessionInput
+	}
+	return start, nil
+}
+
+func frozenStartConfigZero(start FrozenStartConfig) bool {
+	return !start.Config.Valid() && start.ConfigDigest == (idempotency.Digest{}) &&
+		start.ConfigRevision == 0 && start.RoomVersion == 0 &&
+		start.MembershipVersion == 0 && start.RoomOwnershipEpoch == 0
+}
+
+func startConfigDigest(versionKey game.VersionKey, message game.Message) idempotency.Digest {
+	hasher := sha256.New()
+	writeVersionKey(hasher, versionKey)
+	writeMessage(hasher, message)
+	return digestFromHash(hasher)
 }

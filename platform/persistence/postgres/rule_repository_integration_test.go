@@ -160,9 +160,13 @@ func TestRuleRepositoryPersistsDraftsPresetsPendingStartsAndRoomSelection(t *tes
 	if _, err := repository.ConsumePendingStart(ctx, selected.Snapshot().ID, secondStart.ID, secondStart.CancelToken, secondStart.OperationID, secondStart.RequestDigest, now.Add(11*time.Second)); !errors.Is(err, roomDomain.ErrPendingStartInvalid) {
 		t.Fatalf("early consume error = %v", err)
 	}
-	consumed, err := repository.ConsumePendingStart(ctx, selected.Snapshot().ID, secondStart.ID, secondStart.CancelToken, secondStart.OperationID, secondStart.RequestDigest, now.Add(13*time.Second))
+	consumed, err := repository.ConsumePendingStart(ctx, selected.Snapshot().ID, secondStart.ID, secondStart.CancelToken, "consume-op-mismatch", testRuleDigest("consume-digest-mismatch"), now.Add(13*time.Second))
 	if err != nil || !consumed.Consumed {
 		t.Fatalf("consumed start = %+v err=%v", consumed, err)
+	}
+	replayedConsume, err := repository.ConsumePendingStart(ctx, selected.Snapshot().ID, secondStart.ID, secondStart.CancelToken, "consume-op-replay", testRuleDigest("consume-digest-replay"), now.Add(14*time.Second))
+	if err != nil || !replayedConsume.Consumed || replayedConsume.ID != secondStart.ID {
+		t.Fatalf("replayed consumed start = %+v err=%v", replayedConsume, err)
 	}
 }
 
@@ -172,4 +176,10 @@ func testRuleConfig(gameID string, payload []byte) roomDomain.ConfigEnvelope {
 		ClientVersion: "1.0.0", SchemaVersion: 1, MessageType: "dice.config",
 		Payload: append([]byte(nil), payload...),
 	}
+}
+
+func testRuleDigest(seed string) [32]byte {
+	var digest [32]byte
+	copy(digest[:], seed)
+	return digest
 }

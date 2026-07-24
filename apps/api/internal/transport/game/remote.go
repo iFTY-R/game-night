@@ -81,6 +81,13 @@ func (runtime *RemoteRuntime) Start(ctx context.Context, command gameruntime.Sta
 			MessageType: string(command.Config.MessageType), Payload: append([]byte(nil), command.Config.Payload...),
 		},
 		OperationId: command.OperationID.Value(), RequestDigest: command.RequestDigest.Bytes(),
+		ConfigRevision: command.ConfigRevision,
+	}
+	if command.PendingStartProof != nil {
+		requestMessage.PendingStartProof = &realtimev1.PendingStartProof{
+			PendingStartId: command.PendingStartProof.PendingStartID.String(),
+			CancelToken:    command.PendingStartProof.CancelToken,
+		}
 	}
 	var lastErr error
 	for _, peer := range runtime.peerURLs {
@@ -242,7 +249,14 @@ func (runtime *RemoteRuntime) ProjectReplayCurrent(
 			}
 			return gameruntime.Session{}, gameSDK.Projection{}, mapped
 		}
-		return projectionResponseFromRemote(response.Msg.GetSession(), response.Msg.GetProjection())
+		session, projection, err := projectionResponseFromRemote(response.Msg.GetSession(), response.Msg.GetProjection())
+		if err != nil {
+			return gameruntime.Session{}, gameSDK.Projection{}, err
+		}
+		if err := validateReplayTerminalMeta(response.Msg.GetTerminalMeta(), session); err != nil {
+			return gameruntime.Session{}, gameSDK.Projection{}, err
+		}
+		return session, projection, nil
 	}
 	return gameruntime.Session{}, gameSDK.Projection{}, redisstore.ErrCoordinationUnavailable
 }
@@ -364,20 +378,45 @@ func sessionFromRemote(value *realtimev1.SessionSnapshot) (gameruntime.Session, 
 			DueAt: timer.GetDueAt().AsTime().Round(0).UTC(), Message: message,
 		})
 	}
+	// Older owner snapshots did not carry FrozenStartConfig; nil remains a valid legacy restore path.
+	start, err := startFromRemote(value.GetStart(), version)
+	if err != nil {
+		return gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
+	}
 	session, err := gameruntime.RestoreSession(gameruntime.SessionSnapshot{
 		ID: sessionID, RoomID: roomID, VersionKey: version, OwnershipEpoch: value.GetOwnershipEpoch(),
-		Participants: participants,
+		Participants: participants, Start: start,
 		State: gameSDK.Snapshot{
 			SnapshotVersion: value.GetSnapshotVersion(), StateVersion: value.GetStateVersion(), State: state,
 		},
 		Timers: timers, NextDeadlineAt: remoteOptionalTime(value.GetNextDeadlineAt()),
 		Status: statusFromRemote(value.GetStatus()), StartedAt: value.GetStartedAt().AsTime().Round(0).UTC(),
 		UpdatedAt: value.GetUpdatedAt().AsTime().Round(0).UTC(), EndedAt: remoteOptionalTime(value.GetEndedAt()),
+		CancelReason: gameSDK.Identifier(value.GetCancelReason()),
 	})
 	if err != nil {
 		return gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
 	}
 	return session, nil
+}
+
+func startFromRemote(value *realtimev1.FrozenStartConfig, version gameSDK.VersionKey) (gameruntime.FrozenStartConfig, error) {
+	if value == nil {
+		return gameruntime.FrozenStartConfig{}, nil
+	}
+	configVersion, config, err := envelopeFromRemote(value.GetConfig())
+	if err != nil || configVersion != version {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrGameSessionIntegrity
+	}
+	digest, err := idempotency.NewDigest(value.GetConfigDigest())
+	if err != nil {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrGameSessionIntegrity
+	}
+	return gameruntime.FrozenStartConfig{
+		Config: config, ConfigDigest: digest, ConfigRevision: value.GetConfigRevision(),
+		RoomVersion: value.GetRoomVersion(), MembershipVersion: value.GetMembershipVersion(),
+		RoomOwnershipEpoch: value.GetRoomOwnershipEpoch(),
+	}, nil
 }
 
 func actionResultFromRemote(value *realtimev1.GameActionResponse) (gameruntime.ActionResult, error) {
@@ -590,6 +629,29 @@ func remoteOptionalTime(value *timestamppb.Timestamp) time.Time {
 		return time.Time{}
 	}
 	return value.AsTime().Round(0).UTC()
+}
+
+func validateReplayTerminalMeta(value *gamev1.ReplayTerminalMeta, session gameruntime.Session) error {
+	if value == nil {
+		return gameruntime.ErrGameSessionIntegrity
+	}
+	snapshot := session.Snapshot()
+	if value.GetFinished() != (snapshot.Status == gameruntime.StatusFinished) ||
+		value.GetCancelled() != (snapshot.Status == gameruntime.StatusCancelled) ||
+		remoteOptionalTime(value.GetEndedAt()) != snapshot.EndedAt {
+		return gameruntime.ErrGameSessionIntegrity
+	}
+	cancelReason := value.GetCancelReason()
+	if snapshot.Status == gameruntime.StatusFinished {
+		if cancelReason != "" {
+			return gameruntime.ErrGameSessionIntegrity
+		}
+		return nil
+	}
+	if cancelReason != string(snapshot.CancelReason) {
+		return gameruntime.ErrGameSessionIntegrity
+	}
+	return nil
 }
 
 func mapRemoteError(err error) error {

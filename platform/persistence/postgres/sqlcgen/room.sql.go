@@ -19,7 +19,6 @@ WHERE room_id = $2
   AND cancel_token = $4
   AND ownership_epoch = $5
   AND consumed_at IS NULL
-  AND deadline_at >= $1
 RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
     expected_room_version, expected_membership_version, ownership_epoch,
     operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
@@ -42,7 +41,6 @@ type CancelRoomPendingStartParams struct {
 //	  AND cancel_token = $4
 //	  AND ownership_epoch = $5
 //	  AND consumed_at IS NULL
-//	  AND deadline_at >= $1
 //	RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
 //	    expected_room_version, expected_membership_version, ownership_epoch,
 //	    operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at
@@ -80,8 +78,11 @@ SET consumed_at = COALESCE(consumed_at, $1)
 WHERE room_id = $2
   AND pending_start_id = $3
   AND cancel_token = $4
-  AND operation_id = $5
-  AND request_digest = $6
+  AND ($5::text IS NULL OR game_id = $5::text)
+  AND ($6::bigint IS NULL OR config_revision = $6::bigint)
+  AND ($7::bigint IS NULL OR expected_room_version = $7::bigint)
+  AND ($8::bigint IS NULL OR expected_membership_version = $8::bigint)
+  AND ($9::bigint IS NULL OR ownership_epoch = $9::bigint)
   AND cancelled_at IS NULL
   AND deadline_at <= $1
 RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
@@ -90,12 +91,15 @@ RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
 `
 
 type ConsumeRoomPendingStartParams struct {
-	ConsumedAt     pgtype.Timestamptz `json:"consumed_at"`
-	RoomID         pgtype.UUID        `json:"room_id"`
-	PendingStartID pgtype.UUID        `json:"pending_start_id"`
-	CancelToken    string             `json:"cancel_token"`
-	OperationID    string             `json:"operation_id"`
-	RequestDigest  []byte             `json:"request_digest"`
+	ConsumedAt                pgtype.Timestamptz `json:"consumed_at"`
+	RoomID                    pgtype.UUID        `json:"room_id"`
+	PendingStartID            pgtype.UUID        `json:"pending_start_id"`
+	CancelToken               string             `json:"cancel_token"`
+	GameID                    pgtype.Text        `json:"game_id"`
+	ConfigRevision            pgtype.Int8        `json:"config_revision"`
+	ExpectedRoomVersion       pgtype.Int8        `json:"expected_room_version"`
+	ExpectedMembershipVersion pgtype.Int8        `json:"expected_membership_version"`
+	OwnershipEpoch            pgtype.Int8        `json:"ownership_epoch"`
 }
 
 // ConsumeRoomPendingStart
@@ -105,8 +109,11 @@ type ConsumeRoomPendingStartParams struct {
 //	WHERE room_id = $2
 //	  AND pending_start_id = $3
 //	  AND cancel_token = $4
-//	  AND operation_id = $5
-//	  AND request_digest = $6
+//	  AND ($5::text IS NULL OR game_id = $5::text)
+//	  AND ($6::bigint IS NULL OR config_revision = $6::bigint)
+//	  AND ($7::bigint IS NULL OR expected_room_version = $7::bigint)
+//	  AND ($8::bigint IS NULL OR expected_membership_version = $8::bigint)
+//	  AND ($9::bigint IS NULL OR ownership_epoch = $9::bigint)
 //	  AND cancelled_at IS NULL
 //	  AND deadline_at <= $1
 //	RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
@@ -118,8 +125,11 @@ func (q *Queries) ConsumeRoomPendingStart(ctx context.Context, arg ConsumeRoomPe
 		arg.RoomID,
 		arg.PendingStartID,
 		arg.CancelToken,
-		arg.OperationID,
-		arg.RequestDigest,
+		arg.GameID,
+		arg.ConfigRevision,
+		arg.ExpectedRoomVersion,
+		arg.ExpectedMembershipVersion,
+		arg.OwnershipEpoch,
 	)
 	var i RoomPendingStart
 	err := row.Scan(

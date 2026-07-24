@@ -1000,6 +1000,7 @@ type GetReplayProjectionResponse struct {
 	Projection    *GameProjection        `protobuf:"bytes,1,opt,name=projection,proto3" json:"projection,omitempty"`
 	Session       *GameSessionSummary    `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
 	Complete      bool                   `protobuf:"varint,3,opt,name=complete,proto3" json:"complete,omitempty"`
+	TerminalMeta  *ReplayTerminalMeta    `protobuf:"bytes,4,opt,name=terminal_meta,json=terminalMeta,proto3" json:"terminal_meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1055,6 +1056,82 @@ func (x *GetReplayProjectionResponse) GetComplete() bool {
 	return false
 }
 
+func (x *GetReplayProjectionResponse) GetTerminalMeta() *ReplayTerminalMeta {
+	if x != nil {
+		return x.TerminalMeta
+	}
+	return nil
+}
+
+// ReplayTerminalMeta carries runtime-owned terminal lifecycle details that are safe only on replay responses.
+type ReplayTerminalMeta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Finished      bool                   `protobuf:"varint,1,opt,name=finished,proto3" json:"finished,omitempty"`
+	Cancelled     bool                   `protobuf:"varint,2,opt,name=cancelled,proto3" json:"cancelled,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
+	CancelReason  string                 `protobuf:"bytes,4,opt,name=cancel_reason,json=cancelReason,proto3" json:"cancel_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayTerminalMeta) Reset() {
+	*x = ReplayTerminalMeta{}
+	mi := &file_platform_game_v1_game_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayTerminalMeta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayTerminalMeta) ProtoMessage() {}
+
+func (x *ReplayTerminalMeta) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_game_v1_game_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayTerminalMeta.ProtoReflect.Descriptor instead.
+func (*ReplayTerminalMeta) Descriptor() ([]byte, []int) {
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReplayTerminalMeta) GetFinished() bool {
+	if x != nil {
+		return x.Finished
+	}
+	return false
+}
+
+func (x *ReplayTerminalMeta) GetCancelled() bool {
+	if x != nil {
+		return x.Cancelled
+	}
+	return false
+}
+
+func (x *ReplayTerminalMeta) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
+func (x *ReplayTerminalMeta) GetCancelReason() string {
+	if x != nil {
+		return x.CancelReason
+	}
+	return ""
+}
+
 type ReplayAccess struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId                 string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -1069,7 +1146,7 @@ type ReplayAccess struct {
 
 func (x *ReplayAccess) Reset() {
 	*x = ReplayAccess{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[12]
+	mi := &file_platform_game_v1_game_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1081,7 +1158,7 @@ func (x *ReplayAccess) String() string {
 func (*ReplayAccess) ProtoMessage() {}
 
 func (x *ReplayAccess) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[12]
+	mi := &file_platform_game_v1_game_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1094,7 +1171,7 @@ func (x *ReplayAccess) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplayAccess.ProtoReflect.Descriptor instead.
 func (*ReplayAccess) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{12}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ReplayAccess) GetSessionId() string {
@@ -1149,7 +1226,7 @@ type GetReplayAccessRequest struct {
 
 func (x *GetReplayAccessRequest) Reset() {
 	*x = GetReplayAccessRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[13]
+	mi := &file_platform_game_v1_game_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1161,7 +1238,7 @@ func (x *GetReplayAccessRequest) String() string {
 func (*GetReplayAccessRequest) ProtoMessage() {}
 
 func (x *GetReplayAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[13]
+	mi := &file_platform_game_v1_game_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1174,7 +1251,7 @@ func (x *GetReplayAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReplayAccessRequest.ProtoReflect.Descriptor instead.
 func (*GetReplayAccessRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{13}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetReplayAccessRequest) GetRoomId() string {
@@ -1200,7 +1277,7 @@ type GetReplayAccessResponse struct {
 
 func (x *GetReplayAccessResponse) Reset() {
 	*x = GetReplayAccessResponse{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[14]
+	mi := &file_platform_game_v1_game_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1212,7 +1289,7 @@ func (x *GetReplayAccessResponse) String() string {
 func (*GetReplayAccessResponse) ProtoMessage() {}
 
 func (x *GetReplayAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[14]
+	mi := &file_platform_game_v1_game_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1225,7 +1302,7 @@ func (x *GetReplayAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReplayAccessResponse.ProtoReflect.Descriptor instead.
 func (*GetReplayAccessResponse) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{14}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetReplayAccessResponse) GetAccess() *ReplayAccess {
@@ -1247,7 +1324,7 @@ type SetReplayAccessRequest struct {
 
 func (x *SetReplayAccessRequest) Reset() {
 	*x = SetReplayAccessRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[15]
+	mi := &file_platform_game_v1_game_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1259,7 +1336,7 @@ func (x *SetReplayAccessRequest) String() string {
 func (*SetReplayAccessRequest) ProtoMessage() {}
 
 func (x *SetReplayAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[15]
+	mi := &file_platform_game_v1_game_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1272,7 +1349,7 @@ func (x *SetReplayAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReplayAccessRequest.ProtoReflect.Descriptor instead.
 func (*SetReplayAccessRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{15}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SetReplayAccessRequest) GetRoomId() string {
@@ -1312,7 +1389,7 @@ type SetReplayAccessResponse struct {
 
 func (x *SetReplayAccessResponse) Reset() {
 	*x = SetReplayAccessResponse{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[16]
+	mi := &file_platform_game_v1_game_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1324,7 +1401,7 @@ func (x *SetReplayAccessResponse) String() string {
 func (*SetReplayAccessResponse) ProtoMessage() {}
 
 func (x *SetReplayAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[16]
+	mi := &file_platform_game_v1_game_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1337,7 +1414,7 @@ func (x *SetReplayAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReplayAccessResponse.ProtoReflect.Descriptor instead.
 func (*SetReplayAccessResponse) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{16}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SetReplayAccessResponse) GetAccess() *ReplayAccess {
@@ -1364,7 +1441,7 @@ type FinishSessionRequest struct {
 
 func (x *FinishSessionRequest) Reset() {
 	*x = FinishSessionRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[17]
+	mi := &file_platform_game_v1_game_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1376,7 +1453,7 @@ func (x *FinishSessionRequest) String() string {
 func (*FinishSessionRequest) ProtoMessage() {}
 
 func (x *FinishSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[17]
+	mi := &file_platform_game_v1_game_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1389,7 +1466,7 @@ func (x *FinishSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FinishSessionRequest.ProtoReflect.Descriptor instead.
 func (*FinishSessionRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{17}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *FinishSessionRequest) GetRoomId() string {
@@ -1467,7 +1544,7 @@ type FinishSessionResponse struct {
 
 func (x *FinishSessionResponse) Reset() {
 	*x = FinishSessionResponse{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[18]
+	mi := &file_platform_game_v1_game_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1479,7 +1556,7 @@ func (x *FinishSessionResponse) String() string {
 func (*FinishSessionResponse) ProtoMessage() {}
 
 func (x *FinishSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[18]
+	mi := &file_platform_game_v1_game_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1492,7 +1569,7 @@ func (x *FinishSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FinishSessionResponse.ProtoReflect.Descriptor instead.
 func (*FinishSessionResponse) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{18}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *FinishSessionResponse) GetSession() *GameSessionSummary {
@@ -1537,7 +1614,7 @@ type GameSubscribeRequest struct {
 
 func (x *GameSubscribeRequest) Reset() {
 	*x = GameSubscribeRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[19]
+	mi := &file_platform_game_v1_game_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +1626,7 @@ func (x *GameSubscribeRequest) String() string {
 func (*GameSubscribeRequest) ProtoMessage() {}
 
 func (x *GameSubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[19]
+	mi := &file_platform_game_v1_game_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +1639,7 @@ func (x *GameSubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSubscribeRequest.ProtoReflect.Descriptor instead.
 func (*GameSubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{19}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GameSubscribeRequest) GetRoomId() string {
@@ -1614,7 +1691,7 @@ type GameProjection struct {
 
 func (x *GameProjection) Reset() {
 	*x = GameProjection{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[20]
+	mi := &file_platform_game_v1_game_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1626,7 +1703,7 @@ func (x *GameProjection) String() string {
 func (*GameProjection) ProtoMessage() {}
 
 func (x *GameProjection) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[20]
+	mi := &file_platform_game_v1_game_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1639,7 +1716,7 @@ func (x *GameProjection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameProjection.ProtoReflect.Descriptor instead.
 func (*GameProjection) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{20}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GameProjection) GetSessionId() string {
@@ -1694,7 +1771,7 @@ type GameDelta struct {
 
 func (x *GameDelta) Reset() {
 	*x = GameDelta{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[21]
+	mi := &file_platform_game_v1_game_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1706,7 +1783,7 @@ func (x *GameDelta) String() string {
 func (*GameDelta) ProtoMessage() {}
 
 func (x *GameDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[21]
+	mi := &file_platform_game_v1_game_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1719,7 +1796,7 @@ func (x *GameDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameDelta.ProtoReflect.Descriptor instead.
 func (*GameDelta) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{21}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GameDelta) GetSessionId() string {
@@ -1791,7 +1868,7 @@ type OpenSubscriptionRequest struct {
 
 func (x *OpenSubscriptionRequest) Reset() {
 	*x = OpenSubscriptionRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[22]
+	mi := &file_platform_game_v1_game_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1803,7 +1880,7 @@ func (x *OpenSubscriptionRequest) String() string {
 func (*OpenSubscriptionRequest) ProtoMessage() {}
 
 func (x *OpenSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[22]
+	mi := &file_platform_game_v1_game_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1816,7 +1893,7 @@ func (x *OpenSubscriptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*OpenSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{22}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *OpenSubscriptionRequest) GetRoomId() string {
@@ -1867,7 +1944,7 @@ type OpenSubscriptionResponse struct {
 
 func (x *OpenSubscriptionResponse) Reset() {
 	*x = OpenSubscriptionResponse{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[23]
+	mi := &file_platform_game_v1_game_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1879,7 +1956,7 @@ func (x *OpenSubscriptionResponse) String() string {
 func (*OpenSubscriptionResponse) ProtoMessage() {}
 
 func (x *OpenSubscriptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[23]
+	mi := &file_platform_game_v1_game_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1892,7 +1969,7 @@ func (x *OpenSubscriptionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenSubscriptionResponse.ProtoReflect.Descriptor instead.
 func (*OpenSubscriptionResponse) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{23}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *OpenSubscriptionResponse) GetTicket() []byte {
@@ -1948,7 +2025,7 @@ type SubscriptionGrant struct {
 
 func (x *SubscriptionGrant) Reset() {
 	*x = SubscriptionGrant{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[24]
+	mi := &file_platform_game_v1_game_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1960,7 +2037,7 @@ func (x *SubscriptionGrant) String() string {
 func (*SubscriptionGrant) ProtoMessage() {}
 
 func (x *SubscriptionGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[24]
+	mi := &file_platform_game_v1_game_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1973,7 +2050,7 @@ func (x *SubscriptionGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscriptionGrant.ProtoReflect.Descriptor instead.
 func (*SubscriptionGrant) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{24}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SubscriptionGrant) GetUserId() string {
@@ -2053,7 +2130,7 @@ type ClientFrame struct {
 
 func (x *ClientFrame) Reset() {
 	*x = ClientFrame{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[25]
+	mi := &file_platform_game_v1_game_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2065,7 +2142,7 @@ func (x *ClientFrame) String() string {
 func (*ClientFrame) ProtoMessage() {}
 
 func (x *ClientFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[25]
+	mi := &file_platform_game_v1_game_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2078,7 +2155,7 @@ func (x *ClientFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientFrame.ProtoReflect.Descriptor instead.
 func (*ClientFrame) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{25}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ClientFrame) GetBody() isClientFrame_Body {
@@ -2132,7 +2209,7 @@ type SubscriptionHello struct {
 
 func (x *SubscriptionHello) Reset() {
 	*x = SubscriptionHello{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[26]
+	mi := &file_platform_game_v1_game_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2144,7 +2221,7 @@ func (x *SubscriptionHello) String() string {
 func (*SubscriptionHello) ProtoMessage() {}
 
 func (x *SubscriptionHello) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[26]
+	mi := &file_platform_game_v1_game_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2157,7 +2234,7 @@ func (x *SubscriptionHello) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscriptionHello.ProtoReflect.Descriptor instead.
 func (*SubscriptionHello) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{26}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SubscriptionHello) GetTicket() []byte {
@@ -2183,7 +2260,7 @@ type ClientPing struct {
 
 func (x *ClientPing) Reset() {
 	*x = ClientPing{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[27]
+	mi := &file_platform_game_v1_game_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2195,7 +2272,7 @@ func (x *ClientPing) String() string {
 func (*ClientPing) ProtoMessage() {}
 
 func (x *ClientPing) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[27]
+	mi := &file_platform_game_v1_game_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2208,7 +2285,7 @@ func (x *ClientPing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientPing.ProtoReflect.Descriptor instead.
 func (*ClientPing) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{27}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ClientPing) GetNonce() uint64 {
@@ -2236,7 +2313,7 @@ type ServerFrame struct {
 
 func (x *ServerFrame) Reset() {
 	*x = ServerFrame{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[28]
+	mi := &file_platform_game_v1_game_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2248,7 +2325,7 @@ func (x *ServerFrame) String() string {
 func (*ServerFrame) ProtoMessage() {}
 
 func (x *ServerFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[28]
+	mi := &file_platform_game_v1_game_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2261,7 +2338,7 @@ func (x *ServerFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerFrame.ProtoReflect.Descriptor instead.
 func (*ServerFrame) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{28}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ServerFrame) GetBody() isServerFrame_Body {
@@ -2375,7 +2452,7 @@ type SubscriptionDraining struct {
 
 func (x *SubscriptionDraining) Reset() {
 	*x = SubscriptionDraining{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[29]
+	mi := &file_platform_game_v1_game_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2387,7 +2464,7 @@ func (x *SubscriptionDraining) String() string {
 func (*SubscriptionDraining) ProtoMessage() {}
 
 func (x *SubscriptionDraining) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[29]
+	mi := &file_platform_game_v1_game_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2400,7 +2477,7 @@ func (x *SubscriptionDraining) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscriptionDraining.ProtoReflect.Descriptor instead.
 func (*SubscriptionDraining) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{29}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SubscriptionDraining) GetReason() string {
@@ -2426,7 +2503,7 @@ type ServerPong struct {
 
 func (x *ServerPong) Reset() {
 	*x = ServerPong{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[30]
+	mi := &file_platform_game_v1_game_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2438,7 +2515,7 @@ func (x *ServerPong) String() string {
 func (*ServerPong) ProtoMessage() {}
 
 func (x *ServerPong) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[30]
+	mi := &file_platform_game_v1_game_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2451,7 +2528,7 @@ func (x *ServerPong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerPong.ProtoReflect.Descriptor instead.
 func (*ServerPong) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{30}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ServerPong) GetNonce() uint64 {
@@ -2470,7 +2547,7 @@ type SubscriptionError struct {
 
 func (x *SubscriptionError) Reset() {
 	*x = SubscriptionError{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[31]
+	mi := &file_platform_game_v1_game_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2482,7 +2559,7 @@ func (x *SubscriptionError) String() string {
 func (*SubscriptionError) ProtoMessage() {}
 
 func (x *SubscriptionError) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[31]
+	mi := &file_platform_game_v1_game_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2495,7 +2572,7 @@ func (x *SubscriptionError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscriptionError.ProtoReflect.Descriptor instead.
 func (*SubscriptionError) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{31}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SubscriptionError) GetCode() string {
@@ -2520,7 +2597,7 @@ type GameSystemRequest struct {
 
 func (x *GameSystemRequest) Reset() {
 	*x = GameSystemRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[32]
+	mi := &file_platform_game_v1_game_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2532,7 +2609,7 @@ func (x *GameSystemRequest) String() string {
 func (*GameSystemRequest) ProtoMessage() {}
 
 func (x *GameSystemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[32]
+	mi := &file_platform_game_v1_game_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2545,7 +2622,7 @@ func (x *GameSystemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSystemRequest.ProtoReflect.Descriptor instead.
 func (*GameSystemRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{32}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GameSystemRequest) GetSessionId() string {
@@ -2603,7 +2680,7 @@ type GameTimerRequest struct {
 
 func (x *GameTimerRequest) Reset() {
 	*x = GameTimerRequest{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[33]
+	mi := &file_platform_game_v1_game_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2615,7 +2692,7 @@ func (x *GameTimerRequest) String() string {
 func (*GameTimerRequest) ProtoMessage() {}
 
 func (x *GameTimerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[33]
+	mi := &file_platform_game_v1_game_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2628,7 +2705,7 @@ func (x *GameTimerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameTimerRequest.ProtoReflect.Descriptor instead.
 func (*GameTimerRequest) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{33}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GameTimerRequest) GetSessionId() string {
@@ -2674,7 +2751,7 @@ type GameReceipt struct {
 
 func (x *GameReceipt) Reset() {
 	*x = GameReceipt{}
-	mi := &file_platform_game_v1_game_proto_msgTypes[34]
+	mi := &file_platform_game_v1_game_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2686,7 +2763,7 @@ func (x *GameReceipt) String() string {
 func (*GameReceipt) ProtoMessage() {}
 
 func (x *GameReceipt) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_game_v1_game_proto_msgTypes[34]
+	mi := &file_platform_game_v1_game_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2699,7 +2776,7 @@ func (x *GameReceipt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameReceipt.ProtoReflect.Descriptor instead.
 func (*GameReceipt) Descriptor() ([]byte, []int) {
-	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{34}
+	return file_platform_game_v1_game_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GameReceipt) GetSessionId() string {
@@ -2832,13 +2909,19 @@ const file_platform_game_v1_game_proto_rawDesc = "" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12=\n" +
 	"\vviewer_kind\x18\x03 \x01(\x0e2\x1c.platform.game.v1.ViewerKindR\n" +
 	"viewerKind\x122\n" +
-	"\x15through_state_version\x18\x04 \x01(\x04R\x13throughStateVersion\"\xbb\x01\n" +
+	"\x15through_state_version\x18\x04 \x01(\x04R\x13throughStateVersion\"\x86\x02\n" +
 	"\x1bGetReplayProjectionResponse\x12@\n" +
 	"\n" +
 	"projection\x18\x01 \x01(\v2 .platform.game.v1.GameProjectionR\n" +
 	"projection\x12>\n" +
 	"\asession\x18\x02 \x01(\v2$.platform.game.v1.GameSessionSummaryR\asession\x12\x1a\n" +
-	"\bcomplete\x18\x03 \x01(\bR\bcomplete\"\xc3\x02\n" +
+	"\bcomplete\x18\x03 \x01(\bR\bcomplete\x12I\n" +
+	"\rterminal_meta\x18\x04 \x01(\v2$.platform.game.v1.ReplayTerminalMetaR\fterminalMeta\"\xaa\x01\n" +
+	"\x12ReplayTerminalMeta\x12\x1a\n" +
+	"\bfinished\x18\x01 \x01(\bR\bfinished\x12\x1c\n" +
+	"\tcancelled\x18\x02 \x01(\bR\tcancelled\x125\n" +
+	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\x12#\n" +
+	"\rcancel_reason\x18\x04 \x01(\tR\fcancelReason\"\xc3\x02\n" +
 	"\fReplayAccess\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x17\n" +
@@ -3031,7 +3114,7 @@ func file_platform_game_v1_game_proto_rawDescGZIP() []byte {
 }
 
 var file_platform_game_v1_game_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_platform_game_v1_game_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_platform_game_v1_game_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_platform_game_v1_game_proto_goTypes = []any{
 	(GameSessionStatus)(0),              // 0: platform.game.v1.GameSessionStatus
 	(ViewerKind)(0),                     // 1: platform.game.v1.ViewerKind
@@ -3048,30 +3131,31 @@ var file_platform_game_v1_game_proto_goTypes = []any{
 	(*GetProjectionResponse)(nil),       // 12: platform.game.v1.GetProjectionResponse
 	(*GetReplayProjectionRequest)(nil),  // 13: platform.game.v1.GetReplayProjectionRequest
 	(*GetReplayProjectionResponse)(nil), // 14: platform.game.v1.GetReplayProjectionResponse
-	(*ReplayAccess)(nil),                // 15: platform.game.v1.ReplayAccess
-	(*GetReplayAccessRequest)(nil),      // 16: platform.game.v1.GetReplayAccessRequest
-	(*GetReplayAccessResponse)(nil),     // 17: platform.game.v1.GetReplayAccessResponse
-	(*SetReplayAccessRequest)(nil),      // 18: platform.game.v1.SetReplayAccessRequest
-	(*SetReplayAccessResponse)(nil),     // 19: platform.game.v1.SetReplayAccessResponse
-	(*FinishSessionRequest)(nil),        // 20: platform.game.v1.FinishSessionRequest
-	(*FinishSessionResponse)(nil),       // 21: platform.game.v1.FinishSessionResponse
-	(*GameSubscribeRequest)(nil),        // 22: platform.game.v1.GameSubscribeRequest
-	(*GameProjection)(nil),              // 23: platform.game.v1.GameProjection
-	(*GameDelta)(nil),                   // 24: platform.game.v1.GameDelta
-	(*OpenSubscriptionRequest)(nil),     // 25: platform.game.v1.OpenSubscriptionRequest
-	(*OpenSubscriptionResponse)(nil),    // 26: platform.game.v1.OpenSubscriptionResponse
-	(*SubscriptionGrant)(nil),           // 27: platform.game.v1.SubscriptionGrant
-	(*ClientFrame)(nil),                 // 28: platform.game.v1.ClientFrame
-	(*SubscriptionHello)(nil),           // 29: platform.game.v1.SubscriptionHello
-	(*ClientPing)(nil),                  // 30: platform.game.v1.ClientPing
-	(*ServerFrame)(nil),                 // 31: platform.game.v1.ServerFrame
-	(*SubscriptionDraining)(nil),        // 32: platform.game.v1.SubscriptionDraining
-	(*ServerPong)(nil),                  // 33: platform.game.v1.ServerPong
-	(*SubscriptionError)(nil),           // 34: platform.game.v1.SubscriptionError
-	(*GameSystemRequest)(nil),           // 35: platform.game.v1.GameSystemRequest
-	(*GameTimerRequest)(nil),            // 36: platform.game.v1.GameTimerRequest
-	(*GameReceipt)(nil),                 // 37: platform.game.v1.GameReceipt
-	(*timestamppb.Timestamp)(nil),       // 38: google.protobuf.Timestamp
+	(*ReplayTerminalMeta)(nil),          // 15: platform.game.v1.ReplayTerminalMeta
+	(*ReplayAccess)(nil),                // 16: platform.game.v1.ReplayAccess
+	(*GetReplayAccessRequest)(nil),      // 17: platform.game.v1.GetReplayAccessRequest
+	(*GetReplayAccessResponse)(nil),     // 18: platform.game.v1.GetReplayAccessResponse
+	(*SetReplayAccessRequest)(nil),      // 19: platform.game.v1.SetReplayAccessRequest
+	(*SetReplayAccessResponse)(nil),     // 20: platform.game.v1.SetReplayAccessResponse
+	(*FinishSessionRequest)(nil),        // 21: platform.game.v1.FinishSessionRequest
+	(*FinishSessionResponse)(nil),       // 22: platform.game.v1.FinishSessionResponse
+	(*GameSubscribeRequest)(nil),        // 23: platform.game.v1.GameSubscribeRequest
+	(*GameProjection)(nil),              // 24: platform.game.v1.GameProjection
+	(*GameDelta)(nil),                   // 25: platform.game.v1.GameDelta
+	(*OpenSubscriptionRequest)(nil),     // 26: platform.game.v1.OpenSubscriptionRequest
+	(*OpenSubscriptionResponse)(nil),    // 27: platform.game.v1.OpenSubscriptionResponse
+	(*SubscriptionGrant)(nil),           // 28: platform.game.v1.SubscriptionGrant
+	(*ClientFrame)(nil),                 // 29: platform.game.v1.ClientFrame
+	(*SubscriptionHello)(nil),           // 30: platform.game.v1.SubscriptionHello
+	(*ClientPing)(nil),                  // 31: platform.game.v1.ClientPing
+	(*ServerFrame)(nil),                 // 32: platform.game.v1.ServerFrame
+	(*SubscriptionDraining)(nil),        // 33: platform.game.v1.SubscriptionDraining
+	(*ServerPong)(nil),                  // 34: platform.game.v1.ServerPong
+	(*SubscriptionError)(nil),           // 35: platform.game.v1.SubscriptionError
+	(*GameSystemRequest)(nil),           // 36: platform.game.v1.GameSystemRequest
+	(*GameTimerRequest)(nil),            // 37: platform.game.v1.GameTimerRequest
+	(*GameReceipt)(nil),                 // 38: platform.game.v1.GameReceipt
+	(*timestamppb.Timestamp)(nil),       // 39: google.protobuf.Timestamp
 }
 var file_platform_game_v1_game_proto_depIdxs = []int32{
 	3,  // 0: platform.game.v1.GameEnvelope.version:type_name -> platform.game.v1.VersionTuple
@@ -3080,69 +3164,71 @@ var file_platform_game_v1_game_proto_depIdxs = []int32{
 	0,  // 3: platform.game.v1.GameSessionSummary.status:type_name -> platform.game.v1.GameSessionStatus
 	5,  // 4: platform.game.v1.StartSessionRequest.config:type_name -> platform.game.v1.GameConfig
 	6,  // 5: platform.game.v1.StartSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	23, // 6: platform.game.v1.StartSessionResponse.projection:type_name -> platform.game.v1.GameProjection
+	24, // 6: platform.game.v1.StartSessionResponse.projection:type_name -> platform.game.v1.GameProjection
 	4,  // 7: platform.game.v1.GameActionRequest.command:type_name -> platform.game.v1.GameEnvelope
-	23, // 8: platform.game.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
-	37, // 9: platform.game.v1.GameActionResponse.receipt:type_name -> platform.game.v1.GameReceipt
+	24, // 8: platform.game.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
+	38, // 9: platform.game.v1.GameActionResponse.receipt:type_name -> platform.game.v1.GameReceipt
 	1,  // 10: platform.game.v1.GetProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	23, // 11: platform.game.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	24, // 11: platform.game.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
 	6,  // 12: platform.game.v1.GetProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
 	1,  // 13: platform.game.v1.GetReplayProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	23, // 14: platform.game.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	24, // 14: platform.game.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
 	6,  // 15: platform.game.v1.GetReplayProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	2,  // 16: platform.game.v1.ReplayAccess.policy:type_name -> platform.game.v1.ReplayAccessPolicy
-	38, // 17: platform.game.v1.ReplayAccess.member_snapshot_completed_at:type_name -> google.protobuf.Timestamp
-	38, // 18: platform.game.v1.ReplayAccess.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 19: platform.game.v1.GetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
-	2,  // 20: platform.game.v1.SetReplayAccessRequest.policy:type_name -> platform.game.v1.ReplayAccessPolicy
-	15, // 21: platform.game.v1.SetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
-	4,  // 22: platform.game.v1.FinishSessionRequest.command:type_name -> platform.game.v1.GameEnvelope
-	6,  // 23: platform.game.v1.FinishSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	37, // 24: platform.game.v1.FinishSessionResponse.receipt:type_name -> platform.game.v1.GameReceipt
-	23, // 25: platform.game.v1.FinishSessionResponse.projection:type_name -> platform.game.v1.GameProjection
-	1,  // 26: platform.game.v1.GameSubscribeRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	1,  // 27: platform.game.v1.GameProjection.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	4,  // 28: platform.game.v1.GameProjection.view:type_name -> platform.game.v1.GameEnvelope
-	1,  // 29: platform.game.v1.GameDelta.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	4,  // 30: platform.game.v1.GameDelta.messages:type_name -> platform.game.v1.GameEnvelope
-	1,  // 31: platform.game.v1.OpenSubscriptionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	38, // 32: platform.game.v1.OpenSubscriptionResponse.expires_at:type_name -> google.protobuf.Timestamp
-	6,  // 33: platform.game.v1.OpenSubscriptionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	23, // 34: platform.game.v1.OpenSubscriptionResponse.projection:type_name -> platform.game.v1.GameProjection
-	1,  // 35: platform.game.v1.SubscriptionGrant.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	38, // 36: platform.game.v1.SubscriptionGrant.expires_at:type_name -> google.protobuf.Timestamp
-	29, // 37: platform.game.v1.ClientFrame.hello:type_name -> platform.game.v1.SubscriptionHello
-	30, // 38: platform.game.v1.ClientFrame.ping:type_name -> platform.game.v1.ClientPing
-	23, // 39: platform.game.v1.ServerFrame.projection:type_name -> platform.game.v1.GameProjection
-	24, // 40: platform.game.v1.ServerFrame.delta:type_name -> platform.game.v1.GameDelta
-	37, // 41: platform.game.v1.ServerFrame.receipt:type_name -> platform.game.v1.GameReceipt
-	32, // 42: platform.game.v1.ServerFrame.draining:type_name -> platform.game.v1.SubscriptionDraining
-	33, // 43: platform.game.v1.ServerFrame.pong:type_name -> platform.game.v1.ServerPong
-	34, // 44: platform.game.v1.ServerFrame.error:type_name -> platform.game.v1.SubscriptionError
-	38, // 45: platform.game.v1.SubscriptionDraining.reconnect_after:type_name -> google.protobuf.Timestamp
-	4,  // 46: platform.game.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
-	4,  // 47: platform.game.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
-	7,  // 48: platform.game.v1.GameService.StartSession:input_type -> platform.game.v1.StartSessionRequest
-	9,  // 49: platform.game.v1.GameService.GameAction:input_type -> platform.game.v1.GameActionRequest
-	11, // 50: platform.game.v1.GameService.GetProjection:input_type -> platform.game.v1.GetProjectionRequest
-	13, // 51: platform.game.v1.GameService.GetReplayProjection:input_type -> platform.game.v1.GetReplayProjectionRequest
-	16, // 52: platform.game.v1.GameService.GetReplayAccess:input_type -> platform.game.v1.GetReplayAccessRequest
-	18, // 53: platform.game.v1.GameService.SetReplayAccess:input_type -> platform.game.v1.SetReplayAccessRequest
-	20, // 54: platform.game.v1.GameService.FinishSession:input_type -> platform.game.v1.FinishSessionRequest
-	25, // 55: platform.game.v1.GameService.OpenSubscription:input_type -> platform.game.v1.OpenSubscriptionRequest
-	8,  // 56: platform.game.v1.GameService.StartSession:output_type -> platform.game.v1.StartSessionResponse
-	10, // 57: platform.game.v1.GameService.GameAction:output_type -> platform.game.v1.GameActionResponse
-	12, // 58: platform.game.v1.GameService.GetProjection:output_type -> platform.game.v1.GetProjectionResponse
-	14, // 59: platform.game.v1.GameService.GetReplayProjection:output_type -> platform.game.v1.GetReplayProjectionResponse
-	17, // 60: platform.game.v1.GameService.GetReplayAccess:output_type -> platform.game.v1.GetReplayAccessResponse
-	19, // 61: platform.game.v1.GameService.SetReplayAccess:output_type -> platform.game.v1.SetReplayAccessResponse
-	21, // 62: platform.game.v1.GameService.FinishSession:output_type -> platform.game.v1.FinishSessionResponse
-	26, // 63: platform.game.v1.GameService.OpenSubscription:output_type -> platform.game.v1.OpenSubscriptionResponse
-	56, // [56:64] is the sub-list for method output_type
-	48, // [48:56] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	15, // 16: platform.game.v1.GetReplayProjectionResponse.terminal_meta:type_name -> platform.game.v1.ReplayTerminalMeta
+	39, // 17: platform.game.v1.ReplayTerminalMeta.ended_at:type_name -> google.protobuf.Timestamp
+	2,  // 18: platform.game.v1.ReplayAccess.policy:type_name -> platform.game.v1.ReplayAccessPolicy
+	39, // 19: platform.game.v1.ReplayAccess.member_snapshot_completed_at:type_name -> google.protobuf.Timestamp
+	39, // 20: platform.game.v1.ReplayAccess.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 21: platform.game.v1.GetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
+	2,  // 22: platform.game.v1.SetReplayAccessRequest.policy:type_name -> platform.game.v1.ReplayAccessPolicy
+	16, // 23: platform.game.v1.SetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
+	4,  // 24: platform.game.v1.FinishSessionRequest.command:type_name -> platform.game.v1.GameEnvelope
+	6,  // 25: platform.game.v1.FinishSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	38, // 26: platform.game.v1.FinishSessionResponse.receipt:type_name -> platform.game.v1.GameReceipt
+	24, // 27: platform.game.v1.FinishSessionResponse.projection:type_name -> platform.game.v1.GameProjection
+	1,  // 28: platform.game.v1.GameSubscribeRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	1,  // 29: platform.game.v1.GameProjection.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	4,  // 30: platform.game.v1.GameProjection.view:type_name -> platform.game.v1.GameEnvelope
+	1,  // 31: platform.game.v1.GameDelta.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	4,  // 32: platform.game.v1.GameDelta.messages:type_name -> platform.game.v1.GameEnvelope
+	1,  // 33: platform.game.v1.OpenSubscriptionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	39, // 34: platform.game.v1.OpenSubscriptionResponse.expires_at:type_name -> google.protobuf.Timestamp
+	6,  // 35: platform.game.v1.OpenSubscriptionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	24, // 36: platform.game.v1.OpenSubscriptionResponse.projection:type_name -> platform.game.v1.GameProjection
+	1,  // 37: platform.game.v1.SubscriptionGrant.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	39, // 38: platform.game.v1.SubscriptionGrant.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 39: platform.game.v1.ClientFrame.hello:type_name -> platform.game.v1.SubscriptionHello
+	31, // 40: platform.game.v1.ClientFrame.ping:type_name -> platform.game.v1.ClientPing
+	24, // 41: platform.game.v1.ServerFrame.projection:type_name -> platform.game.v1.GameProjection
+	25, // 42: platform.game.v1.ServerFrame.delta:type_name -> platform.game.v1.GameDelta
+	38, // 43: platform.game.v1.ServerFrame.receipt:type_name -> platform.game.v1.GameReceipt
+	33, // 44: platform.game.v1.ServerFrame.draining:type_name -> platform.game.v1.SubscriptionDraining
+	34, // 45: platform.game.v1.ServerFrame.pong:type_name -> platform.game.v1.ServerPong
+	35, // 46: platform.game.v1.ServerFrame.error:type_name -> platform.game.v1.SubscriptionError
+	39, // 47: platform.game.v1.SubscriptionDraining.reconnect_after:type_name -> google.protobuf.Timestamp
+	4,  // 48: platform.game.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
+	4,  // 49: platform.game.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
+	7,  // 50: platform.game.v1.GameService.StartSession:input_type -> platform.game.v1.StartSessionRequest
+	9,  // 51: platform.game.v1.GameService.GameAction:input_type -> platform.game.v1.GameActionRequest
+	11, // 52: platform.game.v1.GameService.GetProjection:input_type -> platform.game.v1.GetProjectionRequest
+	13, // 53: platform.game.v1.GameService.GetReplayProjection:input_type -> platform.game.v1.GetReplayProjectionRequest
+	17, // 54: platform.game.v1.GameService.GetReplayAccess:input_type -> platform.game.v1.GetReplayAccessRequest
+	19, // 55: platform.game.v1.GameService.SetReplayAccess:input_type -> platform.game.v1.SetReplayAccessRequest
+	21, // 56: platform.game.v1.GameService.FinishSession:input_type -> platform.game.v1.FinishSessionRequest
+	26, // 57: platform.game.v1.GameService.OpenSubscription:input_type -> platform.game.v1.OpenSubscriptionRequest
+	8,  // 58: platform.game.v1.GameService.StartSession:output_type -> platform.game.v1.StartSessionResponse
+	10, // 59: platform.game.v1.GameService.GameAction:output_type -> platform.game.v1.GameActionResponse
+	12, // 60: platform.game.v1.GameService.GetProjection:output_type -> platform.game.v1.GetProjectionResponse
+	14, // 61: platform.game.v1.GameService.GetReplayProjection:output_type -> platform.game.v1.GetReplayProjectionResponse
+	18, // 62: platform.game.v1.GameService.GetReplayAccess:output_type -> platform.game.v1.GetReplayAccessResponse
+	20, // 63: platform.game.v1.GameService.SetReplayAccess:output_type -> platform.game.v1.SetReplayAccessResponse
+	22, // 64: platform.game.v1.GameService.FinishSession:output_type -> platform.game.v1.FinishSessionResponse
+	27, // 65: platform.game.v1.GameService.OpenSubscription:output_type -> platform.game.v1.OpenSubscriptionResponse
+	58, // [58:66] is the sub-list for method output_type
+	50, // [50:58] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_platform_game_v1_game_proto_init() }
@@ -3150,11 +3236,11 @@ func file_platform_game_v1_game_proto_init() {
 	if File_platform_game_v1_game_proto != nil {
 		return
 	}
-	file_platform_game_v1_game_proto_msgTypes[25].OneofWrappers = []any{
+	file_platform_game_v1_game_proto_msgTypes[26].OneofWrappers = []any{
 		(*ClientFrame_Hello)(nil),
 		(*ClientFrame_Ping)(nil),
 	}
-	file_platform_game_v1_game_proto_msgTypes[28].OneofWrappers = []any{
+	file_platform_game_v1_game_proto_msgTypes[29].OneofWrappers = []any{
 		(*ServerFrame_Projection)(nil),
 		(*ServerFrame_Delta)(nil),
 		(*ServerFrame_Receipt)(nil),
@@ -3168,7 +3254,7 @@ func file_platform_game_v1_game_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_game_v1_game_proto_rawDesc), len(file_platform_game_v1_game_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   35,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

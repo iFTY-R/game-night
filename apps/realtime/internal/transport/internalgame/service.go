@@ -112,10 +112,16 @@ func (service *Service) StartSession(ctx context.Context, request *connect.Reque
 	if err != nil {
 		return nil, err
 	}
+	proof, err := pendingStartProofFromWire(request.Msg.GetPendingStartProof())
+	if err != nil {
+		return nil, err
+	}
 	room, session, err := service.runtime.Start(ctx, gameruntime.StartCommand{
 		ActorUserID: actorUserID, RoomID: roomID, GameID: gameID,
-		Expected: roomdomain.Version{Room: request.Msg.GetExpectedRoomVersion(), Membership: request.Msg.GetExpectedMembershipVersion()},
-		Config:   config, OperationID: operationID, RequestDigest: &requestDigest,
+		Expected:          roomdomain.Version{Room: request.Msg.GetExpectedRoomVersion(), Membership: request.Msg.GetExpectedMembershipVersion()},
+		ConfigRevision:    request.Msg.GetConfigRevision(),
+		PendingStartProof: proof,
+		Config:            config, OperationID: operationID, RequestDigest: &requestDigest,
 	})
 	if err != nil {
 		return nil, err
@@ -228,6 +234,7 @@ func (service *Service) CancelSession(ctx context.Context, request *connect.Requ
 		ExpectedRoom: roomdomain.Version{
 			Room: request.Msg.GetExpectedRoomVersion(), Membership: request.Msg.GetExpectedMembershipVersion(),
 		},
+		Reason:    gameruntime.CancelReasonPlatformCancelled,
 		CloseRoom: request.Msg.GetCloseRoom(),
 	})
 	if err != nil {
@@ -333,7 +340,7 @@ func (service *Service) GetReplayProjection(ctx context.Context, request *connec
 		return nil, err
 	}
 	return connect.NewResponse(&realtimev1.GetReplayProjectionResponse{
-		Session: sessionToWire(session), Projection: projectionToWire(session, viewer, projection),
+		Session: sessionToWire(session), Projection: projectionToWire(session, viewer, projection), TerminalMeta: replayTerminalMetaToWire(session),
 	}), nil
 }
 
@@ -361,6 +368,20 @@ func configFromWire(value *gamev1.GameConfig, expected game.GameID) (game.Messag
 		return game.Message{}, gameruntime.ErrInvalidSessionInput
 	}
 	return message, nil
+}
+
+func pendingStartProofFromWire(value *realtimev1.PendingStartProof) (*gameruntime.PendingStartProof, error) {
+	if value == nil {
+		return nil, nil
+	}
+	if value.GetPendingStartId() == "" && value.GetCancelToken() == "" {
+		return nil, nil
+	}
+	pendingStartID, err := requiredUUID(value.GetPendingStartId())
+	if err != nil || value.GetCancelToken() == "" {
+		return nil, gameruntime.ErrInvalidSessionInput
+	}
+	return &gameruntime.PendingStartProof{PendingStartID: pendingStartID, CancelToken: value.GetCancelToken()}, nil
 }
 
 func requiredPair(first, second string) (uuid.UUID, uuid.UUID, error) {

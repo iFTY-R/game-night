@@ -123,14 +123,24 @@ func TestCommandRoundTripOpenRevealAndFinish(t *testing.T) {
 	if len(view.GetRevealedDice()) != 2 || openState.LastSettlement.Round != 1 {
 		t.Fatalf("settled public view = %+v", &view)
 	}
+	if _, err := m.HandleCommand(opened.Snapshot, commandRequest(
+		opened.Snapshot.StateVersion, openState.CurrentActorUserID, "session.finish", finishCommandPayload(t), executionAt(time.Unix(103, 0).UTC(), 4),
+	)); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
+		t.Fatalf("command finish error = %v", err)
+	}
 	finished, err := m.HandleSystem(opened.Snapshot, systemRequest(
-		opened.Snapshot.StateVersion, "session.finish", finishCommandPayload(t), executionAt(time.Unix(103, 0).UTC(), 4),
+		opened.Snapshot.StateVersion, "session.finish", finishCommandPayload(t), executionAt(time.Unix(103, 0).UTC(), 4), "user-1",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !finished.Finished || len(finished.Timers) != 0 || eventCount(finished.Events, EventSessionFinishedMessage) != 1 {
 		t.Fatalf("finish transition = %+v", finished)
+	}
+	if _, err := m.HandleSystem(opened.Snapshot, systemRequest(
+		opened.Snapshot.StateVersion, "session.finish", finishCommandPayload(t), executionAt(time.Unix(103, 0).UTC(), 4), "",
+	)); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
+		t.Fatalf("untrusted finish error = %v", err)
 	}
 }
 
@@ -195,7 +205,7 @@ func TestDisabledTimerAndPastDueRevocationReplacement(t *testing.T) {
 	}
 	revokePayload := mustProto(t, &liarsdicev1.ParticipantRevoked{UserId: revokedUser})
 	afterDeadline := time.UnixMilli(state.ActionDeadlineUnixMillis + 1000).UTC()
-	revoked, err := m.HandleSystem(created.Snapshot, systemRequest(1, "participant.revoked", revokePayload, executionAt(afterDeadline, 2)))
+	revoked, err := m.HandleSystem(created.Snapshot, systemRequest(1, "participant.revoked", revokePayload, executionAt(afterDeadline, 2), ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +334,7 @@ func TestReplayKeepsTimeoutAndRevokedRoundsPrivate(t *testing.T) {
 	}
 	revokePayload := mustProto(t, &liarsdicev1.ParticipantRevoked{UserId: state.CurrentActorUserID})
 	revoked, err := m.HandleSystem(created.Snapshot, systemRequest(
-		1, "participant.revoked", revokePayload, executionAt(time.Unix(101, 0).UTC(), 3),
+		1, "participant.revoked", revokePayload, executionAt(time.Unix(101, 0).UTC(), 3), "",
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +350,101 @@ func TestReplayKeepsTimeoutAndRevokedRoundsPrivate(t *testing.T) {
 	}
 	if len(replay.GetRounds()) != 0 || len(replay.GetRevokedUserIds()) != 1 {
 		t.Fatalf("revoked round entered replay: %+v", &replay)
+	}
+}
+
+func TestProjectReplayV2CancelledKeepsPendingRoundAndTrustedReason(t *testing.T) {
+	m := New()
+	created, err := m.Create(createRequest(t, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := DecodeState(created.Snapshot.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bidPayload := bidCommandPayload(t, 3, 3, liarsdicev1.BidMode_BID_MODE_FLYING)
+	bidTransition, err := m.HandleCommand(created.Snapshot, commandRequest(
+		created.Snapshot.StateVersion, state.CurrentActorUserID, "round.bid", bidPayload, executionAt(time.Unix(101, 0).UTC(), 2),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: append(append([]game.Event(nil), created.Events...), bidTransition.Events...),
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Cancelled:    true,
+			EndedAt:      executionAt(time.Unix(102, 0).UTC(), 3).Now,
+			CancelReason: "runtime_cancelled",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var replay liarsdicev1.Replay
+	if err := proto.Unmarshal(projected.View.Payload, &replay); err != nil {
+		t.Fatal(err)
+	}
+	if replay.GetFinishReason() != "runtime_cancelled" || len(replay.GetRounds()) != 1 {
+		t.Fatalf("cancelled replay=%+v", &replay)
+	}
+	pending := replay.GetRounds()[0]
+	if pending.GetReason() != "" || pending.GetDiceRevealed() || len(pending.GetDice()) != 0 || len(pending.GetBids()) != 1 {
+		t.Fatalf("cancelled pending replay=%+v", pending)
+	}
+}
+
+func TestProjectReplayV2FinishedMatchesLegacy(t *testing.T) {
+	m := New()
+	created, err := m.Create(createRequest(t, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := DecodeState(created.Snapshot.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bidPayload := bidCommandPayload(t, 2, 2, liarsdicev1.BidMode_BID_MODE_FLYING)
+	bidTransition, err := m.HandleCommand(created.Snapshot, commandRequest(1, state.CurrentActorUserID, "round.bid", bidPayload, executionAt(time.Unix(101, 0).UTC(), 2)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bidState, err := DecodeState(bidTransition.Snapshot.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := m.HandleCommand(bidTransition.Snapshot, commandRequest(2, bidState.CurrentActorUserID, "round.open", openCommandPayload(t), executionAt(time.Unix(102, 0).UTC(), 3)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished, err := m.HandleSystem(opened.Snapshot, systemRequest(
+		opened.Snapshot.StateVersion, "session.finish", finishCommandPayload(t), executionAt(time.Unix(103, 0).UTC(), 4), "user-1",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	history := append(append(append([]game.Event{}, created.Events...), bidTransition.Events...), opened.Events...)
+	history = append(history, finished.Events...)
+	legacy, err := m.ProjectReplay(history, game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"}, game.ReplayAccessParticipant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: history,
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Finished: true,
+			EndedAt:  executionAt(time.Unix(104, 0).UTC(), 5).Now,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(legacy.View.Payload, v2.View.Payload) {
+		t.Fatal("finished replay v2 diverged from legacy projection")
 	}
 }
 
@@ -449,8 +554,12 @@ func executionAt(now time.Time, seedByte byte) game.DeterministicContext {
 func commandRequest(version uint64, actor, action string, payload []byte, execution game.DeterministicContext) game.CommandRequest {
 	return game.CommandRequest{Context: execution, ActorUserID: game.Identifier(actor), ActionID: testActionID(), ExpectedStateVersion: version, Command: game.Message{MessageType: game.Identifier(action), SchemaVersion: ProtocolSchemaVersion, Payload: payload}}
 }
-func systemRequest(version uint64, action string, payload []byte, execution game.DeterministicContext) game.SystemRequest {
-	return game.SystemRequest{Context: execution, SystemOperationID: testActionID(), SourceEventID: "source-event", ExpectedStateVersion: version, System: game.Message{MessageType: game.Identifier(action), SchemaVersion: ProtocolSchemaVersion, Payload: payload}}
+func systemRequest(version uint64, action string, payload []byte, execution game.DeterministicContext, requester string) game.SystemRequest {
+	return game.SystemRequest{
+		Context: execution, SystemOperationID: testActionID(), SourceEventID: "source-event",
+		RequestedByUserID: game.Identifier(requester), ExpectedStateVersion: version,
+		System: game.Message{MessageType: game.Identifier(action), SchemaVersion: ProtocolSchemaVersion, Payload: payload},
+	}
 }
 func testActionID() game.ActionID { return game.ActionID("AQEBAQEBAQEBAQEBAQEBAQ") }
 func mustProto(t *testing.T, message proto.Message) []byte {

@@ -151,7 +151,7 @@ func TestCancelUsesHeldEpochAndPublishesTerminalCursor(t *testing.T) {
 	roomID := fixture.sessions.session.Snapshot().RoomID
 	_, cancelled, err := fixture.manager.Cancel(t.Context(), gameruntime.CancelCommand{
 		RoomID: roomID, SessionID: fixture.sessionID, ExpectedRoom: roomDomain.Version{Room: 2, Membership: 1},
-		OwnershipEpoch: 999, CloseRoom: true,
+		OwnershipEpoch: 999, Reason: gameruntime.CancelReasonPlatformCancelled, CloseRoom: true,
 	})
 	if err != nil {
 		t.Fatal(err)

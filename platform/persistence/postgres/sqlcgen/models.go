@@ -213,23 +213,32 @@ type GameRulePreset struct {
 }
 
 type GameSession struct {
-	SessionID          pgtype.UUID        `json:"session_id"`
-	RoomID             pgtype.UUID        `json:"room_id"`
-	GameID             string             `json:"game_id"`
-	EngineVersion      string             `json:"engine_version"`
-	ProtocolVersion    string             `json:"protocol_version"`
-	ClientVersion      string             `json:"client_version"`
-	StateVersion       int64              `json:"state_version"`
-	OwnershipEpoch     int64              `json:"ownership_epoch"`
-	SnapshotVersion    int32              `json:"snapshot_version"`
-	StateMessageType   string             `json:"state_message_type"`
-	StateSchemaVersion int32              `json:"state_schema_version"`
-	StatePayload       []byte             `json:"state_payload"`
-	NextDeadlineAt     pgtype.Timestamptz `json:"next_deadline_at"`
-	Status             string             `json:"status"`
-	StartedAt          pgtype.Timestamptz `json:"started_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	EndedAt            pgtype.Timestamptz `json:"ended_at"`
+	SessionID                pgtype.UUID        `json:"session_id"`
+	RoomID                   pgtype.UUID        `json:"room_id"`
+	GameID                   string             `json:"game_id"`
+	EngineVersion            string             `json:"engine_version"`
+	ProtocolVersion          string             `json:"protocol_version"`
+	ClientVersion            string             `json:"client_version"`
+	StateVersion             int64              `json:"state_version"`
+	OwnershipEpoch           int64              `json:"ownership_epoch"`
+	SnapshotVersion          int32              `json:"snapshot_version"`
+	StateMessageType         string             `json:"state_message_type"`
+	StateSchemaVersion       int32              `json:"state_schema_version"`
+	StatePayload             []byte             `json:"state_payload"`
+	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	Status                   string             `json:"status"`
+	StartedAt                pgtype.Timestamptz `json:"started_at"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
+	EndedAt                  pgtype.Timestamptz `json:"ended_at"`
+	StartConfigMessageType   pgtype.Text        `json:"start_config_message_type"`
+	StartConfigSchemaVersion pgtype.Int4        `json:"start_config_schema_version"`
+	StartConfigPayload       []byte             `json:"start_config_payload"`
+	StartConfigDigest        []byte             `json:"start_config_digest"`
+	StartConfigRevision      pgtype.Int8        `json:"start_config_revision"`
+	StartRoomVersion         pgtype.Int8        `json:"start_room_version"`
+	StartMembershipVersion   pgtype.Int8        `json:"start_membership_version"`
+	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
+	CancelReason             pgtype.Text        `json:"cancel_reason"`
 }
 
 type GameSessionEvent struct {

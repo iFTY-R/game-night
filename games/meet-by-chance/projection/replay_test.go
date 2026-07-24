@@ -44,6 +44,36 @@ func TestReplayContainsSettledRoundsOnly(t *testing.T) {
 	}
 }
 
+func TestReplayV2CancelledKeepsPendingEntriesAndTrustedReason(t *testing.T) {
+	m := module.New()
+	created := createTransition(t, m, 4)
+	replay, err := projection.BuildReplayV2(game.ReplayRequest{
+		Events: created.Events,
+		Viewer: replayViewer(),
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Cancelled:    true,
+			EndedAt:      replayNow().Add(2 * time.Second),
+			CancelReason: "runtime_cancelled",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.GetFinishReason() != "runtime_cancelled" || len(replay.GetRounds()) != 0 || len(replay.GetEntries()) == 0 {
+		t.Fatalf("cancelled replay=%+v", replay)
+	}
+	for _, entry := range replay.GetEntries() {
+		event := entry.GetEvent()
+		if event.GetDiceRevealed() != nil && len(event.GetDiceRevealed().GetPlayers()) != 0 {
+			t.Fatalf("cancelled replay leaked authoritative reveal players=%+v", event.GetDiceRevealed())
+		}
+		if event.GetHandClassified() != nil && (len(event.GetHandClassified().GetFullKey()) != 0 || len(event.GetHandClassified().GetTieKey()) != 0) {
+			t.Fatalf("cancelled replay leaked hidden classification keys=%+v", event.GetHandClassified())
+		}
+	}
+}
+
 func TestReplayAcceptsNonTargetRevokeThenTargetReroll(t *testing.T) {
 	m := module.New()
 	created := createTransition(t, m, 4)

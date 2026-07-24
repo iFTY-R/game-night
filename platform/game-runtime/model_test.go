@@ -29,6 +29,13 @@ func TestNewSessionFreezesExactVersionParticipantsAndDeterministicBatch(t *testi
 	request := CreateRequest{
 		SessionID: uuid.New(), RoomID: uuid.New(), VersionKey: testRuntimeVersionKey(),
 		Participants: participants, BatchID: uuid.New(), Execution: testRuntimeExecution(now),
+		Start: FrozenStartConfig{
+			Config:             input.Clone(),
+			ConfigRevision:     7,
+			RoomVersion:        11,
+			MembershipVersion:  13,
+			RoomOwnershipEpoch: 17,
+		},
 		Input: input, Transition: transition,
 	}
 
@@ -40,6 +47,11 @@ func TestNewSessionFreezesExactVersionParticipantsAndDeterministicBatch(t *testi
 	if snapshot.VersionKey != request.VersionKey || snapshot.State.StateVersion != 1 || snapshot.OwnershipEpoch != 0 ||
 		snapshot.Status != StatusActive || !snapshot.NextDeadlineAt.Equal(now.Add(30*time.Second)) {
 		t.Fatalf("unexpected session snapshot: %+v", snapshot)
+	}
+	if !sameGameMessage(snapshot.Start.Config, input) || snapshot.Start.ConfigDigest != startConfigDigest(request.VersionKey, input) ||
+		snapshot.Start.ConfigRevision != 7 || snapshot.Start.RoomVersion != 11 ||
+		snapshot.Start.MembershipVersion != 13 || snapshot.Start.RoomOwnershipEpoch != 17 {
+		t.Fatalf("unexpected frozen start metadata: %+v", snapshot.Start)
 	}
 	wantParticipants := []Participant{{UserID: secondUser, SeatIndex: 1}, {UserID: firstUser, SeatIndex: 4}}
 	if !reflect.DeepEqual(snapshot.Participants, wantParticipants) {
@@ -58,6 +70,7 @@ func TestNewSessionFreezesExactVersionParticipantsAndDeterministicBatch(t *testi
 	transition.Snapshot.State.Payload[0] = 'X'
 	transition.Events[0].Message.Payload[0] = 'X'
 	snapshot.Participants[0].SeatIndex = 99
+	snapshot.Start.Config.Payload[0] = 'Y'
 	snapshot.State.State.Payload[0] = 'Y'
 	snapshot.Timers[0].Message.Payload[0] = 'Y'
 	batchSnapshot.Execution.AllocatedIDs[0] = "mutated"
@@ -67,7 +80,7 @@ func TestNewSessionFreezesExactVersionParticipantsAndDeterministicBatch(t *testi
 	secondSnapshot := session.Snapshot()
 	secondBatch := batch.Snapshot()
 	if !reflect.DeepEqual(secondSnapshot.Participants, wantParticipants) ||
-		bytes.Equal(secondSnapshot.State.State.Payload, snapshot.State.State.Payload) ||
+		secondSnapshot.Start.Config.Payload[0] == 'Y' || bytes.Equal(secondSnapshot.State.State.Payload, snapshot.State.State.Payload) ||
 		secondSnapshot.Timers[0].Message.Payload[0] == 'Y' ||
 		secondBatch.Execution.AllocatedIDs[0] == "mutated" || secondBatch.Input.Payload[0] == 'Y' ||
 		secondBatch.Events[0].Message.Payload[0] == 'Y' {
@@ -310,18 +323,44 @@ func TestSuspendResumeAndCancelApplyLifecycleTimerSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err := suspended.Cancel(1, now.Add(5*time.Second))
+	cancelled, err := suspended.Cancel(1, now.Add(5*time.Second), CancelReasonPlatformCancelled)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cancelledSnapshot := cancelled.Snapshot()
 	if cancelledSnapshot.Status != StatusCancelled || cancelledSnapshot.State.StateVersion != 1 ||
 		len(cancelledSnapshot.Timers) != 0 || !cancelledSnapshot.NextDeadlineAt.IsZero() ||
-		!cancelledSnapshot.EndedAt.Equal(now.Add(5*time.Second)) {
+		!cancelledSnapshot.EndedAt.Equal(now.Add(5*time.Second)) || cancelledSnapshot.CancelReason != CancelReasonPlatformCancelled {
 		t.Fatalf("cancelled snapshot = %+v", cancelledSnapshot)
 	}
-	if _, err := cancelled.Cancel(1, now.Add(6*time.Second)); !errors.Is(err, ErrSessionTerminal) {
+	if _, err := cancelled.Cancel(1, now.Add(6*time.Second), CancelReasonPlatformCancelled); !errors.Is(err, ErrSessionTerminal) {
 		t.Fatalf("terminal cancel error = %v", err)
+	}
+}
+
+func TestRestoreSessionNormalizesLegacyCancelledReason(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 12, 30, 0, 0, time.UTC)
+	session, _, err := NewSession(testRuntimeCreateRequest(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := session.Snapshot()
+	snapshot.Status = StatusCancelled
+	snapshot.Timers = nil
+	snapshot.NextDeadlineAt = time.Time{}
+	snapshot.UpdatedAt = now.Add(2 * time.Second)
+	snapshot.EndedAt = snapshot.UpdatedAt
+	snapshot.CancelReason = ""
+	restored, err := RestoreSession(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.Snapshot().CancelReason != CancelReasonPlatformCancelled {
+		t.Fatalf("normalized cancel reason = %q", restored.Snapshot().CancelReason)
 	}
 }
 

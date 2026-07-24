@@ -62,6 +62,36 @@ func TestOwnerServiceCancelUsesOwnerFencingAndReturnsTerminalSnapshots(t *testin
 	}
 }
 
+func TestOwnerServiceStartSessionForwardsConfigRevision(t *testing.T) {
+	fixture := newInternalGameFixture(t)
+	operationID := internalOperationID(t, 4)
+	digest := sha256.Sum256([]byte("internal-start"))
+	pendingStartID := uuid.New()
+	response, err := fixture.service.StartSession(t.Context(), connect.NewRequest(&realtimev1.StartSessionRequest{
+		ActorUserId: fixture.actorID.String(), RoomId: fixture.room.Snapshot().ID.String(),
+		GameId:              string(fixture.session.Snapshot().VersionKey.GameID),
+		ExpectedRoomVersion: fixture.room.Snapshot().RoomVersion, ExpectedMembershipVersion: fixture.room.Snapshot().MembershipVersion,
+		Config: &gamev1.GameConfig{
+			GameId: string(fixture.session.Snapshot().VersionKey.GameID), SchemaVersion: 1,
+			MessageType: "session.config", Payload: []byte("configured"),
+		},
+		OperationId: operationID.Value(), RequestDigest: digest[:], ConfigRevision: 9,
+		PendingStartProof: &realtimev1.PendingStartProof{
+			PendingStartId: pendingStartID.String(), CancelToken: "pending-start-token",
+		},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.runtime.lastStart.ConfigRevision != 9 || fixture.ownership.ensureCalls != 1 || fixture.sessions.getCalls != 1 ||
+		fixture.runtime.lastStart.PendingStartProof == nil ||
+		fixture.runtime.lastStart.PendingStartProof.PendingStartID != pendingStartID ||
+		fixture.runtime.lastStart.PendingStartProof.CancelToken != "pending-start-token" ||
+		response.Msg.GetSession().GetSessionId() != fixture.session.Snapshot().ID.String() {
+		t.Fatalf("start=%+v ensure=%d reads=%d response=%+v", fixture.runtime.lastStart, fixture.ownership.ensureCalls, fixture.sessions.getCalls, response.Msg)
+	}
+}
+
 func TestOwnerServiceReturnsOnlyReadyRoute(t *testing.T) {
 	fixture := newInternalGameFixture(t)
 	response, err := fixture.service.ResolveOwner(t.Context(), connect.NewRequest(&realtimev1.ResolveOwnerRequest{
@@ -88,6 +118,36 @@ func TestOwnerServiceEventProjectionUsesAtomicRuntimeCursor(t *testing.T) {
 	if fixture.sessions.getCalls != 0 || response.Msg.GetSession().GetStateVersion() != fixture.session.Snapshot().State.StateVersion ||
 		len(response.Msg.GetMessages()) != 1 || response.Msg.GetMessages()[0].GetMessageType() != "viewer.delta" {
 		t.Fatalf("repository reads=%d response=%+v", fixture.sessions.getCalls, response.Msg)
+	}
+}
+
+func TestOwnerServiceReplayIncludesTerminalMeta(t *testing.T) {
+	fixture := newInternalGameFixture(t)
+	cancelledSnapshot := fixture.session.Snapshot()
+	cancelledSnapshot.Status = gameruntime.StatusCancelled
+	cancelledSnapshot.EndedAt = cancelledSnapshot.UpdatedAt.Add(time.Microsecond)
+	cancelledSnapshot.UpdatedAt = cancelledSnapshot.EndedAt
+	cancelledSnapshot.CancelReason = gameruntime.CancelReasonLegacyCancelled
+	cancelled, err := gameruntime.RestoreSession(cancelledSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.session = cancelled
+	fixture.runtime.session = cancelled
+	fixture.ownership.session = cancelled
+	response, err := fixture.service.GetReplayProjection(t.Context(), connect.NewRequest(&realtimev1.GetReplayProjectionRequest{
+		SessionId: cancelled.Snapshot().ID.String(),
+		Viewer: viewerToWire(game.Viewer{
+			Kind: game.ViewerReplay, UserID: game.Identifier(fixture.actorID.String()),
+		}),
+		AccessPolicy: string(game.ReplayAccessParticipant),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.Msg.GetTerminalMeta().GetCancelled() || response.Msg.GetTerminalMeta().GetFinished() ||
+		response.Msg.GetTerminalMeta().GetCancelReason() != string(gameruntime.CancelReasonLegacyCancelled) {
+		t.Fatalf("replay response=%+v", response.Msg)
 	}
 }
 
@@ -170,7 +230,7 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 	projection := game.Projection{
 		View: internalMessage("viewer.state", []byte("safe")), AllowedActions: []game.Identifier{"round.roll"},
 	}
-	runtime := &fakeInternalRuntime{session: session, projection: projection}
+	runtime := &fakeInternalRuntime{session: session, projection: projection, startRoom: room, startSession: session}
 	ownership := &fakeInternalOwnership{room: room, session: session, projection: projection}
 	routes := &fakeInternalRoutes{lease: redisstore.SessionLease{
 		SessionID: session.Snapshot().ID, Owner: "realtime-a", Address: "http://realtime-a.internal:8091",
@@ -185,12 +245,17 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 }
 
 type fakeInternalRuntime struct {
-	session    gameruntime.Session
-	projection game.Projection
+	session      gameruntime.Session
+	projection   game.Projection
+	startRoom    roomdomain.Room
+	startSession gameruntime.Session
+	lastStart    gameruntime.StartCommand
+	lastReplayPolicy game.ReplayAccessPolicy
 }
 
-func (*fakeInternalRuntime) Start(context.Context, gameruntime.StartCommand) (roomdomain.Room, gameruntime.Session, error) {
-	return roomdomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidSessionInput
+func (runtime *fakeInternalRuntime) Start(_ context.Context, command gameruntime.StartCommand) (roomdomain.Room, gameruntime.Session, error) {
+	runtime.lastStart = command
+	return runtime.startRoom, runtime.startSession, nil
 }
 
 func (runtime *fakeInternalRuntime) ProjectCurrent(context.Context, uuid.UUID, game.Viewer) (gameruntime.Session, game.Projection, error) {
@@ -250,7 +315,11 @@ func (*fakeInternalOwnership) HandleSystem(context.Context, gameruntime.SystemCo
 func (ownership *fakeInternalOwnership) Cancel(_ context.Context, command gameruntime.CancelCommand) (roomdomain.Room, gameruntime.Session, error) {
 	ownership.lastCancel = command
 	cancelledAt := ownership.session.Snapshot().UpdatedAt.Add(time.Microsecond)
-	cancelled, err := ownership.session.Cancel(ownership.session.Snapshot().OwnershipEpoch, cancelledAt)
+	cancelled, err := ownership.session.Cancel(
+		ownership.session.Snapshot().OwnershipEpoch,
+		cancelledAt,
+		gameruntime.CancelReasonPlatformCancelled,
+	)
 	if err != nil {
 		return roomdomain.Room{}, gameruntime.Session{}, err
 	}

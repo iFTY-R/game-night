@@ -133,7 +133,7 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	}
 	system := SystemRequest{
 		Context: execution, SystemOperationID: actionIDFixture(4), SourceEventID: "event-4",
-		ExpectedStateVersion: 3, System: message,
+		RequestedByUserID: "user-9", ExpectedStateVersion: 3, System: message,
 	}
 	if !system.Valid() {
 		t.Fatal("valid system request rejected")
@@ -147,6 +147,24 @@ func TestCommandTimerAndViewerRequireCanonicalContext(t *testing.T) {
 	}
 	if (Viewer{Kind: ViewerSpectator, UserID: "user-1", SeatIndex: 1}).Valid() {
 		t.Fatal("spectator with participant seat accepted")
+	}
+}
+
+func TestReplayRequestRequiresReplayViewerAndTerminalMeta(t *testing.T) {
+	request := ReplayRequest{
+		Events: []Event{{Message: Message{MessageType: "round.revealed", SchemaVersion: 1}}},
+		Viewer: Viewer{Kind: ViewerReplay, UserID: "user-1"},
+		Policy: ReplayAccessParticipant,
+		TerminalMeta: ReplayTerminalMeta{
+			Cancelled: true, EndedAt: time.Date(2026, time.July, 20, 23, 0, 0, 0, time.UTC), CancelReason: "platform_cancelled",
+		},
+	}
+	if !request.Valid() {
+		t.Fatal("valid cancelled replay request rejected")
+	}
+	request.TerminalMeta = ReplayTerminalMeta{Finished: true, EndedAt: request.TerminalMeta.EndedAt, CancelReason: "platform_cancelled"}
+	if request.Valid() {
+		t.Fatal("finished replay accepted cancel reason")
 	}
 }
 

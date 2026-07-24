@@ -80,7 +80,7 @@ func TestSystemInboxCompletesTerminalNoopWithoutOwnershipClaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err := session.Cancel(session.Snapshot().OwnershipEpoch, cancelledAt)
+	cancelled, err := session.Cancel(session.Snapshot().OwnershipEpoch, cancelledAt, CancelReasonPlatformCancelled)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,9 +12,10 @@ import (
 
 // CreationCommit keeps the initial state, deterministic event batch, and durable notification inseparable.
 type CreationCommit struct {
-	Session      Session
-	Batch        EventBatch
-	OutboxEvents []outbox.Event
+	Session           Session
+	Batch             EventBatch
+	OutboxEvents      []outbox.Event
+	PendingStartProof *PendingStartProof
 }
 
 // ActionCommitResult distinguishes a newly committed transition from a durable idempotent replay.

@@ -89,6 +89,11 @@ func TestCommandsEnforceActorPayloadAndStateVersion(t *testing.T) {
 	if _, err := m.HandleCommand(created.Snapshot, mismatched); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
 		t.Fatalf("mismatched oneof error=%v", err)
 	}
+	if _, err := m.HandleCommand(created.Snapshot, meetCommandRequest(t, 1, state.TargetUserID, SystemFinishMessage, &meetv1.Command{
+		Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{Reason: engine.FinishHostRequested, OperatorUserId: "user-2"}},
+	})); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
+		t.Fatalf("command finish error=%v", err)
+	}
 }
 
 func TestTimerRejectsStaleTargetCounters(t *testing.T) {
@@ -181,21 +186,21 @@ func TestSystemRevocationFinishAndMigration(t *testing.T) {
 	}
 
 	hostFinish := &meetv1.Command{Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{
-		Reason: engine.FinishHostRequested, OperatorUserId: "user-2",
-	}}}
-	finished, err := m.HandleSystem(created.Snapshot, meetSystemRequest(t, 1, SystemFinishMessage, hostFinish))
-	if err != nil || !finished.Finished || findFinish(t, finished.Events).GetOperatorUserId() != "user-2" {
-		t.Fatalf("runtime host finish=%+v err=%v", finished, err)
-	}
-	missingOperator := &meetv1.Command{Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{Reason: engine.FinishHostRequested}}}
-	if _, err := m.HandleSystem(created.Snapshot, meetSystemRequest(t, 1, SystemFinishMessage, missingOperator)); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
-		t.Fatalf("operator-less host finish error=%v", err)
-	}
-	platformWithOperator := &meetv1.Command{Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{
 		Reason: engine.FinishPlatformCancelled, OperatorUserId: "user-2",
 	}}}
-	if _, err := m.HandleSystem(created.Snapshot, meetSystemRequest(t, 1, SystemFinishMessage, platformWithOperator)); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
-		t.Fatalf("platform finish with operator error=%v", err)
+	finished, err := m.HandleSystem(created.Snapshot, meetTrustedSystemRequest(t, 1, SystemFinishMessage, "user-1", hostFinish))
+	if err != nil || !finished.Finished {
+		t.Fatalf("runtime host finish=%+v err=%v", finished, err)
+	}
+	trustedFinish := findFinish(t, finished.Events)
+	if trustedFinish.GetReason() != engine.FinishHostRequested || trustedFinish.GetOperatorUserId() != "user-1" {
+		t.Fatalf("trusted host finish audit=%+v", trustedFinish)
+	}
+	untrustedHost := &meetv1.Command{Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{
+		Reason: engine.FinishHostRequested, OperatorUserId: "user-2",
+	}}}
+	if _, err := m.HandleSystem(created.Snapshot, meetSystemRequest(t, 1, SystemFinishMessage, untrustedHost)); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
+		t.Fatalf("untrusted host finish error=%v", err)
 	}
 	platformFinish := &meetv1.Command{Command: &meetv1.Command_Finish{Finish: &meetv1.Finish{Reason: engine.FinishPlatformCancelled}}}
 	platform, err := m.HandleSystem(created.Snapshot, meetSystemRequest(t, 1, SystemFinishMessage, platformFinish))
@@ -209,6 +214,77 @@ func TestSystemRevocationFinishAndMigration(t *testing.T) {
 	}
 	if _, err := m.Migrate(created.Snapshot, ProtocolSchemaVersion, ProtocolSchemaVersion+1); engine.ErrorCodeOf(err) != engine.CodeUnsupportedMigration {
 		t.Fatalf("unsupported migration error=%v", err)
+	}
+}
+
+func TestProjectReplayV2CancelledKeepsPendingEntriesAndTrustedReason(t *testing.T) {
+	m := New()
+	created, err := m.Create(meetCreateRequest(t, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: created.Events,
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Cancelled:    true,
+			EndedAt:      meetContextAt(time.Date(2026, 7, 21, 12, 0, 2, 0, time.UTC)).Now,
+			CancelReason: "runtime_cancelled",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var replay meetv1.Replay
+	if err := unmarshalStrict(projected.View.Payload, &replay); err != nil {
+		t.Fatal(err)
+	}
+	if replay.GetFinishReason() != "runtime_cancelled" || len(replay.GetRounds()) != 0 || len(replay.GetEntries()) == 0 {
+		t.Fatalf("cancelled replay=%+v", &replay)
+	}
+	for _, entry := range replay.GetEntries() {
+		event := entry.GetEvent()
+		if event.GetDiceRevealed() != nil && len(event.GetDiceRevealed().GetPlayers()) != 0 {
+			t.Fatalf("cancelled replay leaked authoritative reveal players=%+v", event.GetDiceRevealed())
+		}
+		if event.GetHandClassified() != nil && (len(event.GetHandClassified().GetFullKey()) != 0 || len(event.GetHandClassified().GetTieKey()) != 0) {
+			t.Fatalf("cancelled replay leaked hidden hand keys=%+v", event.GetHandClassified())
+		}
+	}
+}
+
+func TestProjectReplayV2FinishedMatchesLegacy(t *testing.T) {
+	m := New()
+	created, err := m.Create(meetCreateRequest(t, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := decodeState(t, created.Snapshot)
+	settled, err := m.HandleCommand(created.Snapshot, meetCommandRequest(t, created.Snapshot.StateVersion, state.TargetUserID, projection.ActionStand,
+		&meetv1.Command{Command: &meetv1.Command_Stand{Stand: &meetv1.Stand{}}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	history := append(append([]game.Event(nil), created.Events...), settled.Events...)
+	legacy, err := m.ProjectReplay(history, game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"}, game.ReplayAccessParticipant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: history,
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Finished: true,
+			EndedAt:  meetContextAt(time.Date(2026, 7, 21, 12, 0, 3, 0, time.UTC)).Now,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(legacy.View.Payload, v2.View.Payload) {
+		t.Fatal("finished replay v2 diverged from legacy projection")
 	}
 }
 
@@ -329,6 +405,13 @@ func meetSystemRequest(t *testing.T, version uint64, messageType game.Identifier
 		SystemOperationID: game.ActionID("AQEBAQEBAQEBAQEBAQEBAQ"), SourceEventID: "source-event", ExpectedStateVersion: version,
 		System: game.Message{MessageType: messageType, SchemaVersion: ProtocolSchemaVersion, Payload: payload},
 	}
+}
+
+func meetTrustedSystemRequest(t *testing.T, version uint64, messageType game.Identifier, requester string, message proto.Message) game.SystemRequest {
+	t.Helper()
+	request := meetSystemRequest(t, version, messageType, message)
+	request.RequestedByUserID = game.Identifier(requester)
+	return request
 }
 
 func decodeState(t *testing.T, snapshot game.Snapshot) engine.State {

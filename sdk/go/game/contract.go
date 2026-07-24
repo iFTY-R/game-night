@@ -187,6 +187,7 @@ type SystemRequest struct {
 	Context              DeterministicContext
 	SystemOperationID    ActionID
 	SourceEventID        Identifier
+	RequestedByUserID    Identifier
 	ExpectedStateVersion uint64
 	System               Message
 }
@@ -194,7 +195,12 @@ type SystemRequest struct {
 // Valid rejects system commands that cannot participate in exact-version replay and durable deduplication.
 func (request SystemRequest) Valid() bool {
 	_, sourceErr := ParseIdentifier(string(request.SourceEventID))
-	return request.Context.Valid() && request.SystemOperationID.Valid() && sourceErr == nil &&
+	requesterValid := request.RequestedByUserID == ""
+	if !requesterValid {
+		_, requesterErr := ParseIdentifier(string(request.RequestedByUserID))
+		requesterValid = requesterErr == nil
+	}
+	return request.Context.Valid() && request.SystemOperationID.Valid() && sourceErr == nil && requesterValid &&
 		request.ExpectedStateVersion > 0 && request.System.Valid()
 }
 
@@ -317,6 +323,51 @@ func (policy ReplayAccessPolicy) Valid() bool {
 	return policy == ReplayAccessParticipant || policy == ReplayAccessRoomMember || policy == ReplayAccessPublic
 }
 
+// ReplayTerminalMeta describes the runtime-owned terminal lifecycle attached to one replay request.
+// Modules may use it to distinguish a normal finish from a platform cancellation without receiving authoritative state.
+type ReplayTerminalMeta struct {
+	Finished     bool
+	Cancelled    bool
+	EndedAt      time.Time
+	CancelReason Identifier
+}
+
+// Valid requires one explicit terminal mode, one canonical end time, and a cancellation reason only for cancelled sessions.
+func (meta ReplayTerminalMeta) Valid() bool {
+	if meta.EndedAt.IsZero() || meta.EndedAt != meta.EndedAt.Round(0).UTC() {
+		return false
+	}
+	if meta.Finished == meta.Cancelled {
+		return false
+	}
+	if meta.Finished {
+		return meta.CancelReason == ""
+	}
+	_, err := ParseIdentifier(string(meta.CancelReason))
+	return err == nil
+}
+
+// ReplayRequest keeps replay inputs bounded to ordered committed events plus runtime-owned terminal metadata.
+type ReplayRequest struct {
+	Events        []Event
+	Viewer        Viewer
+	Policy        ReplayAccessPolicy
+	TerminalMeta  ReplayTerminalMeta
+}
+
+// Valid rejects non-replay viewers, invalid terminal metadata, and malformed event payloads before a module projects them.
+func (request ReplayRequest) Valid() bool {
+	if request.Viewer.Kind != ViewerReplay || !request.Viewer.Valid() || !request.Policy.Valid() || !request.TerminalMeta.Valid() {
+		return false
+	}
+	for _, event := range request.Events {
+		if !event.Valid() {
+			return false
+		}
+	}
+	return true
+}
+
 // Projection contains one viewer-safe view and the action identifiers currently offered to that viewer.
 type Projection struct {
 	View           Message
@@ -368,6 +419,12 @@ type ServerGameModule interface {
 	Project(Snapshot, Viewer) (Projection, error)
 	ProjectReplay([]Event, Viewer, ReplayAccessPolicy) (Projection, error)
 	Migrate(Snapshot, uint32, uint32) (Snapshot, error)
+}
+
+// ReplayProjectingV2GameModule opts into replay requests that include runtime-owned terminal metadata.
+// Runtime cancellation replay requires this interface because no synthetic module event is manufactured.
+type ReplayProjectingV2GameModule interface {
+	ProjectReplayV2(ReplayRequest) (Projection, error)
 }
 
 // SystemGameModule extends a registered module with runtime-originated commands such as participant revocation.

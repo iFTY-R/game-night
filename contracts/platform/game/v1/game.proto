@@ -130,6 +130,7 @@ message GetReplayProjectionResponse {
   GameProjection projection = 1;
   GameSessionSummary session = 2;
   bool complete = 3;
+  ReplayTerminalMeta terminal_meta = 4;
 }
 
 // ReplayAccessPolicy controls resource authorization; game modules still decide which fields may be revealed.
@@ -138,6 +139,14 @@ enum ReplayAccessPolicy {
   REPLAY_ACCESS_POLICY_PARTICIPANT = 1;
   REPLAY_ACCESS_POLICY_ROOM_MEMBER = 2;
   REPLAY_ACCESS_POLICY_PUBLIC = 3;
+}
+
+// ReplayTerminalMeta carries runtime-owned terminal lifecycle details that are safe only on replay responses.
+message ReplayTerminalMeta {
+  bool finished = 1;
+  bool cancelled = 2;
+  google.protobuf.Timestamp ended_at = 3;
+  string cancel_reason = 4;
 }
 
 message ReplayAccess {

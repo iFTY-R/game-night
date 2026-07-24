@@ -847,7 +847,11 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err := suspendedAgain.Cancel(suspendedAgain.Snapshot().OwnershipEpoch, now.Add(5*time.Second))
+	cancelled, err := suspendedAgain.Cancel(
+		suspendedAgain.Snapshot().OwnershipEpoch,
+		now.Add(5*time.Second),
+		gameruntime.CancelReasonPlatformCancelled,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -866,7 +870,8 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 		t.Fatal(err)
 	}
 	if storedRoom.Snapshot().Status != roomDomain.RoomStatusLobby || storedSession.Snapshot().Status != gameruntime.StatusCancelled ||
-		len(storedSession.Snapshot().Timers) != 0 || storedSession.Snapshot().State.StateVersion != 1 {
+		len(storedSession.Snapshot().Timers) != 0 || storedSession.Snapshot().State.StateVersion != 1 ||
+		storedSession.Snapshot().CancelReason != gameruntime.CancelReasonPlatformCancelled {
 		t.Fatalf("room=%+v session=%+v", storedRoom.Snapshot(), storedSession.Snapshot())
 	}
 	assertGameSessionCounts(t, ctx, fixture, owner.Snapshot().ID, 1, 0, 1, 5)
@@ -885,7 +890,7 @@ func TestRoomGameSessionRepositoryAtomicallyCancelsAndClosesRoom(t *testing.T) {
 		t.Fatal(err)
 	}
 	cancelledAt := now.Add(2 * time.Second)
-	cancelled, err := owner.Cancel(owner.Snapshot().OwnershipEpoch, cancelledAt)
+	cancelled, err := owner.Cancel(owner.Snapshot().OwnershipEpoch, cancelledAt, gameruntime.CancelReasonPlatformCancelled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -908,7 +913,8 @@ func TestRoomGameSessionRepositoryAtomicallyCancelsAndClosesRoom(t *testing.T) {
 		roomSnapshot.ParticipantAdmission != roomDomain.AdmissionClosed || roomSnapshot.SpectatorAdmission != roomDomain.AdmissionClosed ||
 		roomSnapshot.LastFinishedSessionID != uuid.Nil || roomSnapshot.LastFinishedGameID != "" ||
 		sessionSnapshot.Status != gameruntime.StatusCancelled || len(sessionSnapshot.Timers) != 0 ||
-		!sessionSnapshot.NextDeadlineAt.IsZero() || !sessionSnapshot.EndedAt.Equal(cancelledAt) {
+		!sessionSnapshot.NextDeadlineAt.IsZero() || !sessionSnapshot.EndedAt.Equal(cancelledAt) ||
+		sessionSnapshot.CancelReason != gameruntime.CancelReasonPlatformCancelled {
 		t.Fatalf("room=%+v session=%+v", roomSnapshot, sessionSnapshot)
 	}
 	due, err := repository.ListDueTimers(ctx, cancelledAt.Add(time.Hour), 10)
@@ -1326,6 +1332,13 @@ func openGameSessionFixtureWithVisibility(
 		t.Fatal(err)
 	}
 	request := gameSessionCreateRequest(sessionID, room.Snapshot().ID, hostID, playerID, start.StartedAt)
+	request.Start = gameruntime.FrozenStartConfig{
+		Config:             request.Input.Clone(),
+		ConfigRevision:     7,
+		RoomVersion:        room.Version().Room,
+		MembershipVersion:  room.Version().Membership,
+		RoomOwnershipEpoch: room.Snapshot().OwnershipEpoch,
+	}
 	session, batch, err := gameruntime.NewSession(request)
 	if err != nil {
 		t.Fatal(err)

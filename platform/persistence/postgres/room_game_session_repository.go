@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"time"
 
 	"github.com/google/uuid"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
@@ -79,12 +80,16 @@ func (repository *RoomGameSessionRepository) Start(
 	if err := validateRoomGameSessionStart(before, after, commit); err != nil {
 		return roomDomain.Room{}, gameruntime.Session{}, false, err
 	}
+	if err := validatePendingStartProof(before.Snapshot(), commit); err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, false, err
+	}
 	receiptSnapshot := receipt.Snapshot()
 	beforeSnapshot := before.Snapshot()
+	sessionSnapshot := commit.Session.Snapshot()
 	if !receiptSnapshot.Valid() || receiptSnapshot.Key.RoomID != beforeSnapshot.ID ||
 		receiptSnapshot.Key.ActorUserID != beforeSnapshot.HostUserID ||
-		receiptSnapshot.SessionID != commit.Session.Snapshot().ID ||
-		!receiptSnapshot.CommittedAt.Equal(commit.Session.Snapshot().StartedAt) {
+		receiptSnapshot.SessionID != sessionSnapshot.ID ||
+		!receiptSnapshot.CommittedAt.Equal(sessionSnapshot.StartedAt) {
 		return roomDomain.Room{}, gameruntime.Session{}, false, gameruntime.ErrInvalidSessionInput
 	}
 
@@ -130,6 +135,11 @@ func (repository *RoomGameSessionRepository) Start(
 		if !sameRoomSnapshot(lockedSnapshot, beforeSnapshot) {
 			return roomDomain.ErrRoomVersionConflict
 		}
+		if commit.PendingStartProof != nil {
+			if _, err := queries.ConsumeRoomPendingStart(ctx, consumePendingStartParams(beforeSnapshot.ID, sessionSnapshot, *commit.PendingStartProof, receiptSnapshot.CommittedAt)); err != nil {
+				return mapNoRows(err, roomDomain.ErrPendingStartInvalid)
+			}
+		}
 
 		storedRoom, err = updateRoomAggregateCAS(ctx, queries, beforeSnapshot, after.Snapshot())
 		if err != nil {
@@ -161,6 +171,24 @@ func (repository *RoomGameSessionRepository) Start(
 	return storedRoom, storedSession, replayed, nil
 }
 
+func validatePendingStartProof(before roomDomain.RoomSnapshot, commit gameruntime.CreationCommit) error {
+	if commit.PendingStartProof == nil {
+		return nil
+	}
+	if !commit.PendingStartProof.Valid() {
+		return gameruntime.ErrInvalidSessionInput
+	}
+	start := commit.Session.Snapshot().Start
+	if start.ConfigRevision == 0 || start.RoomVersion == 0 || start.MembershipVersion == 0 || start.RoomOwnershipEpoch == 0 {
+		return gameruntime.ErrInvalidSessionInput
+	}
+	if start.RoomVersion != before.RoomVersion || start.MembershipVersion != before.MembershipVersion ||
+		start.RoomOwnershipEpoch != before.OwnershipEpoch {
+		return gameruntime.ErrInvalidSessionInput
+	}
+	return nil
+}
+
 func startReceiptKeyParams(key gameruntime.StartKey) sqlcgen.GetGameSessionStartReceiptParams {
 	return sqlcgen.GetGameSessionStartReceiptParams{
 		ActorUserID: uuidToPG(key.ActorUserID), RoomID: uuidToPG(key.RoomID), OperationID: key.OperationID.Value(),
@@ -178,6 +206,25 @@ func startReceiptCreateParams(snapshot gameruntime.StartReceiptSnapshot) sqlcgen
 		ActorUserID: uuidToPG(snapshot.Key.ActorUserID), RoomID: uuidToPG(snapshot.Key.RoomID),
 		OperationID: snapshot.Key.OperationID.Value(), RequestDigest: snapshot.RequestDigest.Bytes(),
 		SessionID: uuidToPG(snapshot.SessionID), CommittedAt: timeToPG(snapshot.CommittedAt),
+	}
+}
+
+func consumePendingStartParams(
+	roomID uuid.UUID,
+	session gameruntime.SessionSnapshot,
+	proof gameruntime.PendingStartProof,
+	committedAt time.Time,
+) sqlcgen.ConsumeRoomPendingStartParams {
+	return sqlcgen.ConsumeRoomPendingStartParams{
+		ConsumedAt:                timeToPG(committedAt),
+		RoomID:                    uuidToPG(roomID),
+		PendingStartID:            uuidToPG(proof.PendingStartID),
+		CancelToken:               proof.CancelToken,
+		GameID:                    pgtype.Text{String: string(session.VersionKey.GameID), Valid: true},
+		ConfigRevision:            pgtype.Int8{Int64: int64(session.Start.ConfigRevision), Valid: true},
+		ExpectedRoomVersion:       pgtype.Int8{Int64: int64(session.Start.RoomVersion), Valid: true},
+		ExpectedMembershipVersion: pgtype.Int8{Int64: int64(session.Start.MembershipVersion), Valid: true},
+		OwnershipEpoch:            pgtype.Int8{Int64: int64(session.Start.RoomOwnershipEpoch), Valid: true},
 	}
 }
 
@@ -533,7 +580,7 @@ func replayFinishedSystemAfterRoomChange(
 func samePersistedTerminalSession(current, proposed gameruntime.SessionSnapshot, status gameruntime.Status) bool {
 	return current.ID == proposed.ID && current.RoomID == proposed.RoomID && current.VersionKey == proposed.VersionKey &&
 		current.OwnershipEpoch == proposed.OwnershipEpoch && current.State.StateVersion == proposed.State.StateVersion &&
-		current.Status == status && current.EndedAt.Equal(current.UpdatedAt)
+		current.Status == status && current.EndedAt.Equal(current.UpdatedAt) && current.CancelReason == proposed.CancelReason
 }
 
 func finishPartyRoomAggregateCAS(
@@ -627,6 +674,9 @@ func validateRoomGameSessionTermination(
 	if wantStatus == gameruntime.StatusCancelled && !reflect.DeepEqual(sessionBefore.State, sessionAfter.State) {
 		return gameruntime.ErrInvalidLifecycleCommit
 	}
+	if wantStatus != gameruntime.StatusCancelled && sessionAfter.CancelReason != "" {
+		return gameruntime.ErrInvalidLifecycleCommit
+	}
 	return nil
 }
 
@@ -680,6 +730,7 @@ func sameRoomSnapshot(left, right roomDomain.RoomSnapshot) bool {
 		left.HostUserID == right.HostUserID && left.ParticipantCapacity == right.ParticipantCapacity &&
 		left.ParticipantAdmission == right.ParticipantAdmission && left.SpectatorAdmission == right.SpectatorAdmission &&
 		left.ActiveSessionID == right.ActiveSessionID && left.ActiveGameID == right.ActiveGameID &&
+		left.SelectedGameID == right.SelectedGameID && left.OwnershipEpoch == right.OwnershipEpoch &&
 		left.RoomVersion == right.RoomVersion && left.MembershipVersion == right.MembershipVersion &&
 		left.CreatedAt.Equal(right.CreatedAt) && left.UpdatedAt.Equal(right.UpdatedAt) && sameRoomMembers(left.Members, right.Members)
 }
@@ -717,6 +768,7 @@ func mapRoomGameSessionStartError(ctx context.Context, err error) error {
 	for _, domainErr := range []error{
 		roomDomain.ErrInvalidRoomInput,
 		roomDomain.ErrHostRequired,
+		roomDomain.ErrPendingStartInvalid,
 		roomDomain.ErrRoomVersionConflict,
 		roomDomain.ErrRoomNotFound,
 		roomDomain.ErrRoomIntegrity,

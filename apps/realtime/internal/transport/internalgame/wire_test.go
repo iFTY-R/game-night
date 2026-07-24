@@ -31,6 +31,13 @@ func TestWireRoundTripsDomainValues(t *testing.T) {
 
 	sessionSnapshot := fixture.session.Snapshot()
 	dueAt := now.Add(time.Minute)
+	sessionSnapshot.Start = gameruntime.FrozenStartConfig{
+		Config:             internalMessage("session.config", []byte("rules")),
+		ConfigRevision:     7,
+		RoomVersion:        11,
+		MembershipVersion:  5,
+		RoomOwnershipEpoch: 3,
+	}
 	sessionSnapshot.Timers = []gameruntime.TimerSnapshot{{
 		TimerID: "turn.timeout", ExpectedStateVersion: sessionSnapshot.State.StateVersion,
 		DueAt: dueAt, Message: internalMessage("turn.timeout", []byte("timer")),
@@ -60,6 +67,36 @@ func TestWireRoundTripsDomainValues(t *testing.T) {
 	restoredProjection, err := projectionFromWire(projectionToWire(session, viewer, projection))
 	if err != nil || !reflect.DeepEqual(restoredProjection, projection) {
 		t.Fatalf("projection=%+v error=%v", restoredProjection, err)
+	}
+}
+
+func TestWireRestoresLegacySessionWithoutFrozenStartConfig(t *testing.T) {
+	fixture := newInternalGameFixture(t)
+	value := sessionToWire(fixture.session)
+	value.Start = nil
+	restoredSession, err := sessionFromWire(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(restoredSession.Snapshot().Start, gameruntime.FrozenStartConfig{}) {
+		t.Fatalf("legacy start should stay zero: %+v", restoredSession.Snapshot().Start)
+	}
+}
+
+func TestWireRoundTripsCancelledSessionReason(t *testing.T) {
+	fixture := newInternalGameFixture(t)
+	snapshot := fixture.session.Snapshot()
+	snapshot.Status = gameruntime.StatusCancelled
+	snapshot.UpdatedAt = snapshot.UpdatedAt.Add(time.Microsecond)
+	snapshot.EndedAt = snapshot.UpdatedAt
+	snapshot.CancelReason = gameruntime.CancelReasonLegacyCancelled
+	cancelled, err := gameruntime.RestoreSession(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := sessionFromWire(sessionToWire(cancelled))
+	if err != nil || restored.Snapshot().CancelReason != gameruntime.CancelReasonLegacyCancelled {
+		t.Fatalf("restored=%+v error=%v", restored.Snapshot(), err)
 	}
 }
 

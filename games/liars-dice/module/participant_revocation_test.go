@@ -35,7 +35,7 @@ func TestEncodeParticipantRevokedFeedsLiarsSystemHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := systemRequest(created.Snapshot.StateVersion, string(first.MessageType), first.Payload, executionAt(time.Unix(101, 0).UTC(), 2))
+	request := systemRequest(created.Snapshot.StateVersion, string(first.MessageType), first.Payload, executionAt(time.Unix(101, 0).UTC(), 2), "")
 	request.System = first
 	revoked, err := module.HandleSystem(created.Snapshot, request)
 	if err != nil {

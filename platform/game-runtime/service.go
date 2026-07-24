@@ -108,8 +108,12 @@ type StartCommand struct {
 	RoomID      uuid.UUID
 	GameID      game.GameID
 	Expected    roomDomain.Version
-	Config      game.Message
-	OperationID idempotency.OperationID
+	// ConfigRevision is optional until the transport layer can forward the room-rule revision into runtime starts.
+	ConfigRevision uint64
+	Config         game.Message
+	// PendingStartProof is an optional opaque countdown proof that must be atomically consumed with the start commit.
+	PendingStartProof *PendingStartProof
+	OperationID       idempotency.OperationID
 	// RequestDigest is an optional client echo of the server canonical start binding.
 	RequestDigest *idempotency.Digest
 }
@@ -118,6 +122,9 @@ type StartCommand struct {
 func (service *Service) Start(ctx context.Context, command StartCommand) (roomDomain.Room, Session, error) {
 	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil ||
 		!command.Config.Valid() || !command.OperationID.Valid() || command.Expected.Room == 0 || command.Expected.Membership == 0 {
+		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	if command.PendingStartProof != nil && !command.PendingStartProof.Valid() {
 		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
 	}
 	if _, err := game.ParseGameID(string(command.GameID)); err != nil {
@@ -183,6 +190,14 @@ func (service *Service) Start(ctx context.Context, command StartCommand) (roomDo
 	}
 	session, batch, err := NewSession(CreateRequest{
 		SessionID: sessionID, RoomID: command.RoomID, VersionKey: manifest.Key(), Participants: runtimeParticipants,
+		Start: FrozenStartConfig{
+			Config:             command.Config.Clone(),
+			ConfigDigest:       startConfigDigest(manifest.Key(), command.Config),
+			ConfigRevision:     command.ConfigRevision,
+			RoomVersion:        command.Expected.Room,
+			MembershipVersion:  command.Expected.Membership,
+			RoomOwnershipEpoch: room.Snapshot().OwnershipEpoch,
+		},
 		BatchID: batchID, Execution: execution, Input: command.Config.Clone(), Transition: transition,
 	})
 	if err != nil {
@@ -199,7 +214,7 @@ func (service *Service) Start(ctx context.Context, command StartCommand) (roomDo
 		return roomDomain.Room{}, Session{}, err
 	}
 	storedRoom, storedSession, replayed, err := service.roomSessions.Start(ctx, room, nextRoom, CreationCommit{
-		Session: session, Batch: batch, OutboxEvents: []outbox.Event{event},
+		Session: session, Batch: batch, OutboxEvents: []outbox.Event{event}, PendingStartProof: command.PendingStartProof,
 	}, receipt)
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
@@ -536,6 +551,7 @@ func (service *Service) HandleSystem(ctx context.Context, command SystemCommand)
 		transition, err := systemModule.HandleSystem(before.Snapshot().State, game.SystemRequest{
 			Context: execution, SystemOperationID: operationID,
 			SourceEventID:        game.Identifier(command.Source.EventID.String()),
+			RequestedByUserID:    game.Identifier(optionalUserIDString(command.Source.RequestedByUserID)),
 			ExpectedStateVersion: before.Snapshot().State.StateVersion, System: command.Message.Clone(),
 		})
 		if err != nil {
@@ -619,6 +635,8 @@ type CancelCommand struct {
 	SessionID      uuid.UUID
 	ExpectedRoom   roomDomain.Version
 	OwnershipEpoch uint64
+	// Reason is normalized into the durable cancelled session and replay terminal metadata.
+	Reason game.Identifier
 	// CloseRoom distinguishes permanent host dissolution from an operational cancellation that returns to the lobby.
 	CloseRoom bool
 }
@@ -690,7 +708,7 @@ func (service *Service) Cancel(ctx context.Context, command CancelCommand) (room
 		return roomDomain.Room{}, Session{}, err
 	}
 	at := service.clock.Now().Round(0).UTC()
-	after, err := before.Cancel(command.OwnershipEpoch, at)
+	after, err := before.Cancel(command.OwnershipEpoch, at, command.Reason)
 	if err != nil {
 		return roomDomain.Room{}, Session{}, err
 	}
@@ -873,8 +891,7 @@ func (service *Service) ProjectReplayCurrent(
 		return Session{}, game.Projection{}, err
 	}
 	snapshot := session.Snapshot()
-	// Cancellation is a governance terminal state, not a completed game result.
-	if snapshot.Status != StatusFinished {
+	if !snapshot.Status.Terminal() {
 		return Session{}, game.Projection{}, ErrReplayUnavailable
 	}
 	module, err := service.registry.Resolve(snapshot.VersionKey)
@@ -918,14 +935,35 @@ func (service *Service) ProjectReplayCurrent(
 	if previousVersion != snapshot.State.StateVersion {
 		return Session{}, game.Projection{}, ErrReplayUnavailable
 	}
-	projection, err := module.ProjectReplay(events, viewer, policy)
-	if err != nil {
-		return Session{}, game.Projection{}, err
+	var projection game.Projection
+	if snapshot.Status == StatusFinished {
+		projection, err = module.ProjectReplay(events, viewer, policy)
+		if err != nil {
+			return Session{}, game.Projection{}, err
+		}
+	} else {
+		projector, ok := module.(game.ReplayProjectingV2GameModule)
+		if !ok {
+			return Session{}, game.Projection{}, ErrReplayUnavailable
+		}
+		projection, err = projector.ProjectReplayV2(game.ReplayRequest{
+			Events: events, Viewer: viewer, Policy: policy, TerminalMeta: replayTerminalMeta(snapshot),
+		})
+		if err != nil {
+			return Session{}, game.Projection{}, err
+		}
 	}
 	if !projection.Valid() {
 		return Session{}, game.Projection{}, ErrProjectionUnsafe
 	}
 	return session, projection, nil
+}
+
+func replayTerminalMeta(snapshot SessionSnapshot) game.ReplayTerminalMeta {
+	return game.ReplayTerminalMeta{
+		Finished: snapshot.Status == StatusFinished, Cancelled: snapshot.Status == StatusCancelled,
+		EndedAt: snapshot.EndedAt, CancelReason: snapshot.CancelReason,
+	}
 }
 
 func (service *Service) readReplayBatches(ctx context.Context, sessionID uuid.UUID) ([]EventBatch, error) {
@@ -1050,6 +1088,13 @@ func trustedStartingSeat(hostUserID uuid.UUID, participants []roomDomain.FrozenP
 	return minimum, found
 }
 
+func optionalUserIDString(userID uuid.UUID) string {
+	if userID == uuid.Nil {
+		return ""
+	}
+	return userID.String()
+}
+
 func projectPlayer(module game.ServerGameModule, session Session, userID uuid.UUID) (game.Projection, error) {
 	for _, participant := range session.Snapshot().Participants {
 		if participant.UserID == userID {
@@ -1087,6 +1132,7 @@ func startDigest(command StartCommand) idempotency.Digest {
 	writeDigestField(hasher, []byte(command.GameID))
 	writeDigestUint64(hasher, command.Expected.Room)
 	writeDigestUint64(hasher, command.Expected.Membership)
+	writeDigestUint64(hasher, command.ConfigRevision)
 	writeMessage(hasher, command.Config)
 	return digestFromHash(hasher)
 }

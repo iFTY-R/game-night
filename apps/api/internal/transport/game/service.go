@@ -272,7 +272,7 @@ func (service *Service) GetReplayProjection(ctx context.Context, request *connec
 	}
 	return connect.NewResponse(&gamev1.GetReplayProjectionResponse{
 		Projection: projectionWire(projectedSession, authorized.viewer.Kind, projection, false),
-		Session:    sessionWire(projectedSession), Complete: true,
+		Session:    sessionWire(projectedSession), Complete: true, TerminalMeta: replayTerminalMetaWire(projectedSession),
 	}), nil
 }
 
@@ -485,7 +485,7 @@ func (service *Service) authorizeReplay(
 	if err != nil {
 		return authorizedViewer{}, "", err
 	}
-	if session.Snapshot().Status != gameruntime.StatusFinished {
+	if !session.Snapshot().Status.Terminal() {
 		return authorizedViewer{}, "", gameruntime.ErrReplayUnavailable
 	}
 	policy, err := service.replays.Authorize(ctx, actor, roomID, sessionID)

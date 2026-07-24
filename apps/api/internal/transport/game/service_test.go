@@ -189,8 +189,26 @@ func TestGameServiceReplayRequiresTerminalSessionAndFrozenParticipation(t *testi
 	})
 	authorizeGameRead(request, "player-device")
 	response, err := client.GetReplayProjection(t.Context(), request)
-	if err != nil || !response.Msg.GetComplete() || fixture.runtime.lastReplayPolicy != gameSDK.ReplayAccessParticipant {
+	if err != nil || !response.Msg.GetComplete() || fixture.runtime.lastReplayPolicy != gameSDK.ReplayAccessParticipant ||
+		!response.Msg.GetTerminalMeta().GetFinished() || response.Msg.GetTerminalMeta().GetCancelled() ||
+		response.Msg.GetTerminalMeta().GetCancelReason() != "" {
 		t.Fatalf("replay response=%+v policy=%s err=%v", response, fixture.runtime.lastReplayPolicy, err)
+	}
+}
+
+func TestGameServiceReplayAllowsCancelledSessionAndReturnsTerminalMeta(t *testing.T) {
+	fixture := newCancelledGameTransportFixture(t)
+	client := fixture.client(t)
+	request := connect.NewRequest(&gamev1.GetReplayProjectionRequest{
+		RoomId: fixture.roomID.String(), SessionId: fixture.sessionID.String(),
+		ViewerKind: gamev1.ViewerKind_VIEWER_KIND_REPLAY,
+	})
+	authorizeGameRead(request, "player-device")
+	response, err := client.GetReplayProjection(t.Context(), request)
+	if err != nil || !response.Msg.GetComplete() || !response.Msg.GetTerminalMeta().GetCancelled() ||
+		response.Msg.GetTerminalMeta().GetFinished() ||
+		response.Msg.GetTerminalMeta().GetCancelReason() != string(gameruntime.CancelReasonLegacyCancelled) {
+		t.Fatalf("cancelled replay response=%+v err=%v", response, err)
 	}
 }
 
@@ -377,6 +395,22 @@ func newGameTransportFixture(t testing.TB, terminal bool) *gameTransportFixture 
 		}},
 		clock: clock.NewFake(now.Add(2 * time.Second)), replays: replays,
 	}
+}
+
+func newCancelledGameTransportFixture(t testing.TB) *gameTransportFixture {
+	t.Helper()
+	fixture := newGameTransportFixture(t, true)
+	cancelledSnapshot := fixture.session.Snapshot()
+	cancelledSnapshot.Status = gameruntime.StatusCancelled
+	cancelledSnapshot.CancelReason = gameruntime.CancelReasonLegacyCancelled
+	cancelled, err := gameruntime.RestoreSession(cancelledSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.session = cancelled
+	fixture.runtime.session = cancelled
+	fixture.replays.access.MemberSnapshotCompletedAt = cancelled.Snapshot().EndedAt
+	return fixture
 }
 
 func (fixture *gameTransportFixture) client(t testing.TB) gamev1connect.GameServiceClient {

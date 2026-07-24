@@ -335,6 +335,9 @@ type LifecycleCommit struct {
 
 // Valid reports whether the initial session, batch, and outbox notification describe one atomic creation.
 func (commit CreationCommit) Valid() bool {
+	if commit.PendingStartProof != nil && !commit.PendingStartProof.Valid() {
+		return false
+	}
 	session := commit.Session.Snapshot()
 	batch := commit.Batch.Snapshot()
 	if session.ID == uuid.Nil || session.State.StateVersion != 1 || session.OwnershipEpoch != 0 ||
@@ -523,13 +526,15 @@ func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (Lif
 	if beforeSnapshot.Status == StatusSuspended && afterSnapshot.Status == StatusActive {
 		expectedEventType = GameSessionResumedEventType
 		validStatus = reflect.DeepEqual(beforeSnapshot.Timers, afterSnapshot.Timers) &&
-			beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero()
+			beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero() &&
+			afterSnapshot.CancelReason == ""
 	}
 	if afterSnapshot.Status == StatusCancelled {
 		expectedEventType = GameSessionCancelledEventType
 		validStatus = (beforeSnapshot.Status == StatusActive || beforeSnapshot.Status == StatusSuspended) &&
 			len(afterSnapshot.Timers) == 0 && afterSnapshot.NextDeadlineAt.IsZero() &&
-			!afterSnapshot.EndedAt.IsZero() && afterSnapshot.EndedAt.Equal(afterSnapshot.UpdatedAt)
+			!afterSnapshot.EndedAt.IsZero() && afterSnapshot.EndedAt.Equal(afterSnapshot.UpdatedAt) &&
+			afterSnapshot.CancelReason != ""
 	}
 	if !validStatus || !sameSessionIdentity(beforeSnapshot, afterSnapshot) ||
 		beforeSnapshot.OwnershipEpoch == 0 || beforeSnapshot.OwnershipEpoch != afterSnapshot.OwnershipEpoch ||
@@ -607,7 +612,8 @@ func sameSnapshotState(left, right game.Snapshot) bool {
 
 func sameSessionIdentity(left, right SessionSnapshot) bool {
 	if left.ID != right.ID || left.RoomID != right.RoomID || left.VersionKey != right.VersionKey ||
-		!left.StartedAt.Equal(right.StartedAt) || len(left.Participants) != len(right.Participants) {
+		!left.StartedAt.Equal(right.StartedAt) || !sameFrozenStartConfig(left.Start, right.Start) ||
+		len(left.Participants) != len(right.Participants) {
 		return false
 	}
 	for index := range left.Participants {

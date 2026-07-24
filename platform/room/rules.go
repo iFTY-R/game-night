@@ -433,7 +433,7 @@ func (repository *MemoryRuleRepository) GetPendingStart(ctx context.Context, roo
 	return start, nil
 }
 
-// CancelPendingStart invalidates a countdown only when its token and fencing values match.
+// CancelPendingStart invalidates an unconsumed countdown when its token and fencing values match.
 func (repository *MemoryRuleRepository) CancelPendingStart(ctx context.Context, roomID, pendingID uuid.UUID, cancelToken string, ownershipEpoch uint64, _ [32]byte, at time.Time) error {
 	if err := validateRuleContext(ctx, roomID); err != nil {
 		return err
@@ -441,7 +441,7 @@ func (repository *MemoryRuleRepository) CancelPendingStart(ctx context.Context, 
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
 	start, ok := repository.startByRoom[roomID]
-	if !ok || start.ID != pendingID || start.CancelToken != cancelToken || start.OwnershipEpoch != ownershipEpoch || start.Consumed || start.Deadline.Before(at) {
+	if !ok || start.ID != pendingID || start.CancelToken != cancelToken || start.OwnershipEpoch != ownershipEpoch || start.Consumed {
 		return ErrPendingStartInvalid
 	}
 	start.Cancelled = true
@@ -450,14 +450,17 @@ func (repository *MemoryRuleRepository) CancelPendingStart(ctx context.Context, 
 }
 
 // ConsumePendingStart atomically marks a valid countdown as consumed exactly once.
+// Runtime start receipts own idempotent session creation, so consume matches only the durable countdown identity and state.
 func (repository *MemoryRuleRepository) ConsumePendingStart(ctx context.Context, roomID, pendingID uuid.UUID, cancelToken, operationID string, digest [32]byte, at time.Time) (PendingStart, error) {
 	if err := validateRuleContext(ctx, roomID); err != nil {
 		return PendingStart{}, err
 	}
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
+	_ = operationID
+	_ = digest
 	start, ok := repository.startByRoom[roomID]
-	if !ok || start.ID != pendingID || start.CancelToken != cancelToken || start.OperationID != operationID || start.RequestDigest != digest || start.Cancelled || start.Deadline.After(at) {
+	if !ok || start.ID != pendingID || start.CancelToken != cancelToken || start.Cancelled || start.Deadline.After(at) {
 		return PendingStart{}, ErrPendingStartInvalid
 	}
 	if start.Consumed {

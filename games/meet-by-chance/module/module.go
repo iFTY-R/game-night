@@ -54,6 +54,7 @@ func NewModule() *Module { return New() }
 var (
 	_ game.RuntimeServerGameModule         = (*Module)(nil)
 	_ game.ParticipantRevocationGameModule = (*Module)(nil)
+	_ game.ReplayProjectingV2GameModule    = (*Module)(nil)
 )
 
 // Manifest declares the exact release and responsive public presentation contract.
@@ -199,10 +200,14 @@ func (m *Module) HandleSystem(snapshot game.Snapshot, request game.SystemRequest
 		next, facts, err = engine.RevokeParticipant(state, value.GetUserId(), request.Context.Now.UnixMilli(), request.Context.RandomSeed)
 	case SystemFinishMessage:
 		var value meetv1.Command
-		if err := unmarshalStrict(request.System.Payload, &value); err != nil || value.GetFinish() == nil || !finishCommandValid(value.GetFinish()) {
+		if err := unmarshalStrict(request.System.Payload, &value); err != nil {
 			return game.Transition{}, malformed("session.finish payload is invalid")
 		}
-		next, facts, err = engine.Finish(state, value.GetFinish().GetReason(), value.GetFinish().GetOperatorUserId())
+		reason, operatorUserID, ok := finishCommandParameters(&value, request.RequestedByUserID)
+		if !ok {
+			return game.Transition{}, malformed("session.finish payload is invalid")
+		}
+		next, facts, err = engine.Finish(state, reason, operatorUserID)
 	default:
 		return game.Transition{}, malformed("unknown system message type")
 	}
@@ -212,15 +217,19 @@ func (m *Module) HandleSystem(snapshot game.Snapshot, request game.SystemRequest
 	return m.transition(snapshot.StateVersion+1, next, facts, request.Context.Now)
 }
 
-func finishCommandValid(value *meetv1.Finish) bool {
-	if value == nil {
-		return false
+// finishCommandParameters collapses runtime-authorized host finishes onto the trusted requester identity.
+func finishCommandParameters(command *meetv1.Command, requester game.Identifier) (reason, operatorUserID string, ok bool) {
+	finish := command.GetFinish()
+	if finish == nil {
+		return "", "", false
 	}
-	if value.GetReason() == "" || value.GetReason() == engine.FinishHostRequested {
-		_, err := game.ParseIdentifier(value.GetOperatorUserId())
-		return err == nil
+	if requester != "" {
+		return engine.FinishHostRequested, string(requester), true
 	}
-	return value.GetReason() == engine.FinishPlatformCancelled && value.GetOperatorUserId() == ""
+	if finish.GetReason() != engine.FinishPlatformCancelled || finish.GetOperatorUserId() != "" {
+		return "", "", false
+	}
+	return engine.FinishPlatformCancelled, "", true
 }
 
 func revocationCommandValid(value *meetv1.ParticipantRevoked) bool {
@@ -279,6 +288,19 @@ func (m *Module) ProjectEvents(snapshot game.Snapshot, events []game.VersionedEv
 // ProjectReplay reduces ordered public events to settled rounds only.
 func (m *Module) ProjectReplay(events []game.Event, viewer game.Viewer, policy game.ReplayAccessPolicy) (game.Projection, error) {
 	replay, err := projection.BuildReplay(events, viewer, policy)
+	if err != nil {
+		return game.Projection{}, err
+	}
+	payload, err := marshalDeterministic(replay)
+	if err != nil {
+		return game.Projection{}, malformed("replay encoding failed")
+	}
+	return game.Projection{View: game.Message{MessageType: ReplayMessageType, SchemaVersion: ProtocolSchemaVersion, Payload: payload}}, nil
+}
+
+// ProjectReplayV2 supports runtime-owned cancelled replay metadata while staying event-only.
+func (m *Module) ProjectReplayV2(request game.ReplayRequest) (game.Projection, error) {
+	replay, err := projection.BuildReplayV2(request)
 	if err != nil {
 		return game.Projection{}, err
 	}

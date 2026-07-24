@@ -400,7 +400,7 @@ func (repository *RuleRepository) GetPendingStart(ctx context.Context, roomID uu
 	return pendingStartFromRow(row)
 }
 
-// CancelPendingStart marks a countdown cancelled when token, epoch, and deadline still match.
+// CancelPendingStart marks an unconsumed countdown cancelled when its token and epoch still match.
 func (repository *RuleRepository) CancelPendingStart(ctx context.Context, roomID, pendingID uuid.UUID, cancelToken string, ownershipEpoch uint64, _ [32]byte, at time.Time) error {
 	if err := validateRuleRepositoryContext(ctx, roomID); err != nil {
 		return err
@@ -423,18 +423,20 @@ func (repository *RuleRepository) CancelPendingStart(ctx context.Context, roomID
 }
 
 // ConsumePendingStart marks a matured countdown consumed and returns the stored start snapshot.
+// Runtime start receipts own idempotent session creation, so consume matches only the durable countdown identity and state.
 func (repository *RuleRepository) ConsumePendingStart(ctx context.Context, roomID, pendingID uuid.UUID, cancelToken, operationID string, digest [32]byte, at time.Time) (roomDomain.PendingStart, error) {
 	if err := validateRuleRepositoryContext(ctx, roomID); err != nil {
 		return roomDomain.PendingStart{}, err
 	}
-	if pendingID == uuid.Nil || cancelToken == "" || operationID == "" || at.IsZero() {
+	if pendingID == uuid.Nil || cancelToken == "" || at.IsZero() {
 		return roomDomain.PendingStart{}, roomDomain.ErrInvalidRoomInput
 	}
+	_ = operationID
+	_ = digest
 	var stored roomDomain.PendingStart
 	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
 		row, err := queries.ConsumeRoomPendingStart(ctx, sqlcgen.ConsumeRoomPendingStartParams{
-			RoomID: uuidToPG(roomID), PendingStartID: uuidToPG(pendingID), CancelToken: cancelToken,
-			OperationID: operationID, RequestDigest: digestToBytes(digest), ConsumedAt: timeToPG(at),
+			RoomID: uuidToPG(roomID), PendingStartID: uuidToPG(pendingID), CancelToken: cancelToken, ConsumedAt: timeToPG(at),
 		})
 		if err != nil {
 			return mapNoRows(err, roomDomain.ErrPendingStartInvalid)

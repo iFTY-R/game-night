@@ -298,6 +298,28 @@ func TestPlatformCancellationAndAppliedEffectFinish(t *testing.T) {
 	}
 }
 
+func TestTrustedHostFinishOverridesPayloadAudit(t *testing.T) {
+	m := New()
+	created, err := m.Create(testCreateRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished, err := m.HandleSystem(created.Snapshot, trustedSystemRequest(t, 1, SystemFinishMessage, "user-1", &dice789v1.Command{
+		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{Reason: engine.FinishPlatformCancelled, OperatorUserId: "user-2"}},
+	}))
+	if err != nil || !finished.Finished {
+		t.Fatalf("trusted finish transition=%+v error=%v", finished, err)
+	}
+	finishEvent, err := decodeEvent(finished.Events[0].Message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish := finishEvent.ProtocolEvent.GetSessionFinished()
+	if finish.GetReason() != engine.FinishHostRequested || finish.GetOperatorUserId() != "user-1" {
+		t.Fatalf("trusted finish audit=%+v", finish)
+	}
+}
+
 func TestFinishAfterSevenAddFormsValidReplay(t *testing.T) {
 	m := New()
 	created, err := m.Create(testCreateRequest(t))
@@ -552,6 +574,78 @@ func TestReplayKeepsPublicPendingTurn(t *testing.T) {
 	}
 }
 
+func TestProjectReplayV2CancelledKeepsPendingTurnAndTrustedReason(t *testing.T) {
+	m := New()
+	created, err := m.Create(testCreateRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rolled, err := m.HandleCommand(created.Snapshot, commandRequest(t, created.Snapshot.StateVersion, "user-1", "AAAAAAAAAAAAAAAAAAAAAA", projection.ActionRoll, &dice789v1.Command{
+		Command: &dice789v1.Command_Roll{Roll: &dice789v1.Roll{}},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: append(append([]game.Event(nil), created.Events...), rolled.Events...),
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Cancelled:    true,
+			EndedAt:      testContext(2 * time.Second).Now,
+			CancelReason: "runtime_cancelled",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var replay dice789v1.Replay
+	if err := unmarshalStrict(projected.View.Payload, &replay); err != nil {
+		t.Fatal(err)
+	}
+	if replay.GetFinishReason() != "runtime_cancelled" || len(replay.GetTurns()) != 1 || replay.GetTurns()[0].GetSettled() {
+		t.Fatalf("cancelled replay=%+v", &replay)
+	}
+	if replay.GetTurns()[0].GetSummary().GetDieOne() == 0 || len(replay.GetEntries()) < 2 {
+		t.Fatalf("cancelled replay lost public progress=%+v", replay.GetTurns()[0])
+	}
+}
+
+func TestProjectReplayV2FinishedMatchesLegacy(t *testing.T) {
+	m := New()
+	created, err := m.Create(testCreateRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rolled := rollTransitionForResult(t, m, created.Snapshot, engine.ResultEight)
+	cancelled, err := m.HandleSystem(rolled.Snapshot, systemRequest(t, rolled.Snapshot.StateVersion, SystemFinishMessage, &dice789v1.Command{
+		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{Reason: engine.FinishPlatformCancelled}},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	history := append(append(append([]game.Event(nil), created.Events...), rolled.Events...), cancelled.Events...)
+	legacy, err := m.ProjectReplay(history, game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"}, game.ReplayAccessParticipant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := m.ProjectReplayV2(game.ReplayRequest{
+		Events: history,
+		Viewer: game.Viewer{Kind: game.ViewerReplay, UserID: "user-1"},
+		Policy: game.ReplayAccessParticipant,
+		TerminalMeta: game.ReplayTerminalMeta{
+			Finished: true,
+			EndedAt:  testContext(3 * time.Second).Now,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(legacy.View.Payload, v2.View.Payload) {
+		t.Fatal("finished replay v2 diverged from legacy projection")
+	}
+}
+
 func TestDroppedReplayKeepsHostAuditAndOverridesRollEffect(t *testing.T) {
 	m := New()
 	created, err := m.Create(testCreateRequest(t))
@@ -686,20 +780,26 @@ func TestSystemRevocationFinishAndMigration(t *testing.T) {
 	if err != nil || state.Players[1].Active || len(revoked.Timers) != 1 {
 		t.Fatalf("revoked state=%+v timers=%d error=%v", state, len(revoked.Timers), err)
 	}
-	finished, err := m.HandleSystem(created.Snapshot, systemRequest(t, 1, SystemFinishMessage, &dice789v1.Command{
-		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{OperatorUserId: "user-1"}},
+	finished, err := m.HandleSystem(created.Snapshot, trustedSystemRequest(t, 1, SystemFinishMessage, "user-1", &dice789v1.Command{
+		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{Reason: engine.FinishPlatformCancelled, OperatorUserId: "user-9"}},
 	}))
 	if err != nil || !finished.Finished || len(finished.Timers) != 0 {
 		t.Fatalf("finish transition=%+v error=%v", finished, err)
 	}
 	finishEvent, err := decodeEvent(finished.Events[0].Message)
-	if err != nil || finishEvent.ProtocolEvent.GetSessionFinished().GetOperatorUserId() != "user-1" {
+	if err != nil || finishEvent.ProtocolEvent.GetSessionFinished().GetOperatorUserId() != "user-1" ||
+		finishEvent.ProtocolEvent.GetSessionFinished().GetReason() != engine.FinishHostRequested {
 		t.Fatalf("host finish audit=%+v error=%v", finishEvent.ProtocolEvent, err)
 	}
-	if _, err := m.HandleSystem(created.Snapshot, systemRequest(t, 1, SystemFinishMessage, &dice789v1.Command{
-		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{}},
+	if _, err := m.HandleCommand(created.Snapshot, commandRequest(t, 1, "user-1", "AwMDAwMDAwMDAwMDAwMDAw", SystemFinishMessage, &dice789v1.Command{
+		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{Reason: engine.FinishHostRequested, OperatorUserId: "user-1"}},
 	})); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
-		t.Fatalf("operator-less host finish error=%v", err)
+		t.Fatalf("command finish error=%v", err)
+	}
+	if _, err := m.HandleSystem(created.Snapshot, systemRequest(t, 1, SystemFinishMessage, &dice789v1.Command{
+		Command: &dice789v1.Command_Finish{Finish: &dice789v1.Finish{Reason: engine.FinishHostRequested, OperatorUserId: "user-1"}},
+	})); engine.ErrorCodeOf(err) != engine.CodeMalformedPayload {
+		t.Fatalf("untrusted host finish error=%v", err)
 	}
 	migrated, err := m.Migrate(created.Snapshot, 1, 1)
 	if err != nil || !bytes.Equal(migrated.State.Payload, created.Snapshot.State.Payload) {
@@ -776,6 +876,13 @@ func systemRequest(t *testing.T, version uint64, messageType game.Identifier, me
 		SourceEventID: "source-event", ExpectedStateVersion: version,
 		System: game.Message{MessageType: messageType, SchemaVersion: ProtocolSchemaVersion, Payload: payload},
 	}
+}
+
+func trustedSystemRequest(t *testing.T, version uint64, messageType game.Identifier, requester string, message proto.Message) game.SystemRequest {
+	t.Helper()
+	request := systemRequest(t, version, messageType, message)
+	request.RequestedByUserID = game.Identifier(requester)
+	return request
 }
 
 func rollTransitionForResult(t *testing.T, module *Module, snapshot game.Snapshot, wanted engine.ResultKind) game.Transition {

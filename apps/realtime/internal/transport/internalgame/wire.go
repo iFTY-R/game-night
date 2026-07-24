@@ -113,6 +113,7 @@ func sessionToWire(session gameruntime.Session) *realtimev1.SessionSnapshot {
 		AuthoritativeState: envelopeToWire(snapshot.VersionKey, snapshot.State.State), Timers: timers,
 		NextDeadlineAt: timeToWire(snapshot.NextDeadlineAt), Status: statusToWire(snapshot.Status),
 		StartedAt: timeToWire(snapshot.StartedAt), UpdatedAt: timeToWire(snapshot.UpdatedAt), EndedAt: timeToWire(snapshot.EndedAt),
+		Start: startToWire(snapshot.VersionKey, snapshot.Start), CancelReason: string(snapshot.CancelReason),
 	}
 }
 
@@ -188,15 +189,57 @@ func sessionFromWire(value *realtimev1.SessionSnapshot) (gameruntime.Session, er
 	if err != nil {
 		return gameruntime.Session{}, err
 	}
+	// Older snapshots predate FrozenStartConfig; treat a missing message as the legacy zero value.
+	start, err := startFromWire(value.GetStart(), version)
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
 	return gameruntime.RestoreSession(gameruntime.SessionSnapshot{
 		ID: sessionID, RoomID: roomID, VersionKey: version, OwnershipEpoch: value.GetOwnershipEpoch(),
 		Participants: participants,
+		Start:        start,
 		State: game.Snapshot{
 			SnapshotVersion: value.GetSnapshotVersion(), StateVersion: value.GetStateVersion(), State: stateMessage,
 		},
 		Timers: timers, NextDeadlineAt: nextDeadlineAt, Status: status,
-		StartedAt: startedAt, UpdatedAt: updatedAt, EndedAt: endedAt,
+		StartedAt: startedAt, UpdatedAt: updatedAt, EndedAt: endedAt, CancelReason: game.Identifier(value.GetCancelReason()),
 	})
+}
+
+func startToWire(version game.VersionKey, start gameruntime.FrozenStartConfig) *realtimev1.FrozenStartConfig {
+	if frozenStartZero(start) {
+		return nil
+	}
+	return &realtimev1.FrozenStartConfig{
+		Config: envelopeToWire(version, start.Config), ConfigDigest: start.ConfigDigest.Bytes(),
+		ConfigRevision: start.ConfigRevision, RoomVersion: start.RoomVersion,
+		MembershipVersion: start.MembershipVersion, RoomOwnershipEpoch: start.RoomOwnershipEpoch,
+	}
+}
+
+func startFromWire(value *realtimev1.FrozenStartConfig, version game.VersionKey) (gameruntime.FrozenStartConfig, error) {
+	if value == nil {
+		return gameruntime.FrozenStartConfig{}, nil
+	}
+	configVersion, config, err := envelopeFromWire(value.GetConfig())
+	if err != nil || configVersion != version {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrInvalidSessionInput
+	}
+	digest, err := idempotency.NewDigest(value.GetConfigDigest())
+	if err != nil {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrInvalidSessionInput
+	}
+	return gameruntime.FrozenStartConfig{
+		Config: config, ConfigDigest: digest, ConfigRevision: value.GetConfigRevision(),
+		RoomVersion: value.GetRoomVersion(), MembershipVersion: value.GetMembershipVersion(),
+		RoomOwnershipEpoch: value.GetRoomOwnershipEpoch(),
+	}, nil
+}
+
+func frozenStartZero(start gameruntime.FrozenStartConfig) bool {
+	return !start.Config.Valid() && start.ConfigDigest == (idempotency.Digest{}) &&
+		start.ConfigRevision == 0 && start.RoomVersion == 0 &&
+		start.MembershipVersion == 0 && start.RoomOwnershipEpoch == 0
 }
 
 func actionReceiptToWire(receipt gameruntime.ActionReceipt) *realtimev1.ActionReceipt {
@@ -353,6 +396,19 @@ func projectionFromWire(value *gamev1.GameProjection) (game.Projection, error) {
 		return game.Projection{}, gameruntime.ErrProjectionUnsafe
 	}
 	return projection, nil
+}
+
+func replayTerminalMetaToWire(session gameruntime.Session) *gamev1.ReplayTerminalMeta {
+	snapshot := session.Snapshot()
+	meta := &gamev1.ReplayTerminalMeta{
+		Finished: snapshot.Status == gameruntime.StatusFinished,
+		Cancelled: snapshot.Status == gameruntime.StatusCancelled,
+		EndedAt: timeToWire(snapshot.EndedAt), CancelReason: string(snapshot.CancelReason),
+	}
+	if snapshot.Status == gameruntime.StatusFinished {
+		meta.CancelReason = ""
+	}
+	return meta
 }
 
 func envelopeToWire(version game.VersionKey, message game.Message) *gamev1.GameEnvelope {

@@ -17,9 +17,11 @@ import (
 
 func TestRuntimeServiceStartUsesTrustedRoomContextAndAcquiresOwnership(t *testing.T) {
 	fixture := newRuntimeServiceFixture(t)
+	proof := &PendingStartProof{PendingStartID: uuid.New(), CancelToken: "pending-token"}
 	storedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
 		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
-		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", []byte("client-config")),
+		Expected: fixture.room.Version(), ConfigRevision: 7, PendingStartProof: proof,
+		OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", []byte("client-config")),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -31,6 +33,15 @@ func TestRuntimeServiceStartUsesTrustedRoomContextAndAcquiresOwnership(t *testin
 	if storedRoom.Snapshot().Status != roomDomain.RoomStatusPlaying || session.Snapshot().OwnershipEpoch != 1 ||
 		session.Snapshot().VersionKey != fixture.module.manifest.Key() {
 		t.Fatalf("room=%+v session=%+v", storedRoom.Snapshot(), session.Snapshot())
+	}
+	start := session.Snapshot().Start
+	if !sameGameMessage(start.Config, fixture.module.createRequest.Config) || start.ConfigDigest != startConfigDigest(session.Snapshot().VersionKey, fixture.module.createRequest.Config) ||
+		start.ConfigRevision != 7 || start.RoomVersion != fixture.room.Version().Room ||
+		start.MembershipVersion != fixture.room.Version().Membership || start.RoomOwnershipEpoch != fixture.room.Snapshot().OwnershipEpoch {
+		t.Fatalf("frozen start metadata = %+v", start)
+	}
+	if fixture.authority.startProof == nil || *fixture.authority.startProof != *proof {
+		t.Fatalf("pending start proof = %+v", fixture.authority.startProof)
 	}
 	if fixture.module.createRequest.Config.Payload[0] != 'c' {
 		t.Fatal("module did not receive the cloned config payload")
@@ -404,8 +415,9 @@ func TestRuntimeServiceRejectsWrongDefaultGameAndNonterminalHostSystem(t *testin
 			ExpectedStateVersion: 1, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
 			VersionKey: session.Snapshot().VersionKey, Message: runtimeServiceMessage("host.not-finish", nil),
 		})
-		if !errors.Is(err, ErrInvalidSystemCommit) || fixture.authority.session.Snapshot().State.StateVersion != 1 || fixture.module.systemCalls != 1 {
-			t.Fatalf("error=%v session=%+v", err, fixture.authority.session.Snapshot())
+		if !errors.Is(err, ErrInvalidSystemCommit) || fixture.authority.session.Snapshot().State.StateVersion != 1 || fixture.module.systemCalls != 1 ||
+			fixture.module.lastSystemRequest.RequestedByUserID != game.Identifier(fixture.hostID.String()) {
+			t.Fatalf("error=%v session=%+v request=%+v", err, fixture.authority.session.Snapshot(), fixture.module.lastSystemRequest)
 		}
 	})
 }
@@ -712,9 +724,10 @@ func TestRuntimeServiceProjectsOnlyBoundedTerminalReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fixture.registry.module = &runtimeServiceReplayV2Module{runtimeServiceModule: fixture.module}
 	projection, err := fixture.service.ProjectReplay(t.Context(), session.Snapshot().ID, viewer, game.ReplayAccessParticipant)
-	if err != nil || !projection.Valid() || fixture.module.projectReplayCalls != 1 || len(fixture.module.replayEvents) != 2 {
-		t.Fatalf("projection=%+v error=%v calls=%d events=%d", projection, err, fixture.module.projectReplayCalls, len(fixture.module.replayEvents))
+	if err != nil || !projection.Valid() || fixture.module.projectReplayCalls != 1 || fixture.module.projectReplayV2Calls != 0 || len(fixture.module.replayEvents) != 2 {
+		t.Fatalf("projection=%+v error=%v replay=%d replay_v2=%d events=%d", projection, err, fixture.module.projectReplayCalls, fixture.module.projectReplayV2Calls, len(fixture.module.replayEvents))
 	}
 
 	fixture.module.unsafeReplayProjection = true
@@ -748,6 +761,36 @@ func TestRuntimeServiceRejectsCancelledSessionReplay(t *testing.T) {
 	viewer := game.Viewer{Kind: game.ViewerReplay, UserID: game.Identifier(fixture.hostID.String())}
 	if _, err := fixture.service.ProjectReplay(t.Context(), cancelled.Snapshot().ID, viewer, game.ReplayAccessParticipant); !errors.Is(err, ErrReplayUnavailable) {
 		t.Fatalf("cancelled replay error=%v", err)
+	}
+}
+
+func TestRuntimeServiceProjectsCancelledSessionReplayOnlyThroughV2(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	fixture.registry.module = &runtimeServiceReplayV2Module{runtimeServiceModule: fixture.module}
+	startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 41), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	_, cancelled, err := fixture.service.Cancel(t.Context(), CancelCommand{
+		RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID, ExpectedRoom: startedRoom.Version(),
+		OwnershipEpoch: session.Snapshot().OwnershipEpoch, Reason: CancelReasonLegacyCancelled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewer := game.Viewer{Kind: game.ViewerReplay, UserID: game.Identifier(fixture.hostID.String())}
+	projection, err := fixture.service.ProjectReplay(t.Context(), cancelled.Snapshot().ID, viewer, game.ReplayAccessParticipant)
+	if err != nil || !projection.Valid() || fixture.module.projectReplayCalls != 0 || fixture.module.projectReplayV2Calls != 1 {
+		t.Fatalf("projection=%+v error=%v replay=%d replay_v2=%d", projection, err, fixture.module.projectReplayCalls, fixture.module.projectReplayV2Calls)
+	}
+	if fixture.module.replayTerminalMeta.CancelReason != CancelReasonLegacyCancelled ||
+		!fixture.module.replayTerminalMeta.Cancelled || fixture.module.replayTerminalMeta.Finished ||
+		!fixture.module.replayTerminalMeta.EndedAt.Equal(cancelled.Snapshot().EndedAt) {
+		t.Fatalf("terminal meta = %+v", fixture.module.replayTerminalMeta)
 	}
 }
 
@@ -797,12 +840,12 @@ func newRuntimeServiceFixture(t *testing.T) runtimeServiceFixture {
 }
 
 type runtimeServiceRegistry struct {
-	module  *runtimeServiceModule
+	module  game.ServerGameModule
 	missing bool
 }
 
 func (registry *runtimeServiceRegistry) DefaultManifest(context.Context, game.GameID) (game.Manifest, error) {
-	return registry.module.manifest.Clone(), nil
+	return registry.module.Manifest(), nil
 }
 
 func (registry *runtimeServiceRegistry) DefaultModule(context.Context, game.GameID) (game.ServerGameModule, error) {
@@ -824,11 +867,14 @@ type runtimeServiceModule struct {
 	commandCalls           int
 	timerCalls             int
 	systemCalls            int
+	lastSystemRequest      game.SystemRequest
 	unsafeEventProjection  bool
 	unsafeReplayProjection bool
 	projectEventsCalls     int
 	projectReplayCalls     int
+	projectReplayV2Calls   int
 	replayEvents           []game.Event
+	replayTerminalMeta     game.ReplayTerminalMeta
 }
 
 func (module *runtimeServiceModule) Manifest() game.Manifest { return module.manifest.Clone() }
@@ -851,6 +897,7 @@ func (module *runtimeServiceModule) HandleTimer(snapshot game.Snapshot, request 
 
 func (module *runtimeServiceModule) HandleSystem(snapshot game.Snapshot, request game.SystemRequest) (game.Transition, error) {
 	module.systemCalls++
+	module.lastSystemRequest = request
 	return runtimeServiceTransition(snapshot.StateVersion+1, request.System.MessageType == "session.finish", request.Context.Now), nil
 }
 
@@ -879,6 +926,21 @@ func (module *runtimeServiceModule) ProjectReplay(events []game.Event, _ game.Vi
 	return game.Projection{View: runtimeServiceMessage("replay.view", nil)}, nil
 }
 
+type runtimeServiceReplayV2Module struct{ *runtimeServiceModule }
+
+func (module *runtimeServiceReplayV2Module) ProjectReplayV2(request game.ReplayRequest) (game.Projection, error) {
+	module.projectReplayV2Calls++
+	module.replayEvents = append([]game.Event(nil), request.Events...)
+	module.replayTerminalMeta = request.TerminalMeta
+	if !request.Valid() {
+		return game.Projection{}, ErrInvalidSessionInput
+	}
+	if module.unsafeReplayProjection {
+		return game.Projection{}, nil
+	}
+	return game.Projection{View: runtimeServiceMessage("replay.view", []byte("v2"))}, nil
+}
+
 func (*runtimeServiceModule) Migrate(snapshot game.Snapshot, _, _ uint32) (game.Snapshot, error) {
 	return snapshot, nil
 }
@@ -903,6 +965,7 @@ func (generator *runtimeServiceGenerator) NewExecution(at time.Time) (game.Deter
 type runtimeServiceAuthority struct {
 	room            roomDomain.Room
 	session         Session
+	startProof      *PendingStartProof
 	startReceipts   map[StartKey]StartReceipt
 	actionReceipts  map[ActionKey]ActionReceipt
 	timerReceipts   map[TimerKey]TimerReceipt
@@ -1061,6 +1124,12 @@ func (authority *runtimeServiceAuthority) Start(
 			return roomDomain.Room{}, Session{}, false, err
 		}
 		return authority.room, authority.session, true, nil
+	}
+	if commit.PendingStartProof != nil {
+		proof := *commit.PendingStartProof
+		authority.startProof = &proof
+	} else {
+		authority.startProof = nil
 	}
 	authority.room, authority.session = after, commit.Session
 	authority.startReceipts[key] = receipt

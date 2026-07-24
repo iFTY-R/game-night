@@ -36,9 +36,31 @@ func ValidateEvent(message game.Message) error {
 }
 
 // BuildReplay validates public event envelopes and appends only fully settled
-// rounds. Events from a cancelled or still-pending round are intentionally
-// discarded from the replay artifact.
+// rounds. Events from a still-pending round are intentionally discarded from
+// the legacy replay artifact.
 func BuildReplay(events []game.Event, viewer game.Viewer, policy game.ReplayAccessPolicy) (*meetv1.Replay, error) {
+	return buildReplay(events, viewer, policy, false, "")
+}
+
+// BuildReplayV2 preserves public pending progress for runtime-cancelled replay
+// requests without synthesizing any module event.
+func BuildReplayV2(request game.ReplayRequest) (*meetv1.Replay, error) {
+	if !request.Valid() {
+		return nil, projectionError("replay v2 request is invalid")
+	}
+	if request.TerminalMeta.Finished {
+		return BuildReplay(request.Events, request.Viewer, request.Policy)
+	}
+	return buildReplay(request.Events, request.Viewer, request.Policy, true, string(request.TerminalMeta.CancelReason))
+}
+
+func buildReplay(
+	events []game.Event,
+	viewer game.Viewer,
+	policy game.ReplayAccessPolicy,
+	preservePending bool,
+	trustedFinishReason string,
+) (*meetv1.Replay, error) {
 	if len(events) == 0 || !viewer.Valid() || viewer.Kind != game.ViewerReplay || !policy.Valid() {
 		return nil, projectionError("replay request is invalid")
 	}
@@ -112,6 +134,9 @@ func BuildReplay(events []game.Event, viewer game.Viewer, policy game.ReplayAcce
 			current, currentRound = nil, 0
 		}
 		if finishReason != "" {
+			if preservePending && len(current) != 0 {
+				replay.Entries = append(replay.Entries, cloneReplayEntries(current)...)
+			}
 			replay.FinishReason = finishReason
 			current, currentRound = nil, 0
 			finished = true
@@ -119,6 +144,12 @@ func BuildReplay(events []game.Event, viewer game.Viewer, policy game.ReplayAcce
 	}
 	if !semantic.complete() {
 		return nil, projectionError("replay stream ends outside a committed decision boundary")
+	}
+	if preservePending && len(current) != 0 {
+		replay.Entries = append(replay.Entries, cloneReplayEntries(current)...)
+	}
+	if trustedFinishReason != "" {
+		replay.FinishReason = trustedFinishReason
 	}
 	return replay, nil
 }

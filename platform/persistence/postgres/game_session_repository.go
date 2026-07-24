@@ -701,16 +701,20 @@ func getGameSessionForUpdate(ctx context.Context, queries QueryHandle, sessionID
 	return sessionFromUpdatedRow(ctx, queries, row)
 }
 
-func sessionFromUpdatedRow(ctx context.Context, queries QueryHandle, row sqlcgen.GameSession) (gameruntime.Session, error) {
-	participants, err := queries.ListGameSessionParticipants(ctx, sqlcgen.ListGameSessionParticipantsParams{SessionID: row.SessionID})
+func sessionFromUpdatedRow(ctx context.Context, queries QueryHandle, row any) (gameruntime.Session, error) {
+	normalized, err := normalizeGameSessionRow(row)
 	if err != nil {
 		return gameruntime.Session{}, err
 	}
-	timers, err := queries.ListGameSessionTimers(ctx, sqlcgen.ListGameSessionTimersParams{SessionID: row.SessionID})
+	participants, err := queries.ListGameSessionParticipants(ctx, sqlcgen.ListGameSessionParticipantsParams{SessionID: normalized.SessionID})
 	if err != nil {
 		return gameruntime.Session{}, err
 	}
-	return sessionFromRows(row, participants, timers)
+	timers, err := queries.ListGameSessionTimers(ctx, sqlcgen.ListGameSessionTimersParams{SessionID: normalized.SessionID})
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
+	return sessionFromRows(normalized, participants, timers)
 }
 
 func validateCurrentTransition(current gameruntime.Session, before gameruntime.SessionSnapshot) error {
@@ -965,7 +969,7 @@ func terminalSystemCompletionTime(proposed, sessionUpdatedAt time.Time) time.Tim
 
 func updateGameSessionLifecycleParams(before, after gameruntime.SessionSnapshot) sqlcgen.UpdateGameSessionLifecycleCASParams {
 	return sqlcgen.UpdateGameSessionLifecycleCASParams{
-		NextDeadlineAt: optionalTimeToPG(after.NextDeadlineAt), Status: string(after.Status),
+		NextDeadlineAt: optionalTimeToPG(after.NextDeadlineAt), CancelReason: optionalIdentifierToPG(after.CancelReason), Status: string(after.Status),
 		UpdatedAt: timeToPG(after.UpdatedAt), EndedAt: optionalTimeToPG(after.EndedAt), SessionID: uuidToPG(before.ID),
 		ExpectedStateVersion: int64(before.State.StateVersion), ExpectedOwnershipEpoch: int64(before.OwnershipEpoch),
 	}
@@ -1081,20 +1085,32 @@ func rejectTerminalWithPendingSystemInbox(
 }
 
 func createGameSessionParams(snapshot gameruntime.SessionSnapshot) sqlcgen.CreateGameSessionParams {
+	start := snapshot.Start
 	return sqlcgen.CreateGameSessionParams{
 		SessionID: uuidToPG(snapshot.ID), RoomID: uuidToPG(snapshot.RoomID), GameID: string(snapshot.VersionKey.GameID),
 		EngineVersion: string(snapshot.VersionKey.Engine), ProtocolVersion: string(snapshot.VersionKey.Protocol), ClientVersion: string(snapshot.VersionKey.Client),
 		StateVersion: int64(snapshot.State.StateVersion), OwnershipEpoch: int64(snapshot.OwnershipEpoch), SnapshotVersion: int32(snapshot.State.SnapshotVersion),
 		StateMessageType: string(snapshot.State.State.MessageType), StateSchemaVersion: int32(snapshot.State.State.SchemaVersion), StatePayload: requiredBytea(snapshot.State.State.Payload),
+		StartConfigMessageType: optionalIdentifierToPG(start.Config.MessageType), StartConfigSchemaVersion: optionalUint32ToPG(start.Config.SchemaVersion),
+		StartConfigPayload: optionalBytea(start.Config.Payload, start.Config.Valid()), StartConfigDigest: optionalDigestBytes(start.ConfigDigest, start.ConfigDigest != (idempotency.Digest{})),
+		StartConfigRevision: startConfigRevisionToPG(start), StartRoomVersion: optionalUint64ToPG(start.RoomVersion),
+		StartMembershipVersion: optionalUint64ToPG(start.MembershipVersion), StartOwnershipEpoch: optionalUint64ToPG(start.RoomOwnershipEpoch),
+		CancelReason: optionalIdentifierToPG(snapshot.CancelReason),
 		NextDeadlineAt: optionalTimeToPG(snapshot.NextDeadlineAt), Status: string(snapshot.Status), StartedAt: timeToPG(snapshot.StartedAt),
 		UpdatedAt: timeToPG(snapshot.UpdatedAt), EndedAt: optionalTimeToPG(snapshot.EndedAt),
 	}
 }
 
 func updateGameSessionStateParams(before, after gameruntime.SessionSnapshot) sqlcgen.UpdateGameSessionStateCASParams {
+	start := after.Start
 	return sqlcgen.UpdateGameSessionStateCASParams{
 		StateVersion: int64(after.State.StateVersion), SnapshotVersion: int32(after.State.SnapshotVersion),
 		StateMessageType: string(after.State.State.MessageType), StateSchemaVersion: int32(after.State.State.SchemaVersion), StatePayload: requiredBytea(after.State.State.Payload),
+		StartConfigMessageType: optionalIdentifierToPG(start.Config.MessageType), StartConfigSchemaVersion: optionalUint32ToPG(start.Config.SchemaVersion),
+		StartConfigPayload: optionalBytea(start.Config.Payload, start.Config.Valid()), StartConfigDigest: optionalDigestBytes(start.ConfigDigest, start.ConfigDigest != (idempotency.Digest{})),
+		StartConfigRevision: startConfigRevisionToPG(start), StartRoomVersion: optionalUint64ToPG(start.RoomVersion),
+		StartMembershipVersion: optionalUint64ToPG(start.MembershipVersion), StartOwnershipEpoch: optionalUint64ToPG(start.RoomOwnershipEpoch),
+		CancelReason: optionalIdentifierToPG(after.CancelReason),
 		NextDeadlineAt: optionalTimeToPG(after.NextDeadlineAt), Status: string(after.Status), UpdatedAt: timeToPG(after.UpdatedAt), EndedAt: optionalTimeToPG(after.EndedAt),
 		SessionID: uuidToPG(before.ID), ExpectedStateVersion: int64(before.State.StateVersion), ExpectedOwnershipEpoch: int64(before.OwnershipEpoch),
 	}
@@ -1161,10 +1177,14 @@ func insertGameSessionOutbox(ctx context.Context, queries QueryHandle, events []
 	return nil
 }
 
-func sessionFromRows(row sqlcgen.GameSession, participants []sqlcgen.GameSessionParticipant, timers []sqlcgen.GameSessionTimer) (gameruntime.Session, error) {
-	if !row.SessionID.Valid || !row.RoomID.Valid || row.StateVersion <= 0 || row.OwnershipEpoch < 0 || row.SnapshotVersion <= 0 ||
-		row.StateSchemaVersion <= 0 || row.StateVersion > math.MaxInt64 || row.OwnershipEpoch > math.MaxInt64 ||
-		row.SnapshotVersion > math.MaxInt32 || row.StateSchemaVersion > math.MaxInt32 || !row.StartedAt.Valid || !row.UpdatedAt.Valid {
+func sessionFromRows(row any, participants []sqlcgen.GameSessionParticipant, timers []sqlcgen.GameSessionTimer) (gameruntime.Session, error) {
+	normalized, err := normalizeGameSessionRow(row)
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
+	if !normalized.SessionID.Valid || !normalized.RoomID.Valid || normalized.StateVersion <= 0 || normalized.OwnershipEpoch < 0 || normalized.SnapshotVersion <= 0 ||
+		normalized.StateSchemaVersion <= 0 || normalized.StateVersion > math.MaxInt64 || normalized.OwnershipEpoch > math.MaxInt64 ||
+		normalized.SnapshotVersion > math.MaxInt32 || normalized.StateSchemaVersion > math.MaxInt32 || !normalized.StartedAt.Valid || !normalized.UpdatedAt.Valid {
 		return gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
 	}
 	if len(participants) == 0 || len(participants) > int(game.MaximumParticipants) {
@@ -1172,14 +1192,14 @@ func sessionFromRows(row sqlcgen.GameSession, participants []sqlcgen.GameSession
 	}
 	mappedParticipants := make([]gameruntime.Participant, len(participants))
 	for index, participant := range participants {
-		if !participant.SessionID.Valid || uuid.UUID(participant.SessionID.Bytes) != uuid.UUID(row.SessionID.Bytes) || !participant.UserID.Valid || participant.SeatIndex < 0 {
+		if !participant.SessionID.Valid || uuid.UUID(participant.SessionID.Bytes) != uuid.UUID(normalized.SessionID.Bytes) || !participant.UserID.Valid || participant.SeatIndex < 0 {
 			return gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
 		}
 		mappedParticipants[index] = gameruntime.Participant{UserID: uuid.UUID(participant.UserID.Bytes), SeatIndex: uint32(participant.SeatIndex)}
 	}
 	mappedTimers := make([]gameruntime.TimerSnapshot, len(timers))
 	for index, timer := range timers {
-		if !timer.SessionID.Valid || uuid.UUID(timer.SessionID.Bytes) != uuid.UUID(row.SessionID.Bytes) || timer.ExpectedStateVersion <= 0 ||
+		if !timer.SessionID.Valid || uuid.UUID(timer.SessionID.Bytes) != uuid.UUID(normalized.SessionID.Bytes) || timer.ExpectedStateVersion <= 0 ||
 			timer.ExpectedStateVersion > math.MaxInt64 || timer.SchemaVersion <= 0 || timer.SchemaVersion > math.MaxInt32 || !timer.DueAt.Valid {
 			return gameruntime.Session{}, gameruntime.ErrGameSessionIntegrity
 		}
@@ -1188,13 +1208,18 @@ func sessionFromRows(row sqlcgen.GameSession, participants []sqlcgen.GameSession
 			Message: game.Message{MessageType: game.Identifier(timer.MessageType), SchemaVersion: uint32(timer.SchemaVersion), Payload: timer.Payload},
 		}
 	}
+	start, err := frozenStartConfigFromRow(normalized)
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
 	return gameruntime.RestoreSession(gameruntime.SessionSnapshot{
-		ID: uuid.UUID(row.SessionID.Bytes), RoomID: uuid.UUID(row.RoomID.Bytes),
-		VersionKey:     game.VersionKey{GameID: game.GameID(row.GameID), Engine: game.Version(row.EngineVersion), Protocol: game.Version(row.ProtocolVersion), Client: game.Version(row.ClientVersion)},
-		OwnershipEpoch: uint64(row.OwnershipEpoch), Participants: mappedParticipants,
-		State:  game.Snapshot{SnapshotVersion: uint32(row.SnapshotVersion), StateVersion: uint64(row.StateVersion), State: game.Message{MessageType: game.Identifier(row.StateMessageType), SchemaVersion: uint32(row.StateSchemaVersion), Payload: row.StatePayload}},
-		Timers: mappedTimers, NextDeadlineAt: optionalTimeFromPG(row.NextDeadlineAt), Status: gameruntime.Status(row.Status),
-		StartedAt: row.StartedAt.Time, UpdatedAt: row.UpdatedAt.Time, EndedAt: optionalTimeFromPG(row.EndedAt),
+		ID: uuid.UUID(normalized.SessionID.Bytes), RoomID: uuid.UUID(normalized.RoomID.Bytes),
+		VersionKey:     game.VersionKey{GameID: game.GameID(normalized.GameID), Engine: game.Version(normalized.EngineVersion), Protocol: game.Version(normalized.ProtocolVersion), Client: game.Version(normalized.ClientVersion)},
+		OwnershipEpoch: uint64(normalized.OwnershipEpoch), Participants: mappedParticipants, Start: start,
+		State:  game.Snapshot{SnapshotVersion: uint32(normalized.SnapshotVersion), StateVersion: uint64(normalized.StateVersion), State: game.Message{MessageType: game.Identifier(normalized.StateMessageType), SchemaVersion: uint32(normalized.StateSchemaVersion), Payload: normalized.StatePayload}},
+		Timers: mappedTimers, NextDeadlineAt: optionalTimeFromPG(normalized.NextDeadlineAt), Status: gameruntime.Status(normalized.Status),
+		StartedAt: normalized.StartedAt.Time, UpdatedAt: normalized.UpdatedAt.Time, EndedAt: optionalTimeFromPG(normalized.EndedAt),
+		CancelReason: game.Identifier(normalized.CancelReason.String),
 	})
 }
 
@@ -1227,7 +1252,8 @@ func actionReceiptFromRow(row sqlcgen.GameActionReceipt) (gameruntime.ActionRece
 
 func validateCreationWidths(commit gameruntime.CreationCommit) error {
 	snapshot := commit.Session.Snapshot()
-	if snapshot.State.StateVersion > math.MaxInt64 || snapshot.OwnershipEpoch > math.MaxInt64 || snapshot.State.SnapshotVersion > math.MaxInt32 || snapshot.State.State.SchemaVersion > math.MaxInt32 {
+	if snapshot.State.StateVersion > math.MaxInt64 || snapshot.OwnershipEpoch > math.MaxInt64 || snapshot.State.SnapshotVersion > math.MaxInt32 ||
+		snapshot.State.State.SchemaVersion > math.MaxInt32 || !startConfigFitsPostgres(snapshot.Start) {
 		return gameruntime.ErrInvalidSessionInput
 	}
 	for _, participant := range snapshot.Participants {
@@ -1246,7 +1272,8 @@ func validateCreationWidths(commit gameruntime.CreationCommit) error {
 func validateActionWidths(commit gameruntime.ActionCommit) error {
 	for _, snapshot := range []gameruntime.SessionSnapshot{commit.Before().Snapshot(), commit.After().Snapshot()} {
 		if snapshot.State.StateVersion > math.MaxInt64 || snapshot.OwnershipEpoch > math.MaxInt64 ||
-			snapshot.State.SnapshotVersion > math.MaxInt32 || snapshot.State.State.SchemaVersion > math.MaxInt32 {
+			snapshot.State.SnapshotVersion > math.MaxInt32 || snapshot.State.State.SchemaVersion > math.MaxInt32 ||
+			!startConfigFitsPostgres(snapshot.Start) {
 			return gameruntime.ErrInvalidActionCommit
 		}
 		for _, timer := range snapshot.Timers {
@@ -1294,7 +1321,8 @@ func validateSystemCommitWidths(commit gameruntime.SystemCommit) error {
 func validateTransitionWidths(before, after gameruntime.SessionSnapshot, batch gameruntime.EventBatchSnapshot) error {
 	for _, snapshot := range []gameruntime.SessionSnapshot{before, after} {
 		if snapshot.State.StateVersion > math.MaxInt64 || snapshot.OwnershipEpoch > math.MaxInt64 ||
-			snapshot.State.SnapshotVersion > math.MaxInt32 || snapshot.State.State.SchemaVersion > math.MaxInt32 {
+			snapshot.State.SnapshotVersion > math.MaxInt32 || snapshot.State.State.SchemaVersion > math.MaxInt32 ||
+			!startConfigFitsPostgres(snapshot.Start) {
 			return gameruntime.ErrInvalidSessionInput
 		}
 		for _, timer := range snapshot.Timers {
@@ -1389,6 +1417,38 @@ func optionalDigestBytes(value idempotency.Digest, present bool) []byte {
 	return value.Bytes()
 }
 
+func optionalBytea(value []byte, present bool) []byte {
+	if !present {
+		return nil
+	}
+	return requiredBytea(value)
+}
+
+func optionalUint32ToPG(value uint32) pgtype.Int4 {
+	if value == 0 || value > math.MaxInt32 {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(value), Valid: true}
+}
+
+func optionalUint64ToPG(value uint64) pgtype.Int8 {
+	if value == 0 || value > math.MaxInt64 {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: int64(value), Valid: true}
+}
+
+func startConfigRevisionToPG(start gameruntime.FrozenStartConfig) pgtype.Int8 {
+	if !start.Config.Valid() && start.ConfigDigest == (idempotency.Digest{}) &&
+		start.RoomVersion == 0 && start.MembershipVersion == 0 && start.RoomOwnershipEpoch == 0 {
+		return pgtype.Int8{}
+	}
+	if start.ConfigRevision > math.MaxInt64 {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: int64(start.ConfigRevision), Valid: true}
+}
+
 // requiredBytea preserves the protocol's empty-byte-string value instead of letting pgx encode a nil slice as SQL NULL.
 func requiredBytea(value []byte) []byte {
 	if value == nil {
@@ -1415,6 +1475,121 @@ func optionalTimeFromPG(value pgtype.Timestamptz) time.Time {
 		return time.Time{}
 	}
 	return value.Time
+}
+
+func frozenStartConfigFromRow(row sqlcgen.GameSession) (gameruntime.FrozenStartConfig, error) {
+	startPresent := row.StartConfigMessageType.Valid || row.StartConfigSchemaVersion.Valid || row.StartConfigPayload != nil ||
+		len(row.StartConfigDigest) > 0 || row.StartConfigRevision.Valid || row.StartRoomVersion.Valid ||
+		row.StartMembershipVersion.Valid || row.StartOwnershipEpoch.Valid
+	if !startPresent {
+		return gameruntime.FrozenStartConfig{}, nil
+	}
+	if !row.StartConfigMessageType.Valid || !row.StartConfigSchemaVersion.Valid ||
+		!row.StartConfigRevision.Valid || !row.StartRoomVersion.Valid ||
+		!row.StartMembershipVersion.Valid || !row.StartOwnershipEpoch.Valid {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrGameSessionIntegrity
+	}
+	start := gameruntime.FrozenStartConfig{
+		Config: game.Message{
+			MessageType:   game.Identifier(row.StartConfigMessageType.String),
+			SchemaVersion: uint32(row.StartConfigSchemaVersion.Int32),
+			Payload:       bytes.Clone(row.StartConfigPayload),
+		},
+		ConfigRevision:     uint64(row.StartConfigRevision.Int64),
+		RoomVersion:        uint64(row.StartRoomVersion.Int64),
+		MembershipVersion:  uint64(row.StartMembershipVersion.Int64),
+		RoomOwnershipEpoch: uint64(row.StartOwnershipEpoch.Int64),
+	}
+	if len(row.StartConfigDigest) != 32 {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrGameSessionIntegrity
+	}
+	digest, err := idempotency.NewDigest(row.StartConfigDigest)
+	if err != nil {
+		return gameruntime.FrozenStartConfig{}, gameruntime.ErrGameSessionIntegrity
+	}
+	start.ConfigDigest = digest
+	return start, nil
+}
+
+func startConfigFitsPostgres(start gameruntime.FrozenStartConfig) bool {
+	return start.Config.SchemaVersion <= math.MaxInt32 && start.ConfigRevision <= math.MaxInt64 &&
+		start.RoomVersion <= math.MaxInt64 && start.MembershipVersion <= math.MaxInt64 &&
+		start.RoomOwnershipEpoch <= math.MaxInt64
+}
+
+func normalizeGameSessionRow(row any) (sqlcgen.GameSession, error) {
+	switch value := row.(type) {
+	case sqlcgen.GameSession:
+		return value, nil
+	case sqlcgen.CreateGameSessionRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	case sqlcgen.GetGameSessionForShareRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	case sqlcgen.GetGameSessionForUpdateRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	case sqlcgen.AcquireGameSessionOwnershipCASRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	case sqlcgen.UpdateGameSessionStateCASRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	case sqlcgen.UpdateGameSessionLifecycleCASRow:
+		return sqlcgen.GameSession{
+			SessionID: value.SessionID, RoomID: value.RoomID, GameID: value.GameID, EngineVersion: value.EngineVersion,
+			ProtocolVersion: value.ProtocolVersion, ClientVersion: value.ClientVersion, StateVersion: value.StateVersion,
+			OwnershipEpoch: value.OwnershipEpoch, SnapshotVersion: value.SnapshotVersion, StateMessageType: value.StateMessageType,
+			StateSchemaVersion: value.StateSchemaVersion, StatePayload: value.StatePayload, StartConfigMessageType: value.StartConfigMessageType,
+			StartConfigSchemaVersion: value.StartConfigSchemaVersion, StartConfigPayload: value.StartConfigPayload, StartConfigDigest: value.StartConfigDigest,
+			StartConfigRevision: value.StartConfigRevision, StartRoomVersion: value.StartRoomVersion, StartMembershipVersion: value.StartMembershipVersion,
+			StartOwnershipEpoch: value.StartOwnershipEpoch, CancelReason: value.CancelReason, NextDeadlineAt: value.NextDeadlineAt, Status: value.Status,
+			StartedAt: value.StartedAt, UpdatedAt: value.UpdatedAt, EndedAt: value.EndedAt,
+		}, nil
+	default:
+		return sqlcgen.GameSession{}, gameruntime.ErrGameSessionIntegrity
+	}
 }
 
 func identifierStrings(values []game.Identifier) []string {

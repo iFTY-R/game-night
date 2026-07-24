@@ -9,6 +9,7 @@ import (
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const finishAction gameSDK.Identifier = "session.finish"
@@ -108,6 +109,20 @@ func projectionWire(session gameruntime.Session, viewerKind gameSDK.ViewerKind, 
 		SessionId: snapshot.ID.String(), StateVersion: snapshot.State.StateVersion, ViewerKind: viewerKindWire(viewerKind),
 		View: envelopeWire(snapshot.VersionKey, projection.View), AllowedActions: actions,
 	}
+}
+
+func replayTerminalMetaWire(session gameruntime.Session) *gamev1.ReplayTerminalMeta {
+	snapshot := session.Snapshot()
+	meta := &gamev1.ReplayTerminalMeta{
+		Finished: snapshot.Status == gameruntime.StatusFinished,
+		Cancelled: snapshot.Status == gameruntime.StatusCancelled,
+		EndedAt: timestamppb.New(snapshot.EndedAt),
+		CancelReason: string(snapshot.CancelReason),
+	}
+	if snapshot.Status == gameruntime.StatusFinished {
+		meta.CancelReason = ""
+	}
+	return meta
 }
 
 func decorateProjection(projection gameSDK.Projection, canFinish bool) gameSDK.Projection {

@@ -7,6 +7,16 @@ import (
 
 // BuildReplay reduces ordered module events into settled rounds and never forwards raw event payloads.
 func BuildReplay(events []engine.Event) (*liarsdicev1.Replay, error) {
+	return buildReplay(events, false, "")
+}
+
+// BuildReplayCancelled keeps the latest public round state for a runtime-owned
+// cancellation without inventing a session.finished module event.
+func BuildReplayCancelled(events []engine.Event, cancelReason string) (*liarsdicev1.Replay, error) {
+	return buildReplay(events, true, cancelReason)
+}
+
+func buildReplay(events []engine.Event, preservePending bool, trustedFinishReason string) (*liarsdicev1.Replay, error) {
 	if len(events) == 0 {
 		return nil, projectionError("replay event stream is empty")
 	}
@@ -82,14 +92,22 @@ func BuildReplay(events []engine.Event) (*liarsdicev1.Replay, error) {
 				return nil, projectionError("finish reason is missing")
 			}
 			replay.FinishReason = event.Reason
-			if current != nil && current.DiceRevealed {
+			if !preservePending && current != nil && current.DiceRevealed {
 				return nil, projectionError("session finished after an un-settled reveal")
 			}
-			current = nil
+			if !preservePending {
+				current = nil
+			}
 			finished = true
 		default:
 			return nil, projectionError("unknown event cannot enter replay")
 		}
+	}
+	if preservePending && current != nil {
+		replay.Rounds = append(replay.Rounds, current)
+	}
+	if trustedFinishReason != "" {
+		replay.FinishReason = trustedFinishReason
 	}
 	return replay, nil
 }

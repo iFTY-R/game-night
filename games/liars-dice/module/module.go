@@ -68,6 +68,7 @@ func NewModule() *Module { return New() }
 var (
 	_ game.RuntimeServerGameModule         = (*Module)(nil)
 	_ game.ParticipantRevocationGameModule = (*Module)(nil)
+	_ game.ReplayProjectingV2GameModule    = (*Module)(nil)
 )
 
 // Manifest declares the exact retained release and viewer capabilities.
@@ -211,7 +212,7 @@ func (m *Module) HandleSystem(snapshot game.Snapshot, request game.SystemRequest
 		next, facts, err = engine.RevokeParticipant(state, command.GetUserId(), request.Context.Now.UnixMilli(), request.Context.RandomSeed)
 	case game.Identifier("session.finish"):
 		var command liarsdicev1.Command
-		if err := unmarshalStrict(request.System.Payload, &command); err != nil || command.GetFinish() == nil {
+		if err := unmarshalStrict(request.System.Payload, &command); err != nil || !finishCommandValid(&command, request.RequestedByUserID) {
 			return game.Transition{}, malformed("session.finish payload is invalid")
 		}
 		next, facts, err = engine.Finish(state, engine.FinishHostRequested)
@@ -256,6 +257,29 @@ func (m *Module) ProjectReplay(events []game.Event, viewer game.Viewer, policy g
 		return game.Projection{}, err
 	}
 	replay, err := projection.BuildReplay(engineEvents)
+	if err != nil {
+		return game.Projection{}, err
+	}
+	payload, err := marshalDeterministic(replay)
+	if err != nil {
+		return game.Projection{}, malformed("replay encoding failed")
+	}
+	return game.Projection{View: game.Message{MessageType: ReplayMessageType, SchemaVersion: ProtocolSchemaVersion, Payload: payload}}, nil
+}
+
+// ProjectReplayV2 supports runtime-owned cancelled replay metadata while staying event-only.
+func (m *Module) ProjectReplayV2(request game.ReplayRequest) (game.Projection, error) {
+	if !request.Valid() {
+		return game.Projection{}, malformed("replay v2 request is invalid")
+	}
+	if request.TerminalMeta.Finished {
+		return m.ProjectReplay(request.Events, request.Viewer, request.Policy)
+	}
+	engineEvents, err := decodeEvents(request.Events)
+	if err != nil {
+		return game.Projection{}, err
+	}
+	replay, err := projection.BuildReplayCancelled(engineEvents, string(request.TerminalMeta.CancelReason))
 	if err != nil {
 		return game.Projection{}, err
 	}
@@ -348,6 +372,11 @@ func (m *Module) transition(version uint64, state engine.State, facts []engine.E
 		return game.Transition{}, malformed("transition violates sdk contract")
 	}
 	return transition, nil
+}
+
+// finishCommandValid keeps liars-dice on trusted host finishes only because this ruleset does not define platform_cancelled.
+func finishCommandValid(command *liarsdicev1.Command, requester game.Identifier) bool {
+	return command.GetFinish() != nil && requester != ""
 }
 
 func malformed(detail string) error {

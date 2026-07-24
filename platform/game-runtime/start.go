@@ -19,6 +19,18 @@ func (key StartKey) Valid() bool {
 	return key.ActorUserID != uuid.Nil && key.RoomID != uuid.Nil && key.OperationID.Valid()
 }
 
+// PendingStartProof is the opaque room-rule countdown proof that authorizes one atomic start commit.
+// It is optional so legacy callers can continue to start without a pending countdown.
+type PendingStartProof struct {
+	PendingStartID uuid.UUID
+	CancelToken    string
+}
+
+// Valid rejects malformed pending-start proofs before they can reach durable storage fences.
+func (proof PendingStartProof) Valid() bool {
+	return proof.PendingStartID != uuid.Nil && proof.CancelToken != ""
+}
+
 // StartReceiptSnapshot is the immutable durable result of one atomic room/session start.
 type StartReceiptSnapshot struct {
 	Key           StartKey

@@ -176,6 +176,237 @@ func TestRoomActivityMigrationBackfillsExistingRooms(t *testing.T) {
 	}
 }
 
+func TestGameSessionStartConfigMigrationKeepsLegacyRowsAllowsRevisionZeroAndRejectsPartialSnapshots(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 24); err != nil {
+		t.Fatal(err)
+	}
+
+	userID := "60000000-0000-4000-8000-000000000001"
+	roomID := "70000000-0000-4000-8000-000000000001"
+	legacySessionID := "80000000-0000-4000-8000-000000000001"
+	transaction, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = transaction.Rollback(ctx) }()
+	statements := []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO users (user_id, status, created_at, updated_at)
+            VALUES ($1, 'onboarding', now() - interval '2 hours', now() - interval '2 hours')`, []any{userID}},
+		{`INSERT INTO party_rooms (
+            room_id, room_code, visibility, status, host_user_id, participant_capacity,
+            participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
+        ) VALUES ($1, 'START25', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO game_sessions (
+            session_id, room_id, game_id, engine_version, protocol_version, client_version,
+            state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+            state_payload, status, started_at, updated_at, ended_at
+        ) VALUES (
+            $1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+            1, 1, 1, 'session.finished', 1, decode('00', 'hex'),
+            'finished', now() - interval '1 hour', now(), now()
+        )`, []any{legacySessionID, roomID}},
+	}
+	for _, statement := range statements {
+		if _, err := transaction.Exec(ctx, statement.sql, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 25); err != nil {
+		t.Fatalf("upgrade legacy game session to migration 25: %v", err)
+	}
+
+	var startMessageNull, startSchemaNull, startPayloadNull, startDigestNull bool
+	var startRevisionNull, startRoomNull, startMembershipNull, startOwnershipNull bool
+	if err := fixture.Pool.QueryRow(ctx, `
+        SELECT
+            start_config_message_type IS NULL,
+            start_config_schema_version IS NULL,
+            start_config_payload IS NULL,
+            start_config_digest IS NULL,
+            start_config_revision IS NULL,
+            start_room_version IS NULL,
+            start_membership_version IS NULL,
+            start_ownership_epoch IS NULL
+        FROM game_sessions
+        WHERE session_id = $1
+    `, legacySessionID).Scan(
+		&startMessageNull,
+		&startSchemaNull,
+		&startPayloadNull,
+		&startDigestNull,
+		&startRevisionNull,
+		&startRoomNull,
+		&startMembershipNull,
+		&startOwnershipNull,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !startMessageNull || !startSchemaNull || !startPayloadNull || !startDigestNull ||
+		!startRevisionNull || !startRoomNull || !startMembershipNull || !startOwnershipNull {
+		t.Fatal("migration 00025 must preserve legacy game sessions with an entirely NULL frozen start snapshot")
+	}
+
+	if _, err := fixture.Pool.Exec(ctx, `
+        INSERT INTO game_sessions (
+            session_id, room_id, game_id, engine_version, protocol_version, client_version,
+            state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+            state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+            start_config_digest, start_config_revision, start_room_version, start_membership_version,
+            start_ownership_epoch, status, started_at, updated_at, ended_at
+        ) VALUES (
+            $1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+            2, 1, 1, 'session.finished', 1, decode('01', 'hex'),
+            'room.config.snapshot', 1, decode('cafe', 'hex'), decode(repeat('11', 32), 'hex'),
+            0, 3, 2, 1, 'finished', now() - interval '45 minutes', now(), now()
+        )
+    `, "80000000-0000-4000-8000-000000000002", roomID); err != nil {
+		t.Fatalf("insert frozen start snapshot with revision zero: %v", err)
+	}
+
+	_, err = fixture.Pool.Exec(ctx, `
+        INSERT INTO game_sessions (
+            session_id, room_id, game_id, engine_version, protocol_version, client_version,
+            state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+            state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+            start_config_digest, status, started_at, updated_at, ended_at
+        ) VALUES (
+            $1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+            3, 1, 1, 'session.finished', 1, decode('02', 'hex'),
+            'room.config.snapshot', 1, decode('beef', 'hex'), decode(repeat('22', 32), 'hex'),
+            'finished', now() - interval '30 minutes', now(), now()
+        )
+    `, "80000000-0000-4000-8000-000000000003", roomID)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "game_sessions_start_snapshot_shape") {
+		t.Fatalf("partial start metadata error = %v, want constraint %q", err, "game_sessions_start_snapshot_shape")
+	}
+
+	_, err = fixture.Pool.Exec(ctx, `
+        INSERT INTO game_sessions (
+            session_id, room_id, game_id, engine_version, protocol_version, client_version,
+            state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+            state_payload, start_config_revision, start_room_version, start_membership_version,
+            start_ownership_epoch, status, started_at, updated_at, ended_at
+        ) VALUES (
+            $1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+            4, 1, 1, 'session.finished', 1, decode('03', 'hex'),
+            8, 4, 3, 2, 'finished', now() - interval '15 minutes', now(), now()
+        )
+    `, "80000000-0000-4000-8000-000000000004", roomID)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "game_sessions_start_snapshot_shape") {
+		t.Fatalf("partial start fence error = %v, want constraint %q", err, "game_sessions_start_snapshot_shape")
+	}
+}
+
+func TestGameSessionCancelReasonMigrationBackfillsLegacyCancelledRowsAndRejectsInconsistentStates(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 25); err != nil {
+		t.Fatal(err)
+	}
+	userID := "61000000-0000-4000-8000-000000000001"
+	roomID := "71000000-0000-4000-8000-000000000001"
+	cancelledSessionID := "81000000-0000-4000-8000-000000000001"
+	transaction, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = transaction.Rollback(ctx) }()
+	for _, statement := range []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO users (user_id, status, created_at, updated_at)
+			VALUES ($1, 'onboarding', now() - interval '2 hours', now() - interval '2 hours')`, []any{userID}},
+		{`INSERT INTO party_rooms (
+			room_id, room_code, visibility, status, host_user_id, participant_capacity,
+			participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
+		) VALUES ($1, 'CANCEL26', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO game_sessions (
+			session_id, room_id, game_id, engine_version, protocol_version, client_version,
+			state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+			state_payload, status, started_at, updated_at, ended_at
+		) VALUES (
+			$1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+			1, 1, 1, 'session.cancelled', 1, decode('01', 'hex'),
+			'cancelled', now() - interval '1 hour', now(), now()
+		)`, []any{cancelledSessionID, roomID}},
+	} {
+		if _, err := transaction.Exec(ctx, statement.sql, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 26); err != nil {
+		t.Fatal(err)
+	}
+	var cancelReason string
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT cancel_reason
+		FROM game_sessions
+		WHERE session_id = $1
+	`, cancelledSessionID).Scan(&cancelReason); err != nil {
+		t.Fatal(err)
+	}
+	if cancelReason != "legacy_cancelled" {
+		t.Fatalf("backfilled cancel reason = %q", cancelReason)
+	}
+	if _, err := fixture.Pool.Exec(ctx, `
+		INSERT INTO game_sessions (
+			session_id, room_id, game_id, engine_version, protocol_version, client_version,
+			state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+			state_payload, status, started_at, updated_at, ended_at
+		) VALUES (
+			$1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+			2, 1, 1, 'session.cancelled', 1, decode('02', 'hex'),
+			'cancelled', now() - interval '30 minutes', now(), now()
+		)
+	`, "81000000-0000-4000-8000-000000000002", roomID); err == nil || !strings.Contains(strings.ToLower(err.Error()), "game_sessions_cancel_reason_shape") {
+		t.Fatalf("missing cancel reason error = %v", err)
+	}
+	if _, err := fixture.Pool.Exec(ctx, `
+		INSERT INTO game_sessions (
+			session_id, room_id, game_id, engine_version, protocol_version, client_version,
+			state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
+			state_payload, cancel_reason, status, started_at, updated_at, ended_at
+		) VALUES (
+			$1, $2, 'liars-dice', '1.0.0', '1.0.0', '1.0.0',
+			3, 1, 1, 'session.finished', 1, decode('03', 'hex'),
+			'platform_cancelled', 'finished', now() - interval '20 minutes', now(), now()
+		)
+	`, "81000000-0000-4000-8000-000000000003", roomID); err == nil || !strings.Contains(strings.ToLower(err.Error()), "game_sessions_cancel_reason_shape") {
+		t.Fatalf("finished cancel reason error = %v", err)
+	}
+}
+
 func TestIdentityInvariantMigrationAcceptsValidVersionEightRows(t *testing.T) {
 	ctx, fixture, database, migrationsDir := openMigrationEightTest(t)
 	_, err := fixture.Pool.Exec(ctx, `

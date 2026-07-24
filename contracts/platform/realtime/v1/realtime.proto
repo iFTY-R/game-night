@@ -41,6 +41,8 @@ message StartSessionRequest {
   platform.game.v1.GameConfig config = 6;
   string operation_id = 7;
   bytes request_digest = 8;
+  uint64 config_revision = 9;
+  PendingStartProof pending_start_proof = 10;
 }
 
 message StartSessionResponse {
@@ -138,6 +140,7 @@ message GetReplayProjectionRequest {
 message GetReplayProjectionResponse {
   SessionSnapshot session = 1;
   platform.game.v1.GameProjection projection = 2;
+  platform.game.v1.ReplayTerminalMeta terminal_meta = 3;
 }
 
 // RoomSnapshot is private service data used to preserve the existing API transport contract.
@@ -185,6 +188,8 @@ message SessionSnapshot {
   google.protobuf.Timestamp started_at = 13;
   google.protobuf.Timestamp updated_at = 14;
   google.protobuf.Timestamp ended_at = 15;
+  FrozenStartConfig start = 16;
+  string cancel_reason = 17;
 }
 
 message Participant {
@@ -231,6 +236,22 @@ message SystemReceipt {
   bytes result_digest = 8;
   uint64 state_version = 9;
   google.protobuf.Timestamp committed_at = 10;
+}
+
+// FrozenStartConfig preserves the exact start payload plus the room fences that authorized it.
+message FrozenStartConfig {
+  platform.game.v1.GameEnvelope config = 1;
+  bytes config_digest = 2;
+  uint64 config_revision = 3;
+  uint64 room_version = 4;
+  uint64 membership_version = 5;
+  uint64 room_ownership_epoch = 6;
+}
+
+// PendingStartProof carries the exact countdown token pair that authorizes one room start consumption.
+message PendingStartProof {
+  string pending_start_id = 1;
+  string cancel_token = 2;
 }
 
 // CancelSessionRequest omits ownership_epoch so only the receiving owner can fence the terminal write.

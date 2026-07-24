@@ -55,3 +55,50 @@ func TestBuildReplayPreservesInitialRoster(t *testing.T) {
 		t.Fatalf("replay roster = %+v", replay.GetPlayers())
 	}
 }
+
+func TestBuildReplayCancelledKeepsPendingPublicRound(t *testing.T) {
+	events := []engine.Event{
+		{
+			Kind: engine.EventRoundStarted, Round: 1, FirstActor: "user-1",
+			Players: []engine.Participant{{UserID: "user-1", SeatIndex: 0}, {UserID: "user-2", SeatIndex: 1}},
+		},
+		{Kind: engine.EventBidPlaced, Round: 1, UserID: "user-1", Bid: &engine.Bid{Quantity: 2, Face: 3, Mode: engine.BidModeFlying}},
+	}
+	replay, err := BuildReplayCancelled(events, "runtime_cancelled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.GetFinishReason() != "runtime_cancelled" || len(replay.GetRounds()) != 1 {
+		t.Fatalf("cancelled replay=%+v", replay)
+	}
+	pending := replay.GetRounds()[0]
+	if pending.GetReason() != "" || pending.GetDiceRevealed() || len(pending.GetDice()) != 0 || len(pending.GetBids()) != 1 {
+		t.Fatalf("pending replay round=%+v", pending)
+	}
+}
+
+func TestBuildReplayCancelledKeepsAlreadyRevealedDice(t *testing.T) {
+	events := []engine.Event{
+		{
+			Kind: engine.EventRoundStarted, Round: 1, FirstActor: "user-1",
+			Players: []engine.Participant{{UserID: "user-1", SeatIndex: 0}, {UserID: "user-2", SeatIndex: 1}},
+		},
+		{
+			Kind: engine.EventDiceRevealed, Round: 1,
+			Dice: []engine.PrivateRoll{
+				{UserID: "user-1", Faces: []dice.Face{1, 2, 3, 4, 5}},
+				{UserID: "user-2", Faces: []dice.Face{2, 2, 2, 2, 2}},
+			},
+		},
+	}
+	replay, err := BuildReplayCancelled(events, "runtime_cancelled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(replay.GetRounds()) != 1 || !replay.GetRounds()[0].GetDiceRevealed() || len(replay.GetRounds()[0].GetDice()) != 2 {
+		t.Fatalf("revealed cancelled replay=%+v", replay.GetRounds())
+	}
+	if replay.GetRounds()[0].GetReason() != "" {
+		t.Fatalf("revealed cancelled replay leaked settlement=%+v", replay.GetRounds()[0])
+	}
+}

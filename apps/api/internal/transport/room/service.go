@@ -293,6 +293,9 @@ func (service *Service) JoinRoom(ctx context.Context, request *connect.Request[r
 	if err != nil {
 		return nil, err
 	}
+	if result.Changed {
+		service.cancelPendingForRoom(ctx, joined.Snapshot().ID)
+	}
 	wireRoom, err := service.roomWire(ctx, joined)
 	if err != nil {
 		return nil, err
@@ -318,6 +321,7 @@ func (service *Service) ApproveMember(ctx context.Context, request *connect.Requ
 	if err != nil {
 		return nil, err
 	}
+	service.cancelPendingForRoom(ctx, updated.Snapshot().ID)
 	wireRoom, err := service.roomWire(ctx, updated)
 	if err != nil {
 		return nil, err
@@ -342,6 +346,7 @@ func (service *Service) SetAdmission(ctx context.Context, request *connect.Reque
 	if err != nil {
 		return nil, err
 	}
+	service.cancelPendingForRoom(ctx, updated.Snapshot().ID)
 	wireRoom, err := service.roomWire(ctx, updated)
 	if err != nil {
 		return nil, err
@@ -362,7 +367,7 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	gameID, config, operationID, requestDigest, frozenConfig, configRevision, err := service.prepareStart(ctx, actor, roomID, request.Msg)
+	gameID, config, operationID, requestDigest, frozenConfig, configRevision, pendingProof, err := service.prepareStart(ctx, actor, roomID, request.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -372,30 +377,11 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 	}
 	updated, session, err := service.runtime.Start(ctx, gameruntime.StartCommand{
 		ActorUserID: actor, RoomID: roomID, GameID: gameID,
-		Expected: versionDomain(request.Msg.GetExpectedVersion()), Config: config,
-		OperationID: operationID, RequestDigest: &requestDigest,
+		Expected: versionDomain(request.Msg.GetExpectedVersion()), ConfigRevision: configRevision, Config: config,
+		PendingStartProof: pendingProof, OperationID: operationID, RequestDigest: &requestDigest,
 	})
 	if err != nil {
 		return nil, err
-	}
-	if usesPendingStart(request.Msg) {
-		pendingID, parseErr := parseUUID(request.Msg.GetPendingStartId())
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		// The session commit is the point of no return. Consuming only afterwards
-		// keeps a failed module/runtime creation retryable with the same countdown.
-		if _, consumeErr := service.ruleRepo.ConsumePendingStart(
-			ctx,
-			roomID,
-			pendingID,
-			request.Msg.GetCancelToken(),
-			operationID.Value(),
-			[32]byte(requestDigest),
-			service.ruleNow(),
-		); consumeErr != nil {
-			return nil, consumeErr
-		}
 	}
 	snapshot := session.Snapshot()
 	roomSnapshot := updated.Snapshot()
@@ -425,60 +411,61 @@ func (service *Service) StartGame(ctx context.Context, request *connect.Request[
 // the runtime is allowed to mutate room/session state. Empty pending fields are
 // retained as a compatibility path for clients predating the countdown API.
 func (service *Service) prepareStart(ctx context.Context, actor, roomID uuid.UUID, request *roomv1.StartGameRequest) (
-	gameSDK.GameID, gameSDK.Message, idempotency.OperationID, idempotency.Digest, roomDomain.ConfigEnvelope, uint64, error,
+	gameSDK.GameID, gameSDK.Message, idempotency.OperationID, idempotency.Digest, roomDomain.ConfigEnvelope, uint64, *gameruntime.PendingStartProof, error,
 ) {
 	usesPending := usesPendingStart(request)
 	if !usesPending {
 		legacyGameID, legacyConfig, operationID, requestDigest, err := startGameInput(request)
 		if err != nil {
-			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, err
 		}
-		return legacyGameID, legacyConfig, operationID, requestDigest, legacyConfigEnvelope(request.GetConfig(), legacyGameID), 0, nil
+		return legacyGameID, legacyConfig, operationID, requestDigest, legacyConfigEnvelope(request.GetConfig(), legacyGameID), 0, nil, nil
 	}
 	if request.GetPendingStartId() == "" || request.GetCancelToken() == "" || request.GetConfigRevision() == 0 || request.GetOwnershipEpoch() == 0 {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, gameruntime.ErrInvalidSessionInput
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, gameruntime.ErrInvalidSessionInput
 	}
 	pendingID, err := parseUUID(request.GetPendingStartId())
 	if err != nil {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, err
 	}
 	gameID, err := gameSDK.ParseGameID(strings.TrimSpace(request.GetGameId()))
 	if err != nil {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, gameruntime.ErrInvalidSessionInput
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, gameruntime.ErrInvalidSessionInput
 	}
 	operationID, requestDigest, err := operationBinding(request.GetOperationId(), request.GetRequestDigest())
 	if err != nil {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, err
 	}
 	current, err := service.authorizeRuleHost(ctx, actor, roomID, versionDomain(request.GetExpectedVersion()), request.GetOwnershipEpoch())
 	if err != nil {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, err
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, err
 	}
 	if current.Snapshot().SelectedGameID != string(gameID) {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrGameSelectionConflict
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, roomDomain.ErrGameSelectionConflict
 	}
 	pending, err := service.ruleRepo.GetPendingStart(ctx, roomID)
 	if err != nil || pending.ID != pendingID || pending.CancelToken != request.GetCancelToken() || pending.GameID != string(gameID) ||
 		pending.ConfigRevision != request.GetConfigRevision() || pending.Expected != current.Version() || pending.OwnershipEpoch != current.Snapshot().OwnershipEpoch {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrPendingStartInvalid
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, roomDomain.ErrPendingStartInvalid
 	}
 	// A pending record carries a server timestamp, so clients cannot race or
 	// locally shorten the visible countdown by calling StartGame early.
 	if service.ruleNow().Before(pending.Deadline) {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrPendingStartInvalid
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, roomDomain.ErrPendingStartInvalid
 	}
 	draft, err := service.ruleRepo.GetDraft(ctx, roomID, string(gameID))
 	if err != nil || draft.Revision != pending.ConfigRevision {
-		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrRuleRevisionConflict
+		return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, roomDomain.ErrRuleRevisionConflict
 	}
 	config := gameSDK.Message{MessageType: gameSDK.Identifier(draft.Config.MessageType), SchemaVersion: draft.Config.SchemaVersion, Payload: append([]byte(nil), draft.Config.Payload...)}
 	if request.GetConfig() != nil {
 		provided, providedErr := configEnvelopeFromGameConfig(request.GetConfig(), gameID)
 		if providedErr != nil || provided.Digest() != draft.Config.Digest() {
-			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, roomDomain.ErrRuleRevisionConflict
+			return "", gameSDK.Message{}, idempotency.OperationID{}, idempotency.Digest{}, roomDomain.ConfigEnvelope{}, 0, nil, roomDomain.ErrRuleRevisionConflict
 		}
 	}
-	return gameID, config, operationID, requestDigest, draft.Config, draft.Revision, nil
+	proof := &gameruntime.PendingStartProof{PendingStartID: pending.ID, CancelToken: pending.CancelToken}
+	return gameID, config, operationID, requestDigest, draft.Config, draft.Revision, proof, nil
 }
 
 // usesPendingStart distinguishes the new countdown-fenced contract from the
@@ -563,6 +550,7 @@ func (service *Service) RemoveMember(ctx context.Context, request *connect.Reque
 	if err != nil {
 		return nil, err
 	}
+	service.cancelPendingForRoom(ctx, updated.Snapshot().ID)
 	activeSessionID := ""
 	if result.SessionID != uuid.Nil {
 		activeSessionID = result.SessionID.String()
@@ -616,7 +604,7 @@ func (service *Service) CloseRoom(ctx context.Context, request *connect.Request[
 		}
 		updated, cancelled, err := service.runtime.Cancel(ctx, gameruntime.CancelCommand{
 			RoomID: roomID, SessionID: sessionSnapshot.ID, ExpectedRoom: expected,
-			OwnershipEpoch: sessionSnapshot.OwnershipEpoch, CloseRoom: true,
+			OwnershipEpoch: sessionSnapshot.OwnershipEpoch, Reason: gameruntime.CancelReasonPlatformCancelled, CloseRoom: true,
 		})
 		if err != nil {
 			return nil, err
@@ -642,6 +630,7 @@ func (service *Service) CloseRoom(ctx context.Context, request *connect.Request[
 	if err != nil {
 		return nil, err
 	}
+	service.cancelPendingForRoom(ctx, updated.Snapshot().ID)
 	wireRoom, err := service.roomWire(ctx, updated)
 	if err != nil {
 		return nil, err
@@ -820,18 +809,33 @@ func (service *Service) roomWire(ctx context.Context, room roomDomain.Room) (*ro
 		if draftErr != nil {
 			return nil, draftErr
 		}
+		draftRevisions := make(map[string]uint64, len(drafts))
 		wire.GameConfigDrafts = make([]*roomv1.RoomGameConfigDraft, 0, len(drafts))
 		for _, draft := range drafts {
+			draftRevisions[draft.GameID] = draft.Revision
 			wire.GameConfigDrafts = append(wire.GameConfigDrafts, ruleDraftWire(draft))
 		}
 		pending, pendingErr := service.ruleRepo.GetPendingStart(ctx, snapshot.ID)
-		if pendingErr == nil && !pending.Cancelled && !pending.Consumed && pending.Deadline.After(service.ruleNow()) {
+		if pendingErr == nil && pendingStartMatchesRoom(pending, snapshot, draftRevisions) {
 			wire.PendingStart = pendingStartWire(pending)
 		} else if pendingErr != nil && !errors.Is(pendingErr, roomDomain.ErrRuleNotFound) {
 			return nil, pendingErr
 		}
 	}
 	return wire, nil
+}
+
+func pendingStartMatchesRoom(pending roomDomain.PendingStart, snapshot roomDomain.RoomSnapshot, draftRevisions map[string]uint64) bool {
+	if pending.Cancelled || pending.Consumed {
+		return false
+	}
+	// The deadline unlocks StartGame; it does not invalidate the token. Keep an
+	// expired-but-unconsumed start visible so a reconnecting host can complete it.
+	return pending.RoomID == snapshot.ID &&
+		pending.GameID == snapshot.SelectedGameID &&
+		pending.Expected == (roomDomain.Version{Room: snapshot.RoomVersion, Membership: snapshot.MembershipVersion}) &&
+		pending.OwnershipEpoch == snapshot.OwnershipEpoch &&
+		draftRevisions[pending.GameID] == pending.ConfigRevision
 }
 
 func roomWire(room roomDomain.Room, usernames map[uuid.UUID]string) *roomv1.Room {

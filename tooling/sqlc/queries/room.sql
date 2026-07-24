@@ -567,7 +567,6 @@ WHERE room_id = sqlc.arg(room_id)
   AND cancel_token = sqlc.arg(cancel_token)
   AND ownership_epoch = sqlc.arg(ownership_epoch)
   AND consumed_at IS NULL
-  AND deadline_at >= sqlc.arg(cancelled_at)
 RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,
     expected_room_version, expected_membership_version, ownership_epoch,
     operation_id, request_digest, deadline_at, created_at, cancelled_at, consumed_at;
@@ -578,8 +577,11 @@ SET consumed_at = COALESCE(consumed_at, sqlc.arg(consumed_at))
 WHERE room_id = sqlc.arg(room_id)
   AND pending_start_id = sqlc.arg(pending_start_id)
   AND cancel_token = sqlc.arg(cancel_token)
-  AND operation_id = sqlc.arg(operation_id)
-  AND request_digest = sqlc.arg(request_digest)
+  AND (sqlc.narg(game_id)::text IS NULL OR game_id = sqlc.narg(game_id)::text)
+  AND (sqlc.narg(config_revision)::bigint IS NULL OR config_revision = sqlc.narg(config_revision)::bigint)
+  AND (sqlc.narg(expected_room_version)::bigint IS NULL OR expected_room_version = sqlc.narg(expected_room_version)::bigint)
+  AND (sqlc.narg(expected_membership_version)::bigint IS NULL OR expected_membership_version = sqlc.narg(expected_membership_version)::bigint)
+  AND (sqlc.narg(ownership_epoch)::bigint IS NULL OR ownership_epoch = sqlc.narg(ownership_epoch)::bigint)
   AND cancelled_at IS NULL
   AND deadline_at <= sqlc.arg(consumed_at)
 RETURNING pending_start_id, room_id, cancel_token, game_id, config_revision,

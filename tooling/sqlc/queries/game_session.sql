@@ -12,6 +12,15 @@ INSERT INTO game_sessions (
     state_message_type,
     state_schema_version,
     state_payload,
+    start_config_message_type,
+    start_config_schema_version,
+    start_config_payload,
+    start_config_digest,
+    start_config_revision,
+    start_room_version,
+    start_membership_version,
+    start_ownership_epoch,
+    cancel_reason,
     next_deadline_at,
     status,
     started_at,
@@ -30,6 +39,15 @@ INSERT INTO game_sessions (
     sqlc.arg(state_message_type),
     sqlc.arg(state_schema_version),
     sqlc.arg(state_payload),
+    sqlc.narg(start_config_message_type),
+    sqlc.narg(start_config_schema_version),
+    sqlc.narg(start_config_payload),
+    sqlc.narg(start_config_digest),
+    sqlc.narg(start_config_revision),
+    sqlc.narg(start_room_version),
+    sqlc.narg(start_membership_version),
+    sqlc.narg(start_ownership_epoch),
+    sqlc.narg(cancel_reason),
     sqlc.narg(next_deadline_at),
     sqlc.arg(status),
     sqlc.arg(started_at),
@@ -38,12 +56,16 @@ INSERT INTO game_sessions (
 )
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at;
 
 -- name: GetGameSessionForShare :one
 SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
 FROM game_sessions
 WHERE session_id = sqlc.arg(session_id)
 FOR SHARE;
@@ -97,7 +119,9 @@ WHERE session_id = sqlc.arg(session_id);
 -- name: GetGameSessionForUpdate :one
 SELECT session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
 FROM game_sessions
 WHERE session_id = sqlc.arg(session_id)
 FOR UPDATE;
@@ -112,7 +136,9 @@ WHERE session_id = sqlc.arg(session_id)
   AND status IN ('active', 'suspended')
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at;
 
 -- name: CreateGameSessionStartReceipt :one
 INSERT INTO game_session_start_receipts (
@@ -146,6 +172,15 @@ SET state_version = sqlc.arg(state_version),
     state_message_type = sqlc.arg(state_message_type),
     state_schema_version = sqlc.arg(state_schema_version),
     state_payload = sqlc.arg(state_payload),
+    start_config_message_type = sqlc.narg(start_config_message_type),
+    start_config_schema_version = sqlc.narg(start_config_schema_version),
+    start_config_payload = sqlc.narg(start_config_payload),
+    start_config_digest = sqlc.narg(start_config_digest),
+    start_config_revision = sqlc.narg(start_config_revision),
+    start_room_version = sqlc.narg(start_room_version),
+    start_membership_version = sqlc.narg(start_membership_version),
+    start_ownership_epoch = sqlc.narg(start_ownership_epoch),
+    cancel_reason = sqlc.narg(cancel_reason),
     next_deadline_at = sqlc.narg(next_deadline_at),
     status = sqlc.arg(status),
     updated_at = sqlc.arg(updated_at),
@@ -156,11 +191,14 @@ WHERE session_id = sqlc.arg(session_id)
   AND status = 'active'
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at;
 
 -- name: UpdateGameSessionLifecycleCAS :one
 UPDATE game_sessions
 SET next_deadline_at = sqlc.narg(next_deadline_at),
+    cancel_reason = sqlc.narg(cancel_reason),
     status = sqlc.arg(status),
     updated_at = sqlc.arg(updated_at),
     ended_at = sqlc.narg(ended_at)
@@ -170,7 +208,9 @@ WHERE session_id = sqlc.arg(session_id)
   AND status IN ('active', 'suspended')
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
-    state_payload, next_deadline_at, status, started_at, updated_at, ended_at;
+    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
+    start_config_digest, start_config_revision, start_room_version, start_membership_version,
+    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at;
 
 -- name: CreateGameSessionParticipant :exec
 INSERT INTO game_session_participants (session_id, user_id, seat_index)
@@ -232,7 +272,7 @@ WHERE access.session_id = sqlc.arg(session_id)
   AND sqlc.arg(updated_at) > access.updated_at
   AND access.member_snapshot_completed_at IS NOT NULL
   AND session.session_id = access.session_id
-  AND session.status = 'finished'
+  AND session.status IN ('finished', 'cancelled')
   AND room.room_id = access.room_id
   AND room.host_user_id = sqlc.arg(actor_user_id)
   AND (sqlc.arg(policy)::text <> 'public' OR room.visibility = 'public')

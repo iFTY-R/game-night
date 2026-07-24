@@ -46,10 +46,38 @@ func TestRoomGameSessionRepositoryStartsRoomAndSessionAtomically(t *testing.T) {
 	if loadedRoom.Snapshot().ActiveSessionID != loadedSession.Snapshot().ID || loadedSession.Snapshot().VersionKey.GameID != "dice" {
 		t.Fatalf("room/session link mismatch: room=%+v session=%+v", loadedRoom.Snapshot(), loadedSession.Snapshot())
 	}
+	if loadedSession.Snapshot().Start.Config.MessageType != fixture.commit.Session.Snapshot().Start.Config.MessageType ||
+		loadedSession.Snapshot().Start.Config.SchemaVersion != fixture.commit.Session.Snapshot().Start.Config.SchemaVersion ||
+		string(loadedSession.Snapshot().Start.Config.Payload) != string(fixture.commit.Session.Snapshot().Start.Config.Payload) ||
+		loadedSession.Snapshot().Start.ConfigDigest != fixture.commit.Session.Snapshot().Start.ConfigDigest ||
+		loadedSession.Snapshot().Start.ConfigRevision != 7 ||
+		loadedSession.Snapshot().Start.RoomVersion != fixture.before.Version().Room ||
+		loadedSession.Snapshot().Start.MembershipVersion != fixture.before.Version().Membership ||
+		loadedSession.Snapshot().Start.RoomOwnershipEpoch != fixture.before.Snapshot().OwnershipEpoch {
+		t.Fatalf("loaded frozen start = %+v", loadedSession.Snapshot().Start)
+	}
 	assertGameSessionCounts(t, fixture.ctx, fixture.fixture, fixture.sessionID, 1, 0, 1, 1)
 	loadedReceipt, err := repository.GetStartReceipt(fixture.ctx, fixture.receipt.Snapshot().Key, fixture.receipt.Snapshot().RequestDigest)
 	if err != nil || loadedReceipt.Snapshot() != fixture.receipt.Snapshot() {
 		t.Fatalf("loaded start receipt=%+v error=%v", loadedReceipt.Snapshot(), err)
+	}
+}
+
+func TestRoomGameSessionRepositoryConsumesPendingStartProofAtomically(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithPendingProof(t, 7)
+
+	storedRoom, storedSession, replayed, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+		fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed || storedRoom.Snapshot().ActiveSessionID != fixture.sessionID || storedSession.Snapshot().ID != fixture.sessionID {
+		t.Fatalf("stored room=%+v session=%+v replayed=%v", storedRoom.Snapshot(), storedSession.Snapshot(), replayed)
+	}
+	pending := loadLatestPendingStartRow(t, fixture)
+	if !pending.ConsumedAt.Valid || pending.CancelledAt.Valid || uuid.UUID(pending.PendingStartID.Bytes) != fixture.pending.ID {
+		t.Fatalf("pending row = %+v", pending)
 	}
 }
 
@@ -83,6 +111,31 @@ func TestRoomGameSessionRepositoryRollsBackRoomWhenOutboxInsertFails(t *testing.
 		t.Fatalf("session after rollback error = %v", err)
 	}
 	assertGameSessionCounts(t, fixture.ctx, fixture.fixture, fixture.sessionID, 0, 0, 0, 1)
+}
+
+func TestRoomGameSessionRepositoryRollsBackPendingConsumptionWhenOutboxInsertFails(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithPendingProof(t, 7)
+	conflict := fixture.commit.OutboxEvents[0].Snapshot()
+	existing, err := outbox.NewEvent(
+		conflict.ID, conflict.Type, conflict.AggregateType, conflict.AggregateID,
+		[]byte("different-payload"), conflict.CreatedAt, conflict.AvailableAt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newOutboxEventRepository(sqlcgen.New(fixture.fixture.Pool)).Insert(fixture.ctx, existing); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+		fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
+	); err == nil {
+		t.Fatal("expected outbox conflict to abort the cross-aggregate start")
+	}
+	pending := loadLatestPendingStartRow(t, fixture)
+	if pending.ConsumedAt.Valid || pending.CancelledAt.Valid {
+		t.Fatalf("pending row escaped rollback: %+v", pending)
+	}
 }
 
 func TestRoomGameSessionRepositoryRejectsStaleRoomBeforeCreatingSession(t *testing.T) {
@@ -145,6 +198,108 @@ func TestRoomGameSessionRepositorySerializesConcurrentIdempotentStarts(t *testin
 	assertGameSessionCounts(t, fixture.ctx, fixture.fixture, fixture.sessionID, 1, 0, 1, 1)
 }
 
+func TestRoomGameSessionRepositoryReplaysReceiptWithoutPendingDependency(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithPendingProof(t, 7)
+	repository := NewRoomGameSessionRepository(fixture.fixture.Pool)
+
+	if _, _, _, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.fixture.Pool.Exec(
+		fixture.ctx,
+		`UPDATE room_pending_starts SET cancelled_at = $1 WHERE pending_start_id = $2`,
+		fixture.commit.Session.Snapshot().StartedAt.Add(time.Second),
+		fixture.pending.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	room, session, replayed, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !replayed || room.Snapshot().ActiveSessionID != fixture.sessionID || session.Snapshot().ID != fixture.sessionID {
+		t.Fatalf("replay room=%+v session=%+v replayed=%v", room.Snapshot(), session.Snapshot(), replayed)
+	}
+}
+
+func TestRoomGameSessionRepositoryRacesCancelAndStartAtomically(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithPendingProof(t, 7)
+	repository := NewRoomGameSessionRepository(fixture.fixture.Pool)
+	rules := NewRuleRepository(fixture.fixture.Pool)
+
+	ready := make(chan struct{})
+	type startResult struct {
+		replayed bool
+		err      error
+	}
+	startResults := make(chan startResult, 1)
+	cancelResults := make(chan error, 1)
+
+	go func() {
+		<-ready
+		_, _, replayed, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt)
+		startResults <- startResult{replayed: replayed, err: err}
+	}()
+	go func() {
+		<-ready
+		cancelResults <- rules.CancelPendingStart(
+			fixture.ctx,
+			fixture.before.Snapshot().ID,
+			fixture.pending.ID,
+			fixture.pending.CancelToken,
+			fixture.pending.OwnershipEpoch,
+			fixture.pending.RequestDigest,
+			fixture.commit.Session.Snapshot().StartedAt,
+		)
+	}()
+
+	close(ready)
+	result := <-startResults
+	cancelErr := <-cancelResults
+
+	switch {
+	case result.err == nil:
+		if cancelErr == nil || !errors.Is(cancelErr, roomDomain.ErrPendingStartInvalid) {
+			t.Fatalf("cancel after start err = %v", cancelErr)
+		}
+		pending := loadLatestPendingStartRow(t, fixture)
+		if !pending.ConsumedAt.Valid || pending.CancelledAt.Valid || result.replayed {
+			t.Fatalf("pending row after start = %+v replayed=%v", pending, result.replayed)
+		}
+	case errors.Is(result.err, roomDomain.ErrPendingStartInvalid):
+		if cancelErr != nil {
+			t.Fatalf("cancel err = %v", cancelErr)
+		}
+		if _, err := NewGameSessionRepository(fixture.fixture.Pool).Get(fixture.ctx, fixture.sessionID); !errors.Is(err, gameruntime.ErrSessionNotFound) {
+			t.Fatalf("session after cancel won error = %v", err)
+		}
+		pending := loadLatestPendingStartRow(t, fixture)
+		if !pending.CancelledAt.Valid || pending.ConsumedAt.Valid {
+			t.Fatalf("pending row after cancel = %+v", pending)
+		}
+	default:
+		t.Fatalf("unexpected start error = %v", result.err)
+	}
+}
+
+func TestRoomGameSessionRepositoryPersistsZeroStartConfigRevision(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithOptions(t, 0, false)
+
+	if _, _, _, err := NewRoomGameSessionRepository(fixture.fixture.Pool).Start(
+		fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt,
+	); err != nil {
+		t.Fatal(err)
+	}
+	loadedSession, err := NewGameSessionRepository(fixture.fixture.Pool).Get(fixture.ctx, fixture.sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedSession.Snapshot().Start.ConfigRevision != 0 {
+		t.Fatalf("loaded zero revision start = %+v", loadedSession.Snapshot().Start)
+	}
+}
+
 func TestPartyRoomActiveSessionForeignKeyRejectsRoomOnlyStart(t *testing.T) {
 	fixture := openRoomGameSessionStartFixture(t)
 	if _, err := NewRoomRepository(fixture.fixture.Pool).UpdateCAS(fixture.ctx, fixture.before, fixture.after); !errors.Is(err, roomDomain.ErrRoomIntegrity) {
@@ -169,9 +324,18 @@ type roomGameSessionStartFixture struct {
 	after     roomDomain.Room
 	commit    gameruntime.CreationCommit
 	receipt   gameruntime.StartReceipt
+	pending   roomDomain.PendingStart
 }
 
 func openRoomGameSessionStartFixture(t *testing.T) roomGameSessionStartFixture {
+	return openRoomGameSessionStartFixtureWithOptions(t, 7, false)
+}
+
+func openRoomGameSessionStartFixtureWithPendingProof(t *testing.T, configRevision uint64) roomGameSessionStartFixture {
+	return openRoomGameSessionStartFixtureWithOptions(t, configRevision, true)
+}
+
+func openRoomGameSessionStartFixtureWithOptions(t *testing.T, configRevision uint64, withPendingProof bool) roomGameSessionStartFixture {
 	t.Helper()
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
@@ -202,18 +366,65 @@ func openRoomGameSessionStartFixture(t *testing.T) roomGameSessionStartFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, batch, err := gameruntime.NewSession(gameSessionCreateRequest(sessionID, before.Snapshot().ID, hostID, playerID, start.StartedAt))
+	request := gameSessionCreateRequest(sessionID, before.Snapshot().ID, hostID, playerID, start.StartedAt)
+	request.Start = gameruntime.FrozenStartConfig{
+		Config:             request.Input.Clone(),
+		ConfigRevision:     configRevision,
+		RoomVersion:        before.Version().Room,
+		MembershipVersion:  before.Version().Membership,
+		RoomOwnershipEpoch: before.Snapshot().OwnershipEpoch,
+	}
+	session, batch, err := gameruntime.NewSession(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	event := newGameSessionOutboxEvent(t, gameruntime.GameSessionCreatedEventType, sessionID, uuid.New(), start.StartedAt, []byte("atomic-created"))
 	commit := gameruntime.CreationCommit{Session: session, Batch: batch, OutboxEvents: []outbox.Event{event}}
 	receipt := gameSessionStartReceiptForTest(t, before, commit, "atomic-start-request")
+	var pending roomDomain.PendingStart
+	if withPendingProof {
+		pendingRepository := NewRuleRepository(fixture.Pool)
+		pending, err = pendingRepository.BeginPendingStart(ctx, roomDomain.PendingStartCreate{
+			RoomID:         before.Snapshot().ID,
+			ActorUserID:    hostID,
+			GameID:         "dice",
+			ConfigRevision: configRevision,
+			Expected:       before.Version(),
+			OwnershipEpoch: before.Snapshot().OwnershipEpoch,
+			OperationID:    "pending-start-" + sessionID.String(),
+			RequestDigest:  pendingStartDigest("pending-" + sessionID.String()),
+			Deadline:       start.StartedAt,
+			At:             now.Add(time.Second),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		commit.PendingStartProof = &gameruntime.PendingStartProof{
+			PendingStartID: pending.ID,
+			CancelToken:    pending.CancelToken,
+		}
+	}
 	return roomGameSessionStartFixture{
 		fixture: fixture, ctx: ctx, now: now, hostID: hostID, sessionID: sessionID,
 		before: before, after: after, commit: commit,
-		receipt: receipt,
+		receipt: receipt, pending: pending,
 	}
+}
+
+func loadLatestPendingStartRow(t testing.TB, fixture roomGameSessionStartFixture) sqlcgen.RoomPendingStart {
+	t.Helper()
+	row, err := sqlcgen.New(fixture.fixture.Pool).GetLatestRoomPendingStart(
+		fixture.ctx,
+		sqlcgen.GetLatestRoomPendingStartParams{RoomID: uuidToPG(fixture.before.Snapshot().ID)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return row
+}
+
+func pendingStartDigest(seed string) [32]byte {
+	return sha256.Sum256([]byte(seed))
 }
 
 func gameSessionStartReceiptForTest(

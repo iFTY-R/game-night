@@ -29,7 +29,7 @@ func (repository *ReplayAccessRepository) Authorize(ctx context.Context, actorID
 	if err != nil {
 		return "", err
 	}
-	if row.SessionStatus != "finished" {
+	if row.SessionStatus != "finished" && row.SessionStatus != "cancelled" {
 		return "", replay.ErrPolicyUnavailable
 	}
 	if row.ActorParticipated {
@@ -82,7 +82,7 @@ func (repository *ReplayAccessRepository) SetPolicy(ctx context.Context, command
 		if uuid.UUID(state.HostUserID.Bytes) != command.ActorUserID {
 			return replay.ErrAccessDenied
 		}
-		if state.SessionStatus != "finished" || !state.MemberSnapshotCompletedAt.Valid ||
+		if (state.SessionStatus != "finished" && state.SessionStatus != "cancelled") || !state.MemberSnapshotCompletedAt.Valid ||
 			command.Policy == replay.PolicyPublic && state.RoomVisibility != "public" {
 			return replay.ErrPolicyUnavailable
 		}

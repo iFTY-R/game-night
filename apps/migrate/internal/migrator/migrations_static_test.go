@@ -16,7 +16,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 		t.Fatalf("collect migrations: %v", err)
 	}
 
-	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24}
+	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}
 	if len(migrations) != len(wantVersions) {
 		t.Fatalf("expected %d migrations, got %d", len(wantVersions), len(migrations))
 	}
@@ -33,6 +33,81 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 			if !strings.Contains(string(contents), marker) {
 				t.Errorf("migration %s is missing %q", filepath.Base(migration.Source), marker)
 			}
+		}
+	}
+}
+
+func TestGameSessionStartConfigMigrationFreezesSnapshotFieldsAsABundle(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00025_game_session_start_config.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(contents)
+	constraintIndex := strings.Index(migration, "ADD CONSTRAINT game_sessions_start_snapshot_shape CHECK")
+	downIndex := strings.Index(migration, "-- +goose Down")
+	if constraintIndex < 0 || downIndex < 0 || constraintIndex > downIndex {
+		t.Fatal("migration 00025 must define one bundled start snapshot constraint before the down section")
+	}
+	constraintBody := migration[constraintIndex:downIndex]
+
+	requiredFragments := []string{
+		"start_config_message_type IS NULL",
+		"start_config_schema_version IS NULL",
+		"start_config_payload IS NULL",
+		"start_config_digest IS NULL",
+		"start_config_revision IS NULL",
+		"start_room_version IS NULL",
+		"start_membership_version IS NULL",
+		"start_ownership_epoch IS NULL",
+		"start_config_message_type IS NOT NULL",
+		"start_config_schema_version IS NOT NULL",
+		"start_config_payload IS NOT NULL",
+		"start_config_digest IS NOT NULL",
+		"start_config_revision IS NOT NULL",
+		"start_room_version IS NOT NULL",
+		"start_membership_version IS NOT NULL",
+		"start_ownership_epoch IS NOT NULL",
+		"start_config_revision >= 0",
+		"start_room_version > 0",
+		"start_membership_version > 0",
+		"start_ownership_epoch > 0",
+	}
+	for _, fragment := range requiredFragments {
+		if !strings.Contains(constraintBody, fragment) {
+			t.Errorf("migration 00025 bundled constraint is missing %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"ADD CONSTRAINT game_sessions_start_config_shape CHECK",
+		"ADD CONSTRAINT game_sessions_start_fence_shape CHECK",
+		"start_config_revision > 0",
+		"(start_config_revision IS NULL OR start_config_revision > 0)",
+	} {
+		if strings.Contains(constraintBody, forbidden) {
+			t.Errorf("migration 00025 bundled constraint still contains forbidden fragment %q", forbidden)
+		}
+	}
+}
+
+func TestGameSessionCancelReasonMigrationBackfillsLegacyRowsAndRequiresCancelledConsistency(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00026_game_session_cancel_reason.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(contents)
+	for _, fragment := range []string{
+		"ADD COLUMN cancel_reason text",
+		"SET cancel_reason = 'legacy_cancelled'",
+		"WHERE status = 'cancelled'",
+		"ADD CONSTRAINT game_sessions_cancel_reason_shape CHECK",
+		"status = 'cancelled'",
+		"cancel_reason IS NOT NULL",
+		"status <> 'cancelled'",
+		"cancel_reason IS NULL",
+		"DROP COLUMN IF EXISTS cancel_reason",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Errorf("migration 00026 is missing %q", fragment)
 		}
 	}
 }

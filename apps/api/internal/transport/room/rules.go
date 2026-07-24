@@ -54,7 +54,7 @@ func (service *Service) SelectRoomGame(ctx context.Context, request *connect.Req
 	}
 	if updated.Version() != current.Version() {
 		_ = operationID
-		service.cancelPendingForRoom(ctx, roomID, updated.Snapshot().OwnershipEpoch)
+		service.cancelPendingForRoom(ctx, roomID)
 	}
 	wire, err := service.roomWire(ctx, updated)
 	if err != nil {
@@ -110,7 +110,7 @@ func (service *Service) UpdateGameConfig(ctx context.Context, request *connect.R
 	if err != nil {
 		return nil, err
 	}
-	service.cancelPendingForRoom(ctx, roomID, current.Snapshot().OwnershipEpoch)
+	service.cancelPendingForRoom(ctx, roomID)
 	wire, err := service.roomWire(ctx, current)
 	if err != nil {
 		return nil, err
@@ -343,12 +343,12 @@ func (service *Service) authorizeRuleHost(ctx context.Context, actor, roomID uui
 	return room, nil
 }
 
-func (service *Service) cancelPendingForRoom(ctx context.Context, roomID uuid.UUID, ownershipEpoch uint64) {
+func (service *Service) cancelPendingForRoom(ctx context.Context, roomID uuid.UUID) {
 	pending, err := service.ruleRepo.GetPendingStart(ctx, roomID)
-	if err != nil || pending.Cancelled || pending.Consumed || !pending.Deadline.After(service.ruleNow()) {
+	if err != nil || pending.Cancelled || pending.Consumed {
 		return
 	}
-	_ = service.ruleRepo.CancelPendingStart(ctx, roomID, pending.ID, pending.CancelToken, ownershipEpoch, [32]byte{}, service.ruleNow())
+	_ = service.ruleRepo.CancelPendingStart(ctx, roomID, pending.ID, pending.CancelToken, pending.OwnershipEpoch, [32]byte{}, service.ruleNow())
 }
 
 func (service *Service) ruleNow() time.Time {

@@ -23,6 +23,8 @@ var (
 	errResetFailed       = errors.New("administrator reset failed")
 )
 
+const adminResetAuditTargetID = "admin" // Identifies the singleton account without granting adminctl table-read authority.
+
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.LookupEnv, os.Stdout); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
@@ -84,7 +86,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		if err != nil {
 			return err
 		}
-		target, err := audit.NewTarget(audit.TargetAdmin, "admin")
+		target, err := adminResetAuditTarget()
 		if err != nil {
 			return err
 		}
@@ -128,4 +130,9 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 	_, _ = io.WriteString(output, "admin reset committed\n")
 	return nil
+}
+
+// adminResetAuditTarget uses a system identifier because the offline tool cannot read the UUID-backed admin row.
+func adminResetAuditTarget() (audit.Target, error) {
+	return audit.NewTarget(audit.TargetSystem, adminResetAuditTargetID)
 }

@@ -249,7 +249,8 @@ func (repository memoryUserRepository) ChangeUsernameCAS(_ context.Context, curr
 type memoryClaimRepository struct{ storage *memoryIdentityStorage }
 
 func (repository memoryClaimRepository) Claim(_ context.Context, claim UsernameClaim, at time.Time) (UsernameClaim, error) {
-	key := claim.Snapshot().UsernameKey
+	snapshot := claim.Snapshot()
+	key := usernameClaimStorageKey(snapshot.OwnerUserID, snapshot.UsernameKey)
 	if existing, exists := repository.storage.claims[key]; exists && !existing.AvailableAt(at) {
 		return UsernameClaim{}, ErrUsernameUnavailable
 	}
@@ -257,21 +258,27 @@ func (repository memoryClaimRepository) Claim(_ context.Context, claim UsernameC
 	repository.storage.writeCount++
 	return claim, nil
 }
-func (repository memoryClaimRepository) GetForUpdate(_ context.Context, key string) (UsernameClaim, error) {
-	claim, exists := repository.storage.claims[key]
+func (repository memoryClaimRepository) GetForUpdate(_ context.Context, ownerUserID uuid.UUID, key string) (UsernameClaim, error) {
+	claim, exists := repository.storage.claims[usernameClaimStorageKey(ownerUserID, key)]
 	if !exists {
 		return UsernameClaim{}, ErrIdentityIntegrity
 	}
 	return claim, nil
 }
 func (repository memoryClaimRepository) ReserveCAS(_ context.Context, current, next UsernameClaim) (UsernameClaim, error) {
-	stored, exists := repository.storage.claims[current.Snapshot().UsernameKey]
+	currentSnapshot := current.Snapshot()
+	key := usernameClaimStorageKey(currentSnapshot.OwnerUserID, currentSnapshot.UsernameKey)
+	stored, exists := repository.storage.claims[key]
 	if !exists || stored.Snapshot() != current.Snapshot() {
 		return UsernameClaim{}, ErrIdentityConcurrentTransition
 	}
-	repository.storage.claims[next.Snapshot().UsernameKey] = next
+	repository.storage.claims[key] = next
 	repository.storage.writeCount++
 	return next, nil
+}
+
+func usernameClaimStorageKey(ownerUserID uuid.UUID, usernameKey string) string {
+	return ownerUserID.String() + ":" + usernameKey
 }
 
 type memoryDeviceRepository struct{ storage *memoryIdentityStorage }

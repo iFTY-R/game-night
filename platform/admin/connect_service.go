@@ -479,7 +479,7 @@ func adminConnectError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, err)
 	case errors.Is(err, identity.ErrUserNotFound), errors.Is(err, profile.ErrProfileNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
-	case errors.Is(err, identity.ErrUsernameUnavailable):
+	case errors.Is(err, identity.ErrUsernameUnavailable), errors.Is(err, identity.ErrUsernameRoomConflict):
 		return connect.NewError(connect.CodeAlreadyExists, err)
 	case errors.Is(err, identity.ErrIdentityConcurrentTransition), errors.Is(err, identity.ErrDeviceConcurrentTransition),
 		errors.Is(err, profile.ErrProfileConcurrentTransition), errors.Is(err, audit.ErrHeadConflict):
@@ -490,6 +490,7 @@ func adminConnectError(err error) error {
 		errors.Is(err, audit.ErrSensitiveWriteBlocked), errors.Is(err, audit.ErrRepositoryUnavailable):
 		return connect.NewError(connect.CodeUnavailable, errors.New("administrator service temporarily unavailable"))
 	case errors.Is(err, identity.ErrUserStatus), errors.Is(err, identity.ErrRecoveryConcurrentTransition),
+		errors.Is(err, identity.ErrUsernameAmbiguous),
 		errors.Is(err, profile.ErrProfileExportClosed), errors.Is(err, profile.ErrProfileExportExpired),
 		errors.Is(err, secretresult.ErrSecretNoLongerAvailable), errors.Is(err, ErrSessionExpired),
 		errors.Is(err, ErrSessionRevoked), errors.Is(err, ErrUnavailable), errors.Is(err, ErrNotFound):

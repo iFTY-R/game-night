@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import type { MyRoomCardWire, PublicRoomCardWire } from "../api/client";
 import { gameById, gameCatalog, type GameId } from "../game-catalog";
 import { useRoomStore } from "../stores/room";
+import { USERNAME_RULE_MESSAGE, validateUsernameInput } from "../username";
 
 const router = useRouter();
 const room = useRoomStore();
@@ -16,18 +17,26 @@ const roomCode = ref(inviteCode.value);
 const error = ref("");
 const listError = ref("");
 const ready = computed(() => room.hasIdentity);
+const usernameValidation = computed(() => validateUsernameInput(displayName.value));
+const usernameInvalid = computed(() => displayName.value.length > 0 && !usernameValidation.value.isValid);
+const canSubmitIdentity = computed(() => usernameValidation.value.isValid && !room.busy);
 const selectedGameId = ref<GameId>("liars-dice");
 const newRoomVisibility = ref<"ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC">("ROOM_VISIBILITY_PRIVATE");
 const selectedGame = computed(() => gameById(selectedGameId.value) ?? gameCatalog[0]);
 
 const saveIdentity = async (): Promise<boolean> => {
+  if (!usernameValidation.value.isValid) {
+    error.value = `用户名需要 ${USERNAME_RULE_MESSAGE}`;
+    displayName.value = usernameValidation.value.normalized;
+    return false;
+  }
   try {
-    await room.ensureIdentity(displayName.value);
-    displayName.value = room.displayName || displayName.value.trim();
+    await room.ensureIdentity(usernameValidation.value.normalized);
+    displayName.value = room.displayName || usernameValidation.value.normalized;
     error.value = "";
     return true;
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : "用户名需要 1 到 18 个字符";
+    error.value = reason instanceof Error ? reason.message : `用户名需要 ${USERNAME_RULE_MESSAGE}`;
     return false;
   }
 };
@@ -190,9 +199,18 @@ onMounted(async () => {
       <form class="entry-form" @submit.prevent="confirmIdentity">
         <label for="display-name">用户名</label>
         <div class="field-row">
-          <input id="display-name" v-model="displayName" autocomplete="nickname" maxlength="18" placeholder="朋友看到的名字" />
-          <button class="button" type="submit">继续 <ArrowRight :size="18" aria-hidden="true" /></button>
+          <input
+            id="display-name"
+            v-model="displayName"
+            autocomplete="nickname"
+            maxlength="8"
+            placeholder="朋友看到的名字"
+            :aria-invalid="usernameInvalid ? 'true' : 'false'"
+            aria-describedby="display-name-hint"
+          />
+          <button class="button" type="submit" :disabled="!canSubmitIdentity">继续 <ArrowRight :size="18" aria-hidden="true" /></button>
         </div>
+        <p id="display-name-hint" class="field-hint" :class="{ 'field-hint--invalid': usernameInvalid }">{{ USERNAME_RULE_MESSAGE }}</p>
       </form>
       <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     </section>
@@ -278,6 +296,8 @@ onMounted(async () => {
 .entry-form label { color: var(--platform-muted); font-size: 12px; font-weight: 700; }
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
 .field-row input { min-width: 0; min-height: 50px; padding: 0 14px; color: var(--platform-ink); background: rgb(8 18 19 / 48%); border: 1px solid rgb(168 181 180 / 28%); border-radius: 7px; }
+.field-hint { margin: -2px 0 0; color: var(--platform-muted); font-size: 12px; }
+.field-hint--invalid { color: var(--platform-danger); }
 .form-error { margin: 0; color: var(--platform-danger); font-size: 13px; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .room-shelf,

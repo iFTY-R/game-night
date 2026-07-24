@@ -23,13 +23,14 @@ FROM users
 WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
--- name: GetUserByUsernameKey :one
+-- name: ListUsersByUsernameKey :many
 SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
 FROM username_claims AS claim
 JOIN users AS u ON u.user_id = claim.owner_user_id
 WHERE claim.username_key = sqlc.arg(username_key)
   AND claim.status = 'active'
-  AND u.current_username_key = claim.username_key;
+  AND u.current_username_key = claim.username_key
+ORDER BY u.user_id;
 
 -- name: GetDeviceIdentityForUpdate :one
 WITH selected_device AS MATERIALIZED (
@@ -98,10 +99,9 @@ INSERT INTO username_claims (
     sqlc.arg(claimed_at),
     sqlc.arg(claimed_at)
 )
-ON CONFLICT (username_key) DO UPDATE
+ON CONFLICT (username_key, owner_user_id) DO UPDATE
 SET display_username = EXCLUDED.display_username,
     status = 'active',
-    owner_user_id = EXCLUDED.owner_user_id,
     reserved_until = NULL,
     updated_at = EXCLUDED.updated_at
 WHERE username_claims.status = 'reserved'
@@ -112,6 +112,7 @@ RETURNING username_key, display_username, status, owner_user_id, reserved_until,
 SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 FROM username_claims
 WHERE username_key = sqlc.arg(username_key)
+  AND owner_user_id = sqlc.arg(owner_user_id)
 FOR UPDATE;
 
 -- name: CompleteOnboardingUserCAS :one

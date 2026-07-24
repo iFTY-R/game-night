@@ -287,6 +287,10 @@ declare global {
 
 const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const userCSRFName = "__Host-gn_csrf";
+const localizedErrorMessages: Record<string, string> = {
+  // Room-scoped duplicate names are safe to present directly in localized form.
+  "room.username.taken": "房间内已有同名玩家",
+};
 
 const requestID = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -368,13 +372,15 @@ const currentRuleVersion = (room: RoomSnapshot): { roomVersion: string; membersh
 const draftForGame = (room: RoomSnapshot, gameId: string): RoomGameConfigDraftWire | undefined =>
   room.gameConfigDrafts?.find((draft) => draft.gameId === gameId);
 
+const localizeApiMessage = (message: string): string => localizedErrorMessages[message] ?? message;
+
 const errorMessage = (body: unknown, status: number): { code: string; message: string } => {
   if (typeof body === "object" && body !== null) {
     const candidate = body as { code?: unknown; message?: unknown; error?: { code?: unknown; message?: unknown } };
     const nested = candidate.error;
     const code = typeof candidate.code === "string" ? candidate.code : typeof nested?.code === "string" ? nested.code : "http_error";
     const message = typeof candidate.message === "string" ? candidate.message : typeof nested?.message === "string" ? nested.message : `请求失败 (${status})`;
-    return { code, message };
+    return { code, message: localizeApiMessage(message) };
   }
   return { code: "http_error", message: `请求失败 (${status})` };
 };

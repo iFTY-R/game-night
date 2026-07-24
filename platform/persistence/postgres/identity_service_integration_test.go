@@ -69,7 +69,7 @@ func TestIdentityServicePostgresResponseLossReplaysBootstrapAndOnboardingSecrets
 
 	onboardingCommand := identityDomain.CompleteOnboardingCommand{
 		DeviceToken: firstBootstrap.DeviceSecrets.Token(), CSRFToken: firstBootstrap.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.31", Username: "Alice9", OperationID: integrationIdentityOperationID(t, 0x22),
+		ClientIP: "203.0.113.31", Username: "Ali9", OperationID: integrationIdentityOperationID(t, 0x22),
 	}
 	firstOnboarding, err := service.CompleteOnboarding(ctx, onboardingCommand)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestIdentityServicePostgresRecoveryCommitsAndReplaysExactBundle(t *testing.
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
 	service := integrationIdentityService(t, fixture)
-	bootstrap, onboarding := integrationOnboardIdentity(t, ctx, service, 0x71, 0x72, "RecoveryOwner9")
+	bootstrap, onboarding := integrationOnboardIdentity(t, ctx, service, 0x71, 0x72, "RO09")
 	begin := integrationBeginRecovery(t, ctx, service, onboarding.RecoveryCode, "recovery_commit")
 
 	var beginDigest []byte
@@ -158,7 +158,7 @@ func TestIdentityServicePostgresConcurrentRecoveryGrantHasOneWinner(t *testing.T
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
 	service := integrationIdentityService(t, fixture)
-	_, onboarding := integrationOnboardIdentity(t, ctx, service, 0x74, 0x75, "RecoveryRace9")
+	_, onboarding := integrationOnboardIdentity(t, ctx, service, 0x74, 0x75, "RR09")
 	begin := integrationBeginRecovery(t, ctx, service, onboarding.RecoveryCode, "recovery_race")
 	commands := []identityDomain.CompleteRecoveryCommand{
 		{
@@ -210,7 +210,7 @@ func TestIdentityServicePostgresConcurrentRecoveryGrantHasOneWinner(t *testing.T
 	assertIdentityRecoveryCommitCounts(t, ctx, fixture, 2, 2, 3, 1, 1)
 }
 
-func TestIdentityServicePostgresConcurrentUsernameClaimHasOneWinner(t *testing.T) {
+func TestIdentityServicePostgresAllowsConcurrentSharedUsernameClaims(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), transactionIntegrationTimeout)
 	defer cancel()
@@ -222,11 +222,11 @@ func TestIdentityServicePostgresConcurrentUsernameClaimHasOneWinner(t *testing.T
 	commands := []identityDomain.CompleteOnboardingCommand{
 		{
 			DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
-			ClientIP: "203.0.113.32", Username: "Concurrent9", OperationID: integrationIdentityOperationID(t, 0x33),
+			ClientIP: "203.0.113.32", Username: "Co09", OperationID: integrationIdentityOperationID(t, 0x33),
 		},
 		{
 			DeviceToken: second.DeviceSecrets.Token(), CSRFToken: second.DeviceSecrets.CSRFToken(),
-			ClientIP: "203.0.113.33", Username: "ＣＯＮＣＵＲＲＥＮＴ９", OperationID: integrationIdentityOperationID(t, 0x34),
+			ClientIP: "203.0.113.33", Username: "Ｃｏ０９", OperationID: integrationIdentityOperationID(t, 0x34),
 		},
 	}
 	start := make(chan struct{})
@@ -246,22 +246,18 @@ func TestIdentityServicePostgresConcurrentUsernameClaimHasOneWinner(t *testing.T
 	waitGroup.Wait()
 	close(results)
 
-	successes, unavailable := 0, 0
+	successes := 0
 	for resultErr := range results {
-		switch {
-		case resultErr == nil:
-			successes++
-		case errors.Is(resultErr, identityDomain.ErrUsernameUnavailable):
-			unavailable++
-		default:
+		if resultErr != nil {
 			t.Fatalf("unexpected concurrent claim error: %v", resultErr)
 		}
+		successes++
 	}
-	if successes != 1 || unavailable != 1 {
-		t.Fatalf("concurrent claim outcomes: success=%d unavailable=%d", successes, unavailable)
+	if successes != 2 {
+		t.Fatalf("concurrent claim outcomes: success=%d", successes)
 	}
-	assertIdentityTableCount(t, ctx, fixture, "username_claims", 1)
-	assertIdentityTableCount(t, ctx, fixture, "user_recovery_credentials", 1)
+	assertIdentityTableCount(t, ctx, fixture, "username_claims", 2)
+	assertIdentityTableCount(t, ctx, fixture, "user_recovery_credentials", 2)
 	var activeUsers, onboardingUsers int
 	if err := fixture.Pool.QueryRow(ctx, `
         SELECT count(*) FILTER (WHERE status = 'active'), count(*) FILTER (WHERE status = 'onboarding')
@@ -269,12 +265,12 @@ func TestIdentityServicePostgresConcurrentUsernameClaimHasOneWinner(t *testing.T
     `).Scan(&activeUsers, &onboardingUsers); err != nil {
 		t.Fatal(err)
 	}
-	if activeUsers != 1 || onboardingUsers != 1 {
+	if activeUsers != 2 || onboardingUsers != 0 {
 		t.Fatalf("concurrent user states: active=%d onboarding=%d", activeUsers, onboardingUsers)
 	}
 }
 
-func TestIdentityPostgresConcurrentUsernameClaimMeetsAtClaimPoint(t *testing.T) {
+func TestIdentityPostgresConcurrentSharedUsernameClaimsMeetAtClaimPoint(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), transactionIntegrationTimeout)
 	defer cancel()
@@ -284,7 +280,7 @@ func TestIdentityPostgresConcurrentUsernameClaimMeetsAtClaimPoint(t *testing.T) 
 		integrationBootstrapIdentity(t, ctx, service, 0x41),
 		integrationBootstrapIdentity(t, ctx, service, 0x42),
 	}
-	username, err := identifier.ParseUsername("Barrier9")
+	username, err := identifier.ParseUsername("Br09")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,23 +330,19 @@ func TestIdentityPostgresConcurrentUsernameClaimMeetsAtClaimPoint(t *testing.T) 
 		t.Fatalf("prepare claim-point race: %v", preparationErr)
 	}
 
-	successes, unavailable := 0, 0
+	successes := 0
 	for resultErr := range results {
-		switch {
-		case resultErr == nil:
-			successes++
-		case errors.Is(resultErr, identityDomain.ErrUsernameUnavailable):
-			unavailable++
-		default:
+		if resultErr != nil {
 			t.Fatalf("unexpected claim-point race error: %v", resultErr)
 		}
+		successes++
 	}
-	if successes != 1 || unavailable != 1 {
-		t.Fatalf("claim-point outcomes: success=%d unavailable=%d", successes, unavailable)
+	if successes != 2 {
+		t.Fatalf("claim-point outcomes: success=%d", successes)
 	}
 }
 
-func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *testing.T) {
+func TestIdentityServicePostgresChangeUsernameKeepsPerUserReservationAndAllowsSharedName(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), transactionIntegrationTimeout)
 	defer cancel()
@@ -359,7 +351,7 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 	first := integrationBootstrapIdentity(t, ctx, runtime.service, 0x51)
 	if _, err := runtime.service.CompleteOnboarding(ctx, identityDomain.CompleteOnboardingCommand{
 		DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.51", Username: "Alice9", OperationID: integrationIdentityOperationID(t, 0x52),
+		ClientIP: "203.0.113.51", Username: "Ali9", OperationID: integrationIdentityOperationID(t, 0x52),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -381,9 +373,11 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 	if err := fixture.Pool.QueryRow(ctx, `
 		SELECT old_claim.status, old_claim.reserved_until, new_claim.status
 		FROM username_claims AS old_claim
-		JOIN username_claims AS new_claim ON new_claim.username_key = 'bob9'
-		WHERE old_claim.username_key = 'alice9'
-	`).Scan(&oldStatus, &oldReservedUntil, &newStatus); err != nil {
+		JOIN username_claims AS new_claim ON new_claim.owner_user_id = old_claim.owner_user_id
+		WHERE old_claim.username_key = 'ali9'
+		  AND old_claim.owner_user_id = $1
+		  AND new_claim.username_key = 'bob9'
+	`, changed.User.Snapshot().ID).Scan(&oldStatus, &oldReservedUntil, &newStatus); err != nil {
 		t.Fatal(err)
 	}
 	if oldStatus != "reserved" || newStatus != "active" || !oldReservedUntil.Equal(runtime.clock.Now().Add(identityDomain.UsernameReservationTTL)) {
@@ -391,7 +385,7 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 	}
 	if _, err := runtime.service.ChangeUsername(ctx, identityDomain.ChangeUsernameCommand{
 		DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.51", Username: "Carol9",
+		ClientIP: "203.0.113.51", Username: "Car9",
 	}); !errors.Is(err, identityDomain.ErrUsernameChangeCooldown) {
 		t.Fatalf("immediate second rename error = %v", err)
 	}
@@ -402,7 +396,7 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 		if getErr != nil {
 			return getErr
 		}
-		carol, parseErr := identifier.ParseUsername("Carol9")
+		carol, parseErr := identifier.ParseUsername("Car9")
 		if parseErr != nil {
 			return parseErr
 		}
@@ -422,27 +416,36 @@ func TestIdentityServicePostgresChangeUsernameAndReclaimsExpiredReservation(t *t
 		t.Fatalf("adapter cooldown reconstruction error = %v", err)
 	}
 
-	if _, err := runtime.clock.Advance(identityDomain.UsernameReservationTTL); err != nil {
-		t.Fatal(err)
-	}
 	second := integrationBootstrapIdentity(t, ctx, runtime.service, 0x53)
 	if _, err := runtime.service.CompleteOnboarding(ctx, identityDomain.CompleteOnboardingCommand{
 		DeviceToken: second.DeviceSecrets.Token(), CSRFToken: second.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.52", Username: "Alice9", OperationID: integrationIdentityOperationID(t, 0x54),
+		ClientIP: "203.0.113.52", Username: "Ali9", OperationID: integrationIdentityOperationID(t, 0x54),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	var owner uuid.UUID
-	var reclaimedStatus string
-	var reservedUntil pgtype.Timestamptz
+	var secondStatus string
+	var secondReservedUntil pgtype.Timestamptz
 	if err := fixture.Pool.QueryRow(ctx, `
-		SELECT owner_user_id, status, reserved_until
-		FROM username_claims WHERE username_key = 'alice9'
-	`).Scan(&owner, &reclaimedStatus, &reservedUntil); err != nil {
+		SELECT status, reserved_until
+		FROM username_claims
+		WHERE username_key = 'ali9' AND owner_user_id = $1
+	`, second.User.Snapshot().ID).Scan(&secondStatus, &secondReservedUntil); err != nil {
 		t.Fatal(err)
 	}
-	if owner != second.User.Snapshot().ID || reclaimedStatus != "active" || reservedUntil.Valid {
-		t.Fatalf("expired reservation was not reclaimed: owner=%s status=%s reserved=%v", owner, reclaimedStatus, reservedUntil)
+	if secondStatus != "active" || secondReservedUntil.Valid {
+		t.Fatalf("shared username claim state: status=%s reserved=%v", secondStatus, secondReservedUntil)
+	}
+	var firstStatus string
+	var firstReservedUntil time.Time
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT status, reserved_until
+		FROM username_claims
+		WHERE username_key = 'ali9' AND owner_user_id = $1
+	`, changed.User.Snapshot().ID).Scan(&firstStatus, &firstReservedUntil); err != nil {
+		t.Fatal(err)
+	}
+	if firstStatus != "reserved" || !firstReservedUntil.Equal(oldReservedUntil) {
+		t.Fatalf("first user's reservation changed: status=%s until=%s", firstStatus, firstReservedUntil)
 	}
 }
 
@@ -539,7 +542,7 @@ func TestIdentityPostgresOnboardingCASRejectsExpiredWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	username, err := identifier.ParseUsername("Expired9")
+	username, err := identifier.ParseUsername("Ex09")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -79,10 +79,10 @@ type UserRepository interface {
 	ChangeUsernameCAS(context.Context, User, User) (User, error)
 }
 
-// UsernameClaimRepository owns the single global current/history username registry.
+// UsernameClaimRepository owns one user's current and historical username claims; display keys may be shared by other users.
 type UsernameClaimRepository interface {
 	Claim(context.Context, UsernameClaim, time.Time) (UsernameClaim, error)
-	GetForUpdate(context.Context, string) (UsernameClaim, error)
+	GetForUpdate(context.Context, uuid.UUID, string) (UsernameClaim, error)
 	ReserveCAS(context.Context, UsernameClaim, UsernameClaim) (UsernameClaim, error)
 }
 

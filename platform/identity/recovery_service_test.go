@@ -22,7 +22,7 @@ import (
 func TestServiceRecoveryRoundTripReplaysAndConsumesInOrder(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
-	bootstrap, onboarding := fixture.onboard(t, ctx, "recover_me")
+	bootstrap, onboarding := fixture.onboard(t, ctx, "re01")
 	flowID := challenge.RequestFlowID("flow_recovery_round_trip")
 	beginChallenge, err := fixture.service.BeginRecoveryChallenge(ctx, BeginRecoveryChallengeCommand{
 		CanonicalOrigin: "https://play.example", RequestFlowID: flowID,
@@ -104,7 +104,7 @@ func TestServiceRecoveryRoundTripReplaysAndConsumesInOrder(t *testing.T) {
 func TestServiceRotatesConfirmsListsAndRevokesDevices(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
-	bootstrap, _ := fixture.onboard(t, ctx, "device_owner")
+	bootstrap, _ := fixture.onboard(t, ctx, "dv01")
 	rotation, err := fixture.service.RotateRecoveryCode(ctx, RotateRecoveryCodeCommand{
 		DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
 		OperationID: testOperationID(t, 91), RequestID: "req-rotate-1",
@@ -148,7 +148,7 @@ func TestServiceRotatesConfirmsListsAndRevokesDevices(t *testing.T) {
 func TestServiceAssistedRecoveryConsumesOnlyAtComplete(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
-	bootstrap, _ := fixture.onboard(t, ctx, "assisted_user")
+	bootstrap, _ := fixture.onboard(t, ctx, "as01")
 	now := fixture.clock.Now()
 	for id, credential := range fixture.storage.recoveries {
 		revoked, err := credential.Revoke(RecoveryRevokeAssisted, now)
@@ -215,7 +215,7 @@ func TestServiceAssistedRecoveryConsumesOnlyAtComplete(t *testing.T) {
 func TestCompleteRecoveryRollsBackWhenOutboxFails(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
-	_, onboarding := fixture.onboard(t, ctx, "rollback_user")
+	_, onboarding := fixture.onboard(t, ctx, "rb01")
 	flowID := challenge.RequestFlowID("flow_recovery_rollback")
 	beginChallenge, err := fixture.service.BeginRecoveryChallenge(ctx, BeginRecoveryChallengeCommand{
 		CanonicalOrigin: "https://play.example", RequestFlowID: flowID,
@@ -255,7 +255,7 @@ func TestCompleteRecoveryRollsBackWhenOutboxFails(t *testing.T) {
 func TestCompleteRecoveryFailsClosedWhenAuditCheckpointIsStale(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
-	_, onboarding := fixture.onboard(t, ctx, "health_gate")
+	_, onboarding := fixture.onboard(t, ctx, "hg01")
 	flowID := challenge.RequestFlowID("flow_recovery_audit_blocked")
 	beginChallenge, err := fixture.service.BeginRecoveryChallenge(ctx, BeginRecoveryChallengeCommand{
 		CanonicalOrigin: "https://play.example", RequestFlowID: flowID,

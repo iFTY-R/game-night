@@ -176,6 +176,129 @@ func TestRoomActivityMigrationBackfillsExistingRooms(t *testing.T) {
 	}
 }
 
+func TestRoomScopedUsernameMigrationBackfillsCurrentMembers(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 26); err != nil {
+		t.Fatal(err)
+	}
+
+	hostID := "91000000-0000-4000-8000-000000000001"
+	guestID := "91000000-0000-4000-8000-000000000002"
+	roomID := "92000000-0000-4000-8000-000000000001"
+	transaction, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = transaction.Rollback(ctx) }()
+	statements := []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO users (user_id, status, username, current_username_key, username_changed_at, created_at, updated_at)
+			VALUES ($1, 'active', $2, $3, now() - interval '2 days', now() - interval '2 days', now() - interval '2 days')`, []any{hostID, "Host", "host"}},
+		{`INSERT INTO users (user_id, status, username, current_username_key, username_changed_at, created_at, updated_at)
+			VALUES ($1, 'active', $2, $3, now() - interval '2 days', now() - interval '2 days', now() - interval '2 days')`, []any{guestID, "Guest", "guest"}},
+		{`INSERT INTO username_claims (username_key, display_username, status, owner_user_id, created_at, updated_at)
+			VALUES ('host', 'Host', 'active', $1, now() - interval '2 days', now() - interval '2 days'),
+			       ('guest', 'Guest', 'active', $2, now() - interval '2 days', now() - interval '2 days')`, []any{hostID, guestID}},
+		{`INSERT INTO party_rooms (
+			room_id, room_code, visibility, status, host_user_id, participant_capacity,
+			participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
+		) VALUES ($1, 'NAME27', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, now() - interval '1 day', now())`, []any{roomID, hostID}},
+		{`INSERT INTO room_members (room_id, user_id, role, seat_index, joined_at, last_seen_at)
+			VALUES ($1, $2, 'participant', 0, now() - interval '1 day', now()),
+			       ($1, $3, 'spectator', NULL, now() - interval '1 day', now())`, []any{roomID, hostID, guestID}},
+	}
+	for _, statement := range statements {
+		if _, err := transaction.Exec(ctx, statement.sql, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 27); err != nil {
+		t.Fatalf("upgrade existing room members to migration 27: %v", err)
+	}
+	wantAliases := map[string][2]string{
+		hostID:  {"Host", "host"},
+		guestID: {"Guest", "guest"},
+	}
+	for userID, want := range wantAliases {
+		var displayUsername, usernameKey string
+		if err := fixture.Pool.QueryRow(ctx, `
+			SELECT display_username, username_key
+			FROM room_members
+			WHERE room_id = $1 AND user_id = $2
+		`, roomID, userID).Scan(&displayUsername, &usernameKey); err != nil {
+			t.Fatal(err)
+		}
+		if displayUsername != want[0] || usernameKey != want[1] {
+			t.Fatalf("member %s alias = (%q, %q), want (%q, %q)", userID, displayUsername, usernameKey, want[0], want[1])
+		}
+	}
+}
+
+func TestRoomScopedUsernameMigrationRejectsAmbiguousDowngrade(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+
+	var currentUser string
+	if err := fixture.Pool.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+		t.Fatal(err)
+	}
+	database := fixture.OpenSQLDB(t, map[string]string{
+		ownerRoleSetting: currentUser, auditWriterRoleSetting: currentUser, migrationRoleSetting: currentUser,
+		runtimeRoleSetting: currentUser, workerRoleSetting: currentUser,
+	})
+	if err := goose.UpToContext(ctx, database, migrationDirectory(t), 27); err != nil {
+		t.Fatal(err)
+	}
+
+	firstUserID := "93000000-0000-4000-8000-000000000001"
+	secondUserID := "93000000-0000-4000-8000-000000000002"
+	transaction, err := fixture.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = transaction.Rollback(ctx) }()
+	if _, err := transaction.Exec(ctx, `
+		INSERT INTO users (user_id, status, username, current_username_key, username_changed_at, created_at, updated_at)
+		VALUES ($1, 'active', 'Same', 'same', now(), now(), now()),
+		       ($2, 'active', 'Same', 'same', now(), now(), now())
+	`, firstUserID, secondUserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transaction.Exec(ctx, `
+		INSERT INTO username_claims (username_key, display_username, status, owner_user_id, created_at, updated_at)
+		VALUES ('same', 'Same', 'active', $1, now(), now()),
+		       ('same', 'Same', 'active', $2, now(), now())
+	`, firstUserID, secondUserID); err != nil {
+		t.Fatal(err)
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	err = goose.DownToContext(ctx, database, migrationDirectory(t), 26)
+	if err == nil || !strings.Contains(err.Error(), "cannot roll back room-scoped usernames while duplicate username claims exist") {
+		t.Fatalf("ambiguous room-scoped username downgrade error = %v", err)
+	}
+}
+
 func TestGameSessionStartConfigMigrationKeepsLegacyRowsAllowsRevisionZeroAndRejectsPartialSnapshots(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)

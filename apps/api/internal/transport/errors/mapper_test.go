@@ -26,6 +26,8 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 	}{
 		{name: "username invalid", err: identifier.ErrUsernameCharacters, wantConnect: connect.CodeInvalidArgument, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_INVALID, wantKey: "identity.username.invalid"},
 		{name: "username taken", err: identity.ErrUsernameUnavailable, wantConnect: connect.CodeAlreadyExists, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, wantKey: "identity.username.taken"},
+		{name: "rename conflicts in room", err: identity.ErrUsernameRoomConflict, wantConnect: connect.CodeAlreadyExists, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, wantKey: "room.username.taken"},
+		{name: "room username taken", err: room.ErrUsernameConflict, wantConnect: connect.CodeAlreadyExists, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, wantKey: "room.username.taken"},
 		{name: "device invalid", err: identity.ErrDeviceAuthentication, wantConnect: connect.CodeUnauthenticated, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_CREDENTIAL_INVALID, wantKey: "identity.device.invalid"},
 		{name: "admin auth", err: admin.ErrAuthentication, wantConnect: connect.CodeUnauthenticated, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, wantKey: "admin.auth.invalid"},
 		{name: "room version", err: room.ErrRoomVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, wantKey: "room.version.conflict"},

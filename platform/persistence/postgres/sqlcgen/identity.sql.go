@@ -97,10 +97,9 @@ INSERT INTO username_claims (
     $4,
     $4
 )
-ON CONFLICT (username_key) DO UPDATE
+ON CONFLICT (username_key, owner_user_id) DO UPDATE
 SET display_username = EXCLUDED.display_username,
     status = 'active',
-    owner_user_id = EXCLUDED.owner_user_id,
     reserved_until = NULL,
     updated_at = EXCLUDED.updated_at
 WHERE username_claims.status = 'reserved'
@@ -134,10 +133,9 @@ type ClaimUsernameParams struct {
 //	    $4,
 //	    $4
 //	)
-//	ON CONFLICT (username_key) DO UPDATE
+//	ON CONFLICT (username_key, owner_user_id) DO UPDATE
 //	SET display_username = EXCLUDED.display_username,
 //	    status = 'active',
-//	    owner_user_id = EXCLUDED.owner_user_id,
 //	    reserved_until = NULL,
 //	    updated_at = EXCLUDED.updated_at
 //	WHERE username_claims.status = 'reserved'
@@ -803,42 +801,6 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User,
 	return i, err
 }
 
-const getUserByUsernameKey = `-- name: GetUserByUsernameKey :one
-SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
-FROM username_claims AS claim
-JOIN users AS u ON u.user_id = claim.owner_user_id
-WHERE claim.username_key = $1
-  AND claim.status = 'active'
-  AND u.current_username_key = claim.username_key
-`
-
-type GetUserByUsernameKeyParams struct {
-	UsernameKey string `json:"username_key"`
-}
-
-// GetUserByUsernameKey
-//
-//	SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
-//	FROM username_claims AS claim
-//	JOIN users AS u ON u.user_id = claim.owner_user_id
-//	WHERE claim.username_key = $1
-//	  AND claim.status = 'active'
-//	  AND u.current_username_key = claim.username_key
-func (q *Queries) GetUserByUsernameKey(ctx context.Context, arg GetUserByUsernameKeyParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsernameKey, arg.UsernameKey)
-	var i User
-	err := row.Scan(
-		&i.UserID,
-		&i.Status,
-		&i.Username,
-		&i.CurrentUsernameKey,
-		&i.UsernameChangedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getUserForUpdate = `-- name: GetUserForUpdate :one
 SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 FROM users
@@ -953,11 +915,13 @@ const getUsernameClaimForUpdate = `-- name: GetUsernameClaimForUpdate :one
 SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 FROM username_claims
 WHERE username_key = $1
+  AND owner_user_id = $2
 FOR UPDATE
 `
 
 type GetUsernameClaimForUpdateParams struct {
-	UsernameKey string `json:"username_key"`
+	UsernameKey string      `json:"username_key"`
+	OwnerUserID pgtype.UUID `json:"owner_user_id"`
 }
 
 // GetUsernameClaimForUpdate
@@ -965,9 +929,10 @@ type GetUsernameClaimForUpdateParams struct {
 //	SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 //	FROM username_claims
 //	WHERE username_key = $1
+//	  AND owner_user_id = $2
 //	FOR UPDATE
 func (q *Queries) GetUsernameClaimForUpdate(ctx context.Context, arg GetUsernameClaimForUpdateParams) (UsernameClaim, error) {
-	row := q.db.QueryRow(ctx, getUsernameClaimForUpdate, arg.UsernameKey)
+	row := q.db.QueryRow(ctx, getUsernameClaimForUpdate, arg.UsernameKey, arg.OwnerUserID)
 	var i UsernameClaim
 	err := row.Scan(
 		&i.UsernameKey,
@@ -1057,6 +1022,57 @@ func (q *Queries) ListUserDeviceCredentials(ctx context.Context, arg ListUserDev
 			&i.AbsoluteExpiresAt,
 			&i.RevokedAt,
 			&i.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersByUsernameKey = `-- name: ListUsersByUsernameKey :many
+SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+FROM username_claims AS claim
+JOIN users AS u ON u.user_id = claim.owner_user_id
+WHERE claim.username_key = $1
+  AND claim.status = 'active'
+  AND u.current_username_key = claim.username_key
+ORDER BY u.user_id
+`
+
+type ListUsersByUsernameKeyParams struct {
+	UsernameKey string `json:"username_key"`
+}
+
+// ListUsersByUsernameKey
+//
+//	SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+//	FROM username_claims AS claim
+//	JOIN users AS u ON u.user_id = claim.owner_user_id
+//	WHERE claim.username_key = $1
+//	  AND claim.status = 'active'
+//	  AND u.current_username_key = claim.username_key
+//	ORDER BY u.user_id
+func (q *Queries) ListUsersByUsernameKey(ctx context.Context, arg ListUsersByUsernameKeyParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersByUsernameKey, arg.UsernameKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Status,
+			&i.Username,
+			&i.CurrentUsernameKey,
+			&i.UsernameChangedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

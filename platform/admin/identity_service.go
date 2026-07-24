@@ -701,7 +701,7 @@ func (service *IdentityService) ForceChangeUsername(ctx context.Context, command
 		if _, err = transaction.IdentityUsernameClaims().Claim(ctx, newClaim, plan.ChangedAt); err != nil {
 			return err
 		}
-		oldClaim, err := transaction.IdentityUsernameClaims().GetForUpdate(ctx, plan.PreviousUsernameKey)
+		oldClaim, err := transaction.IdentityUsernameClaims().GetForUpdate(ctx, command.UserID, plan.PreviousUsernameKey)
 		if err != nil {
 			return err
 		}
@@ -765,7 +765,7 @@ func (service *IdentityService) transitionUser(ctx context.Context, command Gove
 			return err
 		}
 		if nextStatus == identity.UserStatusDeleted {
-			oldClaim, claimErr := transaction.IdentityUsernameClaims().GetForUpdate(ctx, current.Snapshot().CurrentUsernameKey)
+			oldClaim, claimErr := transaction.IdentityUsernameClaims().GetForUpdate(ctx, command.UserID, current.Snapshot().CurrentUsernameKey)
 			if claimErr != nil {
 				return claimErr
 			}
@@ -1366,7 +1366,8 @@ func mapAdminIdentityError(err error) error {
 		errors.Is(err, ErrInvalidInput), errors.Is(err, ErrAuthentication), errors.Is(err, ErrPermissionDenied),
 		errors.Is(err, ratelimit.ErrRejected), errors.Is(err, ratelimit.ErrUnavailable),
 		errors.Is(err, identity.ErrUserNotFound), errors.Is(err, identity.ErrUserStatus),
-		errors.Is(err, identity.ErrUsernameUnavailable), errors.Is(err, identity.ErrIdentityConcurrentTransition),
+		errors.Is(err, identity.ErrUsernameUnavailable), errors.Is(err, identity.ErrUsernameAmbiguous),
+		errors.Is(err, identity.ErrUsernameRoomConflict), errors.Is(err, identity.ErrIdentityConcurrentTransition),
 		errors.Is(err, identity.ErrDeviceAuthentication), errors.Is(err, identity.ErrDeviceConcurrentTransition),
 		errors.Is(err, identity.ErrRecoveryInvalid), errors.Is(err, identity.ErrRecoveryConcurrentTransition),
 		errors.Is(err, profile.ErrProfileNotFound), errors.Is(err, profile.ErrInvalidProfileInput),

@@ -52,7 +52,7 @@ func (repository *RoomRepository) Create(ctx context.Context, room roomDomain.Ro
 			return err
 		}
 		for _, member := range snapshot.Members {
-			if err := queries.CreateRoomMember(ctx, createRoomMemberParams(snapshot.ID, member)); err != nil {
+			if err := queries.CreateRoomMember(ctx, createRoomMemberParams(snapshot.ID, member, roomMemberUsername{})); err != nil {
 				return err
 			}
 		}
@@ -92,7 +92,7 @@ func (repository *RoomRepository) GetByCode(ctx context.Context, roomCode string
 	})
 }
 
-// ListRoomMemberUsernames projects current identity names without copying mutable profile data into the room aggregate.
+// ListRoomMemberUsernames returns the room-owned aliases so every viewer sees the same name snapshot.
 func (repository *RoomRepository) ListRoomMemberUsernames(ctx context.Context, roomID uuid.UUID) (map[uuid.UUID]string, error) {
 	if repository == nil || repository.runner == nil || ctx == nil || roomID == uuid.Nil {
 		return nil, roomDomain.ErrInvalidRoomInput
@@ -108,8 +108,8 @@ func (repository *RoomRepository) ListRoomMemberUsernames(ctx context.Context, r
 	}
 	usernames := make(map[uuid.UUID]string, len(rows))
 	for _, row := range rows {
-		if row.UserID.Valid && row.Username.Valid {
-			usernames[uuid.UUID(row.UserID.Bytes)] = row.Username.String
+		if row.UserID.Valid {
+			usernames[uuid.UUID(row.UserID.Bytes)] = row.Username
 		}
 	}
 	return usernames, nil
@@ -384,11 +384,21 @@ func updateRoomAggregateCAS(ctx context.Context, queries QueryHandle, beforeSnap
 	if err != nil {
 		return roomDomain.Room{}, err
 	}
+	existingMembers, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(afterSnapshot.ID)})
+	if err != nil {
+		return roomDomain.Room{}, err
+	}
+	usernames := make(map[uuid.UUID]roomMemberUsername, len(existingMembers))
+	for _, member := range existingMembers {
+		if member.UserID.Valid {
+			usernames[uuid.UUID(member.UserID.Bytes)] = roomMemberUsername{display: member.DisplayUsername, key: member.UsernameKey}
+		}
+	}
 	if err := queries.DeleteRoomMembers(ctx, sqlcgen.DeleteRoomMembersParams{RoomID: uuidToPG(afterSnapshot.ID)}); err != nil {
 		return roomDomain.Room{}, err
 	}
 	for _, member := range afterSnapshot.Members {
-		if err := queries.CreateRoomMember(ctx, createRoomMemberParams(afterSnapshot.ID, member)); err != nil {
+		if err := queries.CreateRoomMember(ctx, createRoomMemberParams(afterSnapshot.ID, member, usernames[member.UserID])); err != nil {
 			return roomDomain.Room{}, err
 		}
 	}
@@ -399,11 +409,17 @@ func updateRoomAggregateCAS(ctx context.Context, queries QueryHandle, beforeSnap
 	return roomFromRows(row, members)
 }
 
-func createRoomMemberParams(roomID uuid.UUID, member roomDomain.MemberSnapshot) sqlcgen.CreateRoomMemberParams {
+type roomMemberUsername struct {
+	display string
+	key     string
+}
+
+func createRoomMemberParams(roomID uuid.UUID, member roomDomain.MemberSnapshot, username roomMemberUsername) sqlcgen.CreateRoomMemberParams {
 	return sqlcgen.CreateRoomMemberParams{
 		RoomID: uuidToPG(roomID), UserID: uuidToPG(member.UserID), Role: string(member.Role),
 		RequestedRole: textToPG(string(member.RequestedRole)), SeatIndex: optionalSeatToPG(member),
 		JoinedAt: timeToPG(member.JoinedAt), LastSeenAt: timeToPG(member.LastSeenAt),
+		DisplayUsername: textToPG(username.display), UsernameKey: textToPG(username.key),
 	}
 }
 
@@ -443,14 +459,14 @@ func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDoma
 }
 
 func publicRoomCardFromRow(row sqlcgen.ListPublicRoomCardsRow) (roomDomain.PublicRoomCard, error) {
-	if !row.RoomID.Valid || !row.HostUsername.Valid || row.ParticipantCapacity <= 0 ||
+	if !row.RoomID.Valid || row.HostUsername == "" || row.ParticipantCapacity <= 0 ||
 		row.ParticipantCount < 0 || row.ParticipantCount > math.MaxUint32 ||
 		row.SpectatorCount < 0 || row.SpectatorCount > math.MaxUint32 ||
 		row.WaitingCount < 0 || row.WaitingCount > math.MaxUint32 || !row.UpdatedAt.Valid {
 		return roomDomain.PublicRoomCard{}, roomDomain.ErrRoomIntegrity
 	}
 	return roomDomain.RestorePublicRoomCard(roomDomain.PublicRoomCardSnapshot{
-		RoomID: uuid.UUID(row.RoomID.Bytes), HostUsername: row.HostUsername.String,
+		RoomID: uuid.UUID(row.RoomID.Bytes), HostUsername: row.HostUsername,
 		Status: roomDomain.RoomStatus(row.Status), ParticipantCapacity: uint32(row.ParticipantCapacity),
 		ParticipantCount: uint32(row.ParticipantCount), SpectatorCount: uint32(row.SpectatorCount),
 		WaitingCount: uint32(row.WaitingCount), ParticipantAdmission: roomDomain.AdmissionMode(row.ParticipantAdmission),
@@ -461,7 +477,7 @@ func publicRoomCardFromRow(row sqlcgen.ListPublicRoomCardsRow) (roomDomain.Publi
 }
 
 func myRoomCardFromRow(row sqlcgen.ListMyRoomCardsRow) (roomDomain.MyRoomCard, error) {
-	if !row.RoomID.Valid || !row.HostUsername.Valid || row.ParticipantCapacity <= 0 ||
+	if !row.RoomID.Valid || row.HostUsername == "" || row.ParticipantCapacity <= 0 ||
 		row.ParticipantCount < 0 || row.ParticipantCount > math.MaxUint32 ||
 		row.SpectatorCount < 0 || row.SpectatorCount > math.MaxUint32 ||
 		row.WaitingCount < 0 || row.WaitingCount > math.MaxUint32 || !row.UpdatedAt.Valid {
@@ -469,7 +485,7 @@ func myRoomCardFromRow(row sqlcgen.ListMyRoomCardsRow) (roomDomain.MyRoomCard, e
 	}
 	return roomDomain.RestoreMyRoomCard(roomDomain.MyRoomCardSnapshot{
 		RoomID: uuid.UUID(row.RoomID.Bytes), RoomCode: row.RoomCode, Visibility: roomDomain.Visibility(row.Visibility),
-		HostUsername: row.HostUsername.String, Status: roomDomain.RoomStatus(row.Status), IsHost: row.IsHost,
+		HostUsername: row.HostUsername, Status: roomDomain.RoomStatus(row.Status), IsHost: row.IsHost,
 		ParticipantCapacity: uint32(row.ParticipantCapacity), ParticipantCount: uint32(row.ParticipantCount),
 		SpectatorCount: uint32(row.SpectatorCount), WaitingCount: uint32(row.WaitingCount),
 		ParticipantAdmission: roomDomain.AdmissionMode(row.ParticipantAdmission),
@@ -570,6 +586,9 @@ func mapRoomRepositoryError(ctx context.Context, err, noRowsError error) error {
 		case "23505":
 			if pgError.ConstraintName == "party_rooms_room_code_unique" {
 				return roomDomain.ErrRoomCodeUnavailable
+			}
+			if pgError.ConstraintName == "room_members_username_key_unique" {
+				return roomDomain.ErrUsernameConflict
 			}
 			return roomDomain.ErrRoomVersionConflict
 		case "23503", "23514":

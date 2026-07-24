@@ -14,6 +14,7 @@ import {
   type RoomGameConfigDraftWire,
   type RoomSnapshot,
 } from "../api/client";
+import { USERNAME_RULE_MESSAGE, validateUsernameInput } from "../username";
 
 const STORAGE_KEY = "game-night.room-context.v1";
 const STORAGE_SCHEMA_VERSION = 1;
@@ -85,8 +86,12 @@ export const useRoomStore = defineStore("room", {
         if (typeof candidate.displayName !== "string" || typeof candidate.userId !== "string") {
           return;
         }
+        const recoveredName = validateUsernameInput(candidate.displayName);
+        if (!recoveredName.isValid) {
+          return;
+        }
         this.$patch({
-          displayName: candidate.displayName.slice(0, 18),
+          displayName: recoveredName.normalized,
           userId: candidate.userId.slice(0, 80),
           roomId: asOptionalString(candidate.roomId),
           roomCode: asOptionalString(candidate.roomCode),
@@ -100,12 +105,12 @@ export const useRoomStore = defineStore("room", {
     },
 
     setIdentity(displayName: string): boolean {
-      const normalized = displayName.trim().replace(/\s+/g, " ");
-      if (normalized.length < 1 || normalized.length > 18) {
+      const validation = validateUsernameInput(displayName);
+      if (!validation.isValid) {
         return false;
       }
       // This id is only a local correlation key; device secrets stay outside persisted UI context.
-      this.displayName = normalized;
+      this.displayName = validation.normalized;
       this.userId = this.userId || `guest-${crypto.randomUUID()}`;
       this.identityState = "active";
       this.persist();
@@ -139,10 +144,11 @@ export const useRoomStore = defineStore("room", {
      * local recovery context with the server's immutable user ID.
      */
     async ensureIdentity(displayName: string): Promise<void> {
-      const normalized = normalizeDisplayName(displayName);
-      if (normalized.length < 1 || normalized.length > 18) {
-        throw new Error("用户名需要 1 到 18 个字符");
+      const validation = validateUsernameInput(displayName);
+      if (!validation.isValid) {
+        throw new Error(USERNAME_RULE_MESSAGE);
       }
+      const normalized = validation.normalized;
       this.busy = true;
       this.error = "";
       try {
@@ -594,8 +600,6 @@ export const useRoomStore = defineStore("room", {
 });
 
 type RoomResponseLike = { sessionId?: string };
-
-const normalizeDisplayName = (value: string): string => value.trim().replace(/\s+/g, " ");
 
 const normalizeRoomSnapshot = (snapshot: RoomSnapshot): RoomSnapshot => ({
   ...snapshot,

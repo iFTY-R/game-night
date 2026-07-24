@@ -145,7 +145,9 @@ INSERT INTO room_members (
     requested_role,
     seat_index,
     joined_at,
-    last_seen_at
+    last_seen_at,
+    display_username,
+    username_key
 ) VALUES (
     sqlc.arg(room_id),
     sqlc.arg(user_id),
@@ -153,19 +155,21 @@ INSERT INTO room_members (
     sqlc.narg(requested_role),
     sqlc.narg(seat_index),
     sqlc.arg(joined_at),
-    sqlc.arg(last_seen_at)
+    sqlc.arg(last_seen_at),
+    sqlc.narg(display_username),
+    sqlc.narg(username_key)
 );
 
 -- name: ListRoomMembers :many
-SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
+SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at,
+    display_username, username_key
 FROM room_members
 WHERE room_id = sqlc.arg(room_id)
 ORDER BY joined_at, user_id;
 
 -- name: ListRoomMemberUsernames :many
-SELECT member.user_id, users.username
+SELECT member.user_id, member.display_username AS username
 FROM room_members AS member
-JOIN users ON users.user_id = member.user_id
 WHERE member.room_id = sqlc.arg(room_id)
 ORDER BY member.user_id;
 
@@ -177,7 +181,7 @@ WHERE room_id = sqlc.arg(room_id)
 
 -- name: ListPublicRoomCards :many
 SELECT room.room_id,
-    host.username AS host_username,
+    host.display_username AS host_username,
     room.status,
     room.participant_capacity,
     counts.participant_count,
@@ -190,9 +194,9 @@ SELECT room.room_id,
     viewer.requested_role AS viewer_requested_role,
     room.updated_at
 FROM party_rooms AS room
-JOIN users AS host
-  ON host.user_id = room.host_user_id
- AND host.status = 'active'
+JOIN room_members AS host
+  ON host.room_id = room.room_id
+ AND host.user_id = room.host_user_id
 JOIN LATERAL (
     SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
         count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -231,7 +235,7 @@ LIMIT sqlc.arg(page_limit);
 SELECT room.room_id,
     room.room_code,
     room.visibility,
-    host.username AS host_username,
+    host.display_username AS host_username,
     room.status,
     room.host_user_id = sqlc.arg(actor_user_id) AS is_host,
     room.participant_capacity,
@@ -248,8 +252,9 @@ SELECT room.room_id,
 FROM room_members AS viewer
 JOIN party_rooms AS room
   ON room.room_id = viewer.room_id
-JOIN users AS host
-  ON host.user_id = room.host_user_id
+JOIN room_members AS host
+  ON host.room_id = room.room_id
+ AND host.user_id = room.host_user_id
 JOIN LATERAL (
     SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
         count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,

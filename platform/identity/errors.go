@@ -17,6 +17,10 @@ var (
 	ErrUsernameUnchanged = errors.New("username is unchanged")
 	// ErrUsernameUnavailable collapses active, reserved, and concurrent username claim conflicts.
 	ErrUsernameUnavailable = errors.New("username is unavailable")
+	// ErrUsernameAmbiguous prevents a shared display key from being treated as one stable account selector.
+	ErrUsernameAmbiguous = errors.New("username matches multiple users")
+	// ErrUsernameRoomConflict rejects a rename that would duplicate another member's normalized name in a shared room.
+	ErrUsernameRoomConflict = errors.New("username is already in use in a joined room")
 	// ErrUserNotFound is a repository absence result and must not be used to infer credential validity externally.
 	ErrUserNotFound = errors.New("user not found")
 	// ErrIdentityConcurrentTransition reports a stale user, claim, recovery, or device CAS.

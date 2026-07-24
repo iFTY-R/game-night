@@ -482,7 +482,7 @@ func (service *Service) AuthenticatePrincipal(ctx context.Context, command Authe
 	return principal, err
 }
 
-// ChangeUsername claims the new key and reserves the old key in one database transaction.
+// ChangeUsername records the new per-user claim and reserves that user's old key in one database transaction.
 func (service *Service) ChangeUsername(ctx context.Context, command ChangeUsernameCommand) (ChangeUsernameResult, error) {
 	if service == nil || ctx == nil || command.CSRFToken == "" {
 		return ChangeUsernameResult{}, ErrInvalidIdentityRequest
@@ -518,7 +518,7 @@ func (service *Service) ChangeUsername(ctx context.Context, command ChangeUserna
 		if _, claimErr = transaction.UsernameClaims().Claim(ctx, claim, plan.ChangedAt); claimErr != nil {
 			return claimErr
 		}
-		previousClaim, claimErr := transaction.UsernameClaims().GetForUpdate(ctx, plan.PreviousUsernameKey)
+		previousClaim, claimErr := transaction.UsernameClaims().GetForUpdate(ctx, user.Snapshot().ID, plan.PreviousUsernameKey)
 		if claimErr != nil {
 			return claimErr
 		}

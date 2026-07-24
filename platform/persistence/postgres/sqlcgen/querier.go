@@ -251,10 +251,9 @@ type Querier interface {
 	//      $4,
 	//      $4
 	//  )
-	//  ON CONFLICT (username_key) DO UPDATE
+	//  ON CONFLICT (username_key, owner_user_id) DO UPDATE
 	//  SET display_username = EXCLUDED.display_username,
 	//      status = 'active',
-	//      owner_user_id = EXCLUDED.owner_user_id,
 	//      reserved_until = NULL,
 	//      updated_at = EXCLUDED.updated_at
 	//  WHERE username_claims.status = 'reserved'
@@ -1204,7 +1203,9 @@ type Querier interface {
 	//      requested_role,
 	//      seat_index,
 	//      joined_at,
-	//      last_seen_at
+	//      last_seen_at,
+	//      display_username,
+	//      username_key
 	//  ) VALUES (
 	//      $1,
 	//      $2,
@@ -1212,7 +1213,9 @@ type Querier interface {
 	//      $4,
 	//      $5,
 	//      $6,
-	//      $7
+	//      $7,
+	//      $8,
+	//      $9
 	//  )
 	CreateRoomMember(ctx context.Context, arg CreateRoomMemberParams) error
 	//CreateRoomPendingStart
@@ -2013,15 +2016,6 @@ type Querier interface {
 	//  FROM users
 	//  WHERE user_id = $1
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
-	//GetUserByUsernameKey
-	//
-	//  SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
-	//  FROM username_claims AS claim
-	//  JOIN users AS u ON u.user_id = claim.owner_user_id
-	//  WHERE claim.username_key = $1
-	//    AND claim.status = 'active'
-	//    AND u.current_username_key = claim.username_key
-	GetUserByUsernameKey(ctx context.Context, arg GetUserByUsernameKeyParams) (User, error)
 	//GetUserForUpdate
 	//
 	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
@@ -2101,6 +2095,7 @@ type Querier interface {
 	//  SELECT username_key, display_username, status, owner_user_id, reserved_until, created_at, updated_at
 	//  FROM username_claims
 	//  WHERE username_key = $1
+	//    AND owner_user_id = $2
 	//  FOR UPDATE
 	GetUsernameClaimForUpdate(ctx context.Context, arg GetUsernameClaimForUpdateParams) (UsernameClaim, error)
 	//HasPendingGameSystemInbox
@@ -2211,7 +2206,7 @@ type Querier interface {
 	//  SELECT room.room_id,
 	//      room.room_code,
 	//      room.visibility,
-	//      host.username AS host_username,
+	//      host.display_username AS host_username,
 	//      room.status,
 	//      room.host_user_id = $1 AS is_host,
 	//      room.participant_capacity,
@@ -2228,8 +2223,9 @@ type Querier interface {
 	//  FROM room_members AS viewer
 	//  JOIN party_rooms AS room
 	//    ON room.room_id = viewer.room_id
-	//  JOIN users AS host
-	//    ON host.user_id = room.host_user_id
+	//  JOIN room_members AS host
+	//    ON host.room_id = room.room_id
+	//   AND host.user_id = room.host_user_id
 	//  JOIN LATERAL (
 	//      SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
 	//          count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -2340,7 +2336,7 @@ type Querier interface {
 	//ListPublicRoomCards
 	//
 	//  SELECT room.room_id,
-	//      host.username AS host_username,
+	//      host.display_username AS host_username,
 	//      room.status,
 	//      room.participant_capacity,
 	//      counts.participant_count,
@@ -2353,9 +2349,9 @@ type Querier interface {
 	//      viewer.requested_role AS viewer_requested_role,
 	//      room.updated_at
 	//  FROM party_rooms AS room
-	//  JOIN users AS host
-	//    ON host.user_id = room.host_user_id
-	//   AND host.status = 'active'
+	//  JOIN room_members AS host
+	//    ON host.room_id = room.room_id
+	//   AND host.user_id = room.host_user_id
 	//  JOIN LATERAL (
 	//      SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
 	//          count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -2401,15 +2397,15 @@ type Querier interface {
 	ListRoomGameConfigDrafts(ctx context.Context, arg ListRoomGameConfigDraftsParams) ([]RoomGameConfigDraft, error)
 	//ListRoomMemberUsernames
 	//
-	//  SELECT member.user_id, users.username
+	//  SELECT member.user_id, member.display_username AS username
 	//  FROM room_members AS member
-	//  JOIN users ON users.user_id = member.user_id
 	//  WHERE member.room_id = $1
 	//  ORDER BY member.user_id
 	ListRoomMemberUsernames(ctx context.Context, arg ListRoomMemberUsernamesParams) ([]ListRoomMemberUsernamesRow, error)
 	//ListRoomMembers
 	//
-	//  SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
+	//  SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at,
+	//      display_username, username_key
 	//  FROM room_members
 	//  WHERE room_id = $1
 	//  ORDER BY joined_at, user_id
@@ -2446,6 +2442,16 @@ type Querier interface {
 	//  ORDER BY user_id
 	//  LIMIT $3
 	ListUserProfilesForKeyRotation(ctx context.Context, arg ListUserProfilesForKeyRotationParams) ([]UserProfile, error)
+	//ListUsersByUsernameKey
+	//
+	//  SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+	//  FROM username_claims AS claim
+	//  JOIN users AS u ON u.user_id = claim.owner_user_id
+	//  WHERE claim.username_key = $1
+	//    AND claim.status = 'active'
+	//    AND u.current_username_key = claim.username_key
+	//  ORDER BY u.user_id
+	ListUsersByUsernameKey(ctx context.Context, arg ListUsersByUsernameKeyParams) ([]User, error)
 	//LockRoomActivityLease
 	//
 	//  SELECT last_seen_at

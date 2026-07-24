@@ -15,18 +15,18 @@ const (
 	// MinimumUsernameCodePoints is measured after NFKC normalization and trimming.
 	MinimumUsernameCodePoints = 2
 	// MaximumUsernameCodePoints bounds the normalized display; case-folded claim keys may expand beyond it.
-	MaximumUsernameCodePoints = 20
-	// maximumUsernameInputBytes bounds normalization work while allowing combining forms around the display limit.
+	MaximumUsernameCodePoints = 4
+	// maximumUsernameInputBytes bounds public normalization work while allowing compatibility decompositions around 4 glyphs.
 	maximumUsernameInputBytes = MaximumUsernameCodePoints * 16
+	// maximumUsernamePolicyBytes keeps deny-list normalization bounded without inheriting the public 4-code-point display cap.
+	maximumUsernamePolicyBytes = 256
 )
 
 var (
-	// ErrUsernameLength identifies a normalized username outside the public 2-20 code point contract.
+	// ErrUsernameLength identifies a normalized username outside the public 2-4 code point contract.
 	ErrUsernameLength = errors.New("username length is invalid")
-	// ErrUsernameCharacters covers malformed UTF-8 and characters outside Han, Latin, decimal digits, and underscore.
+	// ErrUsernameCharacters covers malformed UTF-8 and characters outside Han, Latin, and decimal digits.
 	ErrUsernameCharacters = errors.New("username contains unsupported characters")
-	// ErrUsernameUnderscores prevents visually noisy and easily confused runs of underscores.
-	ErrUsernameUnderscores = errors.New("username cannot contain consecutive underscores")
 	// ErrUsernameUnavailable deliberately gives reserved and blocked terms the same external result.
 	ErrUsernameUnavailable = errors.New("username is unavailable")
 	// ErrInvalidUsernamePolicy reports a bad deny-list entry without echoing configuration content.
@@ -89,14 +89,14 @@ type UsernameValidator struct {
 func NewUsernameValidator(additionalReserved, blockedFragments []string) (UsernameValidator, error) {
 	reserved := make(map[string]struct{}, len(builtInReservedUsernameKeys)+len(additionalReserved))
 	for _, value := range builtInReservedUsernameKeys {
-		_, key, err := normalizeUsernameSyntax(value)
+		key, err := normalizeUsernameFragment(value)
 		if err != nil {
 			return UsernameValidator{}, ErrInvalidUsernamePolicy
 		}
 		reserved[key] = struct{}{}
 	}
 	for _, value := range additionalReserved {
-		_, key, err := normalizeUsernameSyntax(value)
+		key, err := normalizeUsernameFragment(value)
 		if err != nil {
 			return UsernameValidator{}, ErrInvalidUsernamePolicy
 		}
@@ -167,16 +167,7 @@ func normalizeUsernameSyntax(input string) (display, key string, err error) {
 		return "", "", ErrUsernameLength
 	}
 
-	previousUnderscore := false
 	for _, character := range display {
-		if character == '_' {
-			if previousUnderscore {
-				return "", "", ErrUsernameUnderscores
-			}
-			previousUnderscore = true
-			continue
-		}
-		previousUnderscore = false
 		if !isAllowedUsernameCharacter(character) {
 			return "", "", ErrUsernameCharacters
 		}
@@ -186,19 +177,24 @@ func normalizeUsernameSyntax(input string) (display, key string, err error) {
 }
 
 func normalizeUsernameFragment(input string) (string, error) {
-	if len(input) > maximumUsernameInputBytes {
+	if len(input) > maximumUsernamePolicyBytes {
 		return "", ErrInvalidUsernamePolicy
 	}
 	if !utf8.ValidString(input) {
 		return "", ErrInvalidUsernamePolicy
 	}
+	// Keep deny-list entries free from invisible or control characters before normalization, matching public parsing safety.
+	for _, character := range input {
+		if unicode.IsControl(character) || unicode.Is(unicode.Cf, character) {
+			return "", ErrInvalidUsernamePolicy
+		}
+	}
 	normalized := strings.TrimSpace(norm.NFKC.String(input))
-	codePoints := utf8.RuneCountInString(normalized)
-	if codePoints == 0 || codePoints > MaximumUsernameCodePoints {
+	if utf8.RuneCountInString(normalized) == 0 {
 		return "", ErrInvalidUsernamePolicy
 	}
 	for _, character := range normalized {
-		if character != '_' && !isAllowedUsernameCharacter(character) {
+		if !isAllowedUsernameCharacter(character) {
 			return "", ErrInvalidUsernamePolicy
 		}
 	}

@@ -37,6 +37,8 @@ var (
 	ErrRoomNotFound = errors.New("room not found")
 	// ErrRoomCodeUnavailable collapses duplicate and concurrently claimed invitation codes.
 	ErrRoomCodeUnavailable = errors.New("room code is unavailable")
+	// ErrUsernameConflict prevents two current members from sharing one normalized display name inside a room.
+	ErrUsernameConflict = errors.New("room username is already in use")
 	// ErrRoomRepositoryUnavailable hides database and generated-query diagnostics from domain callers.
 	ErrRoomRepositoryUnavailable = errors.New("room repository unavailable")
 	// ErrRoomIntegrity reports persisted room/member state that violates aggregate invariants.

@@ -115,6 +115,15 @@ describe("room context recovery", () => {
     expect(room.roomId).toBeNull();
   });
 
+  it("rejects invalid usernames before sending onboarding requests", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const room = useRoomStore();
+
+    await expect(room.ensureIdentity("ab_1")).rejects.toThrow("2-4 个汉字、英文字母或数字");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("rejects an incomplete room creation response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", {
       status: 200,

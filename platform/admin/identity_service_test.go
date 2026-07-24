@@ -6,11 +6,34 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/profile"
 )
+
+func TestAdminIdentityUsernameErrorsRemainActionable(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		code connect.Code
+	}{
+		{name: "ambiguous lookup", err: identity.ErrUsernameAmbiguous, code: connect.CodeFailedPrecondition},
+		{name: "room rename conflict", err: identity.ErrUsernameRoomConflict, code: connect.CodeAlreadyExists},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mapped := mapAdminIdentityError(test.err)
+			if !errors.Is(mapped, test.err) {
+				t.Fatalf("mapped error = %v, want %v", mapped, test.err)
+			}
+			if code := connect.CodeOf(adminConnectError(mapped)); code != test.code {
+				t.Fatalf("connect code = %v, want %v", code, test.code)
+			}
+		})
+	}
+}
 
 func TestAuditPageTokenIsBoundToCanonicalFilters(t *testing.T) {
 	command := ListAuditEventsCommand{

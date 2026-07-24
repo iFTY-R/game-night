@@ -575,7 +575,9 @@ INSERT INTO room_members (
     requested_role,
     seat_index,
     joined_at,
-    last_seen_at
+    last_seen_at,
+    display_username,
+    username_key
 ) VALUES (
     $1,
     $2,
@@ -583,18 +585,22 @@ INSERT INTO room_members (
     $4,
     $5,
     $6,
-    $7
+    $7,
+    $8,
+    $9
 )
 `
 
 type CreateRoomMemberParams struct {
-	RoomID        pgtype.UUID        `json:"room_id"`
-	UserID        pgtype.UUID        `json:"user_id"`
-	Role          string             `json:"role"`
-	RequestedRole pgtype.Text        `json:"requested_role"`
-	SeatIndex     pgtype.Int4        `json:"seat_index"`
-	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
-	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
+	RoomID          pgtype.UUID        `json:"room_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Role            string             `json:"role"`
+	RequestedRole   pgtype.Text        `json:"requested_role"`
+	SeatIndex       pgtype.Int4        `json:"seat_index"`
+	JoinedAt        pgtype.Timestamptz `json:"joined_at"`
+	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
+	DisplayUsername pgtype.Text        `json:"display_username"`
+	UsernameKey     pgtype.Text        `json:"username_key"`
 }
 
 // CreateRoomMember
@@ -606,7 +612,9 @@ type CreateRoomMemberParams struct {
 //	    requested_role,
 //	    seat_index,
 //	    joined_at,
-//	    last_seen_at
+//	    last_seen_at,
+//	    display_username,
+//	    username_key
 //	) VALUES (
 //	    $1,
 //	    $2,
@@ -614,7 +622,9 @@ type CreateRoomMemberParams struct {
 //	    $4,
 //	    $5,
 //	    $6,
-//	    $7
+//	    $7,
+//	    $8,
+//	    $9
 //	)
 func (q *Queries) CreateRoomMember(ctx context.Context, arg CreateRoomMemberParams) error {
 	_, err := q.db.Exec(ctx, createRoomMember,
@@ -625,6 +635,8 @@ func (q *Queries) CreateRoomMember(ctx context.Context, arg CreateRoomMemberPara
 		arg.SeatIndex,
 		arg.JoinedAt,
 		arg.LastSeenAt,
+		arg.DisplayUsername,
+		arg.UsernameKey,
 	)
 	return err
 }
@@ -1606,7 +1618,7 @@ const listMyRoomCards = `-- name: ListMyRoomCards :many
 SELECT room.room_id,
     room.room_code,
     room.visibility,
-    host.username AS host_username,
+    host.display_username AS host_username,
     room.status,
     room.host_user_id = $1 AS is_host,
     room.participant_capacity,
@@ -1623,8 +1635,9 @@ SELECT room.room_id,
 FROM room_members AS viewer
 JOIN party_rooms AS room
   ON room.room_id = viewer.room_id
-JOIN users AS host
-  ON host.user_id = room.host_user_id
+JOIN room_members AS host
+  ON host.room_id = room.room_id
+ AND host.user_id = room.host_user_id
 JOIN LATERAL (
     SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
         count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -1663,7 +1676,7 @@ type ListMyRoomCardsRow struct {
 	RoomID               pgtype.UUID        `json:"room_id"`
 	RoomCode             string             `json:"room_code"`
 	Visibility           string             `json:"visibility"`
-	HostUsername         pgtype.Text        `json:"host_username"`
+	HostUsername         string             `json:"host_username"`
 	Status               string             `json:"status"`
 	IsHost               bool               `json:"is_host"`
 	ParticipantCapacity  int32              `json:"participant_capacity"`
@@ -1684,7 +1697,7 @@ type ListMyRoomCardsRow struct {
 //	SELECT room.room_id,
 //	    room.room_code,
 //	    room.visibility,
-//	    host.username AS host_username,
+//	    host.display_username AS host_username,
 //	    room.status,
 //	    room.host_user_id = $1 AS is_host,
 //	    room.participant_capacity,
@@ -1701,8 +1714,9 @@ type ListMyRoomCardsRow struct {
 //	FROM room_members AS viewer
 //	JOIN party_rooms AS room
 //	  ON room.room_id = viewer.room_id
-//	JOIN users AS host
-//	  ON host.user_id = room.host_user_id
+//	JOIN room_members AS host
+//	  ON host.room_id = room.room_id
+//	 AND host.user_id = room.host_user_id
 //	JOIN LATERAL (
 //	    SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
 //	        count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -1773,7 +1787,7 @@ func (q *Queries) ListMyRoomCards(ctx context.Context, arg ListMyRoomCardsParams
 
 const listPublicRoomCards = `-- name: ListPublicRoomCards :many
 SELECT room.room_id,
-    host.username AS host_username,
+    host.display_username AS host_username,
     room.status,
     room.participant_capacity,
     counts.participant_count,
@@ -1786,9 +1800,9 @@ SELECT room.room_id,
     viewer.requested_role AS viewer_requested_role,
     room.updated_at
 FROM party_rooms AS room
-JOIN users AS host
-  ON host.user_id = room.host_user_id
- AND host.status = 'active'
+JOIN room_members AS host
+  ON host.room_id = room.room_id
+ AND host.user_id = room.host_user_id
 JOIN LATERAL (
     SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
         count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -1839,7 +1853,7 @@ type ListPublicRoomCardsParams struct {
 
 type ListPublicRoomCardsRow struct {
 	RoomID               pgtype.UUID        `json:"room_id"`
-	HostUsername         pgtype.Text        `json:"host_username"`
+	HostUsername         string             `json:"host_username"`
 	Status               string             `json:"status"`
 	ParticipantCapacity  int32              `json:"participant_capacity"`
 	ParticipantCount     int64              `json:"participant_count"`
@@ -1856,7 +1870,7 @@ type ListPublicRoomCardsRow struct {
 // ListPublicRoomCards
 //
 //	SELECT room.room_id,
-//	    host.username AS host_username,
+//	    host.display_username AS host_username,
 //	    room.status,
 //	    room.participant_capacity,
 //	    counts.participant_count,
@@ -1869,9 +1883,9 @@ type ListPublicRoomCardsRow struct {
 //	    viewer.requested_role AS viewer_requested_role,
 //	    room.updated_at
 //	FROM party_rooms AS room
-//	JOIN users AS host
-//	  ON host.user_id = room.host_user_id
-//	 AND host.status = 'active'
+//	JOIN room_members AS host
+//	  ON host.room_id = room.room_id
+//	 AND host.user_id = room.host_user_id
 //	JOIN LATERAL (
 //	    SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
 //	        count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,
@@ -2004,9 +2018,8 @@ func (q *Queries) ListRoomGameConfigDrafts(ctx context.Context, arg ListRoomGame
 }
 
 const listRoomMemberUsernames = `-- name: ListRoomMemberUsernames :many
-SELECT member.user_id, users.username
+SELECT member.user_id, member.display_username AS username
 FROM room_members AS member
-JOIN users ON users.user_id = member.user_id
 WHERE member.room_id = $1
 ORDER BY member.user_id
 `
@@ -2017,14 +2030,13 @@ type ListRoomMemberUsernamesParams struct {
 
 type ListRoomMemberUsernamesRow struct {
 	UserID   pgtype.UUID `json:"user_id"`
-	Username pgtype.Text `json:"username"`
+	Username string      `json:"username"`
 }
 
 // ListRoomMemberUsernames
 //
-//	SELECT member.user_id, users.username
+//	SELECT member.user_id, member.display_username AS username
 //	FROM room_members AS member
-//	JOIN users ON users.user_id = member.user_id
 //	WHERE member.room_id = $1
 //	ORDER BY member.user_id
 func (q *Queries) ListRoomMemberUsernames(ctx context.Context, arg ListRoomMemberUsernamesParams) ([]ListRoomMemberUsernamesRow, error) {
@@ -2048,7 +2060,8 @@ func (q *Queries) ListRoomMemberUsernames(ctx context.Context, arg ListRoomMembe
 }
 
 const listRoomMembers = `-- name: ListRoomMembers :many
-SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
+SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at,
+    display_username, username_key
 FROM room_members
 WHERE room_id = $1
 ORDER BY joined_at, user_id
@@ -2060,7 +2073,8 @@ type ListRoomMembersParams struct {
 
 // ListRoomMembers
 //
-//	SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at
+//	SELECT room_id, user_id, role, requested_role, seat_index, joined_at, last_seen_at,
+//	    display_username, username_key
 //	FROM room_members
 //	WHERE room_id = $1
 //	ORDER BY joined_at, user_id
@@ -2081,6 +2095,8 @@ func (q *Queries) ListRoomMembers(ctx context.Context, arg ListRoomMembersParams
 			&i.SeatIndex,
 			&i.JoinedAt,
 			&i.LastSeenAt,
+			&i.DisplayUsername,
+			&i.UsernameKey,
 		); err != nil {
 			return nil, err
 		}

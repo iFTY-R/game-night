@@ -15,7 +15,7 @@ func TestOnboardingUserExpiresAtTwentyFourHourBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	username, err := identifier.ParseUsername("玩家_Alice9")
+	username, err := identifier.ParseUsername("玩家A9")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestUserOnboardingAndUsernameChangePlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, _ := identifier.ParseUsername("Alice9")
+	first, _ := identifier.ParseUsername("Ali9")
 	active, err := user.CompleteOnboarding(first, now.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestUserOnboardingAndUsernameChangePlan(t *testing.T) {
 
 func TestUserStatusMatrixRejectsInvalidUsernameMutations(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
-	username, _ := identifier.ParseUsername("Alice9")
+	username, _ := identifier.ParseUsername("Ali9")
 	onboarding, _ := NewOnboardingUser(uuid.New(), now)
 	active, _ := onboarding.CompleteOnboarding(username, now.Add(time.Hour))
 
@@ -95,7 +95,7 @@ func TestUserStatusMatrixRejectsInvalidUsernameMutations(t *testing.T) {
 
 func TestUsernameClaimReservationUsesHalfOpenNinetyDayWindow(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
-	username, _ := identifier.ParseUsername("Alice9")
+	username, _ := identifier.ParseUsername("Ali9")
 	claim, err := NewActiveUsernameClaim(username, uuid.New(), now)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestUsernameClaimReservationUsesHalfOpenNinetyDayWindow(t *testing.T) {
 
 func TestUsernameChangeRejectsClockRollbackBehindLatestUserUpdate(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
-	first, _ := identifier.ParseUsername("Alice9")
+	first, _ := identifier.ParseUsername("Ali9")
 	second, _ := identifier.ParseUsername("Bob9")
 	user, _ := NewOnboardingUser(uuid.New(), now)
 	active, _ := user.CompleteOnboarding(first, now.Add(time.Hour))
@@ -131,7 +131,7 @@ func TestUsernameChangeRejectsClockRollbackBehindLatestUserUpdate(t *testing.T) 
 
 func TestOnboardingCompletionRejectsClockRollbackBehindLatestUserUpdate(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
-	username, _ := identifier.ParseUsername("Alice9")
+	username, _ := identifier.ParseUsername("Ali9")
 	user, _ := NewOnboardingUser(uuid.New(), now)
 	snapshot := user.Snapshot()
 	snapshot.UpdatedAt = now.Add(time.Hour)
@@ -146,7 +146,7 @@ func TestOnboardingCompletionRejectsClockRollbackBehindLatestUserUpdate(t *testi
 
 func TestAdministratorGovernanceStatusMatrixAndForcedRename(t *testing.T) {
 	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
-	first, _ := identifier.ParseUsername("Alice9")
+	first, _ := identifier.ParseUsername("Ali9")
 	second, _ := identifier.ParseUsername("Bob9")
 	onboarding, _ := NewOnboardingUser(uuid.New(), now)
 	active, _ := onboarding.CompleteOnboarding(first, now.Add(time.Hour))

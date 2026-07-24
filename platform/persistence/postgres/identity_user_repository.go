@@ -17,7 +17,7 @@ import (
 type identityUserQueries interface {
 	CreateUser(context.Context, sqlcgen.CreateUserParams) (sqlcgen.User, error)
 	GetUserByID(context.Context, sqlcgen.GetUserByIDParams) (sqlcgen.User, error)
-	GetUserByUsernameKey(context.Context, sqlcgen.GetUserByUsernameKeyParams) (sqlcgen.User, error)
+	ListUsersByUsernameKey(context.Context, sqlcgen.ListUsersByUsernameKeyParams) ([]sqlcgen.User, error)
 	GetUserForUpdate(context.Context, sqlcgen.GetUserForUpdateParams) (sqlcgen.User, error)
 	CompleteOnboardingUserCAS(context.Context, sqlcgen.CompleteOnboardingUserCASParams) (sqlcgen.User, error)
 	ChangeCurrentUsernameCAS(context.Context, sqlcgen.ChangeCurrentUsernameCASParams) (sqlcgen.User, error)
@@ -52,16 +52,23 @@ func (repository *identityUserRepository) GetByID(ctx context.Context, id uuid.U
 	return identityUserFromRow(row)
 }
 
-// GetByUsernameKey resolves only the active claim that is still referenced by the owning user row.
+// GetByUsernameKey resolves a shared display key only when it identifies exactly one active user.
 func (repository *identityUserRepository) GetByUsernameKey(ctx context.Context, key string) (identityDomain.User, error) {
 	if key == "" {
 		return identityDomain.User{}, identityDomain.ErrInvalidUserInput
 	}
-	row, err := repository.queries.GetUserByUsernameKey(ctx, sqlcgen.GetUserByUsernameKeyParams{UsernameKey: key})
+	rows, err := repository.queries.ListUsersByUsernameKey(ctx, sqlcgen.ListUsersByUsernameKeyParams{UsernameKey: key})
 	if err != nil {
-		return identityDomain.User{}, mapIdentityQueryError(ctx, err, identityDomain.ErrUserNotFound)
+		return identityDomain.User{}, mapIdentityQueryError(ctx, err, identityDomain.ErrIdentityRepositoryUnavailable)
 	}
-	return identityUserFromRow(row)
+	switch len(rows) {
+	case 0:
+		return identityDomain.User{}, identityDomain.ErrUserNotFound
+	case 1:
+		return identityUserFromRow(rows[0])
+	default:
+		return identityDomain.User{}, identityDomain.ErrUsernameAmbiguous
+	}
 }
 
 func (repository *identityUserRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (identityDomain.User, error) {
@@ -220,11 +227,13 @@ func (repository *identityClaimRepository) Claim(
 	return identityClaimFromRow(row)
 }
 
-func (repository *identityClaimRepository) GetForUpdate(ctx context.Context, key string) (identityDomain.UsernameClaim, error) {
-	if key == "" {
+func (repository *identityClaimRepository) GetForUpdate(ctx context.Context, ownerUserID uuid.UUID, key string) (identityDomain.UsernameClaim, error) {
+	if ownerUserID == uuid.Nil || key == "" {
 		return identityDomain.UsernameClaim{}, identityDomain.ErrInvalidUserInput
 	}
-	row, err := repository.queries.GetUsernameClaimForUpdate(ctx, sqlcgen.GetUsernameClaimForUpdateParams{UsernameKey: key})
+	row, err := repository.queries.GetUsernameClaimForUpdate(ctx, sqlcgen.GetUsernameClaimForUpdateParams{
+		UsernameKey: key, OwnerUserID: uuidToPG(ownerUserID),
+	})
 	if err != nil {
 		return identityDomain.UsernameClaim{}, mapIdentityQueryError(ctx, err, identityDomain.ErrIdentityIntegrity)
 	}
@@ -262,11 +271,11 @@ func mapIdentityQueryError(ctx context.Context, err, noRowsError error) error {
 	}
 	var pgError *pgconn.PgError
 	if errors.As(err, &pgError) {
+		if pgError.Code == "23505" && pgError.ConstraintName == "room_members_username_key_unique" {
+			return identityDomain.ErrUsernameRoomConflict
+		}
 		switch pgError.Code {
 		case "23505":
-			if pgError.ConstraintName == "username_claims_pkey" {
-				return identityDomain.ErrUsernameUnavailable
-			}
 			return identityDomain.ErrIdentityConcurrentTransition
 		case "23503", "23514":
 			return identityDomain.ErrIdentityIntegrity

@@ -71,8 +71,7 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ORIGIN_NOT_ALLOWED, "request.origin.not_allowed"}
 	case stderrors.Is(err, csrf.ErrInvalid):
 		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_CSRF_INVALID, "request.csrf.invalid"}
-	case stderrors.Is(err, identifier.ErrUsernameLength), stderrors.Is(err, identifier.ErrUsernameCharacters),
-		stderrors.Is(err, identifier.ErrUsernameUnderscores):
+	case stderrors.Is(err, identifier.ErrUsernameLength), stderrors.Is(err, identifier.ErrUsernameCharacters):
 		return descriptor{connect.CodeInvalidArgument, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_INVALID, "identity.username.invalid"}
 	case stderrors.Is(err, identity.ErrUsernameUnavailable), stderrors.Is(err, identifier.ErrUsernameUnavailable):
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, "identity.username.taken"}
@@ -123,6 +122,8 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeInternal, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PROJECTION_UNSAFE, "game.projection.unsafe"}
 	case stderrors.Is(err, room.ErrRoomCodeUnavailable):
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_CODE_UNAVAILABLE, "room.code.unavailable"}
+	case stderrors.Is(err, room.ErrUsernameConflict), stderrors.Is(err, identity.ErrUsernameRoomConflict):
+		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, "room.username.taken"}
 	case stderrors.Is(err, room.ErrRoomVersionConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.version.conflict"}
 	case stderrors.Is(err, room.ErrRuleRevisionConflict):

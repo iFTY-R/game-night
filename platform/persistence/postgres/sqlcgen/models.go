@@ -464,13 +464,15 @@ type RoomGameConfigDraft struct {
 }
 
 type RoomMember struct {
-	RoomID        pgtype.UUID        `json:"room_id"`
-	UserID        pgtype.UUID        `json:"user_id"`
-	Role          string             `json:"role"`
-	RequestedRole pgtype.Text        `json:"requested_role"`
-	SeatIndex     pgtype.Int4        `json:"seat_index"`
-	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
-	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
+	RoomID          pgtype.UUID        `json:"room_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Role            string             `json:"role"`
+	RequestedRole   pgtype.Text        `json:"requested_role"`
+	SeatIndex       pgtype.Int4        `json:"seat_index"`
+	JoinedAt        pgtype.Timestamptz `json:"joined_at"`
+	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
+	DisplayUsername string             `json:"display_username"`
+	UsernameKey     string             `json:"username_key"`
 }
 
 type RoomPendingStart struct {

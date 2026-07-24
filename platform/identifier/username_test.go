@@ -14,17 +14,10 @@ func TestParseUsernameNormalizesDisplayAndKey(t *testing.T) {
 		display string
 		key     string
 	}{
-		{name: "trim and full width", input: "  Ａlice  ", display: "Alice", key: "alice"},
-		{name: "composed latin", input: "A\u030Angstrom", display: "Ångstrom", key: "ångstrom"},
-		{name: "case fold expansion", input: "Straße", display: "Straße", key: "strasse"},
-		{name: "han digit underscore", input: "玩家_９", display: "玩家_9", key: "玩家_9"},
+		{name: "trim and full width", input: "  Ａb  ", display: "Ab", key: "ab"},
 		{name: "unicode decimal digits", input: "玩家١٢", display: "玩家١٢", key: "玩家١٢"},
-		{
-			name:    "maximum code points",
-			input:   strings.Repeat("界", MaximumUsernameCodePoints),
-			display: strings.Repeat("界", MaximumUsernameCodePoints),
-			key:     strings.Repeat("界", MaximumUsernameCodePoints),
-		},
+		{name: "nfkc digit folding", input: "A９界2", display: "A9界2", key: "a9界2"},
+		{name: "maximum code points", input: "界A9玩", display: "界A9玩", key: "界a9玩"},
 	}
 
 	for _, test := range tests {
@@ -47,11 +40,11 @@ func TestParseUsernameNormalizesDisplayAndKey(t *testing.T) {
 }
 
 func TestUsernameCaseVariantsShareClaimKey(t *testing.T) {
-	first, err := ParseUsername("Alice")
+	first, err := ParseUsername("Ab")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := ParseUsername("ａｌｉｃｅ")
+	second, err := ParseUsername("ａＢ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,19 +60,18 @@ func TestParseUsernameRejectsInvalidSyntax(t *testing.T) {
 		err   error
 	}{
 		{name: "empty", input: "  \u3000 ", err: ErrUsernameLength},
-		{name: "too short", input: "a", err: ErrUsernameLength},
-		{name: "too long", input: strings.Repeat("界", MaximumUsernameCodePoints+1), err: ErrUsernameLength},
+		{name: "too short", input: "你", err: ErrUsernameLength},
+		{name: "too long", input: "A9界2玩", err: ErrUsernameLength},
 		{name: "far above normalization bound", input: strings.Repeat("Ａ", 1<<16), err: ErrUsernameLength},
-		{name: "consecutive underscores", input: "ab__cd", err: ErrUsernameUnderscores},
-		{name: "path separator", input: "ab/cd", err: ErrUsernameCharacters},
+		{name: "underscore", input: "ab_1", err: ErrUsernameCharacters},
+		{name: "path separator", input: "a/cd", err: ErrUsernameCharacters},
 		{name: "emoji", input: "ab😀", err: ErrUsernameCharacters},
-		{name: "internal whitespace", input: "ab cd", err: ErrUsernameCharacters},
-		{name: "format character", input: "ab\u200dcd", err: ErrUsernameCharacters},
-		{name: "control character", input: "ab\u0000cd", err: ErrUsernameCharacters},
-		{name: "trimmed controls remain forbidden", input: "\tAlice\n", err: ErrUsernameCharacters},
-		{name: "byte order mark remains forbidden", input: "\ufeffAlice", err: ErrUsernameCharacters},
-		{name: "normalization creates consecutive underscores", input: "ab＿_cd", err: ErrUsernameUnderscores},
-		{name: "compatibility expansion exceeds maximum", input: strings.Repeat("Ⅳ", 11), err: ErrUsernameLength},
+		{name: "internal whitespace", input: "ab c", err: ErrUsernameCharacters},
+		{name: "format character", input: "ab\u200d", err: ErrUsernameCharacters},
+		{name: "control character", input: "ab\u0000", err: ErrUsernameCharacters},
+		{name: "trimmed controls remain forbidden", input: "\tAb\n", err: ErrUsernameCharacters},
+		{name: "byte order mark remains forbidden", input: "\ufeffAb", err: ErrUsernameCharacters},
+		{name: "compatibility expansion exceeds maximum", input: strings.Repeat("Ⅳ", 5), err: ErrUsernameLength},
 		{name: "unsupported script", input: "абв", err: ErrUsernameCharacters},
 		{name: "uncomposed mark", input: "q\u0301", err: ErrUsernameCharacters},
 		{name: "invalid utf8", input: string([]byte{'a', 0xff, 'b'}), err: ErrUsernameCharacters},
@@ -110,25 +102,25 @@ func TestUsernameDisplayLimitAllowsFoldedKeyExpansion(t *testing.T) {
 
 func TestUsernameValidatorRejectsReservedAndBlockedNames(t *testing.T) {
 	validator, err := NewUsernameValidator(
-		[]string{"FoundersClub"},
-		[]string{"坏词"},
+		[]string{"A9界2"},
+		[]string{"玩家"},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, input := range []string{"ＡＤＭＩＮ", "官方", "FOUNDERSCLUB", "好坏词名"} {
+	for _, input := range []string{"Ａ9界2", "官方", "好玩家"} {
 		if _, err := validator.Parse(input); !errors.Is(err, ErrUsernameUnavailable) {
 			t.Errorf("validator accepted unavailable username %q: %v", input, err)
 		}
 	}
 
-	username, err := validator.Parse("普通玩家")
+	username, err := validator.Parse("普通人")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if username.Display() != "普通玩家" {
-		t.Fatalf("display = %q, want 普通玩家", username.Display())
+	if username.Display() != "普通人" {
+		t.Fatalf("display = %q, want 普通人", username.Display())
 	}
 }
 
@@ -152,7 +144,7 @@ func TestUsernameValidatorRejectsOversizedPolicyBeforeNormalization(t *testing.T
 }
 
 func TestUsernameValidatorIsConcurrentSafe(t *testing.T) {
-	validator, err := NewUsernameValidator([]string{"FoundersClub"}, []string{"坏词"})
+	validator, err := NewUsernameValidator([]string{"A9界2"}, []string{"玩家"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,12 +157,17 @@ func TestUsernameValidatorIsConcurrentSafe(t *testing.T) {
 		go func() {
 			defer waitGroup.Done()
 			for range parsesPerGoroutine {
-				username, parseErr := validator.Parse("普通_Player9")
+				username, parseErr := validator.Parse("A9界2")
+				if !errors.Is(parseErr, ErrUsernameUnavailable) {
+					t.Errorf("parse: %v", parseErr)
+					return
+				}
+				username, parseErr = validator.Parse("普通人")
 				if parseErr != nil {
 					t.Errorf("parse: %v", parseErr)
 					return
 				}
-				if username.Key() != "普通_player9" {
+				if username.Key() != "普通人" {
 					t.Errorf("key = %q", username.Key())
 					return
 				}

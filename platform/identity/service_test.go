@@ -151,7 +151,7 @@ func TestServiceCompleteOnboardingReplaysRecoveryCodeAndLimitsInOrder(t *testing
 	fixture.service.limiter = fixture.limiter
 	command := CompleteOnboardingCommand{
 		DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.11", Username: "  Ａlice9  ", OperationID: testOperationID(t, 0x41),
+		ClientIP: "203.0.113.11", Username: "  Ａli9  ", OperationID: testOperationID(t, 0x41),
 	}
 	first, err := fixture.service.CompleteOnboarding(ctx, command)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestServiceCompleteOnboardingReplaysRecoveryCodeAndLimitsInOrder(t *testing
 		first.Operation.ResultID != second.Operation.ResultID || !second.Operation.Replayed {
 		t.Fatalf("onboarding replay changed one-time result: first=%+v second=%+v", first, second)
 	}
-	if first.User.Snapshot().Username != "Alice9" || len(fixture.storage.claims) != 1 ||
+	if first.User.Snapshot().Username != "Ali9" || len(fixture.storage.claims) != 1 ||
 		len(fixture.storage.recoveries) != 1 || len(fixture.storage.results) != 2 {
 		t.Fatalf("unexpected onboarding state: user=%+v claims=%d recovery=%d results=%d",
 			first.User.Snapshot(), len(fixture.storage.claims), len(fixture.storage.recoveries), len(fixture.storage.results))
@@ -230,7 +230,7 @@ func TestServiceUsernameLimiterRejectsOrFailsClosedBeforeClaim(t *testing.T) {
 			requests, _ := policy.Requests(
 				testBucketKey(t, ratelimit.DimensionIP, "203.0.113.14"),
 				testBucketKey(t, ratelimit.DimensionDevice, credentialID.String()),
-				testBucketKey(t, ratelimit.DimensionUsername, "alice9"),
+				testBucketKey(t, ratelimit.DimensionUsername, "ali9"),
 			)
 			for _, request := range requests {
 				if request.Bucket().Dimension() != test.dimension {
@@ -249,7 +249,7 @@ func TestServiceUsernameLimiterRejectsOrFailsClosedBeforeClaim(t *testing.T) {
 			writesBefore := fixture.storage.writeCount
 			_, err := fixture.service.CompleteOnboarding(ctx, CompleteOnboardingCommand{
 				DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
-				ClientIP: "203.0.113.14", Username: "Alice9", OperationID: testOperationID(t, 0x55),
+				ClientIP: "203.0.113.14", Username: "Ali9", OperationID: testOperationID(t, 0x55),
 			})
 			if !errors.Is(err, test.want) {
 				t.Fatalf("limiter error = %v, want %v", err, test.want)
@@ -278,7 +278,7 @@ func TestServiceRevokedCredentialStatusInstructionRequiresVerifiedSecret(t *test
 			bootstrap := fixture.bootstrap(t, ctx)
 			onboard, err := fixture.service.CompleteOnboarding(ctx, CompleteOnboardingCommand{
 				DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
-				ClientIP: "203.0.113.15", Username: "Alice9", OperationID: testOperationID(t, 0x56),
+				ClientIP: "203.0.113.15", Username: "Ali9", OperationID: testOperationID(t, 0x56),
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -330,7 +330,7 @@ func TestServiceChangeUsernameEnforcesCooldownAndReservesOldClaim(t *testing.T) 
 	bootstrap := fixture.bootstrap(t, ctx)
 	onboard, err := fixture.service.CompleteOnboarding(ctx, CompleteOnboardingCommand{
 		DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
-		ClientIP: "203.0.113.13", Username: "Alice9", OperationID: testOperationID(t, 0x61),
+		ClientIP: "203.0.113.13", Username: "Ali9", OperationID: testOperationID(t, 0x61),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -353,7 +353,7 @@ func TestServiceChangeUsernameEnforcesCooldownAndReservesOldClaim(t *testing.T) 
 		t.Fatalf("changed username = %q", changed.User.Snapshot().Username)
 	}
 	oldKey := onboard.User.Snapshot().CurrentUsernameKey
-	oldClaim := fixture.storage.claims[oldKey].Snapshot()
+	oldClaim := fixture.storage.claims[usernameClaimStorageKey(onboard.User.Snapshot().ID, oldKey)].Snapshot()
 	if oldClaim.Status != UsernameClaimReserved || !oldClaim.ReservedUntil.Equal(fixture.clock.Now().Add(UsernameReservationTTL)) {
 		t.Fatalf("old claim was not reserved: %+v", oldClaim)
 	}

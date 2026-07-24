@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { gameClient, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../src/api/client";
+import { ApiError, gameClient, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../src/api/client";
 import { gameProjectionFromConnect } from "../src/api/game-projection";
 
 const room: RoomSnapshot = {
@@ -43,6 +43,11 @@ const captureRequest = (responseBody: Record<string, unknown> = {}): { calls: Ar
   return { calls };
 };
 
+const captureFailedRequest = (status: number, responseBody: Record<string, unknown>): void => {
+  vi.stubGlobal("fetch", vi.fn(async () =>
+    new Response(JSON.stringify(responseBody), { status, headers: { "Content-Type": "application/json" } })));
+};
+
 const expectDigest = (value: unknown): void => {
   expect(typeof value).toBe("string");
   expect(atob(String(value))).toHaveLength(32);
@@ -53,6 +58,17 @@ afterEach(() => {
 });
 
 describe("Connect JSON mutation requests", () => {
+  it("translates room duplicate-name failures without changing API status or code", async () => {
+    captureFailedRequest(409, { code: "already_exists", message: "room.username.taken" });
+
+    await expect(roomClient.joinRoom(room.roomCode)).rejects.toMatchObject({
+      name: "ApiError",
+      status: 409,
+      code: "already_exists",
+      message: "房间内已有同名玩家",
+    } satisfies Partial<ApiError>);
+  });
+
   it("restores an omitted zero seat index before room snapshots reach the UI", async () => {
     captureRequest({
       room: {

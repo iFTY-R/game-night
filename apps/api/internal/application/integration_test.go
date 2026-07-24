@@ -197,7 +197,7 @@ func exerciseRoomLifecycle(
 		t.Fatalf("list integrated public rooms: response=%+v err=%v", listed, err)
 	}
 	card := listed.Msg.GetRooms()[0]
-	if card.GetRoomId() != created.Msg.GetRoom().GetRoomId() || card.GetHostUsername() != "ConnectUser9" ||
+	if card.GetRoomId() != created.Msg.GetRoom().GetRoomId() || card.GetHostUsername() != "CU09" ||
 		card.GetPrimaryAction() != roomv1.PublicRoomPrimaryAction_PUBLIC_ROOM_PRIMARY_ACTION_ENTER_ROOM ||
 		card.GetParticipantCount() != 1 || listed.Msg.GetPage().GetNextPageToken() != "" {
 		t.Fatalf("list integrated public rooms: card=%+v", card)
@@ -280,7 +280,7 @@ func onboardAndRecoverIdentity(
 	assertNoStore(t, bootstrap.Header())
 
 	onboardingOperation := applicationOperationID(t)
-	onboardingRequest := connect.NewRequest(&identityv1.CompleteOnboardingRequest{Username: "ConnectUser9", OperationId: onboardingOperation})
+	onboardingRequest := connect.NewRequest(&identityv1.CompleteOnboardingRequest{Username: "CU09", OperationId: onboardingOperation})
 	runtime.authorizeUserWrite(t, onboardingRequest)
 	onboarding, err := client.CompleteOnboarding(ctx, onboardingRequest)
 	if err != nil || onboarding.Msg.GetUser().GetStatus() != identityv1.UserStatus_USER_STATUS_ACTIVE || onboarding.Msg.GetRecoveryCode() == "" {
@@ -508,11 +508,11 @@ func exerciseAdminIdentity(
 		t.Fatalf("create assisted recovery grant: err=%v", err)
 	}
 	usernameRequest := connect.NewRequest(&adminv1.ForceChangeUsernameRequest{
-		UserId: identity.userID, Username: "ConnectAdmin9", Reason: "moderated username change",
+		UserId: identity.userID, Username: "CA09", Reason: "moderated username change",
 	})
 	runtime.authorizeAdminIdentity(t, usernameRequest)
 	username, err := client.ForceChangeUsername(ctx, usernameRequest)
-	if err != nil || username.Msg.GetUser().GetUsername() != "ConnectAdmin9" {
+	if err != nil || username.Msg.GetUser().GetUsername() != "CA09" {
 		t.Fatalf("force username change: err=%v", err)
 	}
 

@@ -1,0 +1,11 @@
+version: v2
+clean: true
+plugins:
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go"]
+    out: games/three-rounds/gen/go
+    opt:
+      - paths=source_relative
+  - local: ["pnpm", "exec", "protoc-gen-es"]
+    out: games/three-rounds/client/src/generated
+    opt:
+      - target=ts

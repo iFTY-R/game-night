@@ -13,16 +13,18 @@ import (
 	liarsmodule "github.com/iFTY-R/game-night/games/liars-dice/module"
 	meetengine "github.com/iFTY-R/game-night/games/meet-by-chance/engine"
 	meetmodule "github.com/iFTY-R/game-night/games/meet-by-chance/module"
+	threeroundsengine "github.com/iFTY-R/game-night/games/three-rounds/engine"
+	threeroundsmodule "github.com/iFTY-R/game-night/games/three-rounds/module"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
-func TestGeneratedRegistryContainsThreeExactDefaults(t *testing.T) {
+func TestGeneratedRegistryContainsExactDefaults(t *testing.T) {
 	registry, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	versions := DefaultVersions()
-	if len(registry.Manifests()) != 3 || len(versions) != 3 {
+	if len(registry.Manifests()) != 4 || len(versions) != 4 {
 		t.Fatalf("manifests=%d versions=%d", len(registry.Manifests()), len(versions))
 	}
 	for gameID, key := range versions {
@@ -57,6 +59,10 @@ func TestRegisteredDefaultsCreateFromFrozenConfigsAndRejectCorruption(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	threeRoundsConfig, err := threeroundsmodule.EncodeConfigForPlayers(threeroundsengine.DefaultConfig(), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	registry, err := New()
 	if err != nil {
@@ -70,6 +76,7 @@ func TestRegisteredDefaultsCreateFromFrozenConfigsAndRejectCorruption(t *testing
 		{gameID: "liars-dice", participants: 2, config: liarsConfig},
 		{gameID: "dice-789", participants: 2, config: dice789Config},
 		{gameID: "meet-by-chance", participants: 3, config: meetConfig},
+		{gameID: "three-rounds", participants: 2, config: threeRoundsConfig},
 	} {
 		t.Run(string(test.gameID), func(t *testing.T) {
 			module, err := registry.DefaultModule(t.Context(), test.gameID)

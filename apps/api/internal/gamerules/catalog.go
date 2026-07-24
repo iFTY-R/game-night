@@ -13,6 +13,8 @@ import (
 	liarsmodule "github.com/iFTY-R/game-night/games/liars-dice/module"
 	meetengine "github.com/iFTY-R/game-night/games/meet-by-chance/engine"
 	meetmodule "github.com/iFTY-R/game-night/games/meet-by-chance/module"
+	threeroundsengine "github.com/iFTY-R/game-night/games/three-rounds/engine"
+	threeroundsmodule "github.com/iFTY-R/game-night/games/three-rounds/module"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 )
@@ -24,7 +26,7 @@ type Adapter interface {
 	Version() gameSDK.VersionKey
 }
 
-// Catalog exposes the three currently playable rule adapters through stable IDs.
+// Catalog exposes the retained playable rule adapters through stable IDs.
 type Catalog struct {
 	adapters map[string]Adapter
 }
@@ -32,9 +34,10 @@ type Catalog struct {
 // NewCatalog constructs the complete rules catalog used by API and tests.
 func NewCatalog() *Catalog {
 	return &Catalog{adapters: map[string]Adapter{
-		string(liarsmodule.GameID):   &liarsAdapter{},
-		string(dice789module.GameID): &dice789Adapter{},
-		string(meetmodule.GameID):    &meetAdapter{},
+		string(liarsmodule.GameID):       &liarsAdapter{},
+		string(dice789module.GameID):     &dice789Adapter{},
+		string(meetmodule.GameID):        &meetAdapter{},
+		string(threeroundsmodule.GameID): &threeRoundsAdapter{},
 	}}
 }
 
@@ -145,4 +148,24 @@ func (*meetAdapter) Normalize(message gameSDK.Message, playerCount uint32) (game
 		return gameSDK.Message{}, err
 	}
 	return meetmodule.EncodeConfigForPlayers(config, int(players))
+}
+
+type threeRoundsAdapter struct{}
+
+func (*threeRoundsAdapter) Version() gameSDK.VersionKey {
+	return gameSDK.VersionKey{GameID: threeroundsmodule.GameID, Engine: threeroundsmodule.EngineVersion, Protocol: threeroundsmodule.ProtocolVersion, Client: threeroundsmodule.ClientVersion}
+}
+
+func (*threeRoundsAdapter) Default(playerCount uint32) (gameSDK.Message, error) {
+	players := effectivePlayers(playerCount, threeroundsengine.MinimumPlayers)
+	return threeroundsmodule.EncodeConfigForPlayers(threeroundsengine.DefaultConfig(), int(players))
+}
+
+func (*threeRoundsAdapter) Normalize(message gameSDK.Message, playerCount uint32) (gameSDK.Message, error) {
+	players := effectivePlayers(playerCount, threeroundsengine.MinimumPlayers)
+	config, err := threeroundsmodule.DecodeConfig(message, int(players))
+	if err != nil {
+		return gameSDK.Message{}, err
+	}
+	return threeroundsmodule.EncodeConfigForPlayers(config, int(players))
 }

@@ -20,6 +20,12 @@ import {
   type MeetByChanceReplay,
 } from "@game-night/meet-by-chance-client";
 import { meetByChanceThemes } from "@game-night/meet-by-chance-themes";
+import {
+  ThreeRoundsReplayTable,
+  decodeThreeRoundsReplay,
+  type ThreeRoundsReplay,
+} from "@game-night/three-rounds-client";
+import { threeRoundsThemes } from "@game-night/three-rounds-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
 import { ApiError, gameClient } from "../api/client";
@@ -38,6 +44,7 @@ const gameId = ref<GameId | null>(null);
 const liarsReplay = ref<LiarsDiceReplay | null>(null);
 const dice789Replay = ref<Dice789Replay | null>(null);
 const meetReplay = ref<MeetByChanceReplay | null>(null);
+const threeReplay = ref<ThreeRoundsReplay | null>(null);
 const muted = ref(false);
 const themeIndex = ref(0);
 // Cancelling the immutable request prevents a departed replay page from applying stale theme or payload state.
@@ -70,6 +77,7 @@ const replaySeats = computed<readonly ReplaySeat[]>(() => {
   }
   if (dice789Replay.value) return dice789Replay.value.players;
   if (meetReplay.value) return meetReplay.value.players;
+  if (threeReplay.value) return threeReplay.value.players;
   return [];
 });
 
@@ -93,6 +101,7 @@ const themes = () => {
   if (gameId.value === "liars-dice") return liarsDiceThemes;
   if (gameId.value === "dice-789") return dice789Themes;
   if (gameId.value === "meet-by-chance") return meetByChanceThemes;
+  if (gameId.value === "three-rounds") return threeRoundsThemes;
   return [];
 };
 
@@ -135,6 +144,7 @@ const loadReplay = async (): Promise<void> => {
     if (session.gameId === "liars-dice") liarsReplay.value = decodeLiarsDiceReplay(projection);
     if (session.gameId === "dice-789") dice789Replay.value = decodeDice789Replay(projection);
     if (session.gameId === "meet-by-chance") meetReplay.value = decodeMeetByChanceReplay(projection);
+    if (session.gameId === "three-rounds") threeReplay.value = decodeThreeRoundsReplay(projection);
     themeIndex.value = 0;
     applyTheme();
   } catch (error) {
@@ -180,6 +190,15 @@ onBeforeUnmount(() => {
   <MeetByChanceReplayTable
     v-else-if="meetReplay"
     :replay="meetReplay"
+    :context="replayContext"
+    :muted="muted"
+    @leave="leave"
+    @toggle-sound="toggleSound"
+    @cycle-theme="cycleTheme"
+  />
+  <ThreeRoundsReplayTable
+    v-else-if="threeReplay"
+    :replay="threeReplay"
     :context="replayContext"
     :muted="muted"
     @leave="leave"

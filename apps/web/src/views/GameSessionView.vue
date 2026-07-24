@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import Dice789View from "./Dice789View.vue";
 import GameView from "./GameView.vue";
 import MeetByChanceView from "./MeetByChanceView.vue";
+import ThreeRoundsView from "./ThreeRoundsView.vue";
 import { gameById, isGameId } from "../game-catalog";
 import { useRoomStore } from "../stores/room";
 
@@ -25,6 +26,7 @@ const gameComponent = computed(() => {
   if (gameId.value === "liars-dice") return GameView;
   if (gameId.value === "dice-789") return Dice789View;
   if (gameId.value === "meet-by-chance") return MeetByChanceView;
+  if (gameId.value === "three-rounds") return ThreeRoundsView;
   return null;
 });
 

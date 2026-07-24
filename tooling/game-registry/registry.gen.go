@@ -6,6 +6,7 @@ import (
 	dice789 "github.com/iFTY-R/game-night/games/dice-789/module"
 	liarsdice "github.com/iFTY-R/game-night/games/liars-dice/module"
 	meetbychance "github.com/iFTY-R/game-night/games/meet-by-chance/module"
+	threerounds "github.com/iFTY-R/game-night/games/three-rounds/module"
 	game "github.com/iFTY-R/game-night/sdk/go/game"
 )
 
@@ -14,6 +15,7 @@ func generatedRegistrations() []game.Registration {
 		{Module: dice789.NewModule(), Default: true},
 		{Module: liarsdice.NewModule(), Default: true},
 		{Module: meetbychance.NewModule(), Default: true},
+		{Module: threerounds.NewModule(), Default: true},
 	}
 }
 
@@ -41,5 +43,13 @@ var generatedExpectedManifests = []game.Manifest{
 		Capabilities: game.Capabilities{Submission: game.SubmissionMode("turn_based"), Timers: true, Spectating: true, Replay: true, Reveal: game.RevealPolicyRuleControlled},
 		Presentation: game.PresentationPreferences{TableShape: game.TableShape("adaptive"), Orientation: game.OrientationPolicy("portrait_preferred"), ActionDock: game.ActionDockPreference("bottom_edge")},
 		Themes:       game.ThemePreferences{Default: game.Identifier("classic"), Fallback: game.Identifier("classic"), Variants: []game.Identifier{game.Identifier("classic"), game.Identifier("copper"), game.Identifier("night")}},
+	},
+	{
+		GameID:       game.GameID("three-rounds"),
+		Versions:     game.VersionSet{Engine: game.Version("1.0.0"), Protocol: game.Version("1.0.0"), Client: game.Version("1.0.0")},
+		Participants: game.ParticipantLimits{Minimum: 2, Maximum: 9, RecommendedMinimum: 2, RecommendedMaximum: 6},
+		Capabilities: game.Capabilities{Submission: game.SubmissionMode("simultaneous"), Timers: true, Spectating: true, Replay: true, Reveal: game.RevealPolicyRuleControlled},
+		Presentation: game.PresentationPreferences{TableShape: game.TableShape("elongated_oval"), Orientation: game.OrientationPolicy("portrait_preferred"), ActionDock: game.ActionDockPreference("bottom_edge")},
+		Themes:       game.ThemePreferences{Default: game.Identifier("classic"), Fallback: game.Identifier("classic"), Variants: []game.Identifier{game.Identifier("classic"), game.Identifier("felt"), game.Identifier("noir")}},
 	},
 }

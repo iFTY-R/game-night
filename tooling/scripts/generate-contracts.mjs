@@ -9,6 +9,7 @@ const games = [
   'liars-dice',
   'dice-789',
   'meet-by-chance',
+  'three-rounds',
 ]
 
 if (protoFiles.length === 0) {

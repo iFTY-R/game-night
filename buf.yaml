@@ -4,6 +4,7 @@ modules:
   - path: games/liars-dice/proto
   - path: games/dice-789/proto
   - path: games/meet-by-chance/proto
+  - path: games/three-rounds/proto
 lint:
   use:
     - STANDARD

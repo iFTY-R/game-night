@@ -1,0 +1,306 @@
+syntax = "proto3";
+
+package game.three_rounds.v1;
+
+option go_package = "github.com/iFTY-R/game-night/games/three-rounds/gen/go/game/three_rounds/v1;threeroundsv1";
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_DEALING = 1;
+  PHASE_ROUND_ONE_SELECTING = 2;
+  PHASE_ROUND_ONE_RESULT = 3;
+  PHASE_ROUND_TWO_SELECTING = 4;
+  PHASE_ROUND_TWO_RESULT = 5;
+  PHASE_ROUND_THREE_RESULT = 6;
+  PHASE_FINAL_RESULT = 7;
+  PHASE_FINISHED = 8;
+}
+
+enum FinishReason {
+  FINISH_REASON_UNSPECIFIED = 0;
+  FINISH_REASON_NORMAL_COMPLETED = 1;
+  FINISH_REASON_HOST_REQUESTED = 2;
+  FINISH_REASON_INSUFFICIENT_PARTICIPANTS = 3;
+}
+
+enum HandClass {
+  HAND_CLASS_UNSPECIFIED = 0;
+  HAND_CLASS_SINGLE = 1;
+  HAND_CLASS_PAIR = 2;
+  HAND_CLASS_STRAIGHT = 3;
+  HAND_CLASS_FLUSH = 4;
+  HAND_CLASS_STRAIGHT_FLUSH = 5;
+  HAND_CLASS_TRIPS = 6;
+}
+
+message Config {
+  uint32 round_one_timeout_seconds = 1;
+  uint32 round_two_timeout_seconds = 2;
+  uint32 round_result_seconds = 3;
+  uint32 final_result_seconds = 4;
+}
+
+message PendingSelection {
+  uint32 round = 1;
+  repeated string card_ids = 2;
+  bool auto_submitted = 3;
+}
+
+message RoundCards {
+  repeated string card_ids = 1;
+}
+
+message WildcardSubstitution {
+  string wildcard_card_id = 1;
+  string substituted_card_id = 2;
+  uint32 card_ordinal = 3;
+}
+
+message WildcardResolution {
+  repeated WildcardSubstitution substitutions = 1;
+  repeated string resolved_cards = 2;
+}
+
+message RoundOneEvaluation {
+  string card_id = 1;
+  uint32 rank_strength = 2;
+  uint32 suit_strength = 3;
+}
+
+message RoundTwoEvaluation {
+  uint32 total_half_points = 1;
+  bool busted = 2;
+  repeated uint32 rank_strengths_desc = 3;
+}
+
+message RoundThreeEvaluation {
+  HandClass hand_class = 1;
+  repeated uint32 compare_values = 2;
+  repeated string resolved_cards = 3;
+}
+
+message PlayerReveal {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  repeated string card_ids = 4;
+  bool auto_submitted = 5;
+  uint32 awarded_points = 6;
+  RoundOneEvaluation round_one = 7;
+  RoundTwoEvaluation round_two = 8;
+  RoundThreeEvaluation round_three = 9;
+  WildcardResolution wildcard_resolution = 10;
+}
+
+message RoundSummary {
+  uint32 round = 1;
+  repeated string winner_user_ids = 2;
+  repeated PlayerReveal reveals = 3;
+  bool all_busted = 4;
+}
+
+message FinalStanding {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  uint32 total_points = 4;
+  bool won_round_one = 5;
+  bool won_round_two = 6;
+  bool won_round_three = 7;
+  bool winner = 8;
+  uint32 rank = 9;
+}
+
+message FinalSummary {
+  repeated FinalStanding standings = 1;
+  repeated string winner_user_ids = 2;
+}
+
+message PlayerState {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  repeated string initial_hand = 4;
+  repeated string remaining_hand = 5;
+  PendingSelection pending_selection = 6;
+  RoundCards round_one_cards = 7;
+  RoundCards round_two_cards = 8;
+  RoundCards round_three_cards = 9;
+  WildcardResolution round_three_wildcard_resolution = 10;
+  uint32 round_one_points = 11;
+  uint32 round_two_points = 12;
+  uint32 round_three_points = 13;
+  uint32 total_points = 14;
+  bool won_round_one = 15;
+  bool won_round_two = 16;
+  bool won_round_three = 17;
+  bool final_winner = 18;
+  uint32 final_rank = 19;
+}
+
+message State {
+  uint32 schema_version = 1;
+  Phase phase = 2;
+  uint32 current_round = 3;
+  int64 phase_deadline_unix_millis = 4;
+  uint32 phase_generation = 5;
+  Config config = 6;
+  string host_user_id = 7;
+  repeated PlayerState players = 8;
+  repeated RoundSummary round_history = 9;
+  FinalSummary final_summary = 10;
+  FinishReason finish_reason = 11;
+}
+
+message SubmitSelection {
+  uint32 round = 1;
+  repeated string card_ids = 2;
+}
+
+message Command {
+  oneof command {
+    SubmitSelection submit_selection = 1;
+  }
+}
+
+message Timer {
+  Phase phase = 1;
+  uint32 round = 2;
+  int64 deadline_unix_millis = 3;
+  uint32 phase_generation = 4;
+}
+
+message ParticipantRevoked {
+  string user_id = 1;
+}
+
+message ReplayPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  repeated string initial_hand = 3;
+}
+
+message PlayerDeal {
+  string user_id = 1;
+  repeated string initial_hand = 2;
+}
+
+message SessionStarted {
+  Config config = 1;
+  repeated ReplayPlayer players = 2;
+  string host_user_id = 3;
+}
+
+message CardsDealt {
+  repeated PlayerDeal deals = 1;
+}
+
+message PhaseStarted {
+  Phase phase = 1;
+  uint32 round = 2;
+  int64 deadline_unix_millis = 3;
+  uint32 phase_generation = 4;
+}
+
+message SelectionSubmitted {
+  string user_id = 1;
+  uint32 round = 2;
+}
+
+message SelectionAutoSubmitted {
+  string user_id = 1;
+  uint32 round = 2;
+}
+
+message RoundRevealed {
+  uint32 round = 1;
+  repeated PlayerReveal reveals = 2;
+}
+
+message RoundSettled {
+  RoundSummary summary = 1;
+}
+
+message WildcardResolved {
+  string user_id = 1;
+  WildcardResolution resolution = 2;
+}
+
+message SessionFinished {
+  FinishReason reason = 1;
+  string operator_user_id = 2;
+}
+
+message Event {
+  oneof event {
+    SessionStarted session_started = 1;
+    CardsDealt cards_dealt = 2;
+    PhaseStarted phase_started = 3;
+    SelectionSubmitted selection_submitted = 4;
+    SelectionAutoSubmitted selection_auto_submitted = 5;
+    RoundRevealed round_revealed = 6;
+    RoundSettled round_settled = 7;
+    WildcardResolved wildcard_resolved = 8;
+    ParticipantRevoked participant_revoked = 9;
+    SessionFinished session_finished = 10;
+  }
+}
+
+message PublicPlayer {
+  string user_id = 1;
+  uint32 seat_index = 2;
+  bool active = 3;
+  bool submitted = 4;
+  RoundCards round_one_cards = 5;
+  RoundCards round_two_cards = 6;
+  RoundCards round_three_cards = 7;
+  WildcardResolution round_three_wildcard_resolution = 8;
+  uint32 round_one_points = 9;
+  uint32 round_two_points = 10;
+  uint32 round_three_points = 11;
+  uint32 total_points = 12;
+  bool won_round_one = 13;
+  bool won_round_two = 14;
+  bool won_round_three = 15;
+  bool final_winner = 16;
+  uint32 final_rank = 17;
+}
+
+message SelfView {
+  repeated string remaining_hand = 1;
+  PendingSelection pending_selection = 2;
+}
+
+message View {
+  Phase phase = 1;
+  uint32 current_round = 2;
+  int64 phase_deadline_unix_millis = 3;
+  uint32 phase_generation = 4;
+  Config config = 5;
+  bool viewer_is_host = 6;
+  repeated PublicPlayer public_players = 7;
+  SelfView self = 8;
+  repeated string allowed_actions = 9;
+  repeated RoundSummary round_history = 10;
+  FinalSummary final_summary = 11;
+  FinishReason finish_reason = 12;
+}
+
+message ViewDelta {
+  View view = 1;
+}
+
+message ReplayEntry {
+  uint64 sequence = 1;
+  Event event = 2;
+}
+
+message Replay {
+  uint32 schema_version = 1;
+  Config config = 2;
+  repeated ReplayPlayer players = 3;
+  repeated ReplayEntry entries = 4;
+  repeated RoundSummary rounds = 5;
+  FinishReason finish_reason = 6;
+  FinalSummary final_summary = 7;
+}

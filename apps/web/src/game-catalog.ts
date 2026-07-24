@@ -20,6 +20,13 @@ export const gameCatalog = [
     minimumPlayers: 3,
     accent: "喜",
   },
+  {
+    gameId: "three-rounds",
+    name: "三关定胜负",
+    summary: "六张手牌分三关结算，前两关手选，第三关自动亮底牌。",
+    minimumPlayers: 2,
+    accent: "3关",
+  },
 ] as const;
 
 export type GameId = (typeof gameCatalog)[number]["gameId"];

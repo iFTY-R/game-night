@@ -105,6 +105,41 @@ export const gameManifests = [
         "night"
       ]
     }
+  },
+  {
+    "gameId": "three-rounds",
+    "versions": {
+      "engine": "1.0.0",
+      "protocol": "1.0.0",
+      "client": "1.0.0"
+    },
+    "participants": {
+      "minimum": 2,
+      "maximum": 9,
+      "recommendedMinimum": 2,
+      "recommendedMaximum": 6
+    },
+    "capabilities": {
+      "submission": "simultaneous",
+      "timers": true,
+      "spectating": true,
+      "replay": true,
+      "reveal": "rule_controlled"
+    },
+    "presentation": {
+      "tableShape": "elongated_oval",
+      "orientation": "portrait_preferred",
+      "actionDock": "bottom_edge"
+    },
+    "themes": {
+      "default": "classic",
+      "fallback": "classic",
+      "variants": [
+        "classic",
+        "felt",
+        "noir"
+      ]
+    }
   }
 ] as const;
 
@@ -120,6 +155,11 @@ export const defaultGameVersions = {
     "client": "1.0.0"
   },
   "meet-by-chance": {
+    "engine": "1.0.0",
+    "protocol": "1.0.0",
+    "client": "1.0.0"
+  },
+  "three-rounds": {
     "engine": "1.0.0",
     "protocol": "1.0.0",
     "client": "1.0.0"

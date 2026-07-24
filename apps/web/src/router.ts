@@ -8,6 +8,7 @@ import MeetByChanceView from "./views/MeetByChanceView.vue";
 import NotFoundView from "./views/NotFoundView.vue";
 import ReplaySessionView from "./views/ReplaySessionView.vue";
 import RoomView from "./views/RoomView.vue";
+import ThreeRoundsView from "./views/ThreeRoundsView.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -26,6 +27,7 @@ export const router = createRouter({
     { path: "/fixtures/table/replay", name: "fixture-table-replay", component: GameView, props: { roomId: "fixture-room", sessionId: "fixture-session", fixtureState: "replay" }, meta: { title: "复盘预览" } },
     { path: "/fixtures/dice-789/:fixtureState?", name: "fixture-dice-789", component: Dice789View, props: (route) => ({ fixtureState: route.params.fixtureState ?? "active" }), meta: { title: "789 预览" } },
     { path: "/fixtures/meet-by-chance/:fixtureState?", name: "fixture-meet-by-chance", component: MeetByChanceView, props: (route) => ({ fixtureState: route.params.fixtureState ?? "active" }), meta: { title: "喜相逢预览" } },
+    { path: "/fixtures/three-rounds/:fixtureState?", name: "fixture-three-rounds", component: ThreeRoundsView, props: (route) => ({ fixtureState: route.params.fixtureState ?? "active" }), meta: { title: "三关预览" } },
     { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView, meta: { title: "找不到页面" } },
   ],
 });

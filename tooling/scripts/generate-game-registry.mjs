@@ -36,6 +36,17 @@ const releases = [
     actionDock: 'bottom_edge',
     themes: { default: 'classic', fallback: 'classic', variants: ['classic', 'copper', 'night'] },
   },
+  {
+    id: 'three-rounds',
+    alias: 'threerounds',
+    importPath: 'github.com/iFTY-R/game-night/games/three-rounds/module',
+    participants: { minimum: 2, maximum: 9, recommendedMinimum: 2, recommendedMaximum: 6 },
+    submission: 'simultaneous',
+    tableShape: 'elongated_oval',
+    orientation: 'portrait_preferred',
+    actionDock: 'bottom_edge',
+    themes: { default: 'classic', fallback: 'classic', variants: ['classic', 'felt', 'noir'] },
+  },
 ].sort((left, right) => left.id.localeCompare(right.id))
 
 // version pins all three artifacts for the first retained release; future releases become additional entries.

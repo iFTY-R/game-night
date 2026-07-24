@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -22,15 +23,24 @@ import (
 )
 
 const (
-	healthLivePath   = "/health/live"
-	healthReadyPath  = "/health/ready"
-	realtimeGamePath = "/realtime/game"
-	platformPrefix   = "/platform."
-	staticIndexName  = "index.html"
+	healthLivePath          = "/health/live"
+	healthReadyPath         = "/health/ready"
+	adminReadyPath          = "/readyz"
+	adminSensitiveReadyPath = "/readyz/sensitive"
+	realtimeGamePath        = "/realtime/game"
+	staticIndexName         = "index.html"
 )
 
 var (
 	errInvalidServer = errors.New("invalid edge server configuration")
+)
+
+type surfaceClass uint8
+
+const (
+	unknownSurface surfaceClass = iota
+	userSurface
+	adminSurface
 )
 
 // Run loads the handler, starts the listener, and shuts down gracefully on cancellation.
@@ -53,7 +63,12 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	go func() {
 		serveErrors <- server.ListenAndServe()
 	}()
-	logger.Info("edge listening", "address", cfg.ListenAddress, "static_directory", cfg.StaticDirectory)
+	logger.Info(
+		"edge listening",
+		"address", cfg.ListenAddress,
+		"user_static_directory", cfg.UserStaticDirectory,
+		"admin_static_directory", cfg.AdminStaticDirectory,
+	)
 	select {
 	case serveErr := <-serveErrors:
 		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
@@ -76,12 +91,15 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 // NewHandler constructs the single public edge HTTP surface.
 func NewHandler(cfg config.Config, logger *slog.Logger) (http.Handler, error) {
-	if logger == nil || cfg.APIUpstreamURL == nil || cfg.RealtimeUpstreamURL == nil || cfg.StaticDirectory == "" || len(cfg.TrustedProxyCIDRs) == 0 {
+	if logger == nil || cfg.APIUpstreamURL == nil || cfg.RealtimeUpstreamURL == nil || cfg.UserStaticDirectory == "" ||
+		cfg.AdminStaticDirectory == "" || len(cfg.UserHosts) == 0 || len(cfg.AdminHosts) == 0 || len(cfg.TrustedProxyCIDRs) == 0 {
 		return nil, errInvalidServer
 	}
 	return &handler{
 		logger:        logger,
 		cfg:           cfg,
+		userHosts:     hostSet(cfg.UserHosts),
+		adminHosts:    hostSet(cfg.AdminHosts),
 		apiProxy:      newProxy(cfg.APIUpstreamURL, cfg.TrustedProxyCIDRs, logger, "api", true, cfg),
 		realtimeProxy: newProxy(cfg.RealtimeUpstreamURL, cfg.TrustedProxyCIDRs, logger, "realtime", false, cfg),
 		healthClient: &http.Client{
@@ -103,29 +121,32 @@ func NewHandler(cfg config.Config, logger *slog.Logger) (http.Handler, error) {
 type handler struct {
 	logger        *slog.Logger
 	cfg           config.Config
+	userHosts     map[string]struct{}
+	adminHosts    map[string]struct{}
 	apiProxy      *httputil.ReverseProxy
 	realtimeProxy *httputil.ReverseProxy
 	healthClient  *http.Client
 }
 
 func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Host classification is the first boundary so unknown authorities never reach health checks, proxies, or SPA fallbacks.
+	surface := h.surfaceForHost(request.Host)
+	switch surface {
+	case unknownSurface:
+		writer.WriteHeader(http.StatusMisdirectedRequest)
+		return
+	case userSurface, adminSurface:
+	}
+
 	switch {
 	case request.Method == http.MethodGet && request.URL.Path == healthLivePath:
 		writer.WriteHeader(http.StatusNoContent)
 	case request.Method == http.MethodGet && request.URL.Path == healthReadyPath:
 		h.handleReady(writer, request)
-	case strings.HasPrefix(request.URL.Path, platformPrefix):
-		h.apiProxy.ServeHTTP(writer, request)
-	case strings.HasPrefix(request.URL.Path, "/platform"):
-		http.NotFound(writer, request)
-	case request.Method == http.MethodGet && request.URL.Path == realtimeGamePath:
-		h.realtimeProxy.ServeHTTP(writer, request)
-	case strings.HasPrefix(request.URL.Path, "/realtime"):
-		http.NotFound(writer, request)
-	case strings.HasPrefix(request.URL.Path, "/health"):
-		http.NotFound(writer, request)
-	case request.Method == http.MethodGet || request.Method == http.MethodHead:
-		h.serveStatic(writer, request)
+	case surface == userSurface:
+		h.serveUserSurface(writer, request)
+	case surface == adminSurface:
+		h.serveAdminSurface(writer, request)
 	default:
 		http.NotFound(writer, request)
 	}
@@ -171,36 +192,74 @@ func (h *handler) checkReady(ctx context.Context, base *url.URL, suffix string) 
 	return nil
 }
 
-func (h *handler) serveStatic(writer http.ResponseWriter, request *http.Request) {
+func (h *handler) serveUserSurface(writer http.ResponseWriter, request *http.Request) {
+	switch {
+	case isUserRPCPath(request.URL.Path):
+		h.apiProxy.ServeHTTP(writer, request)
+	case strings.HasPrefix(request.URL.Path, "/platform"):
+		http.NotFound(writer, request)
+	case request.Method == http.MethodGet && request.URL.Path == realtimeGamePath:
+		h.realtimeProxy.ServeHTTP(writer, request)
+	case strings.HasPrefix(request.URL.Path, "/realtime"):
+		http.NotFound(writer, request)
+	case request.URL.Path == adminReadyPath || request.URL.Path == adminSensitiveReadyPath:
+		http.NotFound(writer, request)
+	case strings.HasPrefix(request.URL.Path, "/health"):
+		http.NotFound(writer, request)
+	case request.Method == http.MethodGet || request.Method == http.MethodHead:
+		h.serveStatic(writer, request, h.cfg.UserStaticDirectory)
+	default:
+		http.NotFound(writer, request)
+	}
+}
+
+func (h *handler) serveAdminSurface(writer http.ResponseWriter, request *http.Request) {
+	switch {
+	case isAdminRPCPath(request.URL.Path):
+		h.apiProxy.ServeHTTP(writer, request)
+	case request.URL.Path == adminReadyPath || request.URL.Path == adminSensitiveReadyPath:
+		http.NotFound(writer, request)
+	case strings.HasPrefix(request.URL.Path, "/platform") || strings.HasPrefix(request.URL.Path, "/realtime") || strings.HasPrefix(request.URL.Path, "/health"):
+		http.NotFound(writer, request)
+	case request.Method == http.MethodGet || request.Method == http.MethodHead:
+		h.serveStatic(writer, request, h.cfg.AdminStaticDirectory)
+	default:
+		http.NotFound(writer, request)
+	}
+}
+
+func (h *handler) serveStatic(writer http.ResponseWriter, request *http.Request, root string) {
 	relative, ok := cleanRequestPath(request.URL.Path)
 	if !ok {
 		http.NotFound(writer, request)
 		return
 	}
-	if served := h.tryServeResolvedPath(writer, request, relative); served {
+	if served := h.tryServeResolvedPath(writer, request, root, relative); served {
 		return
 	}
-	if acceptsHTML(request.Header.Get("Accept")) {
-		if h.tryServeIndex(writer, request) {
+	if request.Method == http.MethodHead || acceptsHTML(request.Header.Get("Accept")) {
+		if h.tryServeIndex(writer, request, root) {
 			return
 		}
-		http.NotFound(writer, request)
-		return
 	}
 	http.NotFound(writer, request)
 }
 
-func (h *handler) tryServeIndex(writer http.ResponseWriter, request *http.Request) bool {
-	return h.tryServeResolvedPath(writer, request, staticIndexName)
+func (h *handler) tryServeIndex(writer http.ResponseWriter, request *http.Request, root string) bool {
+	return h.tryServeResolvedPath(writer, request, root, staticIndexName)
 }
 
-func (h *handler) tryServeResolvedPath(writer http.ResponseWriter, request *http.Request, relative string) bool {
-	candidate := filepath.Join(h.cfg.StaticDirectory, filepath.FromSlash(relative))
+func (h *handler) tryServeResolvedPath(writer http.ResponseWriter, request *http.Request, root, relative string) bool {
+	candidate := filepath.Join(root, filepath.FromSlash(relative))
+	// Reject lexical traversal before touching the filesystem, then re-check after resolving symlinks.
+	if !withinRoot(root, candidate) {
+		return false
+	}
 	resolved, err := filepath.EvalSymlinks(candidate)
 	if err != nil {
 		return false
 	}
-	if !withinRoot(h.cfg.StaticDirectory, resolved) {
+	if !withinRoot(root, resolved) {
 		return false
 	}
 	info, err := os.Stat(resolved)
@@ -208,7 +267,7 @@ func (h *handler) tryServeResolvedPath(writer http.ResponseWriter, request *http
 		return false
 	}
 	if info.IsDir() {
-		return h.tryServeResolvedPath(writer, request, filepath.Join(relative, staticIndexName))
+		return h.tryServeResolvedPath(writer, request, root, filepath.Join(relative, staticIndexName))
 	}
 	http.ServeFile(writer, request, resolved)
 	return true
@@ -311,6 +370,39 @@ func applyProxyHeaders(headers http.Header, trusted bool, peerIP, host, proto st
 	}
 }
 
+func (h *handler) surfaceForHost(host string) surfaceClass {
+	authority, err := config.CanonicalizeAuthority(host)
+	if err != nil {
+		return unknownSurface
+	}
+	if _, ok := h.userHosts[authority]; ok {
+		return userSurface
+	}
+	if _, ok := h.adminHosts[authority]; ok {
+		return adminSurface
+	}
+	return unknownSurface
+}
+
+func hostSet(values []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		set[value] = struct{}{}
+	}
+	return set
+}
+
+func isUserRPCPath(path string) bool {
+	return strings.HasPrefix(path, "/platform.identity.v1.IdentityService/") ||
+		strings.HasPrefix(path, "/platform.room.v1.RoomService/") ||
+		strings.HasPrefix(path, "/platform.game.v1.GameService/")
+}
+
+func isAdminRPCPath(path string) bool {
+	return strings.HasPrefix(path, "/platform.admin.v1.AdminAuthService/") ||
+		strings.HasPrefix(path, "/platform.admin.v1.AdminIdentityService/")
+}
+
 func copyForwardingHeaders(destination, source http.Header) {
 	for _, name := range []string{
 		"Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "X-Forwarded-Port", "X-Real-IP",
@@ -384,16 +476,27 @@ func cleanRequestPath(requestPath string) (string, bool) {
 }
 
 func withinRoot(root, candidate string) bool {
-	if resolved, err := filepath.EvalSymlinks(root); err == nil {
-		root = resolved
-	}
-	root = filepath.Clean(root)
-	candidate = filepath.Clean(candidate)
+	root = normalizePath(root)
+	candidate = normalizePath(candidate)
 	relative, err := filepath.Rel(root, candidate)
 	if err != nil || relative == "." {
 		return err == nil
 	}
 	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func normalizePath(value string) string {
+	if abs, err := filepath.Abs(value); err == nil {
+		value = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(value); err == nil {
+		value = resolved
+	}
+	value = filepath.Clean(value)
+	if runtime.GOOS == "windows" {
+		value = strings.ToLower(value)
+	}
+	return value
 }
 
 func acceptsHTML(value string) bool {

@@ -9,7 +9,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
-	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
@@ -76,14 +75,32 @@ func NewConnectAdminServiceWithCookieEffects(service *Service, effects AdminCook
 	return &ConnectAdminService{service: service, cookieEffects: effects}, nil
 }
 
-var _ adminv1connect.AdminAuthServiceHandler = (*ConnectAdminService)(nil)
-
 func (adapter *ConnectAdminService) GetSetupState(ctx context.Context, _ *connect.Request[adminv1.GetSetupStateRequest]) (*connect.Response[adminv1.GetSetupStateResponse], error) {
 	state, err := adapter.service.GetSetupState(ctx)
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
 	return connect.NewResponse(&adminv1.GetSetupStateResponse{State: setupStateWire(state)}), nil
+}
+
+func (adapter *ConnectAdminService) GetCurrentAdminSession(ctx context.Context, _ *connect.Request[adminv1.GetCurrentAdminSessionRequest]) (*connect.Response[adminv1.GetCurrentAdminSessionResponse], error) {
+	transport := adminTransport(ctx)
+	session, err := adapter.sessionFromTransport(ctx, transport)
+	if err != nil {
+		return nil, adminConnectError(err)
+	}
+	result, err := adapter.service.GetCurrentAdminSession(ctx, CurrentSessionCommand{
+		Session:      session,
+		SessionToken: transport.CookieToken,
+		CSRFToken:    transport.CSRFToken,
+	})
+	if err != nil {
+		return nil, adminConnectError(err)
+	}
+	return connect.NewResponse(&adminv1.GetCurrentAdminSessionResponse{
+		Session:  sessionSummaryFromSession(result.Session),
+		NextStep: nextStepWire(result.NextStep),
+	}), nil
 }
 
 func (adapter *ConnectAdminService) BeginAdminLogin(ctx context.Context, request *connect.Request[adminv1.BeginAdminLoginRequest]) (*connect.Response[adminv1.BeginAdminLoginResponse], error) {
@@ -341,6 +358,9 @@ func (adapter *ConnectAdminService) sessionFromTransport(ctx context.Context, tr
 		session, err = transaction.Sessions().GetForUpdate(ctx, selector)
 		return err
 	})
+	if errors.Is(err, ErrNotFound) {
+		return Session{}, ErrAuthentication
+	}
 	return session, err
 }
 
@@ -373,17 +393,23 @@ func nextStepWire(step NextStep) adminv1.AdminNextStep {
 	switch step {
 	case NextStepChangePassword:
 		return adminv1.AdminNextStep_ADMIN_NEXT_STEP_CHANGE_PASSWORD
-	case NextStepEnrollTOTP, NextStepRebindTOTP:
+	case NextStepEnrollTOTP:
 		return adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP
 	case NextStepVerifyMFA:
 		return adminv1.AdminNextStep_ADMIN_NEXT_STEP_VERIFY_MFA
+	case NextStepRebindTOTP:
+		return adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP
 	default:
 		return adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED
 	}
 }
 
 func sessionSummary(session IssuedSession) *adminv1.AdminSessionSummary {
-	snapshot := session.Session.Snapshot()
+	return sessionSummaryFromSession(session.Session)
+}
+
+func sessionSummaryFromSession(session Session) *adminv1.AdminSessionSummary {
+	snapshot := session.Snapshot()
 	return &adminv1.AdminSessionSummary{AdminId: snapshot.AdminID.String(), Kind: sessionKindWire(snapshot.Kind), Permissions: permissionsWire(snapshot.Kind), IdleExpiresAt: timestamppb.New(snapshot.IdleExpiresAt), AbsoluteExpiresAt: timestamppb.New(snapshot.AbsoluteExpiresAt)}
 }
 

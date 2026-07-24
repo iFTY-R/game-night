@@ -491,7 +491,7 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	adminAuthHandler, err := admin.NewConnectAdminServiceWithCookieEffects(adminService, adminEffects)
+	adminAuthHandler, err := adminauth.NewRuntimeReadinessService(adminService, adminEffects, readiness)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +526,7 @@ func transportHandler(
 		return nil, err
 	}
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
-		Auth: adminAuthHandler, Identity: adminIdentityHandler, Readiness: readiness,
+		Auth: adminAuthHandler, Identity: adminIdentityHandler,
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {

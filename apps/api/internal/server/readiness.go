@@ -55,6 +55,13 @@ type ReadinessChecks struct {
 // Redis and audit checkpoint health additionally gate sensitive writes.
 type Readiness struct{ checks ReadinessChecks }
 
+// RuntimeReadinessSnapshot is the bounded operational state exposed through the authenticated administrator API.
+type RuntimeReadinessSnapshot struct {
+	Mode       string
+	Ready      bool
+	Components map[string]string
+}
+
 // NewReadiness rejects partial health wiring so a missing security component cannot be reported as healthy.
 func NewReadiness(checks ReadinessChecks) (*Readiness, error) {
 	if checks.PostgreSQL == nil || checks.Redis == nil || checks.Keyring == nil || checks.Bootstrap == nil || checks.Checkpoint == nil {
@@ -71,6 +78,21 @@ func (readiness *Readiness) ReadyForOrdinaryReads(ctx context.Context) bool {
 // ReadyForSensitiveWrites evaluates every dependency, including Redis and durable checkpoint health.
 func (readiness *Readiness) ReadyForSensitiveWrites(ctx context.Context) bool {
 	return readiness != nil && readiness.evaluate(ctx, sensitiveReadiness).Ready
+}
+
+// RuntimeSnapshot evaluates one readiness mode for an authenticated transport adapter.
+// The returned component map is request-owned and never contains dependency errors or connection details.
+func (readiness *Readiness) RuntimeSnapshot(ctx context.Context, sensitive bool) RuntimeReadinessSnapshot {
+	mode := ordinaryReadiness
+	if sensitive {
+		mode = sensitiveReadiness
+	}
+	result := readiness.evaluate(ctx, mode)
+	return RuntimeReadinessSnapshot{
+		Mode:       string(result.Mode),
+		Ready:      result.Ready,
+		Components: result.Components,
+	}
 }
 
 type readinessMode string

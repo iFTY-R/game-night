@@ -10,6 +10,8 @@ option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admi
 // AdminAuthService owns the isolated administrator authentication state machine.
 service AdminAuthService {
   rpc GetSetupState(GetSetupStateRequest) returns (GetSetupStateResponse);
+  rpc GetCurrentAdminSession(GetCurrentAdminSessionRequest) returns (GetCurrentAdminSessionResponse);
+  rpc GetRuntimeReadiness(GetRuntimeReadinessRequest) returns (GetRuntimeReadinessResponse);
   rpc BeginAdminLogin(BeginAdminLoginRequest) returns (BeginAdminLoginResponse);
   rpc LoginPassword(LoginPasswordRequest) returns (LoginPasswordResponse);
   rpc VerifyTotp(VerifyTotpRequest) returns (VerifyTotpResponse);
@@ -86,6 +88,26 @@ message GetSetupStateRequest {}
 
 message GetSetupStateResponse {
   AdminSetupState state = 1;
+}
+
+message GetCurrentAdminSessionRequest {}
+
+message GetCurrentAdminSessionResponse {
+  AdminSessionSummary session = 1;
+  AdminNextStep next_step = 2;
+}
+
+message GetRuntimeReadinessRequest {}
+
+message RuntimeReadinessState {
+  string mode = 1;
+  bool ready = 2;
+  map<string, string> components = 3;
+}
+
+message GetRuntimeReadinessResponse {
+  RuntimeReadinessState ordinary = 1;
+  RuntimeReadinessState sensitive = 2;
 }
 
 message BeginAdminLoginRequest {

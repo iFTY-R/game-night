@@ -12,111 +12,207 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/iFTY-R/game-night/apps/edge/internal/config"
 )
 
-func TestStaticRoutingAndFallback(t *testing.T) {
+const (
+	testUserHost  = "localhost:8080"
+	testAdminHost = "admin.localhost:8080"
+)
+
+func TestStaticRoutingUsesSurfaceSpecificRoots(t *testing.T) {
 	handler := newTestHandler(t, nil, nil, map[string]string{
-		"index.html": "INDEX",
-		"asset.txt":  "ASSET",
+		"index.html": "USER-INDEX",
+		"asset.txt":  "USER-ASSET",
+		"shared.txt": "USER-SHARED",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
+		"asset.txt":  "ADMIN-ASSET",
+		"shared.txt": "ADMIN-SHARED",
 	})
-	t.Run("asset", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/asset.txt", nil)
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK || rr.Body.String() != "ASSET" {
-			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
-		}
-	})
-	t.Run("fallback", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/rooms/123", nil)
-		req.Header.Set("Accept", "text/html")
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK || rr.Body.String() != "INDEX" {
-			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
-		}
-	})
-	t.Run("json-no-fallback", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/rooms/123", nil)
-		req.Header.Set("Accept", "application/json")
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusNotFound || strings.Contains(rr.Body.String(), "INDEX") {
-			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
-		}
-	})
-	t.Run("path-traversal-blocked", func(t *testing.T) {
-		outside := filepath.Join(t.TempDir(), "outside.txt")
-		if err := os.WriteFile(outside, []byte("OUTSIDE"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/../outside.txt", nil)
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusNotFound {
-			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
-		}
-	})
+
+	for _, tc := range []struct {
+		name       string
+		host       string
+		method     string
+		target     string
+		accept     string
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "user-asset", host: testUserHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
+		{name: "admin-asset", host: testAdminHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "ADMIN-ASSET"},
+		{name: "user-fallback", host: testUserHost, method: http.MethodGet, target: "/rooms/123", accept: "text/html", wantStatus: http.StatusOK, wantBody: "USER-INDEX"},
+		{name: "admin-fallback", host: testAdminHost, method: http.MethodGet, target: "/audit/events", accept: "text/html", wantStatus: http.StatusOK, wantBody: "ADMIN-INDEX"},
+		{name: "json-no-fallback", host: testUserHost, method: http.MethodGet, target: "/rooms/123", accept: "application/json", wantStatus: http.StatusNotFound},
+		{name: "head-fallback", host: testAdminHost, method: http.MethodHead, target: "/dashboard", wantStatus: http.StatusOK},
+		{name: "post-no-fallback", host: testUserHost, method: http.MethodPost, target: "/dashboard", wantStatus: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.target, nil)
+			req.Host = tc.host
+			if tc.accept != "" {
+				req.Header.Set("Accept", tc.accept)
+			}
+			handler.ServeHTTP(rr, req)
+			if rr.Code != tc.wantStatus {
+				t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+			}
+			if tc.method != http.MethodHead && tc.wantBody != "" && rr.Body.String() != tc.wantBody {
+				t.Fatalf("body=%q, want %q", rr.Body.String(), tc.wantBody)
+			}
+			if tc.method == http.MethodHead && rr.Body.Len() != 0 {
+				t.Fatalf("head body=%q", rr.Body.String())
+			}
+		})
+	}
 }
 
-func TestRouteIsolation(t *testing.T) {
+func TestUnknownHostReturnsMisdirectedRequestBeforeProxyOrStatic(t *testing.T) {
+	apiHits := 0
 	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiHits++
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	t.Cleanup(apiUpstream.Close)
 	handler := newTestHandler(t, mustURL(t, apiUpstream.URL), mustURL(t, apiUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
-	for _, path := range []string{"/health", "/health/livez", "/realtime", "/realtime/other", "/platform", "/platformx"} {
+
+	for _, target := range []string{"/health/live", "/platform.identity.v1.IdentityService/Bootstrap", "/readyz", "/"} {
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.Host = "unknown.game-night.test"
 		req.Header.Set("Accept", "text/html")
 		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusNotFound {
-			t.Fatalf("%s status=%d", path, rr.Code)
+		if rr.Code != http.StatusMisdirectedRequest {
+			t.Fatalf("target=%s status=%d", target, rr.Code)
 		}
+	}
+	if apiHits != 0 {
+		t.Fatalf("unknown host reached upstream %d times", apiHits)
+	}
+}
+
+func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
+	api := startCapturedUpstream(t, "api")
+	realtime := startCapturedUpstream(t, "realtime")
+	handler := newTestHandler(t, mustURL(t, api.server.URL), mustURL(t, realtime.server.URL), map[string]string{
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
+	})
+
+	for _, tc := range []struct {
+		name         string
+		host         string
+		method       string
+		target       string
+		accept       string
+		wantStatus   int
+		wantBody     string
+		wantUpstream string
+	}{
+		{name: "user-identity-rpc", host: testUserHost, method: http.MethodPost, target: "/platform.identity.v1.IdentityService/Bootstrap", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "user-room-rpc", host: testUserHost, method: http.MethodPost, target: "/platform.room.v1.RoomService/Join", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "user-game-rpc", host: testUserHost, method: http.MethodPost, target: "/platform.game.v1.GameService/GetProjection", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "user-admin-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", wantStatus: http.StatusNotFound},
+		{name: "user-readiness-404", host: testUserHost, method: http.MethodGet, target: "/readyz", wantStatus: http.StatusNotFound},
+		{name: "user-realtime", host: testUserHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusOK, wantBody: "realtime", wantUpstream: "realtime"},
+		{name: "user-realtime-other-404", host: testUserHost, method: http.MethodGet, target: "/realtime/other", wantStatus: http.StatusNotFound},
+		{name: "admin-auth-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-runtime-readiness-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetRuntimeReadiness", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-identity-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminIdentityService/ListAuditEvents", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-user-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/platform.identity.v1.IdentityService/Bootstrap", wantStatus: http.StatusNotFound},
+		{name: "admin-realtime-404", host: testAdminHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusNotFound},
+		{name: "admin-readyz-404", host: testAdminHost, method: http.MethodGet, target: "/readyz", wantStatus: http.StatusNotFound},
+		{name: "admin-sensitive-readyz-404", host: testAdminHost, method: http.MethodHead, target: "/readyz/sensitive", wantStatus: http.StatusNotFound},
+		{name: "known-platform-miss", host: testAdminHost, method: http.MethodGet, target: "/platform.example", wantStatus: http.StatusNotFound},
+		{name: "known-health-miss", host: testUserHost, method: http.MethodGet, target: "/health/not-real", wantStatus: http.StatusNotFound},
+		{name: "known-non-get-route", host: testAdminHost, method: http.MethodPatch, target: "/dashboard", wantStatus: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.target, nil)
+			req.Host = tc.host
+			req.Header.Set("Accept", "text/html")
+			handler.ServeHTTP(rr, req)
+			if rr.Code != tc.wantStatus {
+				t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+			}
+			if tc.method != http.MethodHead && tc.wantBody != "" && rr.Body.String() != tc.wantBody {
+				t.Fatalf("body=%q, want %q", rr.Body.String(), tc.wantBody)
+			}
+			if tc.wantUpstream == "" {
+				return
+			}
+			request := lastRecordedRequest(t, upstreamByName(tc.wantUpstream, api, realtime))
+			if request.Host != tc.host {
+				t.Fatalf("upstream host=%q, want %q", request.Host, tc.host)
+			}
+			if request.Path != tc.target {
+				t.Fatalf("upstream path=%q, want %q", request.Path, tc.target)
+			}
+		})
+	}
+}
+
+func TestSurfaceSelectionIgnoresForwardedHost(t *testing.T) {
+	api := startCapturedUpstream(t, "api")
+	handler := newTestHandler(t, mustURL(t, api.server.URL), mustURL(t, api.server.URL), map[string]string{
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
+	})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req.Host = testUserHost
+	req.Header.Set("X-Forwarded-Host", testAdminHost)
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+	}
+
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", strings.NewReader("{}"))
+	req.Host = testAdminHost
+	req.RemoteAddr = "203.0.113.10:12345"
+	req.Header.Set("X-Forwarded-Host", testUserHost)
+	req.Header.Set("X-Forwarded-For", "198.51.100.1")
+	req.Header.Set("Forwarded", "for=198.51.100.1;host=attacker.invalid;proto=http")
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+	}
+	request := lastRecordedRequest(t, api)
+	if got, want := request.Host, testAdminHost; got != want {
+		t.Fatalf("host=%q, want %q", got, want)
+	}
+	if got, want := request.XForwardedHost, testAdminHost; got != want {
+		t.Fatalf("xfh=%q, want %q", got, want)
 	}
 }
 
 func TestAPIProxyRebuildsForwardingHeadersForUntrustedPeer(t *testing.T) {
-	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got, want := r.Method, http.MethodPost; got != want {
-			t.Fatalf("method=%s", got)
-		}
-		if got, want := r.URL.Path, "/platform.game.v1.GameService/Play"; got != want {
-			t.Fatalf("path=%s", got)
-		}
-		if got, want := r.URL.RawQuery, "x=1"; got != want {
-			t.Fatalf("query=%s", got)
-		}
-		if got, want := r.Header.Get("X-Forwarded-For"), "203.0.113.10"; got != want {
-			t.Fatalf("xff=%q", got)
-		}
-		if got, want := r.Header.Get("X-Real-IP"), "203.0.113.10"; got != want {
-			t.Fatalf("xreal=%q", got)
-		}
-		if got := r.Header.Get("Forwarded"); !strings.Contains(got, "203.0.113.10") {
-			t.Fatalf("forwarded=%q", got)
-		}
-		if got, want := r.Host, "game.example.test"; got != want {
-			t.Fatalf("host=%q, want %q", got, want)
-		}
-		w.Header().Set("X-Upstream", "yes")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("api"))
-	}))
-	t.Cleanup(apiUpstream.Close)
-	handler := newTestHandler(t, mustURL(t, apiUpstream.URL), mustURL(t, apiUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+	api := startCapturedUpstream(t, "api")
+	handler := newTestHandler(t, mustURL(t, api.server.URL), mustURL(t, api.server.URL), map[string]string{
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/platform.game.v1.GameService/Play?x=1", strings.NewReader("body"))
 	req.RemoteAddr = "203.0.113.10:12345"
-	req.Host = "game.example.test"
+	req.Host = testUserHost
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	req.Header.Set("Forwarded", "for=1.2.3.4")
 	handler.ServeHTTP(rr, req)
@@ -126,33 +222,54 @@ func TestAPIProxyRebuildsForwardingHeadersForUntrustedPeer(t *testing.T) {
 	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("cache-control=%q", got)
 	}
-	if rr.Body.String() != "api" {
-		t.Fatalf("body=%q", rr.Body.String())
+	request := lastRecordedRequest(t, api)
+	if got, want := request.Method, http.MethodPost; got != want {
+		t.Fatalf("method=%s", got)
+	}
+	if got, want := request.Path, "/platform.game.v1.GameService/Play"; got != want {
+		t.Fatalf("path=%s", got)
+	}
+	if got, want := request.RawQuery, "x=1"; got != want {
+		t.Fatalf("query=%s", got)
+	}
+	if got, want := request.XForwardedFor, "203.0.113.10"; got != want {
+		t.Fatalf("xff=%q", got)
+	}
+	if got, want := request.XRealIP, "203.0.113.10"; got != want {
+		t.Fatalf("xreal=%q", got)
+	}
+	if got, want := request.XForwardedHost, testUserHost; got != want {
+		t.Fatalf("xfh=%q", got)
+	}
+	if got := request.Forwarded; !strings.Contains(got, "203.0.113.10") || !strings.Contains(got, "host="+testUserHost) {
+		t.Fatalf("forwarded=%q", got)
 	}
 }
 
 func TestAPIProxyPreservesTrustedForwardingChain(t *testing.T) {
-	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("X-Forwarded-For"); !strings.Contains(got, "1.2.3.4") || !strings.Contains(got, "127.0.0.1") {
-			t.Fatalf("xff=%q", got)
-		}
-		if got := r.Header.Get("Forwarded"); !strings.Contains(got, "1.2.3.4") || !strings.Contains(got, "127.0.0.1") {
-			t.Fatalf("forwarded=%q", got)
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(apiUpstream.Close)
-	handler := newTestHandler(t, mustURL(t, apiUpstream.URL), mustURL(t, apiUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+	api := startCapturedUpstream(t, "api")
+	handler := newTestHandler(t, mustURL(t, api.server.URL), mustURL(t, api.server.URL), map[string]string{
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/platform.room.v1.RoomService/Join", nil)
 	req.RemoteAddr = "127.0.0.1:12345"
+	req.Host = testUserHost
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	req.Header.Set("Forwarded", "for=1.2.3.4")
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("status=%d", rr.Code)
+		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+	}
+	request := lastRecordedRequest(t, api)
+	if !strings.Contains(request.XForwardedFor, "1.2.3.4") || !strings.Contains(request.XForwardedFor, "127.0.0.1") {
+		t.Fatalf("xff=%q", request.XForwardedFor)
+	}
+	if !strings.Contains(request.Forwarded, "1.2.3.4") || !strings.Contains(request.Forwarded, "127.0.0.1") {
+		t.Fatalf("forwarded=%q", request.Forwarded)
 	}
 }
 
@@ -161,17 +278,16 @@ func TestHealthReadyChecksBothUpstreamsConcurrently(t *testing.T) {
 	realtimeStarted := make(chan struct{}, 1)
 	release := make(chan struct{})
 	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/readyz" {
+		if r.URL.Path != adminReadyPath {
 			t.Fatalf("api path=%s", r.URL.Path)
 		}
 		apiStarted <- struct{}{}
 		<-release
-		// API readiness returns a JSON 200 response, while realtime readiness returns 204.
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(apiUpstream.Close)
 	realtimeUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/health/ready" {
+		if r.URL.Path != healthReadyPath {
 			t.Fatalf("realtime path=%s", r.URL.Path)
 		}
 		realtimeStarted <- struct{}{}
@@ -180,10 +296,14 @@ func TestHealthReadyChecksBothUpstreamsConcurrently(t *testing.T) {
 	}))
 	t.Cleanup(realtimeUpstream.Close)
 	handler := newTestHandler(t, mustURL(t, apiUpstream.URL), mustURL(t, realtimeUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
+
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, healthReadyPath, nil)
+	req.Host = testUserHost
 	done := make(chan struct{})
 	go func() {
 		handler.ServeHTTP(rr, req)
@@ -212,10 +332,14 @@ func TestHealthReadyHidesFailures(t *testing.T) {
 	}))
 	t.Cleanup(realtimeUpstream.Close)
 	handler := newTestHandler(t, mustURL(t, apiUpstream.URL), mustURL(t, realtimeUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
+
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, healthReadyPath, nil)
+	req.Host = testAdminHost
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
@@ -226,9 +350,9 @@ func TestHealthReadyHidesFailures(t *testing.T) {
 }
 
 func TestRealtimeGameWebSocketUpgrade(t *testing.T) {
-	upgradeSeen := make(chan http.Header, 1)
+	upgradeSeen := make(chan recordedRequest, 1)
 	realtimeUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upgradeSeen <- r.Header.Clone()
+		upgradeSeen <- captureRequest(r)
 		if !strings.EqualFold(r.Header.Get("Connection"), "Upgrade") || !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
 			t.Fatalf("missing websocket headers: %#v", r.Header)
 		}
@@ -238,16 +362,20 @@ func TestRealtimeGameWebSocketUpgrade(t *testing.T) {
 	}))
 	t.Cleanup(realtimeUpstream.Close)
 	handler := newTestHandler(t, mustURL(t, realtimeUpstream.URL), mustURL(t, realtimeUpstream.URL), map[string]string{
-		"index.html": "INDEX",
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
 	})
 	edge := httptest.NewServer(handler)
 	t.Cleanup(edge.Close)
+
 	conn, err := net.Dial("tcp", strings.TrimPrefix(edge.URL, "http://"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	_, _ = io.WriteString(conn, "GET /realtime/game HTTP/1.1\r\nHost: edge\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+	_, _ = io.WriteString(conn,
+		"GET /realtime/game HTTP/1.1\r\nHost: "+testUserHost+"\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
 	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -256,30 +384,74 @@ func TestRealtimeGameWebSocketUpgrade(t *testing.T) {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 	select {
-	case <-upgradeSeen:
+	case request := <-upgradeSeen:
+		if request.Host != testUserHost {
+			t.Fatalf("upstream host=%q", request.Host)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("upstream did not receive websocket upgrade")
 	}
 }
 
-func newTestHandler(t *testing.T, apiURL, realtimeURL *url.URL, files map[string]string) http.Handler {
+func TestStaticRoutingBlocksTraversalAndSymlinkEscape(t *testing.T) {
+	handler, roots := newTestHandlerWithRoots(t, nil, nil, map[string]string{
+		"index.html": "USER-INDEX",
+	}, map[string]string{
+		"index.html": "ADMIN-INDEX",
+	})
+	outside := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outside, []byte("OUTSIDE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(roots.user, "escape.txt")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		host   string
+		target string
+	}{
+		{name: "path-traversal", host: testUserHost, target: "/../outside.txt"},
+		{name: "symlink-escape", host: testUserHost, target: "/escape.txt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
+			req.Host = tc.host
+			req.Header.Set("Accept", "text/html")
+			handler.ServeHTTP(rr, req)
+			if rr.Code != http.StatusNotFound {
+				t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
+type testRoots struct {
+	user  string
+	admin string
+}
+
+func newTestHandler(t *testing.T, apiURL, realtimeURL *url.URL, userFiles, adminFiles map[string]string) http.Handler {
 	t.Helper()
-	dir := t.TempDir()
-	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, ok := files["index.html"]; !ok {
-		if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("INDEX"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	handler, _ := newTestHandlerWithRoots(t, apiURL, realtimeURL, userFiles, adminFiles)
+	return handler
+}
+
+func newTestHandlerWithRoots(t *testing.T, apiURL, realtimeURL *url.URL, userFiles, adminFiles map[string]string) (http.Handler, testRoots) {
+	t.Helper()
+	userDir := writeStaticRoot(t, userFiles)
+	adminDir := writeStaticRoot(t, adminFiles)
 	cfg := config.Config{
-		ListenAddress:       ":0",
-		APIUpstreamURL:      apiURL,
-		RealtimeUpstreamURL: realtimeURL,
-		StaticDirectory:     dir,
+		ListenAddress:        ":0",
+		APIUpstreamURL:       apiURL,
+		RealtimeUpstreamURL:  realtimeURL,
+		UserStaticDirectory:  userDir,
+		AdminStaticDirectory: adminDir,
+		UserHosts:            []string{testUserHost},
+		AdminHosts:           []string{testAdminHost},
 		TrustedProxyCIDRs: []netip.Prefix{
 			netip.MustParsePrefix("127.0.0.1/32"),
 		},
@@ -300,7 +472,90 @@ func newTestHandler(t *testing.T, apiURL, realtimeURL *url.URL, files map[string
 	if err != nil {
 		t.Fatal(err)
 	}
-	return handler
+	return handler, testRoots{user: userDir, admin: adminDir}
+}
+
+func writeStaticRoot(t testing.TB, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, contents := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := files["index.html"]; !ok {
+		if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("INDEX"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+type recordedRequest struct {
+	Method         string
+	Path           string
+	RawQuery       string
+	Host           string
+	Forwarded      string
+	XForwardedFor  string
+	XForwardedHost string
+	XRealIP        string
+}
+
+type capturedUpstream struct {
+	name     string
+	server   *httptest.Server
+	mu       sync.Mutex
+	requests []recordedRequest
+}
+
+func startCapturedUpstream(t testing.TB, name string) *capturedUpstream {
+	t.Helper()
+	upstream := &capturedUpstream{name: name}
+	upstream.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream.mu.Lock()
+		upstream.requests = append(upstream.requests, captureRequest(r))
+		upstream.mu.Unlock()
+		w.Header().Set("X-Upstream", name)
+		w.WriteHeader(http.StatusOK)
+		if r.Method != http.MethodHead {
+			_, _ = w.Write([]byte(name))
+		}
+	}))
+	t.Cleanup(upstream.server.Close)
+	return upstream
+}
+
+func captureRequest(r *http.Request) recordedRequest {
+	return recordedRequest{
+		Method:         r.Method,
+		Path:           r.URL.Path,
+		RawQuery:       r.URL.RawQuery,
+		Host:           r.Host,
+		Forwarded:      r.Header.Get("Forwarded"),
+		XForwardedFor:  r.Header.Get("X-Forwarded-For"),
+		XForwardedHost: r.Header.Get("X-Forwarded-Host"),
+		XRealIP:        r.Header.Get("X-Real-IP"),
+	}
+}
+
+func lastRecordedRequest(t testing.TB, upstream *capturedUpstream) recordedRequest {
+	t.Helper()
+	upstream.mu.Lock()
+	defer upstream.mu.Unlock()
+	if len(upstream.requests) == 0 {
+		t.Fatalf("upstream %s received no request", upstream.name)
+	}
+	return upstream.requests[len(upstream.requests)-1]
+}
+
+func upstreamByName(name string, upstreams ...*capturedUpstream) *capturedUpstream {
+	for _, upstream := range upstreams {
+		if upstream != nil && upstream.name == name {
+			return upstream
+		}
+	}
+	return nil
 }
 
 func mustURL(t *testing.T, raw string) *url.URL {

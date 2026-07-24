@@ -36,6 +36,12 @@ const (
 	// AdminAuthServiceGetSetupStateProcedure is the fully-qualified name of the AdminAuthService's
 	// GetSetupState RPC.
 	AdminAuthServiceGetSetupStateProcedure = "/platform.admin.v1.AdminAuthService/GetSetupState"
+	// AdminAuthServiceGetCurrentAdminSessionProcedure is the fully-qualified name of the
+	// AdminAuthService's GetCurrentAdminSession RPC.
+	AdminAuthServiceGetCurrentAdminSessionProcedure = "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession"
+	// AdminAuthServiceGetRuntimeReadinessProcedure is the fully-qualified name of the
+	// AdminAuthService's GetRuntimeReadiness RPC.
+	AdminAuthServiceGetRuntimeReadinessProcedure = "/platform.admin.v1.AdminAuthService/GetRuntimeReadiness"
 	// AdminAuthServiceBeginAdminLoginProcedure is the fully-qualified name of the AdminAuthService's
 	// BeginAdminLogin RPC.
 	AdminAuthServiceBeginAdminLoginProcedure = "/platform.admin.v1.AdminAuthService/BeginAdminLogin"
@@ -83,6 +89,8 @@ const (
 // AdminAuthServiceClient is a client for the platform.admin.v1.AdminAuthService service.
 type AdminAuthServiceClient interface {
 	GetSetupState(context.Context, *connect.Request[v1.GetSetupStateRequest]) (*connect.Response[v1.GetSetupStateResponse], error)
+	GetCurrentAdminSession(context.Context, *connect.Request[v1.GetCurrentAdminSessionRequest]) (*connect.Response[v1.GetCurrentAdminSessionResponse], error)
+	GetRuntimeReadiness(context.Context, *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error)
 	BeginAdminLogin(context.Context, *connect.Request[v1.BeginAdminLoginRequest]) (*connect.Response[v1.BeginAdminLoginResponse], error)
 	LoginPassword(context.Context, *connect.Request[v1.LoginPasswordRequest]) (*connect.Response[v1.LoginPasswordResponse], error)
 	VerifyTotp(context.Context, *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error)
@@ -114,6 +122,18 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+AdminAuthServiceGetSetupStateProcedure,
 			connect.WithSchema(adminAuthServiceMethods.ByName("GetSetupState")),
+			connect.WithClientOptions(opts...),
+		),
+		getCurrentAdminSession: connect.NewClient[v1.GetCurrentAdminSessionRequest, v1.GetCurrentAdminSessionResponse](
+			httpClient,
+			baseURL+AdminAuthServiceGetCurrentAdminSessionProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("GetCurrentAdminSession")),
+			connect.WithClientOptions(opts...),
+		),
+		getRuntimeReadiness: connect.NewClient[v1.GetRuntimeReadinessRequest, v1.GetRuntimeReadinessResponse](
+			httpClient,
+			baseURL+AdminAuthServiceGetRuntimeReadinessProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("GetRuntimeReadiness")),
 			connect.WithClientOptions(opts...),
 		),
 		beginAdminLogin: connect.NewClient[v1.BeginAdminLoginRequest, v1.BeginAdminLoginResponse](
@@ -206,6 +226,8 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 // adminAuthServiceClient implements AdminAuthServiceClient.
 type adminAuthServiceClient struct {
 	getSetupState                *connect.Client[v1.GetSetupStateRequest, v1.GetSetupStateResponse]
+	getCurrentAdminSession       *connect.Client[v1.GetCurrentAdminSessionRequest, v1.GetCurrentAdminSessionResponse]
+	getRuntimeReadiness          *connect.Client[v1.GetRuntimeReadinessRequest, v1.GetRuntimeReadinessResponse]
 	beginAdminLogin              *connect.Client[v1.BeginAdminLoginRequest, v1.BeginAdminLoginResponse]
 	loginPassword                *connect.Client[v1.LoginPasswordRequest, v1.LoginPasswordResponse]
 	verifyTotp                   *connect.Client[v1.VerifyTotpRequest, v1.VerifyTotpResponse]
@@ -225,6 +247,16 @@ type adminAuthServiceClient struct {
 // GetSetupState calls platform.admin.v1.AdminAuthService.GetSetupState.
 func (c *adminAuthServiceClient) GetSetupState(ctx context.Context, req *connect.Request[v1.GetSetupStateRequest]) (*connect.Response[v1.GetSetupStateResponse], error) {
 	return c.getSetupState.CallUnary(ctx, req)
+}
+
+// GetCurrentAdminSession calls platform.admin.v1.AdminAuthService.GetCurrentAdminSession.
+func (c *adminAuthServiceClient) GetCurrentAdminSession(ctx context.Context, req *connect.Request[v1.GetCurrentAdminSessionRequest]) (*connect.Response[v1.GetCurrentAdminSessionResponse], error) {
+	return c.getCurrentAdminSession.CallUnary(ctx, req)
+}
+
+// GetRuntimeReadiness calls platform.admin.v1.AdminAuthService.GetRuntimeReadiness.
+func (c *adminAuthServiceClient) GetRuntimeReadiness(ctx context.Context, req *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error) {
+	return c.getRuntimeReadiness.CallUnary(ctx, req)
 }
 
 // BeginAdminLogin calls platform.admin.v1.AdminAuthService.BeginAdminLogin.
@@ -301,6 +333,8 @@ func (c *adminAuthServiceClient) LogoutAllAdminSessions(ctx context.Context, req
 // AdminAuthServiceHandler is an implementation of the platform.admin.v1.AdminAuthService service.
 type AdminAuthServiceHandler interface {
 	GetSetupState(context.Context, *connect.Request[v1.GetSetupStateRequest]) (*connect.Response[v1.GetSetupStateResponse], error)
+	GetCurrentAdminSession(context.Context, *connect.Request[v1.GetCurrentAdminSessionRequest]) (*connect.Response[v1.GetCurrentAdminSessionResponse], error)
+	GetRuntimeReadiness(context.Context, *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error)
 	BeginAdminLogin(context.Context, *connect.Request[v1.BeginAdminLoginRequest]) (*connect.Response[v1.BeginAdminLoginResponse], error)
 	LoginPassword(context.Context, *connect.Request[v1.LoginPasswordRequest]) (*connect.Response[v1.LoginPasswordResponse], error)
 	VerifyTotp(context.Context, *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error)
@@ -328,6 +362,18 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 		AdminAuthServiceGetSetupStateProcedure,
 		svc.GetSetupState,
 		connect.WithSchema(adminAuthServiceMethods.ByName("GetSetupState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceGetCurrentAdminSessionHandler := connect.NewUnaryHandler(
+		AdminAuthServiceGetCurrentAdminSessionProcedure,
+		svc.GetCurrentAdminSession,
+		connect.WithSchema(adminAuthServiceMethods.ByName("GetCurrentAdminSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceGetRuntimeReadinessHandler := connect.NewUnaryHandler(
+		AdminAuthServiceGetRuntimeReadinessProcedure,
+		svc.GetRuntimeReadiness,
+		connect.WithSchema(adminAuthServiceMethods.ByName("GetRuntimeReadiness")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminAuthServiceBeginAdminLoginHandler := connect.NewUnaryHandler(
@@ -418,6 +464,10 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 		switch r.URL.Path {
 		case AdminAuthServiceGetSetupStateProcedure:
 			adminAuthServiceGetSetupStateHandler.ServeHTTP(w, r)
+		case AdminAuthServiceGetCurrentAdminSessionProcedure:
+			adminAuthServiceGetCurrentAdminSessionHandler.ServeHTTP(w, r)
+		case AdminAuthServiceGetRuntimeReadinessProcedure:
+			adminAuthServiceGetRuntimeReadinessHandler.ServeHTTP(w, r)
 		case AdminAuthServiceBeginAdminLoginProcedure:
 			adminAuthServiceBeginAdminLoginHandler.ServeHTTP(w, r)
 		case AdminAuthServiceLoginPasswordProcedure:
@@ -457,6 +507,14 @@ type UnimplementedAdminAuthServiceHandler struct{}
 
 func (UnimplementedAdminAuthServiceHandler) GetSetupState(context.Context, *connect.Request[v1.GetSetupStateRequest]) (*connect.Response[v1.GetSetupStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.GetSetupState is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) GetCurrentAdminSession(context.Context, *connect.Request[v1.GetCurrentAdminSessionRequest]) (*connect.Response[v1.GetCurrentAdminSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.GetCurrentAdminSession is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) GetRuntimeReadiness(context.Context, *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.GetRuntimeReadiness is not implemented"))
 }
 
 func (UnimplementedAdminAuthServiceHandler) BeginAdminLogin(context.Context, *connect.Request[v1.BeginAdminLoginRequest]) (*connect.Response[v1.BeginAdminLoginResponse], error) {

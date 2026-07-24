@@ -120,6 +120,44 @@ func (service *Service) GetSetupState(ctx context.Context) (SetupState, error) {
 	return state, mapAdminUoWError(err)
 }
 
+type CurrentSessionCommand struct {
+	Session      Session
+	SessionToken string
+	CSRFToken    string
+}
+
+type CurrentSessionResult struct {
+	Session  Session
+	NextStep NextStep
+}
+
+// GetCurrentAdminSession revalidates the live restricted/full session without mutating expiry, cookies, or audit state.
+func (service *Service) GetCurrentAdminSession(ctx context.Context, command CurrentSessionCommand) (CurrentSessionResult, error) {
+	if service == nil || ctx == nil || service.sessions == nil || service.unitOfWork == nil || service.clock == nil {
+		return CurrentSessionResult{}, ErrRepositoryUnavailable
+	}
+	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
+		return CurrentSessionResult{}, err
+	}
+	var result CurrentSessionResult
+	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
+		account, err := transaction.Accounts().GetForUpdate(ctx)
+		if err != nil {
+			return ErrAuthentication
+		}
+		if !sessionMatchesAccount(command.Session, account) {
+			return ErrAuthentication
+		}
+		nextStep, err := nextStepFromSessionKind(command.Session.Snapshot().Kind)
+		if err != nil {
+			return err
+		}
+		result = CurrentSessionResult{Session: command.Session, NextStep: nextStep}
+		return nil
+	})
+	return result, mapAdminUoWError(err)
+}
+
 // BootstrapPassword performs the one-winner bootstrap CAS. A losing instance verifies that its mounted
 // secret matches the committed bootstrap password; later active states reject a still-mounted secret.
 func (service *Service) BootstrapPassword(ctx context.Context, bootstrapSecret string) error {
@@ -445,26 +483,15 @@ func (service *Service) BeginTotpEnrollment(ctx context.Context, command BeginEn
 		if command.Session.Snapshot().Kind == SessionKindTOTPEnrollmentPending {
 			scope = secretresult.ScopeAdminTOTPEnrollment
 		}
-		binding := adminResultBinding(scope, account.Snapshot().ID, command.OperationID, digestAdminRequest("admin.totp_enrollment", string(command.Session.Snapshot().Kind)), secretresult.ResultTypeAdminTOTPEnrollment)
+		digest := digestAdminRequest("admin.totp_enrollment", string(command.Session.Snapshot().Kind))
+		binding := adminResultBinding(scope, account.Snapshot().ID, command.OperationID, digest, secretresult.ResultTypeAdminTOTPEnrollment)
 		existing, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
 		if getErr == nil {
-			if _, resolveErr := existing.Resolve(binding, service.clock.Now()); resolveErr != nil {
-				return resolveErr
+			replayed, replayErr := service.replayEnrollmentResult(command.Session, command.OperationID, binding, existing)
+			if replayErr != nil {
+				return replayErr
 			}
-			grant, grantErr := service.sessions.ResultGrant(command.Session, existing.Snapshot().ID, service.clock.Now())
-			if grantErr != nil {
-				return grantErr
-			}
-			plaintext, openErr := service.results.OpenAdminAuthorizedResult(existing, binding, grant)
-			if openErr != nil {
-				return openErr
-			}
-			defer clear(plaintext)
-			envelope, decodeErr := decodeTOTPEnrollmentEnvelope(plaintext)
-			if decodeErr != nil {
-				return decodeErr
-			}
-			result = EnrollmentResult{Operation: adminOperationResult(command.OperationID, existing, true), Secret: envelope.Secret, URI: envelope.URI}
+			result = replayed
 			return nil
 		}
 		if !errors.Is(getErr, secretresult.ErrNotFound) {
@@ -472,6 +499,35 @@ func (service *Service) BeginTotpEnrollment(ctx context.Context, command BeginEn
 		}
 		if !sessionMatchesAccount(command.Session, account) {
 			return ErrAuthentication
+		}
+		pending, pendingErr := transaction.Enrollments().GetPendingForUpdate(ctx, account.Snapshot().ID)
+		if pendingErr == nil {
+			ps := pending.Snapshot()
+			if ps.AdminVersion != account.Snapshot().AdminVersion || !service.clock.Now().Before(ps.ExpiresAt) {
+				return ErrAuthentication
+			}
+			pendingOperationID, parseErr := idempotency.ParseOperationID(ps.OperationID)
+			if parseErr != nil {
+				return ErrIntegrity
+			}
+			pendingBinding := adminResultBinding(scope, account.Snapshot().ID, pendingOperationID, digest, secretresult.ResultTypeAdminTOTPEnrollment)
+			pendingResult, resultErr := transaction.SecretResults().GetByOperationForUpdate(ctx, pendingBinding.Key)
+			if errors.Is(resultErr, secretresult.ErrNotFound) {
+				return secretresult.ErrSecretNoLongerAvailable
+			}
+			if resultErr != nil {
+				return resultErr
+			}
+			replayed, replayErr := service.replayEnrollmentResult(command.Session, pendingOperationID, pendingBinding, pendingResult)
+			if replayErr != nil {
+				return replayErr
+			}
+			replayed.Enrollment = pending
+			result = replayed
+			return nil
+		}
+		if !errors.Is(pendingErr, ErrNotFound) {
+			return pendingErr
 		}
 		enrollmentID, err := uuid.NewV7()
 		if err != nil {
@@ -981,6 +1037,23 @@ func normalizeAuthError(err error) error {
 	return err
 }
 
+func nextStepFromSessionKind(kind SessionKind) (NextStep, error) {
+	switch kind {
+	case SessionKindSetupPasswordPending:
+		return NextStepChangePassword, nil
+	case SessionKindTOTPEnrollmentPending:
+		return NextStepEnrollTOTP, nil
+	case SessionKindMFAPending:
+		return NextStepVerifyMFA, nil
+	case SessionKindRecoveryPending:
+		return NextStepRebindTOTP, nil
+	case SessionKindFull:
+		return NextStepAuthenticated, nil
+	default:
+		return "", ErrAuthentication
+	}
+}
+
 func sessionMatchesAccount(session Session, account Account) bool {
 	sessionSnapshot, accountSnapshot := session.Snapshot(), account.Snapshot()
 	return sessionSnapshot.AdminID == accountSnapshot.ID && sessionSnapshot.AdminVersion == accountSnapshot.AdminVersion && sessionSnapshot.PasswordVersion == accountSnapshot.PasswordVersion
@@ -993,6 +1066,35 @@ func adminResultBinding(scope secretresult.Scope, actorID uuid.UUID, operationID
 func adminOperationResult(operationID idempotency.OperationID, result secretresult.Result, replayed bool) OperationResult {
 	snapshot := result.Snapshot()
 	return OperationResult{OperationID: operationID, ResultID: snapshot.ID, SecretExpiresAt: snapshot.SecretExpiresAt, Replayed: replayed}
+}
+
+func (service *Service) replayEnrollmentResult(
+	session Session,
+	operationID idempotency.OperationID,
+	binding secretresult.Binding,
+	result secretresult.Result,
+) (EnrollmentResult, error) {
+	if _, err := result.Resolve(binding, service.clock.Now()); err != nil {
+		return EnrollmentResult{}, err
+	}
+	grant, err := service.sessions.ResultGrant(session, result.Snapshot().ID, service.clock.Now())
+	if err != nil {
+		return EnrollmentResult{}, err
+	}
+	plaintext, err := service.results.OpenAdminAuthorizedResult(result, binding, grant)
+	if err != nil {
+		return EnrollmentResult{}, err
+	}
+	defer clear(plaintext)
+	envelope, err := decodeTOTPEnrollmentEnvelope(plaintext)
+	if err != nil {
+		return EnrollmentResult{}, err
+	}
+	return EnrollmentResult{
+		Operation: adminOperationResult(operationID, result, true),
+		Secret:    envelope.Secret,
+		URI:       envelope.URI,
+	}, nil
 }
 
 func digestAdminRequest(domain string, fields ...string) idempotency.Digest {

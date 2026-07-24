@@ -1,3 +1,9 @@
+map $request_method $game_night_edge_allows_spa {
+    default 0;
+    GET 1;
+    HEAD 1;
+}
+
 upstream game_night_identity_api {
     server ${GAME_NIGHT_IDENTITY_UPSTREAM};
     keepalive 16;
@@ -10,6 +16,11 @@ upstream game_night_admin_api {
 
 upstream game_night_realtime {
     server ${GAME_NIGHT_REALTIME_UPSTREAM};
+    keepalive 16;
+}
+
+upstream game_night_edge_spa {
+    server ${GAME_NIGHT_EDGE_UPSTREAM};
     keepalive 16;
 }
 
@@ -134,8 +145,43 @@ server {
         add_header Strict-Transport-Security "max-age=31536000" always;
     }
 
-    location / {
+    location ^~ /platform.admin.v1. {
         return 404;
+    }
+
+    location ^~ /platform {
+        return 404;
+    }
+
+    location ^~ /readyz {
+        return 404;
+    }
+
+    location ^~ /realtime {
+        return 404;
+    }
+
+    location / {
+        if ($game_night_edge_allows_spa = 0) {
+            return 404;
+        }
+
+        proxy_pass http://game_night_edge_spa;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 }
 
@@ -197,7 +243,50 @@ server {
         add_header Strict-Transport-Security "max-age=31536000" always;
     }
 
-    location / {
+    location ^~ /platform.identity.v1. {
         return 404;
+    }
+
+    location ^~ /platform.room.v1. {
+        return 404;
+    }
+
+    location ^~ /platform.game.v1. {
+        return 404;
+    }
+
+    location ^~ /platform {
+        return 404;
+    }
+
+    location ^~ /realtime {
+        return 404;
+    }
+
+    location ^~ /readyz {
+        return 404;
+    }
+
+    location / {
+        if ($game_night_edge_allows_spa = 0) {
+            return 404;
+        }
+
+        proxy_pass http://game_night_edge_spa;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Forwarded "for=\"$remote_addr\";proto=https;host=\"$host\"";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 }

@@ -35,7 +35,6 @@ type AdminSurfaceConfig struct {
 	Auth         adminv1connect.AdminAuthServiceHandler
 	Identity     adminv1connect.AdminIdentityServiceHandler
 	Interceptors []connect.Interceptor
-	Readiness    *Readiness
 }
 
 // UserSurface exposes only IdentityService plus public readiness endpoints.
@@ -67,13 +66,14 @@ func (surface *UserSurface) ServeHTTP(writer http.ResponseWriter, request *http.
 	surface.handler.ServeHTTP(writer, request)
 }
 
-// AdminSurface exposes only AdminAuthService, AdminIdentityService, and readiness endpoints.
+// AdminSurface exposes only AdminAuthService and AdminIdentityService.
+// Operational readiness is available through the authenticated AdminAuthService RPC.
 type AdminSurface struct{ handler http.Handler }
 
 // NewAdminSurface builds an immutable administrator mux with an interceptor
 // chain independent from the one supplied to NewUserSurface.
 func NewAdminSurface(config AdminSurfaceConfig) (*AdminSurface, error) {
-	if config.Auth == nil || config.Identity == nil || config.Readiness == nil || invalidInterceptors(config.Interceptors) {
+	if config.Auth == nil || config.Identity == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
@@ -82,7 +82,6 @@ func NewAdminSurface(config AdminSurfaceConfig) (*AdminSurface, error) {
 	mux := http.NewServeMux()
 	mux.Handle(authPath, authHandler)
 	mux.Handle(identityPath, identityHandler)
-	mountReadiness(mux, config.Readiness)
 	return &AdminSurface{handler: mux}, nil
 }
 

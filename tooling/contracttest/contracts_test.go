@@ -31,6 +31,8 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 	})
 	assertServiceMethods(t, adminv1.File_platform_admin_v1_admin_auth_proto, "AdminAuthService", []string{
 		"GetSetupState",
+		"GetCurrentAdminSession",
+		"GetRuntimeReadiness",
 		"BeginAdminLogin",
 		"LoginPassword",
 		"VerifyTotp",
@@ -160,6 +162,65 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 	for _, file := range files {
 		assertEnumsHaveUnspecifiedZero(t, file.Enums(), file.Path())
 		assertMessagesUsePortableFields(t, file.Messages(), file.Path())
+	}
+}
+
+func TestAdminCurrentSessionContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_auth_proto
+	request := file.Messages().ByName("GetCurrentAdminSessionRequest")
+	if request == nil || request.Fields().Len() != 0 {
+		t.Fatalf("GetCurrentAdminSessionRequest must stay empty: %+v", request)
+	}
+
+	response := file.Messages().ByName("GetCurrentAdminSessionResponse")
+	if response == nil {
+		t.Fatal("GetCurrentAdminSessionResponse is missing")
+	}
+	if response.Fields().Len() != 2 {
+		t.Fatalf("GetCurrentAdminSessionResponse field count = %d", response.Fields().Len())
+	}
+	if field := response.Fields().ByNumber(1); field == nil || string(field.Name()) != "session" {
+		t.Fatalf("field 1 = %v", field)
+	}
+	if field := response.Fields().ByNumber(2); field == nil || string(field.Name()) != "next_step" {
+		t.Fatalf("field 2 = %v", field)
+	}
+}
+
+func TestAdminRuntimeReadinessContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_auth_proto
+	request := file.Messages().ByName("GetRuntimeReadinessRequest")
+	if request == nil || request.Fields().Len() != 0 {
+		t.Fatalf("GetRuntimeReadinessRequest must stay empty: %+v", request)
+	}
+
+	state := file.Messages().ByName("RuntimeReadinessState")
+	if state == nil || state.Fields().Len() != 3 {
+		t.Fatalf("RuntimeReadinessState field count is invalid: %+v", state)
+	}
+	if field := state.Fields().ByNumber(1); field == nil || string(field.Name()) != "mode" {
+		t.Fatalf("RuntimeReadinessState field 1 = %v", field)
+	}
+	if field := state.Fields().ByNumber(2); field == nil || string(field.Name()) != "ready" {
+		t.Fatalf("RuntimeReadinessState field 2 = %v", field)
+	}
+	if field := state.Fields().ByNumber(3); field == nil || string(field.Name()) != "components" || !field.IsMap() {
+		t.Fatalf("RuntimeReadinessState field 3 = %v", field)
+	}
+
+	response := file.Messages().ByName("GetRuntimeReadinessResponse")
+	if response == nil || response.Fields().Len() != 2 {
+		t.Fatalf("GetRuntimeReadinessResponse field count is invalid: %+v", response)
+	}
+	if field := response.Fields().ByNumber(1); field == nil || string(field.Name()) != "ordinary" {
+		t.Fatalf("GetRuntimeReadinessResponse field 1 = %v", field)
+	}
+	if field := response.Fields().ByNumber(2); field == nil || string(field.Name()) != "sensitive" {
+		t.Fatalf("GetRuntimeReadinessResponse field 2 = %v", field)
 	}
 }
 

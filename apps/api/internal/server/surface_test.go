@@ -31,7 +31,7 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 		t.Fatal(err)
 	}
 	adminSurface, err := NewAdminSurface(AdminSurfaceConfig{
-		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{}, Readiness: readiness,
+		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -64,11 +64,13 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 		t.Fatalf("call admin identity surface: %v", err)
 	}
 
-	assertHTTPStatus(t, userServer, adminv1connect.AdminAuthServiceGetSetupStateProcedure, http.StatusNotFound)
-	assertHTTPStatus(t, userServer, adminv1connect.AdminIdentityServiceGetUserProcedure, http.StatusNotFound)
-	assertHTTPStatus(t, adminServer, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
-	assertHTTPStatus(t, adminServer, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
-	assertHTTPStatus(t, adminServer, gamev1connect.GameServiceGetProjectionProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminAuthServiceGetSetupStateProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminIdentityServiceGetUserProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, adminServer, http.MethodPost, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, adminServer, http.MethodPost, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, adminServer, http.MethodPost, gamev1connect.GameServiceGetProjectionProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, adminServer, http.MethodGet, ReadinessPath, http.StatusNotFound)
+	assertHTTPStatus(t, adminServer, http.MethodGet, SensitiveReadinessPath, http.StatusNotFound)
 	if userCalls.Load() != 3 || adminCalls.Load() != 2 {
 		t.Fatalf("interceptor calls crossed surfaces: user=%d admin=%d", userCalls.Load(), adminCalls.Load())
 	}
@@ -86,7 +88,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 		t.Fatal(err)
 	}
 	adminSurface, err := NewAdminSurface(AdminSurfaceConfig{
-		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{}, Readiness: readiness,
+		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -137,9 +139,9 @@ func countingInterceptor(calls *atomic.Int32) connect.Interceptor {
 	})
 }
 
-func assertHTTPStatus(t testing.TB, server *httptest.Server, procedure string, want int) {
+func assertHTTPStatus(t testing.TB, server *httptest.Server, method, path string, want int) {
 	t.Helper()
-	request, err := http.NewRequest(http.MethodPost, server.URL+procedure, strings.NewReader("{}"))
+	request, err := http.NewRequest(method, server.URL+path, strings.NewReader("{}"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +152,7 @@ func assertHTTPStatus(t testing.TB, server *httptest.Server, procedure string, w
 	}
 	defer response.Body.Close()
 	if response.StatusCode != want {
-		t.Fatalf("%s status = %d, want %d", procedure, response.StatusCode, want)
+		t.Fatalf("%s %s status = %d, want %d", method, path, response.StatusCode, want)
 	}
 }
 

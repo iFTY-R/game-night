@@ -376,6 +376,10 @@ func activateAdministrator(
 	if err != nil || password.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
 		t.Fatalf("change initial administrator password: next=%s err=%v", password.Msg.GetNextStep(), err)
 	}
+	sessionState, err := client.GetCurrentAdminSession(ctx, connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{}))
+	if err != nil || sessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
+		t.Fatalf("current administrator session after password change: next=%s err=%v", sessionState.Msg.GetNextStep(), err)
+	}
 
 	enrollmentRequest := connect.NewRequest(&adminv1.BeginTotpEnrollmentRequest{OperationId: applicationOperationID(t)})
 	runtime.authorizeAdminSession(t, enrollmentRequest)
@@ -397,6 +401,10 @@ func activateAdministrator(
 	}
 	if complete.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL || len(complete.Msg.GetRecoveryCodes()) == 0 {
 		t.Fatalf("complete TOTP enrollment: session=%s codes=%d", complete.Msg.GetSession().GetKind(), len(complete.Msg.GetRecoveryCodes()))
+	}
+	fullSessionState, err := client.GetCurrentAdminSession(ctx, connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{}))
+	if err != nil || fullSessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
+		t.Fatalf("current administrator session after enrollment: next=%s err=%v", fullSessionState.Msg.GetNextStep(), err)
 	}
 	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT, enrollment.Msg.GetResult())
 	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES, complete.Msg.GetResult())

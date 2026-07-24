@@ -14,6 +14,7 @@ ENV CI=1 \
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .node-version ./
+COPY apps/admin/package.json apps/admin/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY games/dice-789/client/package.json games/dice-789/client/package.json
 COPY games/dice-789/themes/package.json games/dice-789/themes/package.json
@@ -71,12 +72,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 --system game-night \
     && useradd --uid 10001 --gid 10001 --system --home-dir /nonexistent --shell /usr/sbin/nologin game-night \
-    && mkdir -p /app/bin /app/web /app/infra/migrations \
+    && mkdir -p /app/bin /app/web /app/admin /app/infra/migrations \
     && chown -R 10001:10001 /app
 
 WORKDIR /app
 
 COPY --from=go-build --chown=10001:10001 /out/bin/ /app/bin/
+COPY --from=web-build --chown=10001:10001 /src/apps/admin/dist/ /app/admin/
 COPY --from=web-build --chown=10001:10001 /src/apps/web/dist/ /app/web/
 COPY --from=go-build --chown=10001:10001 /src/infra/migrations/ /app/infra/migrations/
 

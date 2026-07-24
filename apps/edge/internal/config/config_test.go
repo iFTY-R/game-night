@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-func TestLoadUsesDefaultsAndValidatesStaticDirectory(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, staticIndexFileName), []byte("index"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+func TestLoadUsesDefaultsAndValidatesStaticDirectories(t *testing.T) {
+	userDir := writeStaticRoot(t, "USER")
+	adminDir := writeStaticRoot(t, "ADMIN")
 	cfg, err := Load(func(name string) (string, bool) {
 		switch name {
-		case staticDirectoryEnvironment:
-			return dir, true
+		case userStaticDirectoryEnvironment:
+			return userDir, true
+		case adminStaticDirectoryEnvironment:
+			return adminDir, true
 		default:
 			return "", false
 		}
@@ -31,11 +31,45 @@ func TestLoadUsesDefaultsAndValidatesStaticDirectory(t *testing.T) {
 	if got, want := cfg.RealtimeUpstreamURL.String(), defaultRealtimeUpstreamURL; got != want {
 		t.Fatalf("realtime upstream = %q", got)
 	}
-	if cfg.StaticDirectory != dir {
-		t.Fatalf("static directory = %q", cfg.StaticDirectory)
+	if cfg.UserStaticDirectory != userDir || cfg.AdminStaticDirectory != adminDir {
+		t.Fatalf("static directories = %q / %q", cfg.UserStaticDirectory, cfg.AdminStaticDirectory)
+	}
+	if got, want := cfg.UserHosts, []string{"localhost:8080", "127.0.0.1:8080"}; !equalStrings(got, want) {
+		t.Fatalf("user hosts = %v, want %v", got, want)
+	}
+	if got, want := cfg.AdminHosts, []string{"admin.localhost:8080"}; !equalStrings(got, want) {
+		t.Fatalf("admin hosts = %v, want %v", got, want)
 	}
 	if len(cfg.TrustedProxyCIDRs) != 2 {
 		t.Fatalf("trusted proxy cidrs = %v", cfg.TrustedProxyCIDRs)
+	}
+}
+
+func TestLoadCanonicalizesHosts(t *testing.T) {
+	userDir := writeStaticRoot(t, "USER")
+	adminDir := writeStaticRoot(t, "ADMIN")
+	cfg, err := Load(func(name string) (string, bool) {
+		switch name {
+		case userStaticDirectoryEnvironment:
+			return userDir, true
+		case adminStaticDirectoryEnvironment:
+			return adminDir, true
+		case userHostsEnvironment:
+			return " LOCALHOST:8080 , [2001:db8::1]:8443 , localhost:8080 ", true
+		case adminHostsEnvironment:
+			return " Admin.LocalHost:8080 ", true
+		default:
+			return "", false
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.UserHosts, []string{"localhost:8080", "[2001:db8::1]:8443"}; !equalStrings(got, want) {
+		t.Fatalf("user hosts = %v, want %v", got, want)
+	}
+	if got, want := cfg.AdminHosts, []string{"admin.localhost:8080"}; !equalStrings(got, want) {
+		t.Fatalf("admin hosts = %v, want %v", got, want)
 	}
 }
 
@@ -57,19 +91,45 @@ func TestLoadRejectsInvalidInputs(t *testing.T) {
 			},
 		},
 		{
-			name: "missing-index",
+			name: "missing-user-index",
 			env:  map[string]string{},
+		},
+		{
+			name: "missing-admin-index",
+			env:  map[string]string{},
+		},
+		{
+			name: "empty-user-hosts",
+			env: map[string]string{
+				userHostsEnvironment: " , ",
+			},
+		},
+		{
+			name: "wildcard-host",
+			env: map[string]string{
+				adminHostsEnvironment: "*.example.test",
+			},
+		},
+		{
+			name: "overlapping-hosts",
+			env: map[string]string{
+				userHostsEnvironment:  "shared.example.test",
+				adminHostsEnvironment: "SHARED.EXAMPLE.TEST",
+			},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			tc.env[staticDirectoryEnvironment] = dir
-			if tc.name != "missing-index" {
-				if err := os.WriteFile(filepath.Join(dir, staticIndexFileName), []byte("index"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+			userDir := t.TempDir()
+			adminDir := t.TempDir()
+			if tc.name != "missing-user-index" {
+				writeIndexFile(t, userDir, "USER")
 			}
+			if tc.name != "missing-admin-index" {
+				writeIndexFile(t, adminDir, "ADMIN")
+			}
+			tc.env[userStaticDirectoryEnvironment] = userDir
+			tc.env[adminStaticDirectoryEnvironment] = adminDir
 			_, err := Load(func(name string) (string, bool) {
 				value, ok := tc.env[name]
 				return value, ok
@@ -79,4 +139,30 @@ func TestLoadRejectsInvalidInputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func writeStaticRoot(t testing.TB, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeIndexFile(t, dir, body)
+	return dir
+}
+
+func writeIndexFile(t testing.TB, dir, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, staticIndexFileName), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }

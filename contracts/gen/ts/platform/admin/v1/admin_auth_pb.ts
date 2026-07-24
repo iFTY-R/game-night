@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/admin/v1/admin_auth.proto.
  */
 export const file_platform_admin_v1_admin_auth: GenFile = /*@__PURE__*/
-  fileDesc("CiJwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9hdXRoLnByb3RvEhFwbGF0Zm9ybS5hZG1pbi52MSKBAgoTQWRtaW5TZXNzaW9uU3VtbWFyeRIQCghhZG1pbl9pZBgBIAEoCRIxCgRraW5kGAIgASgOMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uS2luZBI3CgtwZXJtaXNzaW9ucxgDIAMoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluUGVybWlzc2lvbhIzCg9pZGxlX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjcKE2Fic29sdXRlX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhYKFEdldFNldHVwU3RhdGVSZXF1ZXN0IkoKFUdldFNldHVwU3RhdGVSZXNwb25zZRIxCgVzdGF0ZRgBIAEoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2V0dXBTdGF0ZSIxChZCZWdpbkFkbWluTG9naW5SZXF1ZXN0EhcKD3JlcXVlc3RfZmxvd19pZBgBIAEoCSJUChdCZWdpbkFkbWluTG9naW5SZXNwb25zZRI5CgljaGFsbGVuZ2UYASABKAsyJi5wbGF0Zm9ybS5jb21tb24udjEuQW5vbnltb3VzQ2hhbGxlbmdlIkEKFExvZ2luUGFzc3dvcmRSZXF1ZXN0EhcKD2NoYWxsZW5nZV9wcm9vZhgBIAEoCRIQCghwYXNzd29yZBgCIAEoCSJ8ChVMb2dpblBhc3N3b3JkUmVzcG9uc2USMwoJbmV4dF9zdGVwGAEgASgOMiAucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5OZXh0U3RlcBIuCgpleHBpcmVzX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCImChFWZXJpZnlUb3RwUmVxdWVzdBIRCgl0b3RwX2NvZGUYASABKAkiTQoSVmVyaWZ5VG90cFJlc3BvbnNlEjcKB3Nlc3Npb24YASABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IjQKHENoYW5nZUluaXRpYWxQYXNzd29yZFJlcXVlc3QSFAoMbmV3X3Bhc3N3b3JkGAEgASgJIoQBCh1DaGFuZ2VJbml0aWFsUGFzc3dvcmRSZXNwb25zZRIzCgluZXh0X3N0ZXAYASABKA4yIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk5leHRTdGVwEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjIKGkJlZ2luVG90cEVucm9sbG1lbnRSZXF1ZXN0EhQKDG9wZXJhdGlvbl9pZBgBIAEoCSJ8ChtCZWdpblRvdHBFbnJvbGxtZW50UmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBITCgt0b3RwX3NlY3JldBgCIAEoCRITCgtvdHBhdXRoX3VyaRgDIAEoCSJ4Ch1Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVxdWVzdBIfChdlbnJvbGxtZW50X29wZXJhdGlvbl9pZBgBIAEoCRIjChtyZWNvdmVyeV9jb2Rlc19vcGVyYXRpb25faWQYAiABKAkSEQoJdG90cF9jb2RlGAMgASgJIqYBCh5Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCRI3CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSKHAQogQ29uZmlybUFkbWluU2VjcmV0UmVjZWlwdFJlcXVlc3QSOgoJb3BlcmF0aW9uGAEgASgOMicucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZWNyZXRPcGVyYXRpb24SFAoMb3BlcmF0aW9uX2lkGAIgASgJEhEKCXJlc3VsdF9pZBgDIAEoCSI2CiFDb25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVzcG9uc2USEQoJY29uZmlybWVkGAEgASgIIiwKE1JlY292ZXJBZG1pblJlcXVlc3QSFQoNcmVjb3ZlcnlfY29kZRgBIAEoCSKEAQoUUmVjb3ZlckFkbWluUmVzcG9uc2USMwoJbmV4dF9zdGVwGAEgASgOMiAucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5OZXh0U3RlcBI3CgdzZXNzaW9uGAIgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSJMChpDaGFuZ2VBZG1pblBhc3N3b3JkUmVxdWVzdBIYChBjdXJyZW50X3Bhc3N3b3JkGAEgASgJEhQKDG5ld19wYXNzd29yZBgCIAEoCSKLAQobQ2hhbmdlQWRtaW5QYXNzd29yZFJlc3BvbnNlEjMKCW5leHRfc3RlcBgBIAEoDjIgLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluTmV4dFN0ZXASNwoHc2Vzc2lvbhgCIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiLgoWQmVnaW5Ub3RwUmViaW5kUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkieAoXQmVnaW5Ub3RwUmViaW5kUmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBITCgt0b3RwX3NlY3JldBgCIAEoCRITCgtvdHBhdXRoX3VyaRgDIAEoCSJ0ChlDb21wbGV0ZVRvdHBSZWJpbmRSZXF1ZXN0Eh8KF2Vucm9sbG1lbnRfb3BlcmF0aW9uX2lkGAEgASgJEiMKG3JlY292ZXJ5X2NvZGVzX29wZXJhdGlvbl9pZBgCIAEoCRIRCgl0b3RwX2NvZGUYAyABKAkiogEKGkNvbXBsZXRlVG90cFJlYmluZFJlc3BvbnNlEjMKBnJlc3VsdBgBIAEoCzIjLnBsYXRmb3JtLmNvbW1vbi52MS5PcGVyYXRpb25SZXN1bHQSFgoOcmVjb3ZlcnlfY29kZXMYAiADKAkSNwoHc2Vzc2lvbhgDIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiTgojUmVnZW5lcmF0ZUFkbWluUmVjb3ZlcnlDb2Rlc1JlcXVlc3QSFAoMb3BlcmF0aW9uX2lkGAEgASgJEhEKCXRvdHBfY29kZRgCIAEoCSJzCiRSZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCSIUChJMb2dvdXRBZG1pblJlcXVlc3QiKQoTTG9nb3V0QWRtaW5SZXNwb25zZRISCgpsb2dnZWRfb3V0GAEgASgIIh8KHUxvZ291dEFsbEFkbWluU2Vzc2lvbnNSZXF1ZXN0IjoKHkxvZ291dEFsbEFkbWluU2Vzc2lvbnNSZXNwb25zZRIYChByZXZva2VkX3Nlc3Npb25zGAEgASgFKqEBCg9BZG1pblNldHVwU3RhdGUSIQodQURNSU5fU0VUVVBfU1RBVEVfVU5TUEVDSUZJRUQQABInCiNBRE1JTl9TRVRVUF9TVEFURV9CT09UU1RSQVBfUEVORElORxABEiQKIEFETUlOX1NFVFVQX1NUQVRFX1NFVFVQX1JFUVVJUkVEEAISHAoYQURNSU5fU0VUVVBfU1RBVEVfQUNUSVZFEAMq2gEKDUFkbWluTmV4dFN0ZXASHwobQURNSU5fTkVYVF9TVEVQX1VOU1BFQ0lGSUVEEAASIwofQURNSU5fTkVYVF9TVEVQX0NIQU5HRV9QQVNTV09SRBABEh8KG0FETUlOX05FWFRfU1RFUF9FTlJPTExfVE9UUBACEh4KGkFETUlOX05FWFRfU1RFUF9WRVJJRllfTUZBEAMSHwobQURNSU5fTkVYVF9TVEVQX1JFQklORF9UT1RQEAQSIQodQURNSU5fTkVYVF9TVEVQX0FVVEhFTlRJQ0FURUQQBSr/AQoQQWRtaW5TZXNzaW9uS2luZBIiCh5BRE1JTl9TRVNTSU9OX0tJTkRfVU5TUEVDSUZJRUQQABItCilBRE1JTl9TRVNTSU9OX0tJTkRfU0VUVVBfUEFTU1dPUkRfUEVORElORxABEi4KKkFETUlOX1NFU1NJT05fS0lORF9UT1RQX0VOUk9MTE1FTlRfUEVORElORxACEiIKHkFETUlOX1NFU1NJT05fS0lORF9NRkFfUEVORElORxADEicKI0FETUlOX1NFU1NJT05fS0lORF9SRUNPVkVSWV9QRU5ESU5HEAQSGwoXQURNSU5fU0VTU0lPTl9LSU5EX0ZVTEwQBSqXAwoPQWRtaW5QZXJtaXNzaW9uEiAKHEFETUlOX1BFUk1JU1NJT05fVU5TUEVDSUZJRUQQABIdChlBRE1JTl9QRVJNSVNTSU9OX0dFVF9VU0VSEAESIgoeQURNSU5fUEVSTUlTU0lPTl9HRVRfUkVBTF9OQU1FEAISJQohQURNSU5fUEVSTUlTU0lPTl9VUERBVEVfUkVBTF9OQU1FEAMSIwofQURNSU5fUEVSTUlTU0lPTl9FWFBPUlRfUFJPRklMRRAEEiQKIEFETUlOX1BFUk1JU1NJT05fTUFOQUdFX1JFQ09WRVJZEAUSIwofQURNSU5fUEVSTUlTU0lPTl9GT1JDRV9VU0VSTkFNRRAGEiEKHUFETUlOX1BFUk1JU1NJT05fU1VTUEVORF9VU0VSEAcSIAocQURNSU5fUEVSTUlTU0lPTl9ERUxFVEVfVVNFUhAIEiIKHkFETUlOX1BFUk1JU1NJT05fUkVWT0tFX0RFVklDRRAJEh8KG0FETUlOX1BFUk1JU1NJT05fUkVBRF9BVURJVBAKKq8CChRBZG1pblNlY3JldE9wZXJhdGlvbhImCiJBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1VOU1BFQ0lGSUVEEAASKgomQURNSU5fU0VDUkVUX09QRVJBVElPTl9UT1RQX0VOUk9MTE1FTlQQARIxCi1BRE1JTl9TRUNSRVRfT1BFUkFUSU9OX0lOSVRJQUxfUkVDT1ZFUllfQ09ERVMQAhImCiJBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1RPVFBfUkVCSU5EEAMSNAowQURNSU5fU0VDUkVUX09QRVJBVElPTl9SRUdFTkVSQVRFX1JFQ09WRVJZX0NPREVTEAQSMgouQURNSU5fU0VDUkVUX09QRVJBVElPTl9BU1NJU1RFRF9SRUNPVkVSWV9HUkFOVBAFMrwNChBBZG1pbkF1dGhTZXJ2aWNlEmIKDUdldFNldHVwU3RhdGUSJy5wbGF0Zm9ybS5hZG1pbi52MS5HZXRTZXR1cFN0YXRlUmVxdWVzdBooLnBsYXRmb3JtLmFkbWluLnYxLkdldFNldHVwU3RhdGVSZXNwb25zZRJoCg9CZWdpbkFkbWluTG9naW4SKS5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpbkFkbWluTG9naW5SZXF1ZXN0GioucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5BZG1pbkxvZ2luUmVzcG9uc2USYgoNTG9naW5QYXNzd29yZBInLnBsYXRmb3JtLmFkbWluLnYxLkxvZ2luUGFzc3dvcmRSZXF1ZXN0GigucGxhdGZvcm0uYWRtaW4udjEuTG9naW5QYXNzd29yZFJlc3BvbnNlElkKClZlcmlmeVRvdHASJC5wbGF0Zm9ybS5hZG1pbi52MS5WZXJpZnlUb3RwUmVxdWVzdBolLnBsYXRmb3JtLmFkbWluLnYxLlZlcmlmeVRvdHBSZXNwb25zZRJ6ChVDaGFuZ2VJbml0aWFsUGFzc3dvcmQSLy5wbGF0Zm9ybS5hZG1pbi52MS5DaGFuZ2VJbml0aWFsUGFzc3dvcmRSZXF1ZXN0GjAucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVzcG9uc2USdAoTQmVnaW5Ub3RwRW5yb2xsbWVudBItLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cEVucm9sbG1lbnRSZXF1ZXN0Gi4ucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5Ub3RwRW5yb2xsbWVudFJlc3BvbnNlEn0KFkNvbXBsZXRlVG90cEVucm9sbG1lbnQSMC5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVxdWVzdBoxLnBsYXRmb3JtLmFkbWluLnYxLkNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXNwb25zZRKGAQoZQ29uZmlybUFkbWluU2VjcmV0UmVjZWlwdBIzLnBsYXRmb3JtLmFkbWluLnYxLkNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHRSZXF1ZXN0GjQucGxhdGZvcm0uYWRtaW4udjEuQ29uZmlybUFkbWluU2VjcmV0UmVjZWlwdFJlc3BvbnNlEl8KDFJlY292ZXJBZG1pbhImLnBsYXRmb3JtLmFkbWluLnYxLlJlY292ZXJBZG1pblJlcXVlc3QaJy5wbGF0Zm9ybS5hZG1pbi52MS5SZWNvdmVyQWRtaW5SZXNwb25zZRJ0ChNDaGFuZ2VBZG1pblBhc3N3b3JkEi0ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlQWRtaW5QYXNzd29yZFJlcXVlc3QaLi5wbGF0Zm9ybS5hZG1pbi52MS5DaGFuZ2VBZG1pblBhc3N3b3JkUmVzcG9uc2USaAoPQmVnaW5Ub3RwUmViaW5kEikucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5Ub3RwUmViaW5kUmVxdWVzdBoqLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cFJlYmluZFJlc3BvbnNlEnEKEkNvbXBsZXRlVG90cFJlYmluZBIsLnBsYXRmb3JtLmFkbWluLnYxLkNvbXBsZXRlVG90cFJlYmluZFJlcXVlc3QaLS5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBSZWJpbmRSZXNwb25zZRKPAQocUmVnZW5lcmF0ZUFkbWluUmVjb3ZlcnlDb2RlcxI2LnBsYXRmb3JtLmFkbWluLnYxLlJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXF1ZXN0GjcucGxhdGZvcm0uYWRtaW4udjEuUmVnZW5lcmF0ZUFkbWluUmVjb3ZlcnlDb2Rlc1Jlc3BvbnNlElwKC0xvZ291dEFkbWluEiUucGxhdGZvcm0uYWRtaW4udjEuTG9nb3V0QWRtaW5SZXF1ZXN0GiYucGxhdGZvcm0uYWRtaW4udjEuTG9nb3V0QWRtaW5SZXNwb25zZRJ9ChZMb2dvdXRBbGxBZG1pblNlc3Npb25zEjAucGxhdGZvcm0uYWRtaW4udjEuTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1JlcXVlc3QaMS5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dvdXRBbGxBZG1pblNlc3Npb25zUmVzcG9uc2VCSVpHZ2l0aHViLmNvbS9pRlRZLVIvZ2FtZS1uaWdodC9jb250cmFjdHMvZ2VuL2dvL3BsYXRmb3JtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_platform_common_v1_common]);
+  fileDesc("CiJwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9hdXRoLnByb3RvEhFwbGF0Zm9ybS5hZG1pbi52MSKBAgoTQWRtaW5TZXNzaW9uU3VtbWFyeRIQCghhZG1pbl9pZBgBIAEoCRIxCgRraW5kGAIgASgOMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uS2luZBI3CgtwZXJtaXNzaW9ucxgDIAMoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluUGVybWlzc2lvbhIzCg9pZGxlX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjcKE2Fic29sdXRlX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhYKFEdldFNldHVwU3RhdGVSZXF1ZXN0IkoKFUdldFNldHVwU3RhdGVSZXNwb25zZRIxCgVzdGF0ZRgBIAEoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2V0dXBTdGF0ZSIfCh1HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVxdWVzdCKOAQoeR2V0Q3VycmVudEFkbWluU2Vzc2lvblJlc3BvbnNlEjcKB3Nlc3Npb24YASABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5EjMKCW5leHRfc3RlcBgCIAEoDjIgLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluTmV4dFN0ZXAiHAoaR2V0UnVudGltZVJlYWRpbmVzc1JlcXVlc3QitQEKFVJ1bnRpbWVSZWFkaW5lc3NTdGF0ZRIMCgRtb2RlGAEgASgJEg0KBXJlYWR5GAIgASgIEkwKCmNvbXBvbmVudHMYAyADKAsyOC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUuQ29tcG9uZW50c0VudHJ5GjEKD0NvbXBvbmVudHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpYBChtHZXRSdW50aW1lUmVhZGluZXNzUmVzcG9uc2USOgoIb3JkaW5hcnkYASABKAsyKC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUSOwoJc2Vuc2l0aXZlGAIgASgLMigucGxhdGZvcm0uYWRtaW4udjEuUnVudGltZVJlYWRpbmVzc1N0YXRlIjEKFkJlZ2luQWRtaW5Mb2dpblJlcXVlc3QSFwoPcmVxdWVzdF9mbG93X2lkGAEgASgJIlQKF0JlZ2luQWRtaW5Mb2dpblJlc3BvbnNlEjkKCWNoYWxsZW5nZRgBIAEoCzImLnBsYXRmb3JtLmNvbW1vbi52MS5Bbm9ueW1vdXNDaGFsbGVuZ2UiQQoUTG9naW5QYXNzd29yZFJlcXVlc3QSFwoPY2hhbGxlbmdlX3Byb29mGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJInwKFUxvZ2luUGFzc3dvcmRSZXNwb25zZRIzCgluZXh0X3N0ZXAYASABKA4yIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk5leHRTdGVwEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKEVZlcmlmeVRvdHBSZXF1ZXN0EhEKCXRvdHBfY29kZRgBIAEoCSJNChJWZXJpZnlUb3RwUmVzcG9uc2USNwoHc2Vzc2lvbhgBIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiNAocQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVxdWVzdBIUCgxuZXdfcGFzc3dvcmQYASABKAkihAEKHUNoYW5nZUluaXRpYWxQYXNzd29yZFJlc3BvbnNlEjMKCW5leHRfc3RlcBgBIAEoDjIgLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluTmV4dFN0ZXASLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMgoaQmVnaW5Ub3RwRW5yb2xsbWVudFJlcXVlc3QSFAoMb3BlcmF0aW9uX2lkGAEgASgJInwKG0JlZ2luVG90cEVucm9sbG1lbnRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhMKC3RvdHBfc2VjcmV0GAIgASgJEhMKC290cGF1dGhfdXJpGAMgASgJIngKHUNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXF1ZXN0Eh8KF2Vucm9sbG1lbnRfb3BlcmF0aW9uX2lkGAEgASgJEiMKG3JlY292ZXJ5X2NvZGVzX29wZXJhdGlvbl9pZBgCIAEoCRIRCgl0b3RwX2NvZGUYAyABKAkipgEKHkNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhYKDnJlY292ZXJ5X2NvZGVzGAIgAygJEjcKB3Nlc3Npb24YAyABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IocBCiBDb25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVxdWVzdBI6CglvcGVyYXRpb24YASABKA4yJy5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlY3JldE9wZXJhdGlvbhIUCgxvcGVyYXRpb25faWQYAiABKAkSEQoJcmVzdWx0X2lkGAMgASgJIjYKIUNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHRSZXNwb25zZRIRCgljb25maXJtZWQYASABKAgiLAoTUmVjb3ZlckFkbWluUmVxdWVzdBIVCg1yZWNvdmVyeV9jb2RlGAEgASgJIoQBChRSZWNvdmVyQWRtaW5SZXNwb25zZRIzCgluZXh0X3N0ZXAYASABKA4yIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk5leHRTdGVwEjcKB3Nlc3Npb24YAiABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IkwKGkNoYW5nZUFkbWluUGFzc3dvcmRSZXF1ZXN0EhgKEGN1cnJlbnRfcGFzc3dvcmQYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJIosBChtDaGFuZ2VBZG1pblBhc3N3b3JkUmVzcG9uc2USMwoJbmV4dF9zdGVwGAEgASgOMiAucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5OZXh0U3RlcBI3CgdzZXNzaW9uGAIgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSIuChZCZWdpblRvdHBSZWJpbmRSZXF1ZXN0EhQKDG9wZXJhdGlvbl9pZBgBIAEoCSJ4ChdCZWdpblRvdHBSZWJpbmRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhMKC3RvdHBfc2VjcmV0GAIgASgJEhMKC290cGF1dGhfdXJpGAMgASgJInQKGUNvbXBsZXRlVG90cFJlYmluZFJlcXVlc3QSHwoXZW5yb2xsbWVudF9vcGVyYXRpb25faWQYASABKAkSIwobcmVjb3ZlcnlfY29kZXNfb3BlcmF0aW9uX2lkGAIgASgJEhEKCXRvdHBfY29kZRgDIAEoCSKiAQoaQ29tcGxldGVUb3RwUmViaW5kUmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCRI3CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSJOCiNSZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSEQoJdG90cF9jb2RlGAIgASgJInMKJFJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhYKDnJlY292ZXJ5X2NvZGVzGAIgAygJIhQKEkxvZ291dEFkbWluUmVxdWVzdCIpChNMb2dvdXRBZG1pblJlc3BvbnNlEhIKCmxvZ2dlZF9vdXQYASABKAgiHwodTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1JlcXVlc3QiOgoeTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1Jlc3BvbnNlEhgKEHJldm9rZWRfc2Vzc2lvbnMYASABKAUqoQEKD0FkbWluU2V0dXBTdGF0ZRIhCh1BRE1JTl9TRVRVUF9TVEFURV9VTlNQRUNJRklFRBAAEicKI0FETUlOX1NFVFVQX1NUQVRFX0JPT1RTVFJBUF9QRU5ESU5HEAESJAogQURNSU5fU0VUVVBfU1RBVEVfU0VUVVBfUkVRVUlSRUQQAhIcChhBRE1JTl9TRVRVUF9TVEFURV9BQ1RJVkUQAyraAQoNQWRtaW5OZXh0U3RlcBIfChtBRE1JTl9ORVhUX1NURVBfVU5TUEVDSUZJRUQQABIjCh9BRE1JTl9ORVhUX1NURVBfQ0hBTkdFX1BBU1NXT1JEEAESHwobQURNSU5fTkVYVF9TVEVQX0VOUk9MTF9UT1RQEAISHgoaQURNSU5fTkVYVF9TVEVQX1ZFUklGWV9NRkEQAxIfChtBRE1JTl9ORVhUX1NURVBfUkVCSU5EX1RPVFAQBBIhCh1BRE1JTl9ORVhUX1NURVBfQVVUSEVOVElDQVRFRBAFKv8BChBBZG1pblNlc3Npb25LaW5kEiIKHkFETUlOX1NFU1NJT05fS0lORF9VTlNQRUNJRklFRBAAEi0KKUFETUlOX1NFU1NJT05fS0lORF9TRVRVUF9QQVNTV09SRF9QRU5ESU5HEAESLgoqQURNSU5fU0VTU0lPTl9LSU5EX1RPVFBfRU5ST0xMTUVOVF9QRU5ESU5HEAISIgoeQURNSU5fU0VTU0lPTl9LSU5EX01GQV9QRU5ESU5HEAMSJwojQURNSU5fU0VTU0lPTl9LSU5EX1JFQ09WRVJZX1BFTkRJTkcQBBIbChdBRE1JTl9TRVNTSU9OX0tJTkRfRlVMTBAFKpcDCg9BZG1pblBlcm1pc3Npb24SIAocQURNSU5fUEVSTUlTU0lPTl9VTlNQRUNJRklFRBAAEh0KGUFETUlOX1BFUk1JU1NJT05fR0VUX1VTRVIQARIiCh5BRE1JTl9QRVJNSVNTSU9OX0dFVF9SRUFMX05BTUUQAhIlCiFBRE1JTl9QRVJNSVNTSU9OX1VQREFURV9SRUFMX05BTUUQAxIjCh9BRE1JTl9QRVJNSVNTSU9OX0VYUE9SVF9QUk9GSUxFEAQSJAogQURNSU5fUEVSTUlTU0lPTl9NQU5BR0VfUkVDT1ZFUlkQBRIjCh9BRE1JTl9QRVJNSVNTSU9OX0ZPUkNFX1VTRVJOQU1FEAYSIQodQURNSU5fUEVSTUlTU0lPTl9TVVNQRU5EX1VTRVIQBxIgChxBRE1JTl9QRVJNSVNTSU9OX0RFTEVURV9VU0VSEAgSIgoeQURNSU5fUEVSTUlTU0lPTl9SRVZPS0VfREVWSUNFEAkSHwobQURNSU5fUEVSTUlTU0lPTl9SRUFEX0FVRElUEAoqrwIKFEFkbWluU2VjcmV0T3BlcmF0aW9uEiYKIkFETUlOX1NFQ1JFVF9PUEVSQVRJT05fVU5TUEVDSUZJRUQQABIqCiZBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1RPVFBfRU5ST0xMTUVOVBABEjEKLUFETUlOX1NFQ1JFVF9PUEVSQVRJT05fSU5JVElBTF9SRUNPVkVSWV9DT0RFUxACEiYKIkFETUlOX1NFQ1JFVF9PUEVSQVRJT05fVE9UUF9SRUJJTkQQAxI0CjBBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1JFR0VORVJBVEVfUkVDT1ZFUllfQ09ERVMQBBIyCi5BRE1JTl9TRUNSRVRfT1BFUkFUSU9OX0FTU0lTVEVEX1JFQ09WRVJZX0dSQU5UEAUysQ8KEEFkbWluQXV0aFNlcnZpY2USYgoNR2V0U2V0dXBTdGF0ZRInLnBsYXRmb3JtLmFkbWluLnYxLkdldFNldHVwU3RhdGVSZXF1ZXN0GigucGxhdGZvcm0uYWRtaW4udjEuR2V0U2V0dXBTdGF0ZVJlc3BvbnNlEn0KFkdldEN1cnJlbnRBZG1pblNlc3Npb24SMC5wbGF0Zm9ybS5hZG1pbi52MS5HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVxdWVzdBoxLnBsYXRmb3JtLmFkbWluLnYxLkdldEN1cnJlbnRBZG1pblNlc3Npb25SZXNwb25zZRJ0ChNHZXRSdW50aW1lUmVhZGluZXNzEi0ucGxhdGZvcm0uYWRtaW4udjEuR2V0UnVudGltZVJlYWRpbmVzc1JlcXVlc3QaLi5wbGF0Zm9ybS5hZG1pbi52MS5HZXRSdW50aW1lUmVhZGluZXNzUmVzcG9uc2USaAoPQmVnaW5BZG1pbkxvZ2luEikucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5BZG1pbkxvZ2luUmVxdWVzdBoqLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luQWRtaW5Mb2dpblJlc3BvbnNlEmIKDUxvZ2luUGFzc3dvcmQSJy5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dpblBhc3N3b3JkUmVxdWVzdBooLnBsYXRmb3JtLmFkbWluLnYxLkxvZ2luUGFzc3dvcmRSZXNwb25zZRJZCgpWZXJpZnlUb3RwEiQucGxhdGZvcm0uYWRtaW4udjEuVmVyaWZ5VG90cFJlcXVlc3QaJS5wbGF0Zm9ybS5hZG1pbi52MS5WZXJpZnlUb3RwUmVzcG9uc2USegoVQ2hhbmdlSW5pdGlhbFBhc3N3b3JkEi8ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVxdWVzdBowLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUluaXRpYWxQYXNzd29yZFJlc3BvbnNlEnQKE0JlZ2luVG90cEVucm9sbG1lbnQSLS5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpblRvdHBFbnJvbGxtZW50UmVxdWVzdBouLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cEVucm9sbG1lbnRSZXNwb25zZRJ9ChZDb21wbGV0ZVRvdHBFbnJvbGxtZW50EjAucGxhdGZvcm0uYWRtaW4udjEuQ29tcGxldGVUb3RwRW5yb2xsbWVudFJlcXVlc3QaMS5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVzcG9uc2UShgEKGUNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHQSMy5wbGF0Zm9ybS5hZG1pbi52MS5Db25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVxdWVzdBo0LnBsYXRmb3JtLmFkbWluLnYxLkNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHRSZXNwb25zZRJfCgxSZWNvdmVyQWRtaW4SJi5wbGF0Zm9ybS5hZG1pbi52MS5SZWNvdmVyQWRtaW5SZXF1ZXN0GicucGxhdGZvcm0uYWRtaW4udjEuUmVjb3ZlckFkbWluUmVzcG9uc2USdAoTQ2hhbmdlQWRtaW5QYXNzd29yZBItLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUFkbWluUGFzc3dvcmRSZXF1ZXN0Gi4ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlQWRtaW5QYXNzd29yZFJlc3BvbnNlEmgKD0JlZ2luVG90cFJlYmluZBIpLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cFJlYmluZFJlcXVlc3QaKi5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpblRvdHBSZWJpbmRSZXNwb25zZRJxChJDb21wbGV0ZVRvdHBSZWJpbmQSLC5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBSZWJpbmRSZXF1ZXN0Gi0ucGxhdGZvcm0uYWRtaW4udjEuQ29tcGxldGVUb3RwUmViaW5kUmVzcG9uc2USjwEKHFJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXMSNi5wbGF0Zm9ybS5hZG1pbi52MS5SZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVxdWVzdBo3LnBsYXRmb3JtLmFkbWluLnYxLlJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXNwb25zZRJcCgtMb2dvdXRBZG1pbhIlLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFkbWluUmVxdWVzdBomLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFkbWluUmVzcG9uc2USfQoWTG9nb3V0QWxsQWRtaW5TZXNzaW9ucxIwLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFsbEFkbWluU2Vzc2lvbnNSZXF1ZXN0GjEucGxhdGZvcm0uYWRtaW4udjEuTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1Jlc3BvbnNlQklaR2dpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_google_protobuf_timestamp, file_platform_common_v1_common]);
 
 /**
  * @generated from message platform.admin.v1.AdminSessionSummary
@@ -84,6 +84,103 @@ export const GetSetupStateResponseSchema: GenMessage<GetSetupStateResponse> = /*
   messageDesc(file_platform_admin_v1_admin_auth, 2);
 
 /**
+ * @generated from message platform.admin.v1.GetCurrentAdminSessionRequest
+ */
+export type GetCurrentAdminSessionRequest = Message<"platform.admin.v1.GetCurrentAdminSessionRequest"> & {
+};
+
+/**
+ * Describes the message platform.admin.v1.GetCurrentAdminSessionRequest.
+ * Use `create(GetCurrentAdminSessionRequestSchema)` to create a new message.
+ */
+export const GetCurrentAdminSessionRequestSchema: GenMessage<GetCurrentAdminSessionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 3);
+
+/**
+ * @generated from message platform.admin.v1.GetCurrentAdminSessionResponse
+ */
+export type GetCurrentAdminSessionResponse = Message<"platform.admin.v1.GetCurrentAdminSessionResponse"> & {
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
+   */
+  session?: AdminSessionSummary;
+
+  /**
+   * @generated from field: platform.admin.v1.AdminNextStep next_step = 2;
+   */
+  nextStep: AdminNextStep;
+};
+
+/**
+ * Describes the message platform.admin.v1.GetCurrentAdminSessionResponse.
+ * Use `create(GetCurrentAdminSessionResponseSchema)` to create a new message.
+ */
+export const GetCurrentAdminSessionResponseSchema: GenMessage<GetCurrentAdminSessionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 4);
+
+/**
+ * @generated from message platform.admin.v1.GetRuntimeReadinessRequest
+ */
+export type GetRuntimeReadinessRequest = Message<"platform.admin.v1.GetRuntimeReadinessRequest"> & {
+};
+
+/**
+ * Describes the message platform.admin.v1.GetRuntimeReadinessRequest.
+ * Use `create(GetRuntimeReadinessRequestSchema)` to create a new message.
+ */
+export const GetRuntimeReadinessRequestSchema: GenMessage<GetRuntimeReadinessRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 5);
+
+/**
+ * @generated from message platform.admin.v1.RuntimeReadinessState
+ */
+export type RuntimeReadinessState = Message<"platform.admin.v1.RuntimeReadinessState"> & {
+  /**
+   * @generated from field: string mode = 1;
+   */
+  mode: string;
+
+  /**
+   * @generated from field: bool ready = 2;
+   */
+  ready: boolean;
+
+  /**
+   * @generated from field: map<string, string> components = 3;
+   */
+  components: { [key: string]: string };
+};
+
+/**
+ * Describes the message platform.admin.v1.RuntimeReadinessState.
+ * Use `create(RuntimeReadinessStateSchema)` to create a new message.
+ */
+export const RuntimeReadinessStateSchema: GenMessage<RuntimeReadinessState> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 6);
+
+/**
+ * @generated from message platform.admin.v1.GetRuntimeReadinessResponse
+ */
+export type GetRuntimeReadinessResponse = Message<"platform.admin.v1.GetRuntimeReadinessResponse"> & {
+  /**
+   * @generated from field: platform.admin.v1.RuntimeReadinessState ordinary = 1;
+   */
+  ordinary?: RuntimeReadinessState;
+
+  /**
+   * @generated from field: platform.admin.v1.RuntimeReadinessState sensitive = 2;
+   */
+  sensitive?: RuntimeReadinessState;
+};
+
+/**
+ * Describes the message platform.admin.v1.GetRuntimeReadinessResponse.
+ * Use `create(GetRuntimeReadinessResponseSchema)` to create a new message.
+ */
+export const GetRuntimeReadinessResponseSchema: GenMessage<GetRuntimeReadinessResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 7);
+
+/**
  * @generated from message platform.admin.v1.BeginAdminLoginRequest
  */
 export type BeginAdminLoginRequest = Message<"platform.admin.v1.BeginAdminLoginRequest"> & {
@@ -98,7 +195,7 @@ export type BeginAdminLoginRequest = Message<"platform.admin.v1.BeginAdminLoginR
  * Use `create(BeginAdminLoginRequestSchema)` to create a new message.
  */
 export const BeginAdminLoginRequestSchema: GenMessage<BeginAdminLoginRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 3);
+  messageDesc(file_platform_admin_v1_admin_auth, 8);
 
 /**
  * @generated from message platform.admin.v1.BeginAdminLoginResponse
@@ -115,7 +212,7 @@ export type BeginAdminLoginResponse = Message<"platform.admin.v1.BeginAdminLogin
  * Use `create(BeginAdminLoginResponseSchema)` to create a new message.
  */
 export const BeginAdminLoginResponseSchema: GenMessage<BeginAdminLoginResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 4);
+  messageDesc(file_platform_admin_v1_admin_auth, 9);
 
 /**
  * @generated from message platform.admin.v1.LoginPasswordRequest
@@ -137,7 +234,7 @@ export type LoginPasswordRequest = Message<"platform.admin.v1.LoginPasswordReque
  * Use `create(LoginPasswordRequestSchema)` to create a new message.
  */
 export const LoginPasswordRequestSchema: GenMessage<LoginPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 5);
+  messageDesc(file_platform_admin_v1_admin_auth, 10);
 
 /**
  * @generated from message platform.admin.v1.LoginPasswordResponse
@@ -159,7 +256,7 @@ export type LoginPasswordResponse = Message<"platform.admin.v1.LoginPasswordResp
  * Use `create(LoginPasswordResponseSchema)` to create a new message.
  */
 export const LoginPasswordResponseSchema: GenMessage<LoginPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 6);
+  messageDesc(file_platform_admin_v1_admin_auth, 11);
 
 /**
  * @generated from message platform.admin.v1.VerifyTotpRequest
@@ -176,7 +273,7 @@ export type VerifyTotpRequest = Message<"platform.admin.v1.VerifyTotpRequest"> &
  * Use `create(VerifyTotpRequestSchema)` to create a new message.
  */
 export const VerifyTotpRequestSchema: GenMessage<VerifyTotpRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 7);
+  messageDesc(file_platform_admin_v1_admin_auth, 12);
 
 /**
  * @generated from message platform.admin.v1.VerifyTotpResponse
@@ -193,7 +290,7 @@ export type VerifyTotpResponse = Message<"platform.admin.v1.VerifyTotpResponse">
  * Use `create(VerifyTotpResponseSchema)` to create a new message.
  */
 export const VerifyTotpResponseSchema: GenMessage<VerifyTotpResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 8);
+  messageDesc(file_platform_admin_v1_admin_auth, 13);
 
 /**
  * @generated from message platform.admin.v1.ChangeInitialPasswordRequest
@@ -210,7 +307,7 @@ export type ChangeInitialPasswordRequest = Message<"platform.admin.v1.ChangeInit
  * Use `create(ChangeInitialPasswordRequestSchema)` to create a new message.
  */
 export const ChangeInitialPasswordRequestSchema: GenMessage<ChangeInitialPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 9);
+  messageDesc(file_platform_admin_v1_admin_auth, 14);
 
 /**
  * @generated from message platform.admin.v1.ChangeInitialPasswordResponse
@@ -232,7 +329,7 @@ export type ChangeInitialPasswordResponse = Message<"platform.admin.v1.ChangeIni
  * Use `create(ChangeInitialPasswordResponseSchema)` to create a new message.
  */
 export const ChangeInitialPasswordResponseSchema: GenMessage<ChangeInitialPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 10);
+  messageDesc(file_platform_admin_v1_admin_auth, 15);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpEnrollmentRequest
@@ -249,7 +346,7 @@ export type BeginTotpEnrollmentRequest = Message<"platform.admin.v1.BeginTotpEnr
  * Use `create(BeginTotpEnrollmentRequestSchema)` to create a new message.
  */
 export const BeginTotpEnrollmentRequestSchema: GenMessage<BeginTotpEnrollmentRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 11);
+  messageDesc(file_platform_admin_v1_admin_auth, 16);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpEnrollmentResponse
@@ -276,7 +373,7 @@ export type BeginTotpEnrollmentResponse = Message<"platform.admin.v1.BeginTotpEn
  * Use `create(BeginTotpEnrollmentResponseSchema)` to create a new message.
  */
 export const BeginTotpEnrollmentResponseSchema: GenMessage<BeginTotpEnrollmentResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 12);
+  messageDesc(file_platform_admin_v1_admin_auth, 17);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpEnrollmentRequest
@@ -303,7 +400,7 @@ export type CompleteTotpEnrollmentRequest = Message<"platform.admin.v1.CompleteT
  * Use `create(CompleteTotpEnrollmentRequestSchema)` to create a new message.
  */
 export const CompleteTotpEnrollmentRequestSchema: GenMessage<CompleteTotpEnrollmentRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 13);
+  messageDesc(file_platform_admin_v1_admin_auth, 18);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpEnrollmentResponse
@@ -330,7 +427,7 @@ export type CompleteTotpEnrollmentResponse = Message<"platform.admin.v1.Complete
  * Use `create(CompleteTotpEnrollmentResponseSchema)` to create a new message.
  */
 export const CompleteTotpEnrollmentResponseSchema: GenMessage<CompleteTotpEnrollmentResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 14);
+  messageDesc(file_platform_admin_v1_admin_auth, 19);
 
 /**
  * @generated from message platform.admin.v1.ConfirmAdminSecretReceiptRequest
@@ -357,7 +454,7 @@ export type ConfirmAdminSecretReceiptRequest = Message<"platform.admin.v1.Confir
  * Use `create(ConfirmAdminSecretReceiptRequestSchema)` to create a new message.
  */
 export const ConfirmAdminSecretReceiptRequestSchema: GenMessage<ConfirmAdminSecretReceiptRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 15);
+  messageDesc(file_platform_admin_v1_admin_auth, 20);
 
 /**
  * @generated from message platform.admin.v1.ConfirmAdminSecretReceiptResponse
@@ -374,7 +471,7 @@ export type ConfirmAdminSecretReceiptResponse = Message<"platform.admin.v1.Confi
  * Use `create(ConfirmAdminSecretReceiptResponseSchema)` to create a new message.
  */
 export const ConfirmAdminSecretReceiptResponseSchema: GenMessage<ConfirmAdminSecretReceiptResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 16);
+  messageDesc(file_platform_admin_v1_admin_auth, 21);
 
 /**
  * @generated from message platform.admin.v1.RecoverAdminRequest
@@ -391,7 +488,7 @@ export type RecoverAdminRequest = Message<"platform.admin.v1.RecoverAdminRequest
  * Use `create(RecoverAdminRequestSchema)` to create a new message.
  */
 export const RecoverAdminRequestSchema: GenMessage<RecoverAdminRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 17);
+  messageDesc(file_platform_admin_v1_admin_auth, 22);
 
 /**
  * @generated from message platform.admin.v1.RecoverAdminResponse
@@ -413,7 +510,7 @@ export type RecoverAdminResponse = Message<"platform.admin.v1.RecoverAdminRespon
  * Use `create(RecoverAdminResponseSchema)` to create a new message.
  */
 export const RecoverAdminResponseSchema: GenMessage<RecoverAdminResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 18);
+  messageDesc(file_platform_admin_v1_admin_auth, 23);
 
 /**
  * @generated from message platform.admin.v1.ChangeAdminPasswordRequest
@@ -435,7 +532,7 @@ export type ChangeAdminPasswordRequest = Message<"platform.admin.v1.ChangeAdminP
  * Use `create(ChangeAdminPasswordRequestSchema)` to create a new message.
  */
 export const ChangeAdminPasswordRequestSchema: GenMessage<ChangeAdminPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 19);
+  messageDesc(file_platform_admin_v1_admin_auth, 24);
 
 /**
  * @generated from message platform.admin.v1.ChangeAdminPasswordResponse
@@ -457,7 +554,7 @@ export type ChangeAdminPasswordResponse = Message<"platform.admin.v1.ChangeAdmin
  * Use `create(ChangeAdminPasswordResponseSchema)` to create a new message.
  */
 export const ChangeAdminPasswordResponseSchema: GenMessage<ChangeAdminPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 20);
+  messageDesc(file_platform_admin_v1_admin_auth, 25);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpRebindRequest
@@ -474,7 +571,7 @@ export type BeginTotpRebindRequest = Message<"platform.admin.v1.BeginTotpRebindR
  * Use `create(BeginTotpRebindRequestSchema)` to create a new message.
  */
 export const BeginTotpRebindRequestSchema: GenMessage<BeginTotpRebindRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 21);
+  messageDesc(file_platform_admin_v1_admin_auth, 26);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpRebindResponse
@@ -501,7 +598,7 @@ export type BeginTotpRebindResponse = Message<"platform.admin.v1.BeginTotpRebind
  * Use `create(BeginTotpRebindResponseSchema)` to create a new message.
  */
 export const BeginTotpRebindResponseSchema: GenMessage<BeginTotpRebindResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 22);
+  messageDesc(file_platform_admin_v1_admin_auth, 27);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpRebindRequest
@@ -528,7 +625,7 @@ export type CompleteTotpRebindRequest = Message<"platform.admin.v1.CompleteTotpR
  * Use `create(CompleteTotpRebindRequestSchema)` to create a new message.
  */
 export const CompleteTotpRebindRequestSchema: GenMessage<CompleteTotpRebindRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 23);
+  messageDesc(file_platform_admin_v1_admin_auth, 28);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpRebindResponse
@@ -555,7 +652,7 @@ export type CompleteTotpRebindResponse = Message<"platform.admin.v1.CompleteTotp
  * Use `create(CompleteTotpRebindResponseSchema)` to create a new message.
  */
 export const CompleteTotpRebindResponseSchema: GenMessage<CompleteTotpRebindResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 24);
+  messageDesc(file_platform_admin_v1_admin_auth, 29);
 
 /**
  * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesRequest
@@ -577,7 +674,7 @@ export type RegenerateAdminRecoveryCodesRequest = Message<"platform.admin.v1.Reg
  * Use `create(RegenerateAdminRecoveryCodesRequestSchema)` to create a new message.
  */
 export const RegenerateAdminRecoveryCodesRequestSchema: GenMessage<RegenerateAdminRecoveryCodesRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 25);
+  messageDesc(file_platform_admin_v1_admin_auth, 30);
 
 /**
  * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesResponse
@@ -599,7 +696,7 @@ export type RegenerateAdminRecoveryCodesResponse = Message<"platform.admin.v1.Re
  * Use `create(RegenerateAdminRecoveryCodesResponseSchema)` to create a new message.
  */
 export const RegenerateAdminRecoveryCodesResponseSchema: GenMessage<RegenerateAdminRecoveryCodesResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 26);
+  messageDesc(file_platform_admin_v1_admin_auth, 31);
 
 /**
  * @generated from message platform.admin.v1.LogoutAdminRequest
@@ -612,7 +709,7 @@ export type LogoutAdminRequest = Message<"platform.admin.v1.LogoutAdminRequest">
  * Use `create(LogoutAdminRequestSchema)` to create a new message.
  */
 export const LogoutAdminRequestSchema: GenMessage<LogoutAdminRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 27);
+  messageDesc(file_platform_admin_v1_admin_auth, 32);
 
 /**
  * @generated from message platform.admin.v1.LogoutAdminResponse
@@ -629,7 +726,7 @@ export type LogoutAdminResponse = Message<"platform.admin.v1.LogoutAdminResponse
  * Use `create(LogoutAdminResponseSchema)` to create a new message.
  */
 export const LogoutAdminResponseSchema: GenMessage<LogoutAdminResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 28);
+  messageDesc(file_platform_admin_v1_admin_auth, 33);
 
 /**
  * @generated from message platform.admin.v1.LogoutAllAdminSessionsRequest
@@ -642,7 +739,7 @@ export type LogoutAllAdminSessionsRequest = Message<"platform.admin.v1.LogoutAll
  * Use `create(LogoutAllAdminSessionsRequestSchema)` to create a new message.
  */
 export const LogoutAllAdminSessionsRequestSchema: GenMessage<LogoutAllAdminSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 29);
+  messageDesc(file_platform_admin_v1_admin_auth, 34);
 
 /**
  * @generated from message platform.admin.v1.LogoutAllAdminSessionsResponse
@@ -659,7 +756,7 @@ export type LogoutAllAdminSessionsResponse = Message<"platform.admin.v1.LogoutAl
  * Use `create(LogoutAllAdminSessionsResponseSchema)` to create a new message.
  */
 export const LogoutAllAdminSessionsResponseSchema: GenMessage<LogoutAllAdminSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 30);
+  messageDesc(file_platform_admin_v1_admin_auth, 35);
 
 /**
  * @generated from enum platform.admin.v1.AdminSetupState
@@ -894,6 +991,22 @@ export const AdminAuthService: GenService<{
     methodKind: "unary";
     input: typeof GetSetupStateRequestSchema;
     output: typeof GetSetupStateResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.GetCurrentAdminSession
+   */
+  getCurrentAdminSession: {
+    methodKind: "unary";
+    input: typeof GetCurrentAdminSessionRequestSchema;
+    output: typeof GetCurrentAdminSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.GetRuntimeReadiness
+   */
+  getRuntimeReadiness: {
+    methodKind: "unary";
+    input: typeof GetRuntimeReadinessRequestSchema;
+    output: typeof GetRuntimeReadinessResponseSchema;
   },
   /**
    * @generated from rpc platform.admin.v1.AdminAuthService.BeginAdminLogin

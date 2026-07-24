@@ -110,6 +110,8 @@ func isAdminSessionOperation(operation string) bool {
 	}
 	switch operation {
 	case adminv1connect.AdminAuthServiceVerifyTotpProcedure,
+		adminv1connect.AdminAuthServiceGetCurrentAdminSessionProcedure,
+		adminv1connect.AdminAuthServiceGetRuntimeReadinessProcedure,
 		adminv1connect.AdminAuthServiceChangeInitialPasswordProcedure,
 		adminv1connect.AdminAuthServiceBeginTotpEnrollmentProcedure,
 		adminv1connect.AdminAuthServiceCompleteTotpEnrollmentProcedure,

@@ -71,6 +71,8 @@ var GameOperations = []string{
 // AdminAuthOperations contains every reviewed administrator authentication procedure.
 var AdminAuthOperations = []string{
 	adminv1connect.AdminAuthServiceGetSetupStateProcedure,
+	adminv1connect.AdminAuthServiceGetCurrentAdminSessionProcedure,
+	adminv1connect.AdminAuthServiceGetRuntimeReadinessProcedure,
 	adminv1connect.AdminAuthServiceBeginAdminLoginProcedure,
 	adminv1connect.AdminAuthServiceLoginPasswordProcedure,
 	adminv1connect.AdminAuthServiceVerifyTotpProcedure,

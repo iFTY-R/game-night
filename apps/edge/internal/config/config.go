@@ -14,15 +14,21 @@ import (
 )
 
 const (
-	listenAddressEnvironment       = "GAME_NIGHT_EDGE_LISTEN_ADDRESS"
-	apiUpstreamURLEnvironment      = "GAME_NIGHT_EDGE_API_UPSTREAM_URL"
-	realtimeUpstreamURLEnvironment = "GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL"
-	staticDirectoryEnvironment     = "GAME_NIGHT_EDGE_STATIC_DIRECTORY"
-	trustedProxyCIDRsEnvironment   = "GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS"
-	defaultListenAddress           = ":8080"
-	defaultAPIUpstreamURL          = "http://127.0.0.1:8081"
-	defaultRealtimeUpstreamURL     = "http://127.0.0.1:8090"
-	defaultStaticDirectory         = "/app/web"
+	listenAddressEnvironment        = "GAME_NIGHT_EDGE_LISTEN_ADDRESS"
+	apiUpstreamURLEnvironment       = "GAME_NIGHT_EDGE_API_UPSTREAM_URL"
+	realtimeUpstreamURLEnvironment  = "GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL"
+	userStaticDirectoryEnvironment  = "GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY"
+	adminStaticDirectoryEnvironment = "GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY"
+	userHostsEnvironment            = "GAME_NIGHT_EDGE_USER_HOSTS"
+	adminHostsEnvironment           = "GAME_NIGHT_EDGE_ADMIN_HOSTS"
+	trustedProxyCIDRsEnvironment    = "GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS"
+	defaultListenAddress            = ":8080"
+	defaultAPIUpstreamURL           = "http://127.0.0.1:8081"
+	defaultRealtimeUpstreamURL      = "http://127.0.0.1:8090"
+	defaultUserStaticDirectory      = "/app/web"
+	defaultAdminStaticDirectory     = "/app/admin"
+	defaultUserHosts                = "localhost:8080,127.0.0.1:8080"
+	defaultAdminHosts               = "admin.localhost:8080"
 	// Only local loopback is trusted by default; deployments must explicitly name their proxy networks.
 	defaultTrustedProxyCIDRs          = "127.0.0.1/32,::1/128"
 	defaultShutdownTimeout            = 15 * time.Second
@@ -42,7 +48,10 @@ type Config struct {
 	ListenAddress              string
 	APIUpstreamURL             *url.URL
 	RealtimeUpstreamURL        *url.URL
-	StaticDirectory            string
+	UserStaticDirectory        string
+	AdminStaticDirectory       string
+	UserHosts                  []string
+	AdminHosts                 []string
 	TrustedProxyCIDRs          []netip.Prefix
 	ShutdownTimeout            time.Duration
 	ReadHeaderTimeout          time.Duration
@@ -69,9 +78,30 @@ func Load(lookup LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	staticDirectory, err := parseStaticDirectory(valueOrDefault(lookup, staticDirectoryEnvironment, defaultStaticDirectory))
+	userStaticDirectory, err := parseStaticDirectory(
+		valueOrDefault(lookup, userStaticDirectoryEnvironment, defaultUserStaticDirectory),
+		userStaticDirectoryEnvironment,
+	)
 	if err != nil {
 		return Config{}, err
+	}
+	adminStaticDirectory, err := parseStaticDirectory(
+		valueOrDefault(lookup, adminStaticDirectoryEnvironment, defaultAdminStaticDirectory),
+		adminStaticDirectoryEnvironment,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+	userHosts, err := parseHostAllowlist(valueOrDefault(lookup, userHostsEnvironment, defaultUserHosts), userHostsEnvironment)
+	if err != nil {
+		return Config{}, err
+	}
+	adminHosts, err := parseHostAllowlist(valueOrDefault(lookup, adminHostsEnvironment, defaultAdminHosts), adminHostsEnvironment)
+	if err != nil {
+		return Config{}, err
+	}
+	if overlaps(userHosts, adminHosts) {
+		return Config{}, fieldError(adminHostsEnvironment, "overlaps user hosts")
 	}
 	trustedProxyCIDRs, err := parseTrustedProxyCIDRs(valueOrDefault(lookup, trustedProxyCIDRsEnvironment, defaultTrustedProxyCIDRs))
 	if err != nil {
@@ -81,7 +111,10 @@ func Load(lookup LookupEnv) (Config, error) {
 		ListenAddress:              listenAddress,
 		APIUpstreamURL:             apiUpstreamURL,
 		RealtimeUpstreamURL:        realtimeUpstreamURL,
-		StaticDirectory:            staticDirectory,
+		UserStaticDirectory:        userStaticDirectory,
+		AdminStaticDirectory:       adminStaticDirectory,
+		UserHosts:                  userHosts,
+		AdminHosts:                 adminHosts,
 		TrustedProxyCIDRs:          trustedProxyCIDRs,
 		ShutdownTimeout:            defaultShutdownTimeout,
 		ReadHeaderTimeout:          defaultReadHeaderTimeout,
@@ -115,23 +148,116 @@ func parseUpstreamURL(lookup LookupEnv, name, fallback string) (*url.URL, error)
 	return parsed, nil
 }
 
-func parseStaticDirectory(raw string) (string, error) {
+func parseStaticDirectory(raw, environment string) (string, error) {
 	if raw == "" {
-		return "", fieldError(staticDirectoryEnvironment, "invalid static directory")
+		return "", fieldError(environment, "invalid static directory")
 	}
 	abs, err := filepath.Abs(raw)
 	if err != nil {
-		return "", fieldError(staticDirectoryEnvironment, "invalid static directory")
+		return "", fieldError(environment, "invalid static directory")
 	}
 	info, err := os.Stat(abs)
 	if err != nil || !info.IsDir() {
-		return "", fieldError(staticDirectoryEnvironment, "invalid static directory")
+		return "", fieldError(environment, "invalid static directory")
 	}
 	if _, err := os.Stat(filepath.Join(abs, staticIndexFileName)); err != nil {
-		return "", fieldError(staticDirectoryEnvironment, "missing static index.html")
+		return "", fieldError(environment, "missing static index.html")
 	}
 	// Keep the caller's absolute path stable; the server resolves both sides when checking symlink boundaries.
 	return abs, nil
+}
+
+func parseHostAllowlist(raw, environment string) ([]string, error) {
+	parts := strings.Split(raw, ",")
+	hosts := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		authority, err := CanonicalizeAuthority(part)
+		if err != nil {
+			return nil, fieldError(environment, "invalid host")
+		}
+		if _, ok := seen[authority]; ok {
+			continue
+		}
+		seen[authority] = struct{}{}
+		hosts = append(hosts, authority)
+	}
+	if len(hosts) == 0 {
+		return nil, fieldError(environment, "invalid host")
+	}
+	return hosts, nil
+}
+
+// CanonicalizeAuthority normalizes a Host authority the same way config parsing and request routing do.
+func CanonicalizeAuthority(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.Contains(raw, "://") {
+		return "", fmt.Errorf("invalid authority")
+	}
+	parsed, err := url.Parse("//" + raw)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("invalid authority")
+	}
+	host := parsed.Hostname()
+	if host == "" || strings.Contains(host, "*") {
+		return "", fmt.Errorf("invalid authority")
+	}
+	if parsed.Port() != "" {
+		port, err := strconv.Atoi(parsed.Port())
+		if err != nil || port < 1 || port > 65535 {
+			return "", fmt.Errorf("invalid authority")
+		}
+	}
+	canonicalHost, err := canonicalizeHost(host)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Port() == "" {
+		return canonicalHost, nil
+	}
+	return formatAuthority(canonicalHost, parsed.Port()), nil
+}
+
+func canonicalizeHost(raw string) (string, error) {
+	if ip, err := netip.ParseAddr(raw); err == nil {
+		return ip.String(), nil
+	}
+	host := strings.ToLower(strings.TrimSuffix(raw, "."))
+	if host == "" {
+		return "", fmt.Errorf("invalid host")
+	}
+	labels := strings.Split(host, ".")
+	for _, label := range labels {
+		if label == "" || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return "", fmt.Errorf("invalid host")
+		}
+		for _, r := range label {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return "", fmt.Errorf("invalid host")
+			}
+		}
+	}
+	return host, nil
+}
+
+func formatAuthority(host, port string) string {
+	if strings.Contains(host, ":") {
+		return "[" + host + "]:" + port
+	}
+	return host + ":" + port
+}
+
+func overlaps(left, right []string) bool {
+	seen := make(map[string]struct{}, len(left))
+	for _, value := range left {
+		seen[value] = struct{}{}
+	}
+	for _, value := range right {
+		if _, ok := seen[value]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func parseTrustedProxyCIDRs(raw string) ([]netip.Prefix, error) {

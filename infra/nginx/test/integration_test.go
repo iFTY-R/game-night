@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -50,6 +51,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	identity := startEchoUpstream(t, "identity")
 	admin := startEchoUpstream(t, "admin")
 	realtime := startEchoUpstream(t, "realtime")
+	edge := startEchoUpstream(t, "edge")
 	userHost, adminHost := "play.game-night.test", "admin.game-night.test"
 	tlsDirectory, roots := writeTestTLSIdentity(t, userHost, adminHost)
 	configurationDirectory := t.TempDir()
@@ -61,6 +63,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 		"--env", "GAME_NIGHT_IDENTITY_UPSTREAM=" + identity.containerAddress(),
 		"--env", "GAME_NIGHT_ADMIN_UPSTREAM=" + admin.containerAddress(),
 		"--env", "GAME_NIGHT_REALTIME_UPSTREAM=" + realtime.containerAddress(),
+		"--env", "GAME_NIGHT_EDGE_UPSTREAM=" + edge.containerAddress(),
 		"--env", "GAME_NIGHT_USER_HOST=" + userHost,
 		"--env", "GAME_NIGHT_ADMIN_HOST=" + adminHost,
 		"--mount", bindMount(nginxConfig, "/etc/nginx/nginx.conf", true),
@@ -93,19 +96,32 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	}
 	waitForNginx(t, client, endpoint, userHost, containerName)
 
+	userSPAResponse := requestNginxWithMethod(t, client, endpoint, userHost, http.MethodGet, "/", true)
+	assertProxyResponse(t, userSPAResponse, "edge", false)
+	assertForwardingHeadersReplaced(t, edge.lastRequest(t), userHost)
+
+	adminSPAResponse := requestNginxWithMethod(t, client, endpoint, adminHost, http.MethodGet, "/", false)
+	assertProxyResponse(t, adminSPAResponse, "edge", false)
+	if got := edge.lastRequest(t).Host; got != adminHost {
+		t.Fatalf("edge upstream host=%q, want %q", got, adminHost)
+	}
+
+	adminSPAHead := requestNginxWithMethod(t, client, endpoint, adminHost, http.MethodHead, "/dashboard", false)
+	assertProxyResponse(t, adminSPAHead, "edge", false)
+
 	identityResponse := requestNginx(t, client, endpoint, userHost,
 		"/platform.identity.v1.IdentityService/Bootstrap", true)
-	assertAllowedResponse(t, identityResponse, "identity")
+	assertProxyResponse(t, identityResponse, "identity", true)
 	identityRequest := identity.lastRequest(t)
 	assertForwardingHeadersReplaced(t, identityRequest, userHost)
 	roomResponse := requestNginx(t, client, endpoint, userHost,
 		"/platform.room.v1.RoomService/GetRoom", false)
-	assertAllowedResponse(t, roomResponse, "identity")
+	assertProxyResponse(t, roomResponse, "identity", true)
 	gameResponse := requestNginx(t, client, endpoint, userHost,
 		"/platform.game.v1.GameService/GetProjection", false)
-	assertAllowedResponse(t, gameResponse, "identity")
+	assertProxyResponse(t, gameResponse, "identity", true)
 	realtimeResponse := requestNginxUpgrade(t, client, endpoint, userHost, "/realtime/game")
-	assertAllowedResponse(t, realtimeResponse, "realtime")
+	assertProxyResponse(t, realtimeResponse, "realtime", true)
 	realtimeRequest := realtime.lastRequest(t)
 	assertForwardingHeadersReplaced(t, realtimeRequest, userHost)
 	if realtimeRequest.Upgrade != "websocket" || !strings.EqualFold(realtimeRequest.Connection, "upgrade") {
@@ -114,25 +130,29 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 
 	adminAuthResponse := requestNginx(t, client, endpoint, adminHost,
 		"/platform.admin.v1.AdminAuthService/GetStatus", false)
-	assertAllowedResponse(t, adminAuthResponse, "admin")
+	assertProxyResponse(t, adminAuthResponse, "admin", true)
 	adminIdentityResponse := requestNginx(t, client, endpoint, adminHost,
 		"/platform.admin.v1.AdminIdentityService/GetUser", false)
-	assertAllowedResponse(t, adminIdentityResponse, "admin")
-
+	assertProxyResponse(t, adminIdentityResponse, "admin", true)
 	for _, request := range []struct {
-		host string
-		path string
+		host   string
+		method string
+		path   string
 	}{
-		{host: userHost, path: "/platform.admin.v1.AdminAuthService/GetStatus"},
-		{host: adminHost, path: "/platform.identity.v1.IdentityService/Bootstrap"},
-		{host: adminHost, path: "/platform.room.v1.RoomService/GetRoom"},
-		{host: adminHost, path: "/platform.game.v1.GameService/GetProjection"},
-		{host: adminHost, path: "/realtime/game"},
-		{host: userHost, path: "/realtime/game/other"},
-		{host: userHost, path: "/platform.identity.v1.UnknownService/Call"},
-		{host: "unexpected.game-night.test", path: "/platform.identity.v1.IdentityService/Bootstrap"},
+		{host: userHost, method: http.MethodPost, path: "/platform.admin.v1.AdminAuthService/GetStatus"},
+		{host: userHost, method: http.MethodGet, path: "/readyz"},
+		{host: adminHost, method: http.MethodGet, path: "/readyz"},
+		{host: adminHost, method: http.MethodHead, path: "/readyz/sensitive"},
+		{host: adminHost, method: http.MethodPost, path: "/platform.identity.v1.IdentityService/Bootstrap"},
+		{host: adminHost, method: http.MethodPost, path: "/platform.room.v1.RoomService/GetRoom"},
+		{host: adminHost, method: http.MethodPost, path: "/platform.game.v1.GameService/GetProjection"},
+		{host: adminHost, method: http.MethodGet, path: "/realtime/game"},
+		{host: userHost, method: http.MethodGet, path: "/realtime/game/other"},
+		{host: userHost, method: http.MethodGet, path: "/platform.identity.v1.UnknownService/Call"},
+		{host: adminHost, method: http.MethodPost, path: "/"},
+		{host: "unexpected.game-night.test", method: http.MethodGet, path: "/"},
 	} {
-		response := requestNginx(t, client, endpoint, request.host, request.path, false)
+		response := requestNginxWithMethod(t, client, endpoint, request.host, request.method, request.path, false)
 		if response.StatusCode != http.StatusNotFound || response.Upstream != "" {
 			t.Fatalf("rejected request host=%q path=%q returned status=%d upstream=%q",
 				request.host, request.path, response.StatusCode, response.Upstream)
@@ -141,6 +161,8 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 }
 
 type capturedRequest struct {
+	Method          string
+	Path            string
 	Forwarded       []string
 	XForwardedFor   []string
 	XForwardedProto []string
@@ -170,6 +192,7 @@ func startEchoUpstream(t testing.TB, name string) *echoUpstream {
 	upstream.server = &http.Server{ReadHeaderTimeout: 5 * time.Second, Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		upstream.mu.Lock()
 		upstream.requests = append(upstream.requests, capturedRequest{
+			Method: request.Method, Path: request.URL.Path,
 			Forwarded: request.Header.Values("Forwarded"), XForwardedFor: request.Header.Values("X-Forwarded-For"),
 			XForwardedProto: request.Header.Values("X-Forwarded-Proto"), XForwardedHost: request.Header.Values("X-Forwarded-Host"),
 			XForwardedPort: request.Header.Values("X-Forwarded-Port"), XRealIP: request.Header.Values("X-Real-IP"), Host: request.Host,
@@ -217,12 +240,23 @@ type nginxResponse struct {
 
 func requestNginx(t testing.TB, client *http.Client, endpoint, host, path string, forgedHeaders bool) nginxResponse {
 	t.Helper()
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint+path, strings.NewReader("{}"))
+	return requestNginxWithMethod(t, client, endpoint, host, http.MethodPost, path, forgedHeaders)
+}
+
+func requestNginxWithMethod(t testing.TB, client *http.Client, endpoint, host, method, path string, forgedHeaders bool) nginxResponse {
+	t.Helper()
+	var body io.Reader
+	if method != http.MethodGet && method != http.MethodHead {
+		body = strings.NewReader("{}")
+	}
+	request, err := http.NewRequestWithContext(context.Background(), method, endpoint+path, body)
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Host = host
-	request.Header.Set("Content-Type", "application/json")
+	if method != http.MethodGet && method != http.MethodHead {
+		request.Header.Set("Content-Type", "application/json")
+	}
 	if forgedHeaders {
 		request.Header.Add("Forwarded", "for=198.51.100.10;proto=http;host=attacker.invalid")
 		request.Header.Add("Forwarded", "for=203.0.113.20")
@@ -276,13 +310,16 @@ func requestNginxUpgrade(t testing.TB, client *http.Client, endpoint, host, path
 	return result
 }
 
-func assertAllowedResponse(t testing.TB, response nginxResponse, upstream string) {
+func assertProxyResponse(t testing.TB, response nginxResponse, upstream string, expectNoStore bool) {
 	t.Helper()
 	if response.StatusCode != http.StatusOK || response.Upstream != upstream {
 		t.Fatalf("allowed route status=%d upstream=%q, want 200/%q", response.StatusCode, response.Upstream, upstream)
 	}
-	if response.CacheControl != "no-store" || response.Pragma != "no-cache" {
+	if expectNoStore && (response.CacheControl != "no-store" || response.Pragma != "no-cache") {
 		t.Fatalf("cache headers = %q / %q", response.CacheControl, response.Pragma)
+	}
+	if !expectNoStore && response.CacheControl == "no-store" {
+		t.Fatalf("unexpected no-store cache header for %q", upstream)
 	}
 	if response.HSTS != "max-age=31536000" || response.TLSVersion < 0x0303 {
 		t.Fatalf("TLS boundary hsts=%q version=%#x", response.HSTS, response.TLSVersion)

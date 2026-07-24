@@ -513,8 +513,19 @@ const confirmFinish = (): void => {
   :deep(.liars-die--private) { --die-size: 28px; }
   .bid-controls { grid-template-columns: 90px minmax(0, 1fr) 76px; }
   .action-row { position: absolute; right: max(12px, env(safe-area-inset-right)); top: 48px; width: min(38%, 330px); }
-  .bid-feedback { padding-right: min(40%, 350px); }
+  .bid-feedback { min-height: 10px; margin-top: 0; padding-right: min(40%, 350px); line-height: 10px; }
   .round-details { grid-template-columns: 1.3fr 1fr auto; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .table-focus { position: relative; }
+  /* The result occupies the open lower-left table lane instead of covering the local seat at bottom center. */
+  .revealed-grid {
+    position: absolute;
+    top: 78px;
+    right: calc(50% + 70px);
+    width: 181px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

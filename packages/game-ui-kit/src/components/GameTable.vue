@@ -11,28 +11,52 @@ const props = withDefaults(
     selfSeatIndex: number;
     shape?: TableShape;
     label?: string;
+    bottomInset?: number;
+    seatWidth?: number;
   }>(),
-  { shape: "adaptive", label: "共同游戏桌" },
+  { shape: "adaptive", label: "共同游戏桌", bottomInset: 0, seatWidth: 118 },
 );
 
 const root = ref<HTMLElement>();
 const size = ref({ width: 390, height: 520 });
-// Shared seats use a fixed compact height; measured stages smaller than this are transition artifacts.
+// Shared seats keep one compact geometry so every game view can align cards, action trays, and hit areas consistently.
 const seatHeight = 50;
+// The center card only needs to react to the tray overflow beyond the local seat stack; larger shifts would make the table feel detached.
+const centerShiftRatio = 0.35;
+const maxCenterShift = 96;
 let observer: ResizeObserver | undefined;
 
-const seatWidthFor = (width: number): number => (width <= 370 ? 104 : 116);
+const resolvedSeatWidth = computed(() => Math.max(props.seatWidth, 48));
+
+const safeBottomInset = computed(() => Math.max(0, Math.min(props.bottomInset, Math.max(size.value.height - seatHeight - 1, 0))));
+const safeCenterShift = computed(() => {
+  const trayOverflow = Math.max(safeBottomInset.value - seatHeight - 18, 0);
+  return Math.min(Math.round(trayOverflow * centerShiftRatio), Math.floor(size.value.height * 0.16), maxCenterShift);
+});
+const tableStyle = computed(() => ({
+  "--gn-safe-bottom": `${safeBottomInset.value}px`,
+  "--gn-safe-center-shift": `${safeCenterShift.value}px`,
+}));
 
 const positions = computed(() =>
-  computeSeatLayout({
-    seatIndexes: props.seats.map((seat) => seat.seatIndex),
-    selfSeatIndex: props.selfSeatIndex,
-    width: size.value.width,
-    height: size.value.height,
-    seatWidth: seatWidthFor(size.value.width),
-    seatHeight,
-    shape: props.shape,
-  }),
+  props.seats.length === 0
+    ? []
+    : props.seats.length === 1
+      ? [{
+        seatIndex: props.seats[0]?.seatIndex ?? props.selfSeatIndex,
+        x: size.value.width / 2,
+        y: Math.max(seatHeight / 2 + 24, size.value.height - safeBottomInset.value - seatHeight / 2 - 18),
+        angle: Math.PI / 2,
+      }]
+      : computeSeatLayout({
+        seatIndexes: props.seats.map((seat) => seat.seatIndex),
+        selfSeatIndex: props.selfSeatIndex,
+        width: size.value.width,
+        height: Math.max(size.value.height - safeBottomInset.value, seatHeight + 1),
+        seatWidth: resolvedSeatWidth.value,
+        seatHeight,
+        shape: props.shape,
+      }),
 );
 
 const positionedSeats = computed(() =>
@@ -46,8 +70,8 @@ onMounted(() => {
   observer = new ResizeObserver(([entry]) => {
     if (
       entry !== undefined &&
-      entry.contentRect.width > seatWidthFor(entry.contentRect.width) &&
-      entry.contentRect.height > seatHeight
+      entry.contentRect.width > resolvedSeatWidth.value &&
+      entry.contentRect.height > seatHeight + safeBottomInset.value
     ) {
       // Route and orientation transitions may briefly collapse the table; preserve the last valid positions during that frame.
       size.value = { width: entry.contentRect.width, height: entry.contentRect.height };
@@ -62,7 +86,7 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <section ref="root" class="gn-table" :aria-label="label">
+  <section ref="root" class="gn-table" :style="tableStyle" :aria-label="label">
     <div class="gn-table__rail" aria-hidden="true" />
     <div class="gn-table__center">
       <slot name="center" />
@@ -71,7 +95,7 @@ onBeforeUnmount(() => observer?.disconnect());
       v-for="item in positionedSeats"
       :key="item.position.seatIndex"
       class="gn-table__seat"
-      :style="{ left: `${item.position.x}px`, top: `${item.position.y}px` }"
+      :style="{ left: `${item.position.x}px`, top: `${item.position.y}px`, '--gn-seat-width': `${resolvedSeatWidth}px`, '--gn-seat-height': `${seatHeight}px` }"
     >
       <PlayerSeat
         v-if="item.seat"
@@ -108,11 +132,12 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .gn-table__center {
   position: absolute;
-  inset: 28% 25% 34%;
+  inset: 24% 21% calc(29% + min(var(--gn-safe-bottom), 108px)) 21%;
   display: grid;
   place-items: center;
   text-align: center;
   z-index: 1;
+  transform: translateY(calc(var(--gn-safe-center-shift, 0px) * -1));
 }
 
 .gn-table__seat {
@@ -123,7 +148,7 @@ onBeforeUnmount(() => observer?.disconnect());
 .gn-table__private {
   position: absolute;
   left: 50%;
-  bottom: 3%;
+  bottom: calc(3% + min(var(--gn-safe-bottom), 132px));
   z-index: 3;
   transform: translateX(-50%);
 }
@@ -139,7 +164,7 @@ onBeforeUnmount(() => observer?.disconnect());
   }
 
   .gn-table__center {
-    inset: 23% 31% 27%;
+    inset: 20% 27% calc(21% + min(var(--gn-safe-bottom), 72px)) 27%;
   }
 
   .gn-table__private {

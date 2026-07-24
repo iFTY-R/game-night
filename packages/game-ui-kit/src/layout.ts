@@ -36,10 +36,19 @@ export const computeSeatLayout = (input: SeatLayoutInput): readonly SeatPosition
   const centerX = input.width / 2;
   const centerY = input.height / 2;
   const exponent = resolvedShape === "rounded-table" ? 0.65 : 1;
+  const portraitOpponentAngle = (logicalIndex: number): number | null => {
+    if (!portrait || ordered.length > 4 || logicalIndex === 0) return null;
+    const opponentCount = ordered.length - 1;
+    if (opponentCount === 1) return Math.PI * 1.5;
+    // Small portrait tables keep every opponent on the upper arc so the shared game state owns the center lane.
+    const arcStart = Math.PI * 7 / 6;
+    const arcEnd = Math.PI * 11 / 6;
+    return arcStart + (logicalIndex - 1) * (arcEnd - arcStart) / (opponentCount - 1);
+  };
 
   return ordered.map((seatIndex, logicalIndex) => {
     // The local player begins at the bottom; clockwise rank remains unchanged across viewport rotation.
-    const angle = Math.PI / 2 + (logicalIndex * Math.PI * 2) / ordered.length;
+    const angle = portraitOpponentAngle(logicalIndex) ?? Math.PI / 2 + (logicalIndex * Math.PI * 2) / ordered.length;
     const cosine = Math.cos(angle);
     const sine = Math.sin(angle);
     const projectedX = Math.sign(cosine) * Math.abs(cosine) ** exponent;

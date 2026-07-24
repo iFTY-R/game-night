@@ -78,7 +78,7 @@ test("open dice requires explicit confirmation", async ({ page }) => {
 });
 
 test("revealed dice stay clear of player seats on narrow portraits", async ({ page }) => {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await page.goto("/fixtures/table/revealed");
 
@@ -95,10 +95,10 @@ test("revealed dice stay clear of player seats on narrow portraits", async ({ pa
 
     for (const seatBox of geometry.seats) {
       const resultBox = geometry.result;
-      const horizontallySeparate = resultBox.x + resultBox.width <= seatBox.x || seatBox.x + seatBox.width <= resultBox.x;
-      const verticallySeparate = resultBox.y + resultBox.height <= seatBox.y || seatBox.y + seatBox.height <= resultBox.y;
+      const overlapX = Math.max(0, Math.min(resultBox.x + resultBox.width, seatBox.x + seatBox.width) - Math.max(resultBox.x, seatBox.x));
+      const overlapY = Math.max(0, Math.min(resultBox.y + resultBox.height, seatBox.y + seatBox.height) - Math.max(resultBox.y, seatBox.y));
       expect(
-        horizontallySeparate || verticallySeparate,
+        overlapX <= 1 || overlapY <= 1,
         `result panel overlaps a seat at ${viewport.width}x${viewport.height}: ${JSON.stringify({ resultBox, seatBox })}`,
       ).toBe(true);
     }

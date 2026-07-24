@@ -27,6 +27,17 @@ describe("computeSeatLayout", () => {
     expect(second).toEqual(first);
   });
 
+  it("keeps every opponent above the center lane on a four-seat portrait table", () => {
+    const result = computeSeatLayout({
+      seatIndexes: [0, 1, 2, 3], selfSeatIndex: 0, width: 390, height: 560, seatWidth: 92, seatHeight: 50, shape: "elongated-oval",
+    });
+    const self = result[0];
+    const opponents = result.slice(1);
+    expect(self?.seatIndex).toBe(0);
+    expect(opponents.every((seat) => seat.y < 280)).toBe(true);
+    expect(opponents.map((seat) => seat.seatIndex)).toEqual([1, 2, 3]);
+  });
+
   it("rejects duplicate or unsupported seats", () => {
     expect(() => computeSeatLayout({
       seatIndexes: [1, 1], selfSeatIndex: 1, width: 390, height: 560, seatWidth: 116, seatHeight: 50, shape: "adaptive",

@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .gn-tray {
-  --tray-height: min(11dvh, 96px);
+  --tray-height: clamp(72px, 10dvh, 88px);
   position: absolute;
   inset-inline: 0;
   bottom: 0;
@@ -106,19 +106,20 @@ onBeforeUnmount(() => {
 }
 
 .gn-tray.is-compact {
-  --tray-height: min(23dvh, 194px);
+  /* Short phones still need one summary row, complete controls, and feedback without page overflow. */
+  --tray-height: clamp(170px, 21dvh, 204px);
 }
 
 .gn-tray.is-expanded {
-  --tray-height: min(41dvh, 360px);
+  --tray-height: min(41dvh, 344px);
 }
 
 .gn-tray__handle {
   position: absolute;
-  top: -17px;
+  top: -24px;
   left: 50%;
   width: 58px;
-  height: 34px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,21 +171,21 @@ onBeforeUnmount(() => {
 
 @media (orientation: landscape) {
   .gn-tray {
-    --tray-height: min(18dvh, 72px);
+    --tray-height: clamp(64px, 16dvh, 72px);
     padding-top: 12px;
   }
 
   .gn-tray.is-compact {
-    --tray-height: min(31dvh, 122px);
+    --tray-height: min(28dvh, 124px);
   }
 
   .gn-tray.is-expanded {
-    --tray-height: min(45dvh, 176px);
+    --tray-height: min(34dvh, 168px);
   }
 
   .gn-tray__handle {
-    top: -15px;
-    height: 30px;
+    top: -24px;
+    height: 48px;
   }
 }
 

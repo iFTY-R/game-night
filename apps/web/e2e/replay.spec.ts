@@ -10,6 +10,9 @@ import { ReplaySchema as LiarsDiceReplaySchema } from "../../../games/liars-dice
 import { MEET_BY_CHANCE_GAME_ID, MEET_BY_CHANCE_REPLAY_MESSAGE, MEET_BY_CHANCE_SCHEMA_VERSION, MEET_BY_CHANCE_VERSION } from "../../../games/meet-by-chance/client/src/constants";
 import { meetByChanceReplayFixture } from "../../../games/meet-by-chance/client/src/fixture";
 import { ReplaySchema as MeetByChanceReplaySchema } from "../../../games/meet-by-chance/client/src/generated/game/meet_by_chance/v1/meet_by_chance_pb";
+import { THREE_ROUNDS_GAME_ID, THREE_ROUNDS_REPLAY_MESSAGE, THREE_ROUNDS_SCHEMA_VERSION, THREE_ROUNDS_VERSION } from "../../../games/three-rounds/client/src/constants";
+import { threeRoundsReplayFixture } from "../../../games/three-rounds/client/src/fixture";
+import { ReplaySchema as ThreeRoundsReplaySchema } from "../../../games/three-rounds/client/src/generated/game/three_rounds/v1/three_rounds_pb";
 import type { RoomSnapshot } from "../src/api/client";
 
 const roomId = "00000000-0000-4000-8000-000000000001";
@@ -40,6 +43,14 @@ const replays = [
     payload: toBinary(MeetByChanceReplaySchema, meetByChanceReplayFixture()),
     testId: "meet-by-chance-replay-screen",
   },
+  {
+    gameId: THREE_ROUNDS_GAME_ID,
+    messageType: THREE_ROUNDS_REPLAY_MESSAGE,
+    schemaVersion: THREE_ROUNDS_SCHEMA_VERSION,
+    version: THREE_ROUNDS_VERSION,
+    payload: toBinary(ThreeRoundsReplaySchema, threeRoundsReplayFixture()),
+    testId: "three-rounds-replay-screen",
+  },
 ] as const;
 
 const roomSnapshot = (gameId: string): RoomSnapshot => ({
@@ -59,8 +70,9 @@ const roomSnapshot = (gameId: string): RoomSnapshot => ({
   version: { roomVersion: "2", membershipVersion: "1" },
 });
 
-/** Installs one finished room and its viewer-safe replay projection without a realtime transport. */
-const mockReplay = async (page: Page, replay: typeof replays[number]): Promise<void> => {
+/** Installs one terminal room and its viewer-safe replay projection without a realtime transport. */
+const mockReplay = async (page: Page, replay: typeof replays[number], terminal: "finished" | "cancelled" = "finished"): Promise<void> => {
+  const cancelled = terminal === "cancelled";
   await page.addInitScript(({ storedRoomId, storedSessionId }) => {
     localStorage.setItem("game-night.room-context.v1", JSON.stringify({
       schemaVersion: 1,
@@ -86,7 +98,13 @@ const mockReplay = async (page: Page, replay: typeof replays[number]): Promise<v
           gameId: replay.gameId,
           version: replay.version,
           stateVersion: "9",
-          status: "GAME_SESSION_STATUS_FINISHED",
+          status: cancelled ? "GAME_SESSION_STATUS_CANCELLED" : "GAME_SESSION_STATUS_FINISHED",
+        },
+        terminalMeta: {
+          finished: !cancelled,
+          cancelled,
+          endedAt: "2026-07-23T12:00:00Z",
+          ...(cancelled ? { cancelReason: "host_requested" } : {}),
         },
         projection: {
           sessionId,
@@ -134,6 +152,14 @@ for (const replay of replays) {
     expect(realtimeConnections).toBe(0);
   });
 }
+
+test("loads a cancelled replay with trusted terminal metadata", async ({ page }) => {
+  await mockReplay(page, replays[0], "cancelled");
+
+  await page.goto(`/room/${roomId}/replay/${sessionId}`);
+
+  await expect(page.getByTestId("liars-dice-replay-screen")).toBeVisible();
+});
 
 test("post-game room opens the last finished session replay", async ({ page }) => {
   await mockReplay(page, replays[0]);

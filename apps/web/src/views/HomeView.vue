@@ -32,13 +32,13 @@ const saveIdentity = async (): Promise<boolean> => {
   }
 };
 
-const enterRoom = async (roomId: string, code: string): Promise<void> => {
+const enterRoom = async (code: string): Promise<void> => {
   try {
     if (!room.hasIdentity && !(await saveIdentity())) return;
     const joined = await room.joinRemote(code);
-    const resolvedRoomId = joined?.roomId ?? roomId;
-    room.enterRoom(resolvedRoomId, joined?.roomCode ?? code);
-    if (joined) room.setRemoteRoom(joined);
+    const resolvedRoomId = joined.roomId;
+    room.enterRoom(resolvedRoomId, joined.roomCode);
+    room.setRemoteRoom(joined);
     await router.push({ name: "room", params: { roomId: resolvedRoomId } });
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : "加入房间失败";
@@ -55,7 +55,7 @@ const loadRoomLists = async (): Promise<void> => {
 const confirmIdentity = async (): Promise<void> => {
   if (!(await saveIdentity())) return;
   if (/^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
-    await enterRoom(inviteCode.value.toLowerCase(), inviteCode.value);
+    await enterRoom(inviteCode.value);
     return;
   }
   await loadRoomLists();
@@ -67,17 +67,22 @@ const joinRoom = async (): Promise<void> => {
     error.value = "请输入 4 到 8 位房间码";
     return;
   }
-  await enterRoom(code.toLowerCase(), code);
+  await enterRoom(code);
 };
 
 const createRoom = async (): Promise<void> => {
   try {
     if (!room.hasIdentity && !(await saveIdentity())) return;
     const created = await room.createRemoteRoom(newRoomVisibility.value);
-    const roomId = created?.roomId ?? "night-789";
-    const code = created?.roomCode ?? "N789";
+    // CreateRoom starts from the platform default; commit the card selected on
+    // the discovery screen before any member can observe a different table.
+    const selected = created.selectedGameId === selectedGameId.value
+      ? created
+      : await room.selectRemoteGame(selectedGameId.value);
+    const roomId = selected.roomId;
+    const code = selected.roomCode;
     room.enterRoom(roomId, code);
-    if (created) room.setRemoteRoom(created);
+    room.setRemoteRoom(selected);
     await router.push({ name: "room", params: { roomId }, query: { game: selectedGameId.value } });
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : "创建房间失败";
@@ -152,7 +157,7 @@ onMounted(async () => {
   }
   displayName.value = room.displayName || displayName.value;
   if (room.hasIdentity && /^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
-    await enterRoom(inviteCode.value.toLowerCase(), inviteCode.value);
+    await enterRoom(inviteCode.value);
     return;
   }
   if (room.hasIdentity) await loadRoomLists();

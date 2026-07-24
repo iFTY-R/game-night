@@ -21,6 +21,7 @@ import { useRoomStore } from "../stores/room";
 import { useRoomPresenceLease } from "./use-room-presence-lease";
 
 type TableConnection = "online" | "offline" | "reconnecting" | "draining";
+type SimultaneousActionConflictResolution = "confirmed" | "retry" | "abort";
 
 interface LivePlayer {
   readonly userId: string;
@@ -44,6 +45,12 @@ interface LiveTableContext {
   readonly players: readonly PlayerPresentation[];
 }
 
+interface SimultaneousActionConflictContext<TView> {
+  readonly attemptedAction: ActionInput;
+  readonly latestView: TView;
+  readonly latestAllowedActions: readonly string[];
+}
+
 interface UseLiveGameTableOptions<TView, TContext extends LiveTableContext> {
   readonly roomId: string;
   readonly sessionId: string;
@@ -54,7 +61,21 @@ interface UseLiveGameTableOptions<TView, TContext extends LiveTableContext> {
   readonly players: (view: TView) => readonly LivePlayer[];
   readonly viewActions: (view: TView) => readonly string[];
   readonly finished: (view: TView) => boolean;
+  readonly resolveSimultaneousConflict?: (
+    context: SimultaneousActionConflictContext<TView>,
+  ) => SimultaneousActionConflictResolution;
 }
+
+interface LiveActionFence {
+  readonly roomId: string;
+  readonly sessionId: string;
+  readonly userId: string;
+}
+
+/** Simultaneous card-selection games may transparently replay at most two times after the initial conflicted write. */
+const simultaneousActionRetryLimit = 2;
+/** Only this canonical platform error proves that refreshing before a bounded retry is appropriate. */
+const gameStateVersionConflictCode = "game.state.version_conflict";
 
 /** A game route remains valid only while the room still points at that exact active session. */
 export const isActiveRoomSession = (snapshot: RoomSnapshot, sessionId: string): boolean =>
@@ -65,7 +86,6 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   useRoomPresenceLease(() => options.roomId, { enabled: () => !options.fixtureMode.value });
   const router = useRouter();
   const room = useRoomStore();
-  const liveFallback = ref(false);
   const liveStateVersion = ref(0);
   const pendingAction = ref<string | null>(null);
   // The outer projection includes platform-owned commands that are intentionally absent from the opaque game view.
@@ -91,6 +111,26 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     if (phase === "online" || phase === "reconnecting" || phase === "draining") return phase;
     return "offline";
   };
+
+  /** Guards post-conflict retries so stale identities, sessions, or controllers cannot write into a replaced table. */
+  const captureLiveActionFence = (): LiveActionFence => ({
+    roomId: room.roomId ?? options.roomId,
+    sessionId: room.sessionId ?? options.sessionId,
+    userId: room.userId,
+  });
+
+  /** Version-conflict recovery must stop as soon as the room/user/session scope or active controller changes. */
+  const canContinueLiveAction = (controller: AbortController, fence: LiveActionFence): boolean =>
+    !lifecycleController.signal.aborted
+    && !controller.signal.aborted
+    && actionController === controller
+    && (room.roomId ?? options.roomId) === fence.roomId
+    && (room.sessionId ?? options.sessionId) === fence.sessionId
+    && room.userId === fence.userId;
+
+  /** Only state-version conflicts are eligible for silent projection refresh and bounded replay. */
+  const isGameStateVersionConflict = (error: unknown): error is ApiError =>
+    error instanceof ApiError && error.code === gameStateVersionConflictCode;
 
   /** Leaves a terminal or inaccessible room instead of routing the viewer into a stale room shell. */
   const exitUnavailableRoom = async (message: string): Promise<void> => {
@@ -192,17 +232,21 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     return url.toString();
   };
 
+  /** Reads one full projection for both initial load and state-version conflict recovery. */
+  const fetchProjection = async (signal: AbortSignal) => {
+    const response = await gameClient.getProjection(
+      options.roomId,
+      options.sessionId,
+      viewerKind(viewerRoleForRoom()),
+      signal,
+    );
+    return gameProjectionFromConnect(response.projection);
+  };
+
   const loadLiveProjection = async (): Promise<void> => {
     try {
-      const response = await gameClient.getProjection(
-        options.roomId,
-        options.sessionId,
-        viewerKind(viewerRoleForRoom()),
-        lifecycleController.signal,
-      );
-      liveClient.accept(gameProjectionFromConnect(response.projection));
+      liveClient.accept(await fetchProjection(lifecycleController.signal));
     } catch (error) {
-      if (import.meta.env.DEV && error instanceof ApiError && [401, 403, 404].includes(error.status)) liveFallback.value = true;
       liveClient.markReconnecting(error instanceof ApiError ? error.code : "projection_unavailable");
     }
   };
@@ -278,30 +322,92 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
       // Projection authorization remains authoritative when a room refresh is temporarily unavailable.
     }
     await loadLiveProjection();
-    if (!liveFallback.value && !lifecycleController.signal.aborted) startLiveSubscription();
+    if (!lifecycleController.signal.aborted) startLiveSubscription();
+  };
+
+  /** Recovers one optimistic-write conflict by refreshing the latest projection and asking the game view whether replay is safe. */
+  const recoverSimultaneousActionConflict = async (
+    input: ActionInput,
+    controller: AbortController,
+    fence: LiveActionFence,
+    retries: number,
+  ): Promise<{ handled: boolean; shouldRetry: boolean; nextStateVersion: number | null }> => {
+    if (!canContinueLiveAction(controller, fence)) {
+      return { handled: true, shouldRetry: false, nextStateVersion: null };
+    }
+    try {
+      const projection = await fetchProjection(controller.signal);
+      if (!canContinueLiveAction(controller, fence)) {
+        return { handled: true, shouldRetry: false, nextStateVersion: null };
+      }
+      liveClient.accept(projection);
+      const latest = liveClient.snapshot();
+      if (latest.view === null) {
+        return { handled: true, shouldRetry: false, nextStateVersion: null };
+      }
+      const resolution = options.resolveSimultaneousConflict?.({
+        attemptedAction: input,
+        latestView: latest.view,
+        latestAllowedActions: latest.allowedActions,
+      }) ?? "abort";
+      if (resolution !== "retry" || retries >= simultaneousActionRetryLimit) {
+        return { handled: true, shouldRetry: false, nextStateVersion: null };
+      }
+      if (!canContinueLiveAction(controller, fence)) {
+        return { handled: true, shouldRetry: false, nextStateVersion: null };
+      }
+      return { handled: true, shouldRetry: true, nextStateVersion: latest.stateVersion };
+    } catch (refreshError) {
+      if (canContinueLiveAction(controller, fence)) {
+        liveClient.markReconnecting(refreshError instanceof ApiError ? refreshError.code : "projection_unavailable");
+      }
+      return { handled: true, shouldRetry: false, nextStateVersion: null };
+    }
   };
 
   /** Submits one authoritative action and immediately accepts the returned projection. */
   const submitLiveAction = async (input: ActionInput): Promise<boolean> => {
-    if (options.fixtureMode.value || liveFallback.value) return false;
+    if (options.fixtureMode.value) return false;
     if (pendingAction.value !== null || options.context.value.connection !== "online") return true;
     pendingAction.value = input.action;
     const controller = new AbortController();
     actionController?.abort();
     actionController = controller;
+    const fence = captureLiveActionFence();
+    let nextStateVersion = liveStateVersion.value;
+    let retries = 0;
     try {
-      const response = await gameClient.action(
-        options.roomId,
-        room.userId,
-        options.sessionId,
-        liveStateVersion.value,
-        crypto.randomUUID(),
-        input.message,
-        controller.signal,
-      );
-      liveClient.accept(gameProjectionFromConnect(response.projection));
+      while (canContinueLiveAction(controller, fence)) {
+        try {
+          const response = await gameClient.action(
+            options.roomId,
+            fence.userId,
+            options.sessionId,
+            nextStateVersion,
+            crypto.randomUUID(),
+            input.message,
+            controller.signal,
+          );
+          if (!canContinueLiveAction(controller, fence)) break;
+          liveClient.accept(gameProjectionFromConnect(response.projection));
+          break;
+        } catch (error) {
+          if (!isGameStateVersionConflict(error)) {
+            if (canContinueLiveAction(controller, fence)) {
+              liveClient.markReconnecting(error instanceof ApiError ? error.code : "action_failed");
+            }
+            break;
+          }
+          const recovery = await recoverSimultaneousActionConflict(input, controller, fence, retries);
+          if (!recovery.handled || !recovery.shouldRetry || recovery.nextStateVersion === null) break;
+          nextStateVersion = recovery.nextStateVersion;
+          retries += 1;
+        }
+      }
     } catch (error) {
-      if (!controller.signal.aborted) liveClient.markReconnecting(error instanceof ApiError ? error.code : "action_failed");
+      if (canContinueLiveAction(controller, fence)) {
+        liveClient.markReconnecting(error instanceof ApiError ? error.code : "action_failed");
+      }
     } finally {
       if (actionController === controller) {
         actionController = undefined;
@@ -313,7 +419,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
 
   /** Finishes through the room aggregate so room and game status change atomically. */
   const finishLiveSession = async (command: GameEnvelopeInput): Promise<boolean> => {
-    if (options.fixtureMode.value || liveFallback.value) return false;
+    if (options.fixtureMode.value) return false;
     if (pendingAction.value !== null) return true;
     pendingAction.value = "session.finish";
     try {
@@ -329,7 +435,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   };
 
   const retry = (): void => {
-    if (options.fixtureMode.value || liveFallback.value) {
+    if (options.fixtureMode.value) {
       options.context.value = { ...options.context.value, connection: "online" };
       return;
     }
@@ -363,8 +469,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   });
 
   return {
-    liveFallback: computed(() => liveFallback.value),
-    allowedActions: computed(() => options.fixtureMode.value || liveFallback.value
+    allowedActions: computed(() => options.fixtureMode.value
       ? options.viewActions(options.view.value)
       : authoritativeActions.value),
     pendingAction,

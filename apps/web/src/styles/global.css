@@ -6,6 +6,22 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   background: var(--platform-surface);
+  --room-surface: color-mix(in srgb, var(--platform-surface-raised) 90%, transparent);
+  --room-surface-strong: color-mix(in srgb, var(--platform-surface) 62%, var(--platform-surface-raised));
+  --room-surface-soft: color-mix(in srgb, var(--platform-surface) 54%, transparent);
+  --room-card: color-mix(in srgb, var(--platform-surface-raised) 78%, var(--game-table) 22%);
+  --room-border: color-mix(in srgb, var(--platform-muted) 24%, transparent);
+  --room-border-dashed: color-mix(in srgb, var(--platform-muted) 34%, transparent);
+  --room-border-strong: color-mix(in srgb, var(--platform-accent) 42%, transparent);
+  --room-border-danger: color-mix(in srgb, var(--platform-danger) 38%, transparent);
+  --room-accent-surface: color-mix(in srgb, var(--platform-accent) 14%, transparent);
+  --room-accent-surface-strong: color-mix(in srgb, var(--platform-accent) 22%, var(--game-table));
+  --room-stage: color-mix(in srgb, var(--game-table) 46%, var(--platform-surface));
+  --room-success: color-mix(in srgb, var(--platform-focus) 74%, var(--platform-accent));
+  --room-danger-surface: color-mix(in srgb, var(--platform-danger) 12%, transparent);
+  --room-accent-ink: color-mix(in srgb, var(--platform-surface) 86%, black);
+  --room-shadow: 0 18px 46px rgb(0 0 0 / 18%);
+  --room-shadow-strong: 0 24px 80px rgb(0 0 0 / 34%);
 }
 
 * { box-sizing: border-box; }

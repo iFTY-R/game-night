@@ -3,11 +3,15 @@ import { defineStore } from "pinia";
 import {
   ApiError,
   identityClient,
-  isDevelopmentFallbackAllowed,
   roomClient,
   type GameEnvelopeInput,
+  type GameEnvelopeWire,
+  type GameRulePresetWire,
+  type GameRulePresetWriteMode,
   type MyRoomCardWire,
+  type PendingGameStartWire,
   type PublicRoomCardWire,
+  type RoomGameConfigDraftWire,
   type RoomSnapshot,
 } from "../api/client";
 
@@ -50,10 +54,18 @@ export const useRoomStore = defineStore("room", {
     publicRoomsNextPageToken: "",
     myRoomsLoading: false,
     publicRoomsLoading: false,
+    selectedGameId: "",
+    gameConfigDrafts: [] as RoomGameConfigDraftWire[],
+    pendingStart: null as PendingGameStartWire | null,
+    ownershipEpoch: "",
+    gameRulePresets: [] as GameRulePresetWire[],
+    gameRulePresetsLoading: false,
   }),
   getters: {
     hasIdentity: (state) => state.displayName.length > 0 && state.userId.length > 0 && state.identityState !== "anonymous",
     hasActiveRoom: (state) => state.roomId !== null,
+    currentGameId: (state) => state.selectedGameId || state.remoteRoom?.activeGameId || "liars-dice",
+    currentGameConfigDraft: (state) => state.gameConfigDrafts.find((draft) => draft.gameId === (state.selectedGameId || state.remoteRoom?.activeGameId)),
   },
   actions: {
     recover(): void {
@@ -100,10 +112,7 @@ export const useRoomStore = defineStore("room", {
       return true;
     },
 
-    /**
-     * Restores the server-owned device identity. A local context is retained
-     * only as a development fallback so fixture pages stay usable without API.
-     */
+    /** Restores the server-owned device identity without trusting local room context as authentication. */
     async recoverIdentity(): Promise<void> {
       try {
         const response = await identityClient.current();
@@ -117,10 +126,6 @@ export const useRoomStore = defineStore("room", {
         this.identityState = normalizeIdentityState(user.status, this.displayName);
         this.persist();
       } catch (error) {
-        if (isDevelopmentFallbackAllowed() && (error instanceof ApiError ? error.status === 401 || error.status === 403 || error.status === 404 : true)) {
-          this.identityState = this.displayName.length > 0 ? "active" : "anonymous";
-          return;
-        }
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
           this.identityState = "anonymous";
           return;
@@ -163,12 +168,6 @@ export const useRoomStore = defineStore("room", {
           this.applyIdentity(onboarded.user, normalized);
         }
       } catch (error) {
-        if (isDevelopmentFallbackAllowed() && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
-          if (!this.setIdentity(normalized)) {
-            throw error;
-          }
-          return;
-        }
         this.error = error instanceof Error ? error.message : "身份初始化失败";
         throw error;
       } finally {
@@ -185,15 +184,9 @@ export const useRoomStore = defineStore("room", {
         if (!response.room) {
           throw new Error("房间响应缺少状态");
         }
-        this.remoteRoom = response.room;
-        this.roomId = response.room.roomId;
-        this.roomCode = response.room.roomCode;
-        this.persist();
+        this.setRemoteRoom(response.room);
         return response.room;
       } catch (error) {
-        if (isDevelopmentFallbackAllowed() && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
-          return null;
-        }
         this.error = error instanceof Error ? error.message : "房间加载失败";
         throw error;
       } finally {
@@ -202,41 +195,26 @@ export const useRoomStore = defineStore("room", {
     },
 
     /** Joins or queues this device and replaces the locally displayed snapshot. */
-    async joinRemote(roomCode: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR" = "JOIN_INTENT_PARTICIPANT"): Promise<RoomSnapshot | null> {
-      try {
-        const normalizedCode = roomCode.trim().toUpperCase();
-        // A CAS token is room-specific; carrying the previous room's version into a new invite causes a false conflict.
-        const knownVersion = this.remoteRoom?.roomCode === normalizedCode ? this.remoteRoom.version : undefined;
-        const response = await roomClient.joinRoom(normalizedCode, intent, knownVersion);
-        if (response.room) {
-          this.remoteRoom = response.room;
-          this.roomId = response.room.roomId;
-          this.roomCode = response.room.roomCode;
-          this.persist();
-        }
-        return response.room ?? null;
-      } catch (error) {
-        if (isDevelopmentFallbackAllowed() && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
-          return null;
-        }
-        throw error;
+    async joinRemote(roomCode: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR" = "JOIN_INTENT_PARTICIPANT"): Promise<RoomSnapshot> {
+      const normalizedCode = roomCode.trim().toUpperCase();
+      // A CAS token is room-specific; carrying the previous room's version into a new invite causes a false conflict.
+      const knownVersion = this.remoteRoom?.roomCode === normalizedCode ? this.remoteRoom.version : undefined;
+      const response = await roomClient.joinRoom(normalizedCode, intent, knownVersion);
+      if (!response.room) {
+        throw new Error("加入房间响应缺少状态");
       }
+      this.setRemoteRoom(response.room);
+      return response.room;
     },
 
     /** Creates a room through the host command and stores its server-issued code. */
-    async createRemoteRoom(visibility: "ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC" = "ROOM_VISIBILITY_PRIVATE"): Promise<RoomSnapshot | null> {
-      try {
-        const response = await roomClient.createRoom(visibility);
-        if (response.room) {
-          this.setRemoteRoom(response.room);
-        }
-        return response.room ?? null;
-      } catch (error) {
-        if (isDevelopmentFallbackAllowed() && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
-          return null;
-        }
-        throw error;
+    async createRemoteRoom(visibility: "ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC" = "ROOM_VISIBILITY_PRIVATE"): Promise<RoomSnapshot> {
+      const response = await roomClient.createRoom(visibility);
+      if (!response.room) {
+        throw new Error("创建房间响应缺少状态");
       }
+      this.setRemoteRoom(response.room);
+      return response.room;
     },
 
     /** Loads the actor's authoritative active rooms; reset is used after create, close, or identity recovery. */
@@ -250,10 +228,6 @@ export const useRoomStore = defineStore("room", {
         const rooms = response.rooms ?? [];
         this.myRooms = reset ? [...rooms] : [...this.myRooms, ...rooms];
         this.myRoomsNextPageToken = response.page?.nextPageToken ?? "";
-      } catch (error) {
-        if (!(isDevelopmentFallbackAllowed() && error instanceof ApiError && [401, 403, 404].includes(error.status))) throw error;
-        if (reset) this.myRooms = [];
-        this.myRoomsNextPageToken = "";
       } finally {
         this.myRoomsLoading = false;
       }
@@ -270,20 +244,17 @@ export const useRoomStore = defineStore("room", {
         const rooms = response.rooms ?? [];
         this.publicRooms = reset ? [...rooms] : [...this.publicRooms, ...rooms];
         this.publicRoomsNextPageToken = response.page?.nextPageToken ?? "";
-      } catch (error) {
-        if (!(isDevelopmentFallbackAllowed() && error instanceof ApiError && [401, 403, 404].includes(error.status))) throw error;
-        if (reset) this.publicRooms = [];
-        this.publicRoomsNextPageToken = "";
       } finally {
         this.publicRoomsLoading = false;
       }
     },
 
     /** Joins a discoverable room by public ID; private invites continue to use room codes. */
-    async joinPublicRemote(roomId: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR"): Promise<RoomSnapshot | null> {
+    async joinPublicRemote(roomId: string, intent: "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR"): Promise<RoomSnapshot> {
       const response = await roomClient.joinPublicRoom(roomId, intent);
-      if (response.room) this.setRemoteRoom(response.room);
-      return response.room ?? null;
+      if (!response.room) throw new Error("加入公开房间响应缺少状态");
+      this.setRemoteRoom(response.room);
+      return response.room;
     },
 
     /** Applies host admission policy with the snapshot version as a CAS token. */
@@ -298,12 +269,178 @@ export const useRoomStore = defineStore("room", {
       return response.room ?? null;
     },
 
+    /** Host-selects the pregame rules table and adopts the server's selected_game_id snapshot. */
+    async selectRemoteGame(gameId: string): Promise<RoomSnapshot> {
+      if (!this.remoteRoom) {
+        throw new Error("尚未进入房间");
+      }
+      const response = await roomClient.selectRoomGame(this.remoteRoom, gameId);
+      if (!response.room) throw new Error("游戏选择响应缺少房间状态");
+      this.setRemoteRoom(response.room);
+      return response.room;
+    },
+
+    /** Legacy alias kept for RoomView compatibility while the UI migrates to the explicit remote action names. */
+    async selectGame(gameId: string): Promise<RoomSnapshot> {
+      return this.selectRemoteGame(gameId);
+    },
+
+    /** Persists one complete server-normalized config draft under the current room ownership epoch. */
+    async updateRemoteGameConfig(gameId: string, config: GameEnvelopeInput | GameEnvelopeWire | undefined, expectedRevision?: string | number | bigint): Promise<RoomGameConfigDraftWire | null> {
+      if (!this.remoteRoom) {
+        return null;
+      }
+      if (!config) {
+        return null;
+      }
+      const revision = expectedRevision ?? this.gameConfigDrafts.find((draft) => draft.gameId === gameId)?.revision ?? "0";
+      const response = await roomClient.updateGameConfig(this.remoteRoom, gameId, config, revision);
+      if (response.room) {
+        this.setRemoteRoom(response.room);
+      }
+      if (response.draft) {
+        this.upsertGameConfigDraft(response.draft);
+      }
+      return response.draft ?? null;
+    },
+
+    /** Legacy alias kept for RoomView compatibility while the UI migrates to the explicit remote action names. */
+    async updateGameConfig(gameId: string, config: GameEnvelopeInput | GameEnvelopeWire | undefined, expectedRevision?: string | number | bigint): Promise<RoomGameConfigDraftWire | null> {
+      return this.updateRemoteGameConfig(gameId, config, expectedRevision);
+    },
+
+    /** Loads this user's personal reusable presets for the selected game. */
+    async loadGameRulePresets(gameId?: string): Promise<GameRulePresetWire[]> {
+      const targetGameId = gameId ?? this.currentGameId;
+      if (this.gameRulePresetsLoading) {
+        return this.gameRulePresets;
+      }
+      this.gameRulePresetsLoading = true;
+      try {
+        const response = await roomClient.listGameRulePresets(targetGameId);
+        this.gameRulePresets = response.presets ?? [];
+        return this.gameRulePresets;
+      } finally {
+        this.gameRulePresetsLoading = false;
+      }
+    },
+
+    /** Legacy alias kept for RoomView compatibility while the UI migrates to the explicit remote action names. */
+    async listGameRulePresets(gameId?: string): Promise<GameRulePresetWire[]> {
+      return this.loadGameRulePresets(gameId);
+    },
+
+    /** Legacy alias that maps the old create/update preset surface onto the server's save RPC. */
+    async createGameRulePreset(gameId: string, name: string, config: GameEnvelopeInput): Promise<GameRulePresetWire | null> {
+      return this.saveGameRulePreset({
+        gameId,
+        name,
+        config,
+        mode: "GAME_RULE_PRESET_WRITE_MODE_CREATE",
+        expectedPresetRevision: "0",
+      });
+    },
+
+    /** Legacy alias that maps the old overwrite preset surface onto the server's save RPC. */
+    async updateGameRulePreset(preset: GameRulePresetWire, config: GameEnvelopeInput, name = preset.name): Promise<GameRulePresetWire | null> {
+      return this.saveGameRulePreset({
+        presetId: preset.presetId,
+        gameId: preset.gameId,
+        name,
+        config,
+        mode: "GAME_RULE_PRESET_WRITE_MODE_OVERWRITE",
+        expectedPresetRevision: preset.presetRevision ?? "0",
+      });
+    },
+
+    /** Creates, overwrites, or copies a personal preset using the backend's optimistic preset revision. */
+    async saveGameRulePreset(input: {
+      presetId?: string;
+      gameId?: string;
+      name: string;
+      config: GameEnvelopeInput | GameEnvelopeWire;
+      mode: GameRulePresetWriteMode;
+      expectedPresetRevision?: string | number | bigint;
+    }): Promise<GameRulePresetWire | null> {
+      const response = await roomClient.saveGameRulePreset({
+        presetId: input.presetId,
+        gameId: input.gameId ?? this.currentGameId,
+        name: input.name,
+        config: input.config,
+        mode: input.mode,
+        expectedPresetRevision: input.expectedPresetRevision,
+      });
+      if (response.preset) {
+        this.upsertGameRulePreset(response.preset);
+      }
+      return response.preset ?? null;
+    },
+
+    /** Deletes one personal preset and removes it from the local preset list only after the server confirms. */
+    async deleteGameRulePreset(presetOrId: string | GameRulePresetWire, expectedPresetRevision?: string | number | bigint): Promise<string> {
+      const presetId = typeof presetOrId === "string" ? presetOrId : presetOrId.presetId;
+      const revision = expectedPresetRevision ?? (typeof presetOrId === "string" ? "0" : presetOrId.presetRevision ?? "0");
+      const response = await roomClient.deleteGameRulePreset(presetId, revision);
+      const deletedId = response.presetId || presetId;
+      this.gameRulePresets = this.gameRulePresets.filter((preset) => preset.presetId !== deletedId);
+      return deletedId;
+    },
+
+    /** Legacy alias that keeps the RoomView delete flow compiling during the migration. */
+    async deleteGameRulePresetById(presetOrId: string | GameRulePresetWire, expectedPresetRevision?: string | number | bigint): Promise<string> {
+      return this.deleteGameRulePreset(presetOrId, expectedPresetRevision);
+    },
+
+    /** Creates the authoritative countdown and synchronizes pending_start from the server response. */
+    async beginRemoteGameStart(gameId?: string, configRevision?: string | number | bigint): Promise<PendingGameStartWire | null> {
+      const targetGameId = gameId ?? this.currentGameId;
+      if (!this.remoteRoom) {
+        return null;
+      }
+      const revision = configRevision ?? this.gameConfigDrafts.find((draft) => draft.gameId === targetGameId)?.revision ?? "0";
+      const response = await roomClient.beginGameStart(this.remoteRoom, targetGameId, revision);
+      if (response.room) {
+        this.setRemoteRoom(response.room);
+      }
+      if (response.pendingStart) {
+        this.pendingStart = response.pendingStart;
+        this.remoteRoom = this.remoteRoom ? { ...this.remoteRoom, pendingStart: response.pendingStart } : this.remoteRoom;
+      }
+      return response.pendingStart ?? this.pendingStart;
+    },
+
+    /** Legacy alias kept for RoomView compatibility while the UI migrates to the explicit remote action names. */
+    async beginGameStart(gameId?: string, configRevision?: string | number | bigint): Promise<PendingGameStartWire | null> {
+      return this.beginRemoteGameStart(gameId, configRevision);
+    },
+
+    /** Cancels the server countdown using the opaque token from the latest room snapshot. */
+    async cancelRemoteGameStart(pendingStart?: PendingGameStartWire | null): Promise<RoomSnapshot | null> {
+      const targetPendingStart = pendingStart ?? this.pendingStart;
+      if (!this.remoteRoom || !targetPendingStart) {
+        return null;
+      }
+      const response = await roomClient.cancelGameStart(this.remoteRoom, targetPendingStart);
+      if (response.room) {
+        this.setRemoteRoom(response.room);
+      } else {
+        this.pendingStart = null;
+      }
+      return response.room ?? null;
+    },
+
+    /** Legacy alias kept for RoomView compatibility while the UI migrates to the explicit remote action names. */
+    async cancelGameStart(pendingStart?: PendingGameStartWire | null): Promise<RoomSnapshot | null> {
+      return this.cancelRemoteGameStart(pendingStart);
+    },
+
     /** Starts a new child session without losing the continuous room context. */
-    async startRemoteGame(gameId = "liars-dice"): Promise<RoomResponseLike> {
+    async startRemoteGame(gameId?: string): Promise<RoomResponseLike> {
+      const targetGameId = gameId ?? this.currentGameId;
       if (!this.remoteRoom) {
         return { sessionId: "" };
       }
-      const response = await roomClient.startGame(this.remoteRoom, this.userId, gameId);
+      const response = await roomClient.startGame(this.remoteRoom, this.userId, targetGameId);
       if (response.room) {
         this.setRemoteRoom(response.room);
       }
@@ -362,10 +499,31 @@ export const useRoomStore = defineStore("room", {
     },
 
     setRemoteRoom(snapshot: RoomSnapshot): void {
-      this.remoteRoom = snapshot;
-      this.roomId = snapshot.roomId;
-      this.roomCode = snapshot.roomCode;
+      const normalized = normalizeRoomSnapshot(snapshot);
+      this.remoteRoom = normalized;
+      this.roomId = normalized.roomId;
+      this.roomCode = normalized.roomCode;
+      this.syncRuleState(normalized);
       this.persist();
+    },
+
+    /** Keeps host-rule state derived from the authoritative Room snapshot instead of stale UI-only fields. */
+    syncRuleState(snapshot: RoomSnapshot): void {
+      this.selectedGameId = snapshot.selectedGameId || snapshot.activeGameId || this.selectedGameId || "liars-dice";
+      this.gameConfigDrafts = [...(snapshot.gameConfigDrafts ?? [])];
+      this.pendingStart = snapshot.pendingStart ?? null;
+      this.ownershipEpoch = String(snapshot.ownershipEpoch ?? "");
+    },
+
+    upsertGameConfigDraft(draft: RoomGameConfigDraftWire): void {
+      const next = this.gameConfigDrafts.filter((candidate) => candidate.gameId !== draft.gameId);
+      this.gameConfigDrafts = [...next, draft];
+      this.remoteRoom = this.remoteRoom ? { ...this.remoteRoom, gameConfigDrafts: this.gameConfigDrafts } : this.remoteRoom;
+    },
+
+    upsertGameRulePreset(preset: GameRulePresetWire): void {
+      const next = this.gameRulePresets.filter((candidate) => candidate.presetId !== preset.presetId);
+      this.gameRulePresets = [...next, preset];
     },
 
     enterRoom(roomId: string, roomCode = roomId.toUpperCase().slice(0, 6)): void {
@@ -388,6 +546,10 @@ export const useRoomStore = defineStore("room", {
       this.roomCode = null;
       this.sessionId = null;
       this.remoteRoom = null;
+      this.selectedGameId = "";
+      this.gameConfigDrafts = [];
+      this.pendingStart = null;
+      this.ownershipEpoch = "";
       this.persist();
     },
 
@@ -434,6 +596,14 @@ export const useRoomStore = defineStore("room", {
 type RoomResponseLike = { sessionId?: string };
 
 const normalizeDisplayName = (value: string): string => value.trim().replace(/\s+/g, " ");
+
+const normalizeRoomSnapshot = (snapshot: RoomSnapshot): RoomSnapshot => ({
+  ...snapshot,
+  selectedGameId: snapshot.selectedGameId || snapshot.activeGameId || "liars-dice",
+  gameConfigDrafts: [...(snapshot.gameConfigDrafts ?? [])],
+  ...(snapshot.pendingStart === undefined ? {} : { pendingStart: snapshot.pendingStart }),
+  ownershipEpoch: String(snapshot.ownershipEpoch ?? ""),
+});
 
 const normalizeIdentityState = (status: string, username: string): IdentityState => {
   if (status.includes("ONBOARDING") || status === "onboarding") {

@@ -18,6 +18,9 @@ const room: RoomSnapshot = {
   lastFinishedSessionId: "",
   lastFinishedGameId: "",
   version: { roomVersion: "9", membershipVersion: "4" },
+  selectedGameId: "liars-dice",
+  gameConfigDrafts: [],
+  ownershipEpoch: "2",
 };
 
 const command: GameEnvelopeInput = {
@@ -50,6 +53,33 @@ afterEach(() => {
 });
 
 describe("Connect JSON mutation requests", () => {
+  it("restores an omitted zero seat index before room snapshots reach the UI", async () => {
+    captureRequest({
+      room: {
+        ...room,
+        members: [{
+          userId: room.hostUserId,
+          username: "小满",
+          role: "MEMBER_ROLE_PARTICIPANT",
+          requestedRole: "MEMBER_ROLE_UNSPECIFIED",
+        }],
+      },
+      member: {
+        userId: room.hostUserId,
+        username: "小满",
+        role: "MEMBER_ROLE_PARTICIPANT",
+        requestedRole: "MEMBER_ROLE_UNSPECIFIED",
+      },
+      participants: [{ userId: room.hostUserId }],
+    });
+
+    const response = await roomClient.getRoom(room.roomId);
+
+    expect(response.room?.members[0]?.seatIndex).toBe(0);
+    expect(response.member?.seatIndex).toBe(0);
+    expect(response.participants?.[0]?.seatIndex).toBe(0);
+  });
+
   it("renews a room lease through the authenticated write boundary", async () => {
     const { calls } = captureRequest({ observedAt: "2026-07-22T12:00:00Z" });
 
@@ -72,10 +102,11 @@ describe("Connect JSON mutation requests", () => {
     expect(calls[0]?.body).toMatchObject({
       roomId: room.roomId,
       gameId: "liars-dice",
+      configRevision: "0",
       expectedVersion: { roomVersion: "9", membershipVersion: "4" },
       config: { gameId: "liars-dice", schemaVersion: 1, messageType: "session.config", payload: "" },
     });
-    expect(calls[0]?.body.requestDigest).toBe("9K0P+U1xdZycwUwjMQIMujaX+EOBfbsoT5NNbWH8Rko=");
+    expect(calls[0]?.body.requestDigest).toBe("drAey0lL07qe/lTQrmkvJ251Re6+SjAa6kgs+ZRKhMU=");
   });
 
   it("uses the atomic room finish boundary and canonical uint64 strings", async () => {
@@ -125,6 +156,138 @@ describe("Connect JSON mutation requests", () => {
     ]);
   });
 
+  it("serializes room rule selection and config draft updates with ownership fencing", async () => {
+    const { calls } = captureRequest({ room });
+    const config: GameEnvelopeInput = {
+      gameId: "liars-dice",
+      version: { engine: "1.2.0", protocol: "1.1.0", client: "1.0.0" },
+      schemaVersion: 2,
+      messageType: "rules.config",
+      payload: new Uint8Array([9, 8, 7]),
+    };
+
+    await roomClient.selectRoomGame(room, "liars-dice");
+    await roomClient.updateGameConfig(room, "liars-dice", config, "3");
+
+    expect(calls[0]?.url).toBe("/platform.room.v1.RoomService/SelectRoomGame");
+    expect(calls[0]?.body).toMatchObject({
+      roomId: room.roomId,
+      gameId: "liars-dice",
+      expectedVersion: { roomVersion: "9", membershipVersion: "4" },
+      ownershipEpoch: "2",
+    });
+    expectDigest(calls[0]?.body.requestDigest);
+    expect(calls[1]?.url).toBe("/platform.room.v1.RoomService/UpdateGameConfig");
+    expect(calls[1]?.body).toMatchObject({
+      roomId: room.roomId,
+      gameId: "liars-dice",
+      config: { gameId: "liars-dice", schemaVersion: 2, messageType: "rules.config", payload: "CQgH" },
+      expectedRevision: "3",
+      expectedVersion: { roomVersion: "9", membershipVersion: "4" },
+      ownershipEpoch: "2",
+    });
+    expectDigest(calls[1]?.body.requestDigest);
+  });
+
+  it("serializes personal preset CRUD requests with optimistic revisions", async () => {
+    const { calls } = captureRequest({ preset: { presetId: "preset-1" }, presetId: "preset-1" });
+
+    await roomClient.listGameRulePresets("liars-dice");
+    await roomClient.saveGameRulePreset({
+      presetId: "preset-1",
+      gameId: "liars-dice",
+      name: "Fast table",
+      mode: "GAME_RULE_PRESET_WRITE_MODE_OVERWRITE",
+      expectedPresetRevision: "7",
+      config: { ...command, payload: "AQID" },
+    });
+    await roomClient.deleteGameRulePreset("preset-1", "8");
+
+    expect(calls[0]).toEqual({
+      url: "/platform.room.v1.RoomService/ListGameRulePresets",
+      body: { gameId: "liars-dice" },
+    });
+    expect(calls[1]?.url).toBe("/platform.room.v1.RoomService/SaveGameRulePreset");
+    expect(calls[1]?.body).toMatchObject({
+      presetId: "preset-1",
+      gameId: "liars-dice",
+      name: "Fast table",
+      mode: "GAME_RULE_PRESET_WRITE_MODE_OVERWRITE",
+      expectedPresetRevision: "7",
+      config: { payload: "AQID" },
+    });
+    expectDigest(calls[1]?.body.requestDigest);
+    expect(calls[2]?.url).toBe("/platform.room.v1.RoomService/DeleteGameRulePreset");
+    expect(calls[2]?.body).toMatchObject({ presetId: "preset-1", expectedPresetRevision: "8" });
+    expectDigest(calls[2]?.body.requestDigest);
+  });
+
+  it("serializes begin, cancel, and pending-aware start requests", async () => {
+    const pendingRoom: RoomSnapshot = {
+      ...room,
+      pendingStart: {
+        pendingStartId: "00000000-0000-4000-8000-000000000010",
+        cancelToken: "cancel-token-1",
+        gameId: "liars-dice",
+        configRevision: "5",
+        ownershipEpoch: "2",
+      },
+      gameConfigDrafts: [{
+        gameId: "liars-dice",
+        revision: "5",
+        updatedBy: room.hostUserId,
+        config: {
+          gameId: "liars-dice",
+          version: { engine: "1.2.0", protocol: "1.1.0", client: "1.0.0" },
+          schemaVersion: 2,
+          messageType: "rules.config",
+          payload: "BQQ=",
+        },
+      }],
+    };
+    const { calls } = captureRequest();
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000011")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000012")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000013");
+
+    await roomClient.beginGameStart(room, "liars-dice", "5");
+    await roomClient.cancelGameStart(pendingRoom, pendingRoom.pendingStart!);
+    await roomClient.startGame(pendingRoom, room.hostUserId, "liars-dice");
+
+    expect(calls[0]?.url).toBe("/platform.room.v1.RoomService/BeginGameStart");
+    expect(calls[0]?.body).toMatchObject({
+      roomId: room.roomId,
+      gameId: "liars-dice",
+      configRevision: "5",
+      expectedVersion: { roomVersion: "9", membershipVersion: "4" },
+      ownershipEpoch: "2",
+    });
+    expectDigest(calls[0]?.body.requestDigest);
+    expect(calls[1]?.url).toBe("/platform.room.v1.RoomService/CancelGameStart");
+    expect(calls[1]?.body).toMatchObject({
+      pendingStartId: "00000000-0000-4000-8000-000000000010",
+      cancelToken: "cancel-token-1",
+      ownershipEpoch: "2",
+    });
+    expectDigest(calls[1]?.body.requestDigest);
+    expect(calls[2]?.url).toBe("/platform.room.v1.RoomService/StartGame");
+    expect(calls[2]?.body).toMatchObject({
+      pendingStartId: "00000000-0000-4000-8000-000000000010",
+      cancelToken: "cancel-token-1",
+      configRevision: "5",
+      ownershipEpoch: "2",
+      config: {
+        gameId: "liars-dice",
+        version: { engine: "1.2.0", protocol: "1.1.0", client: "1.0.0" },
+        schemaVersion: 2,
+        messageType: "rules.config",
+        payload: "BQQ=",
+      },
+    });
+    expect(calls[2]?.body.requestDigest).toBe("W+E6COC59InWHbGusQOWRxsQGnJXedJh0xRmxKAOMdc=");
+  });
+
   it("serializes action versions and protobuf bytes using Connect JSON rules", async () => {
     const { calls } = captureRequest();
 
@@ -160,10 +323,24 @@ describe("Connect JSON mutation requests", () => {
     expect([...response.grant]).toEqual([3, 4]);
   });
 
-  it("requests an immutable replay projection with the replay viewer kind", async () => {
-    const { calls } = captureRequest({ complete: true });
+  it("requests an immutable replay projection with validated terminal metadata", async () => {
+    const { calls } = captureRequest({
+      complete: true,
+      session: {
+        sessionId: room.activeSessionId,
+        roomId: room.roomId,
+        gameId: "liars-dice",
+        stateVersion: "9",
+        status: "GAME_SESSION_STATUS_FINISHED",
+      },
+      terminalMeta: {
+        finished: true,
+        cancelled: false,
+        endedAt: "2026-07-23T12:00:00Z",
+      },
+    });
 
-    await gameClient.getReplayProjection(room.roomId, room.activeSessionId);
+    const response = await gameClient.getReplayProjection(room.roomId, room.activeSessionId);
 
     expect(calls[0]?.url).toBe("/platform.game.v1.GameService/GetReplayProjection");
     expect(calls[0]?.body).toEqual({
@@ -172,6 +349,46 @@ describe("Connect JSON mutation requests", () => {
       viewerKind: "VIEWER_KIND_REPLAY",
       throughStateVersion: "0",
     });
+    expect(response.terminalMeta).toMatchObject({
+      finished: true,
+      cancelled: false,
+      endedAt: "2026-07-23T12:00:00Z",
+    });
+  });
+
+  it("fails closed when replay terminal metadata is missing", async () => {
+    captureRequest({
+      complete: true,
+      session: {
+        sessionId: room.activeSessionId,
+        roomId: room.roomId,
+        gameId: "liars-dice",
+        stateVersion: "9",
+        status: "GAME_SESSION_STATUS_FINISHED",
+      },
+    });
+
+    await expect(gameClient.getReplayProjection(room.roomId, room.activeSessionId)).rejects.toThrowError("replay_terminal_meta_missing");
+  });
+
+  it("fails closed when replay terminal metadata disagrees with the session status", async () => {
+    captureRequest({
+      complete: true,
+      session: {
+        sessionId: room.activeSessionId,
+        roomId: room.roomId,
+        gameId: "liars-dice",
+        stateVersion: "9",
+        status: "GAME_SESSION_STATUS_CANCELLED",
+      },
+      terminalMeta: {
+        finished: true,
+        cancelled: false,
+        endedAt: "2026-07-23T12:00:00Z",
+      },
+    });
+
+    await expect(gameClient.getReplayProjection(room.roomId, room.activeSessionId)).rejects.toThrowError("replay_terminal_status_inconsistent");
   });
 
   it("reads and updates replay access with an explicit policy version", async () => {

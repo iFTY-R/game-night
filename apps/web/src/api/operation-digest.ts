@@ -20,6 +20,7 @@ interface StartDigestInput {
   gameId: string;
   roomVersion: string;
   membershipVersion: string;
+  configRevision: string | number | bigint;
   config: MessageDigestInput;
 }
 
@@ -38,6 +39,48 @@ interface FinishDigestInput {
   sourceEventId: string;
   expectedStateVersion: number;
   command: VersionedMessageDigestInput;
+}
+
+interface RuleRoomDigestInput {
+  roomId: string;
+  operationId: string;
+  roomVersion: string;
+  membershipVersion: string;
+  ownershipEpoch: string | number | bigint;
+}
+
+interface SelectRoomGameDigestInput extends RuleRoomDigestInput {
+  gameId: string;
+}
+
+interface UpdateGameConfigDigestInput extends SelectRoomGameDigestInput {
+  expectedRevision: string | number | bigint;
+  config: VersionedMessageDigestInput;
+}
+
+interface SaveGameRulePresetDigestInput {
+  presetId: string;
+  gameId: string;
+  name: string;
+  mode: string;
+  expectedPresetRevision: string | number | bigint;
+  operationId: string;
+  config: VersionedMessageDigestInput;
+}
+
+interface DeleteGameRulePresetDigestInput {
+  presetId: string;
+  expectedPresetRevision: string | number | bigint;
+  operationId: string;
+}
+
+interface BeginGameStartDigestInput extends SelectRoomGameDigestInput {
+  configRevision: string | number | bigint;
+}
+
+interface CancelGameStartDigestInput extends RuleRoomDigestInput {
+  pendingStartId: string;
+  cancelToken: string;
 }
 
 const textBytes = (value: string): Uint8Array => textEncoder.encode(value);
@@ -94,6 +137,14 @@ const versionFields = (message: VersionedMessageDigestInput): Uint8Array[] => [
   textBytes(message.version.client),
 ];
 
+const roomRuleFields = (input: RuleRoomDigestInput): Uint8Array[] => [
+  textBytes(input.roomId),
+  textBytes(input.operationId),
+  uint64Bytes(input.roomVersion),
+  uint64Bytes(input.membershipVersion),
+  uint64Bytes(input.ownershipEpoch),
+];
+
 /** Reproduces game-runtime.startDigest so the server can reject tampered start requests. */
 export const startRequestDigest = (input: StartDigestInput): Promise<string> => digestFields([
   uuidBytes(input.actorUserId),
@@ -102,6 +153,7 @@ export const startRequestDigest = (input: StartDigestInput): Promise<string> => 
   textBytes(input.gameId),
   uint64Bytes(input.roomVersion),
   uint64Bytes(input.membershipVersion),
+  uint64Bytes(input.configRevision),
   ...messageFields(input.config),
 ]);
 
@@ -125,4 +177,58 @@ export const finishRequestDigest = (input: FinishDigestInput): Promise<string> =
   ...versionFields(input.command),
   uint64Bytes(input.expectedStateVersion),
   ...messageFields(input.command),
+]);
+
+/** Binds a host-only game selection request to the room version and ownership epoch it observed. */
+export const selectRoomGameRequestDigest = (input: SelectRoomGameDigestInput): Promise<string> => digestFields([
+  textBytes("room.select_game"),
+  ...roomRuleFields(input),
+  textBytes(input.gameId),
+]);
+
+/** Binds one complete rules envelope update so operation replays cannot swap the payload. */
+export const updateGameConfigRequestDigest = (input: UpdateGameConfigDigestInput): Promise<string> => digestFields([
+  textBytes("room.update_game_config"),
+  ...roomRuleFields(input),
+  textBytes(input.gameId),
+  uint64Bytes(input.expectedRevision),
+  ...versionFields(input.config),
+  ...messageFields(input.config),
+]);
+
+/** Binds a personal preset create/overwrite/copy operation to its selected mode and envelope. */
+export const saveGameRulePresetRequestDigest = (input: SaveGameRulePresetDigestInput): Promise<string> => digestFields([
+  textBytes("room.save_game_rule_preset"),
+  textBytes(input.operationId),
+  textBytes(input.presetId),
+  textBytes(input.gameId),
+  textBytes(input.name),
+  textBytes(input.mode),
+  uint64Bytes(input.expectedPresetRevision),
+  ...versionFields(input.config),
+  ...messageFields(input.config),
+]);
+
+/** Binds personal preset deletion to the optimistic preset revision seen by the UI. */
+export const deleteGameRulePresetRequestDigest = (input: DeleteGameRulePresetDigestInput): Promise<string> => digestFields([
+  textBytes("room.delete_game_rule_preset"),
+  textBytes(input.operationId),
+  textBytes(input.presetId),
+  uint64Bytes(input.expectedPresetRevision),
+]);
+
+/** Binds countdown creation to the selected draft revision and room ownership epoch. */
+export const beginGameStartRequestDigest = (input: BeginGameStartDigestInput): Promise<string> => digestFields([
+  textBytes("room.begin_game_start"),
+  ...roomRuleFields(input),
+  textBytes(input.gameId),
+  uint64Bytes(input.configRevision),
+]);
+
+/** Binds countdown cancellation to the opaque pending-start token issued by the server. */
+export const cancelGameStartRequestDigest = (input: CancelGameStartDigestInput): Promise<string> => digestFields([
+  textBytes("room.cancel_game_start"),
+  ...roomRuleFields(input),
+  textBytes(input.pendingStartId),
+  textBytes(input.cancelToken),
 ]);

@@ -28,6 +28,11 @@ const roomSnapshot = (host = hostUserId): RoomSnapshot => ({
 
 /** Seeds a recognized device so room governance can be tested without onboarding noise. */
 const seedIdentity = async (page: Page): Promise<void> => {
+  // Host room views load personal presets in the background; keep that unrelated request
+  // deterministic so governance assertions only observe the command under test.
+  await page.route("**/platform.room.v1.RoomService/ListGameRulePresets", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ presets: [] }) });
+  });
   await page.addInitScript(({ storedRoomId, userId }) => {
     localStorage.setItem("game-night.room-context.v1", JSON.stringify({
       schemaVersion: 1,
@@ -67,10 +72,10 @@ test("host confirms member removal and idle-room closure on mobile", async ({ pa
   await page.goto(`/room/${roomId}`);
   const remove = page.getByRole("button", { name: "移出 玩家 user-t" });
   await remove.click();
-  await expect(page.getByRole("dialog", { name: "确认移出成员？" })).toBeVisible();
+  await expect(page.getByRole("alertdialog", { name: "确认移出成员？" })).toBeVisible();
   expect(removalBody).toBeUndefined();
   await page.getByRole("button", { name: "取消" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(removalBody).toBeUndefined();
 
   await remove.click();
@@ -83,7 +88,7 @@ test("host confirms member removal and idle-room closure on mobile", async ({ pa
   await expect(page.getByRole("button", { name: "移出 玩家 user-t" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "解散房间" }).click();
-  await expect(page.getByRole("dialog", { name: "确认解散房间？" })).toBeVisible();
+  await expect(page.getByRole("alertdialog", { name: "确认解散房间？" })).toBeVisible();
   expect(closeBody).toBeUndefined();
   await page.getByRole("button", { name: "确认解散" }).click();
 
@@ -92,6 +97,7 @@ test("host confirms member removal and idle-room closure on mobile", async ({ pa
     expectedVersion: { roomVersion: "3", membershipVersion: "2" },
   });
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("status")).toContainText("房间已解散");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { roomId?: unknown })).toMatchObject({ roomId: null });
 });
 
@@ -128,8 +134,9 @@ test("host cancels the active game and closes the room from management view", as
   const closeButton = page.getByRole("button", { name: "解散房间" });
   await expect(closeButton).toBeEnabled();
   await closeButton.click();
-  const dialog = page.getByRole("dialog", { name: "确认解散房间？" });
-  await expect(dialog).toContainText("当前对局会立即取消，且不会生成复盘");
+  const dialog = page.getByRole("alertdialog", { name: "确认解散房间？" });
+  await expect(dialog).toContainText("当前对局会立即终止");
+  await expect(dialog).toContainText("取消前已公开的进度会保留，未公开手牌继续保密");
   await page.getByRole("button", { name: "确认解散" }).click();
 
   await expect.poll(() => closeBody).toMatchObject({
@@ -213,7 +220,7 @@ test("governance conflicts stay in context and refresh the authoritative room", 
   await page.getByRole("button", { name: "移出 玩家 user-t" }).click();
   await page.getByRole("button", { name: "确认移出" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "确认移出成员？" });
+  const dialog = page.getByRole("alertdialog", { name: "确认移出成员？" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("alert")).toHaveText("房间状态已更新");
   await expect.poll(() => roomReads).toBeGreaterThanOrEqual(2);

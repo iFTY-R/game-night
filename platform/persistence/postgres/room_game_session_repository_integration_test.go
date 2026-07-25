@@ -314,6 +314,179 @@ func TestPartyRoomActiveSessionForeignKeyRejectsRoomOnlyStart(t *testing.T) {
 	}
 }
 
+func TestRoomGameSessionRepositoryPersistsApprovedPauseAndResumesTimersAtomically(t *testing.T) {
+	fixture := openRoomGameSessionStartFixture(t)
+	repository := NewRoomGameSessionRepository(fixture.fixture.Pool)
+	roomRepository := NewRoomRepository(fixture.fixture.Pool)
+	sessionRepository := NewGameSessionRepository(fixture.fixture.Pool)
+
+	playingRoom, session, _, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err := session.AcquireOwnership(session.Snapshot().OwnershipEpoch, session.Snapshot().UpdatedAt.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err = sessionRepository.AcquireOwnershipCAS(fixture.ctx, session, owned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	participantID := playingRoom.Snapshot().Members[1].UserID
+	requestID := uuid.New()
+	requestedRoom, err := playingRoom.RequestPause(
+		participantID, requestID, session.Snapshot().ID, playingRoom.Version(), owned.Snapshot().UpdatedAt.Add(time.Second),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestedRoom, err = roomRepository.UpdateCAS(fixture.ctx, playingRoom, requestedRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedRequest, err := roomRepository.GetByID(fixture.ctx, requestedRoom.Snapshot().ID)
+	if err != nil || loadedRequest.Snapshot().PendingPauseRequest.ID != requestID {
+		t.Fatalf("loaded pause request=%+v error=%v", loadedRequest.Snapshot().PendingPauseRequest, err)
+	}
+
+	pauseID := uuid.New()
+	pauseAt := requestedRoom.Snapshot().UpdatedAt.Add(time.Second)
+	pausedRoom, err := requestedRoom.Pause(
+		fixture.hostID, pauseID, session.Snapshot().ID, requestID, requestedRoom.Version(), pauseAt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := owned.Suspend(owned.Snapshot().OwnershipEpoch, pauseAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pausedRoom, suspended, err = repository.Suspend(
+		fixture.ctx, requestedRoom, pausedRoom,
+		newGameLifecycleCommit(t, owned, suspended, gameruntime.GameSessionSuspendedEventType),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pausedRoom.Snapshot().PendingPauseRequest.ID != uuid.Nil || pausedRoom.Snapshot().ActivePause.ID != pauseID ||
+		pausedRoom.Snapshot().ActivePause.Source != roomDomain.PauseSourceApprovedRequest ||
+		suspended.Snapshot().Status != gameruntime.StatusSuspended || !suspended.Snapshot().SuspendedAt.Equal(pauseAt) {
+		t.Fatalf("paused room=%+v session=%+v", pausedRoom.Snapshot(), suspended.Snapshot())
+	}
+	transferredRoom, err := pausedRoom.TransferHost(
+		fixture.hostID, participantID, pausedRoom.Snapshot().OwnershipEpoch, pausedRoom.Version(), pauseAt.Add(time.Second),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transferredRoom, err = roomRepository.UpdateCAS(fixture.ctx, pausedRoom, transferredRoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transferredRoom.Snapshot().ActivePause.PausedByUserID != fixture.hostID || transferredRoom.Snapshot().HostUserID != participantID {
+		t.Fatalf("transferred paused room=%+v", transferredRoom.Snapshot())
+	}
+
+	resumeAt := pauseAt.Add(30 * time.Second)
+	resumedRoom, err := transferredRoom.Resume(participantID, session.Snapshot().ID, transferredRoom.Version(), resumeAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := suspended.Resume(suspended.Snapshot().OwnershipEpoch, resumeAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumedRoom, resumed, err = repository.Resume(
+		fixture.ctx, transferredRoom, resumedRoom,
+		newGameLifecycleCommit(t, suspended, resumed, gameruntime.GameSessionResumedEventType),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDueAt := session.Snapshot().Timers[0].DueAt.Add(30 * time.Second)
+	if resumedRoom.Snapshot().ActivePause.ID != uuid.Nil || resumed.Snapshot().Status != gameruntime.StatusActive ||
+		!resumed.Snapshot().SuspendedAt.IsZero() || len(resumed.Snapshot().Timers) != 1 ||
+		!resumed.Snapshot().Timers[0].DueAt.Equal(wantDueAt) || !resumed.Snapshot().NextDeadlineAt.Equal(wantDueAt) {
+		t.Fatalf("resumed room=%+v session=%+v want_due_at=%v", resumedRoom.Snapshot(), resumed.Snapshot(), wantDueAt)
+	}
+}
+
+func TestRoomGameSessionRepositoryRollsBackPauseWhenOutboxInsertFails(t *testing.T) {
+	fixture := openRoomGameSessionStartFixture(t)
+	repository := NewRoomGameSessionRepository(fixture.fixture.Pool)
+	roomRepository := NewRoomRepository(fixture.fixture.Pool)
+	sessionRepository := NewGameSessionRepository(fixture.fixture.Pool)
+	playingRoom, session, _, err := repository.Start(fixture.ctx, fixture.before, fixture.after, fixture.commit, fixture.receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err := session.AcquireOwnership(session.Snapshot().OwnershipEpoch, session.Snapshot().UpdatedAt.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err = sessionRepository.AcquireOwnershipCAS(fixture.ctx, session, owned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pauseAt := owned.Snapshot().UpdatedAt.Add(time.Second)
+	pausedRoom, err := playingRoom.Pause(fixture.hostID, uuid.New(), session.Snapshot().ID, uuid.Nil, playingRoom.Version(), pauseAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := owned.Suspend(owned.Snapshot().OwnershipEpoch, pauseAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := newGameLifecycleCommit(t, owned, suspended, gameruntime.GameSessionSuspendedEventType)
+	conflict := commit.OutboxEvents()[0].Snapshot()
+	existing, err := outbox.NewEvent(
+		conflict.ID, conflict.Type, conflict.AggregateType, conflict.AggregateID,
+		[]byte("conflicting-pause-payload"), conflict.CreatedAt, conflict.AvailableAt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newOutboxEventRepository(sqlcgen.New(fixture.fixture.Pool)).Insert(fixture.ctx, existing); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := repository.Suspend(fixture.ctx, playingRoom, pausedRoom, commit); err == nil {
+		t.Fatal("expected outbox conflict to abort the governed pause")
+	}
+	loadedRoom, err := roomRepository.GetByID(fixture.ctx, playingRoom.Snapshot().ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedSession, err := sessionRepository.Get(fixture.ctx, session.Snapshot().ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedRoom.Version() != playingRoom.Version() || loadedRoom.Snapshot().ActivePause.ID != uuid.Nil ||
+		loadedSession.Snapshot().Status != gameruntime.StatusActive || !loadedSession.Snapshot().SuspendedAt.IsZero() {
+		t.Fatalf("rollback room=%+v session=%+v", loadedRoom.Snapshot(), loadedSession.Snapshot())
+	}
+}
+
+func TestRoomRepositoryTransferHostCancelsPriorOwnershipPendingStart(t *testing.T) {
+	fixture := openRoomGameSessionStartFixtureWithPendingProof(t, 7)
+	participantID := fixture.before.Snapshot().Members[1].UserID
+	transferred, err := fixture.before.TransferHost(
+		fixture.hostID, participantID, fixture.before.Snapshot().OwnershipEpoch,
+		fixture.before.Version(), fixture.now.Add(2*time.Second),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := NewRoomRepository(fixture.fixture.Pool).UpdateCAS(fixture.ctx, fixture.before, transferred)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending := loadLatestPendingStartRow(t, fixture)
+	if stored.Snapshot().HostUserID != participantID || stored.Snapshot().OwnershipEpoch != fixture.before.Snapshot().OwnershipEpoch+1 ||
+		!pending.CancelledAt.Valid || pending.ConsumedAt.Valid {
+		t.Fatalf("transferred room=%+v pending=%+v", stored.Snapshot(), pending)
+	}
+}
+
 type roomGameSessionStartFixture struct {
 	fixture   *integrationtest.PostgresSchema
 	ctx       context.Context

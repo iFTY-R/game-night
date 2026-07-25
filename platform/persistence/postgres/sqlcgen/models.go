@@ -239,6 +239,7 @@ type GameSession struct {
 	StartMembershipVersion   pgtype.Int8        `json:"start_membership_version"`
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 }
 
 type GameSessionEvent struct {
@@ -397,24 +398,34 @@ type OutboxEvent struct {
 }
 
 type PartyRoom struct {
-	RoomID                pgtype.UUID        `json:"room_id"`
-	RoomCode              string             `json:"room_code"`
-	Visibility            string             `json:"visibility"`
-	Status                string             `json:"status"`
-	HostUserID            pgtype.UUID        `json:"host_user_id"`
-	ParticipantCapacity   int32              `json:"participant_capacity"`
-	ParticipantAdmission  string             `json:"participant_admission"`
-	SpectatorAdmission    string             `json:"spectator_admission"`
-	ActiveSessionID       pgtype.UUID        `json:"active_session_id"`
-	ActiveGameID          pgtype.Text        `json:"active_game_id"`
-	RoomVersion           int64              `json:"room_version"`
-	MembershipVersion     int64              `json:"membership_version"`
-	CreatedAt             pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
-	LastFinishedSessionID pgtype.UUID        `json:"last_finished_session_id"`
-	LastFinishedGameID    pgtype.Text        `json:"last_finished_game_id"`
-	SelectedGameID        string             `json:"selected_game_id"`
-	OwnershipEpoch        int64              `json:"ownership_epoch"`
+	RoomID                       pgtype.UUID        `json:"room_id"`
+	RoomCode                     string             `json:"room_code"`
+	Visibility                   string             `json:"visibility"`
+	Status                       string             `json:"status"`
+	HostUserID                   pgtype.UUID        `json:"host_user_id"`
+	ParticipantCapacity          int32              `json:"participant_capacity"`
+	ParticipantAdmission         string             `json:"participant_admission"`
+	SpectatorAdmission           string             `json:"spectator_admission"`
+	ActiveSessionID              pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID                 pgtype.Text        `json:"active_game_id"`
+	RoomVersion                  int64              `json:"room_version"`
+	MembershipVersion            int64              `json:"membership_version"`
+	CreatedAt                    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                    pgtype.Timestamptz `json:"updated_at"`
+	LastFinishedSessionID        pgtype.UUID        `json:"last_finished_session_id"`
+	LastFinishedGameID           pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID               string             `json:"selected_game_id"`
+	OwnershipEpoch               int64              `json:"ownership_epoch"`
+	PauseRequestID               pgtype.UUID        `json:"pause_request_id"`
+	PauseRequestSessionID        pgtype.UUID        `json:"pause_request_session_id"`
+	PauseRequestedByUserID       pgtype.UUID        `json:"pause_requested_by_user_id"`
+	PauseRequestedAt             pgtype.Timestamptz `json:"pause_requested_at"`
+	ActivePauseID                pgtype.UUID        `json:"active_pause_id"`
+	ActivePauseSessionID         pgtype.UUID        `json:"active_pause_session_id"`
+	ActivePauseSource            pgtype.Text        `json:"active_pause_source"`
+	ActivePauseRequestedByUserID pgtype.UUID        `json:"active_pause_requested_by_user_id"`
+	ActivePausePausedByUserID    pgtype.UUID        `json:"active_pause_paused_by_user_id"`
+	ActivePausePausedAt          pgtype.Timestamptz `json:"active_pause_paused_at"`
 }
 
 type ProfileExportContext struct {

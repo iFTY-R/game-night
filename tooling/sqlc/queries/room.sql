@@ -14,6 +14,16 @@ INSERT INTO party_rooms (
     last_finished_game_id,
     selected_game_id,
     ownership_epoch,
+    pause_request_id,
+    pause_request_session_id,
+    pause_requested_by_user_id,
+    pause_requested_at,
+    active_pause_id,
+    active_pause_session_id,
+    active_pause_source,
+    active_pause_requested_by_user_id,
+    active_pause_paused_by_user_id,
+    active_pause_paused_at,
     room_version,
     membership_version,
     created_at,
@@ -33,6 +43,16 @@ INSERT INTO party_rooms (
     sqlc.narg(last_finished_game_id),
     sqlc.arg(selected_game_id),
     sqlc.arg(ownership_epoch),
+    sqlc.narg(pause_request_id),
+    sqlc.narg(pause_request_session_id),
+    sqlc.narg(pause_requested_by_user_id),
+    sqlc.narg(pause_requested_at),
+    sqlc.narg(active_pause_id),
+    sqlc.narg(active_pause_session_id),
+    sqlc.narg(active_pause_source),
+    sqlc.narg(active_pause_requested_by_user_id),
+    sqlc.narg(active_pause_paused_by_user_id),
+    sqlc.narg(active_pause_paused_at),
     sqlc.arg(room_version),
     sqlc.arg(membership_version),
     sqlc.arg(created_at),
@@ -41,7 +61,10 @@ INSERT INTO party_rooms (
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch;
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at;
 
 -- name: CreateRoomActivityLease :exec
 INSERT INTO room_activity_leases (room_id, last_seen_at)
@@ -63,7 +86,10 @@ RETURNING last_seen_at;
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_id = sqlc.arg(room_id)
 FOR SHARE;
@@ -72,7 +98,10 @@ FOR SHARE;
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_id = sqlc.arg(room_id)
 FOR UPDATE;
@@ -81,7 +110,10 @@ FOR UPDATE;
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_code = sqlc.arg(room_code)
 FOR SHARE;
@@ -100,6 +132,16 @@ SET visibility = sqlc.arg(visibility),
     last_finished_game_id = sqlc.narg(last_finished_game_id),
     selected_game_id = sqlc.arg(selected_game_id),
     ownership_epoch = sqlc.arg(ownership_epoch),
+    pause_request_id = sqlc.narg(pause_request_id),
+    pause_request_session_id = sqlc.narg(pause_request_session_id),
+    pause_requested_by_user_id = sqlc.narg(pause_requested_by_user_id),
+    pause_requested_at = sqlc.narg(pause_requested_at),
+    active_pause_id = sqlc.narg(active_pause_id),
+    active_pause_session_id = sqlc.narg(active_pause_session_id),
+    active_pause_source = sqlc.narg(active_pause_source),
+    active_pause_requested_by_user_id = sqlc.narg(active_pause_requested_by_user_id),
+    active_pause_paused_by_user_id = sqlc.narg(active_pause_paused_by_user_id),
+    active_pause_paused_at = sqlc.narg(active_pause_paused_at),
     room_version = sqlc.arg(room_version),
     membership_version = sqlc.arg(membership_version),
     updated_at = sqlc.arg(updated_at)
@@ -111,7 +153,10 @@ WHERE room_id = sqlc.arg(room_id)
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch;
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at;
 
 -- name: FinishPartyRoomCAS :one
 UPDATE party_rooms
@@ -121,6 +166,16 @@ SET status = 'post_game',
     last_finished_game_id = active_game_id,
     active_session_id = NULL,
     active_game_id = NULL,
+    pause_request_id = NULL,
+    pause_request_session_id = NULL,
+    pause_requested_by_user_id = NULL,
+    pause_requested_at = NULL,
+    active_pause_id = NULL,
+    active_pause_session_id = NULL,
+    active_pause_source = NULL,
+    active_pause_requested_by_user_id = NULL,
+    active_pause_paused_by_user_id = NULL,
+    active_pause_paused_at = NULL,
     room_version = sqlc.arg(room_version),
     updated_at = sqlc.arg(updated_at)
 WHERE room_id = sqlc.arg(room_id)
@@ -132,7 +187,18 @@ WHERE room_id = sqlc.arg(room_id)
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch;
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at;
+
+-- name: CancelActiveRoomPendingStarts :execrows
+UPDATE room_pending_starts
+SET cancelled_at = sqlc.arg(cancelled_at)
+WHERE room_id = sqlc.arg(room_id)
+  AND ownership_epoch = sqlc.arg(expected_ownership_epoch)
+  AND cancelled_at IS NULL
+  AND consumed_at IS NULL;
 
 -- name: DeleteRoomMembers :exec
 DELETE FROM room_members WHERE room_id = sqlc.arg(room_id);

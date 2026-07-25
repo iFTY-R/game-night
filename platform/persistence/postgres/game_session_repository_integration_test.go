@@ -817,6 +817,9 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !suspended.Snapshot().SuspendedAt.Equal(now.Add(2 * time.Second)) {
+		t.Fatalf("persisted suspended_at=%v", suspended.Snapshot().SuspendedAt)
+	}
 	due, err := repository.ListDueTimers(ctx, now.Add(31*time.Second), 10)
 	if err != nil {
 		t.Fatal(err)
@@ -831,6 +834,9 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	resumed, err = repository.CommitLifecycle(ctx, newGameLifecycleCommit(t, suspended, resumed, gameruntime.GameSessionResumedEventType))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !resumed.Snapshot().SuspendedAt.IsZero() || !resumed.Snapshot().NextDeadlineAt.Equal(now.Add(31*time.Second)) {
+		t.Fatalf("resumed lifecycle=%+v", resumed.Snapshot())
 	}
 	due, err = repository.ListDueTimers(ctx, now.Add(31*time.Second), 10)
 	if err != nil {

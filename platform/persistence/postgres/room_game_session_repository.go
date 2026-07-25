@@ -455,6 +455,64 @@ func (repository *RoomGameSessionRepository) Cancel(
 	return storedRoom, storedSession, nil
 }
 
+// Suspend atomically records host-authorized room governance and freezes the matching runtime session.
+func (repository *RoomGameSessionRepository) Suspend(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.LifecycleCommit,
+) (roomDomain.Room, gameruntime.Session, error) {
+	return repository.commitGovernedLifecycle(ctx, before, after, commit, gameruntime.StatusActive, gameruntime.StatusSuspended)
+}
+
+// Resume atomically clears room governance and shifts the matching runtime timers before reactivation.
+func (repository *RoomGameSessionRepository) Resume(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.LifecycleCommit,
+) (roomDomain.Room, gameruntime.Session, error) {
+	return repository.commitGovernedLifecycle(ctx, before, after, commit, gameruntime.StatusSuspended, gameruntime.StatusActive)
+}
+
+func (repository *RoomGameSessionRepository) commitGovernedLifecycle(
+	ctx context.Context,
+	before roomDomain.Room,
+	after roomDomain.Room,
+	commit gameruntime.LifecycleCommit,
+	wantBefore gameruntime.Status,
+	wantAfter gameruntime.Status,
+) (roomDomain.Room, gameruntime.Session, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !commit.Valid() {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidLifecycleCommit
+	}
+	if err := validateRoomGameSessionGovernance(before, after, commit.Before(), commit.After(), wantBefore, wantAfter); err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	var storedRoom roomDomain.Room
+	var storedSession gameruntime.Session
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		lockedRoom, err := lockExactRoom(ctx, queries, before)
+		if err != nil {
+			return err
+		}
+		current, err := getGameSessionForUpdate(ctx, queries, commit.Before().Snapshot().ID)
+		if err != nil {
+			return err
+		}
+		storedSession, err = persistLifecycleAfterSessionLock(ctx, queries, current, commit)
+		if err != nil {
+			return err
+		}
+		storedRoom, err = updateRoomAggregateCAS(ctx, queries, lockedRoom.Snapshot(), after.Snapshot())
+		return err
+	})
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, mapRoomGameSessionStartError(ctx, err)
+	}
+	return storedRoom, storedSession, nil
+}
+
 func lockExactRoom(ctx context.Context, queries QueryHandle, before roomDomain.Room) (roomDomain.Room, error) {
 	snapshot := before.Snapshot()
 	locked, err := lockRoomForUpdate(ctx, queries, snapshot.ID)
@@ -680,6 +738,59 @@ func validateRoomGameSessionTermination(
 	return nil
 }
 
+func validateRoomGameSessionGovernance(
+	before roomDomain.Room,
+	after roomDomain.Room,
+	beforeSession gameruntime.Session,
+	afterSession gameruntime.Session,
+	wantBefore gameruntime.Status,
+	wantAfter gameruntime.Status,
+) error {
+	if err := validateRoomTransition(before.Snapshot(), after.Snapshot()); err != nil {
+		return err
+	}
+	roomBefore, roomAfter := before.Snapshot(), after.Snapshot()
+	sessionBefore, sessionAfter := beforeSession.Snapshot(), afterSession.Snapshot()
+	if roomBefore.Status != roomDomain.RoomStatusPlaying || roomAfter.Status != roomDomain.RoomStatusPlaying ||
+		roomBefore.ActiveSessionID == uuid.Nil || roomBefore.ActiveSessionID != roomAfter.ActiveSessionID ||
+		roomBefore.ActiveSessionID != sessionBefore.ID || sessionBefore.RoomID != roomBefore.ID ||
+		string(sessionBefore.VersionKey.GameID) != roomBefore.ActiveGameID ||
+		sessionBefore.Status != wantBefore || sessionAfter.Status != wantAfter ||
+		!sameTerminatingSessionIdentity(sessionBefore, sessionAfter) ||
+		!reflect.DeepEqual(sessionBefore.State, sessionAfter.State) ||
+		!sessionAfter.UpdatedAt.Equal(roomAfter.UpdatedAt) || !sameRoomOutsidePauseGovernance(roomBefore, roomAfter) {
+		return gameruntime.ErrInvalidLifecycleCommit
+	}
+	switch {
+	case wantBefore == gameruntime.StatusActive && wantAfter == gameruntime.StatusSuspended:
+		pause := roomAfter.ActivePause
+		if roomBefore.ActivePause.ID != uuid.Nil || pause.ID == uuid.Nil || pause.SessionID != sessionBefore.ID ||
+			!pause.PausedAt.Equal(sessionAfter.SuspendedAt) || !roomAfter.PendingPauseRequest.RequestedAt.IsZero() {
+			return gameruntime.ErrInvalidLifecycleCommit
+		}
+	case wantBefore == gameruntime.StatusSuspended && wantAfter == gameruntime.StatusActive:
+		if roomBefore.ActivePause.ID == uuid.Nil || roomBefore.ActivePause.SessionID != sessionBefore.ID ||
+			!roomBefore.ActivePause.PausedAt.Equal(sessionBefore.SuspendedAt) || roomAfter.ActivePause.ID != uuid.Nil ||
+			!roomAfter.PendingPauseRequest.RequestedAt.IsZero() {
+			return gameruntime.ErrInvalidLifecycleCommit
+		}
+	default:
+		return gameruntime.ErrInvalidLifecycleCommit
+	}
+	return nil
+}
+
+func sameRoomOutsidePauseGovernance(left, right roomDomain.RoomSnapshot) bool {
+	return left.ID == right.ID && left.RoomCode == right.RoomCode && left.Visibility == right.Visibility &&
+		left.Status == right.Status && left.HostUserID == right.HostUserID && left.ParticipantCapacity == right.ParticipantCapacity &&
+		left.ParticipantAdmission == right.ParticipantAdmission && left.SpectatorAdmission == right.SpectatorAdmission &&
+		left.ActiveSessionID == right.ActiveSessionID && left.ActiveGameID == right.ActiveGameID &&
+		left.LastFinishedSessionID == right.LastFinishedSessionID && left.LastFinishedGameID == right.LastFinishedGameID &&
+		left.SelectedGameID == right.SelectedGameID && left.OwnershipEpoch == right.OwnershipEpoch &&
+		right.RoomVersion == left.RoomVersion+1 && right.MembershipVersion == left.MembershipVersion &&
+		left.CreatedAt.Equal(right.CreatedAt) && sameRoomMembers(left.Members, right.Members)
+}
+
 func sameTerminatingSessionIdentity(left, right gameruntime.SessionSnapshot) bool {
 	return left.ID == right.ID && left.RoomID == right.RoomID && left.VersionKey == right.VersionKey &&
 		left.OwnershipEpoch == right.OwnershipEpoch && left.StartedAt.Equal(right.StartedAt) &&
@@ -730,6 +841,8 @@ func sameRoomSnapshot(left, right roomDomain.RoomSnapshot) bool {
 		left.HostUserID == right.HostUserID && left.ParticipantCapacity == right.ParticipantCapacity &&
 		left.ParticipantAdmission == right.ParticipantAdmission && left.SpectatorAdmission == right.SpectatorAdmission &&
 		left.ActiveSessionID == right.ActiveSessionID && left.ActiveGameID == right.ActiveGameID &&
+		left.LastFinishedSessionID == right.LastFinishedSessionID && left.LastFinishedGameID == right.LastFinishedGameID &&
+		reflect.DeepEqual(left.PendingPauseRequest, right.PendingPauseRequest) && reflect.DeepEqual(left.ActivePause, right.ActivePause) &&
 		left.SelectedGameID == right.SelectedGameID && left.OwnershipEpoch == right.OwnershipEpoch &&
 		left.RoomVersion == right.RoomVersion && left.MembershipVersion == right.MembershipVersion &&
 		left.CreatedAt.Equal(right.CreatedAt) && left.UpdatedAt.Equal(right.UpdatedAt) && sameRoomMembers(left.Members, right.Members)

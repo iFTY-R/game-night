@@ -11,6 +11,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelActiveRoomPendingStarts = `-- name: CancelActiveRoomPendingStarts :execrows
+UPDATE room_pending_starts
+SET cancelled_at = $1
+WHERE room_id = $2
+  AND ownership_epoch = $3
+  AND cancelled_at IS NULL
+  AND consumed_at IS NULL
+`
+
+type CancelActiveRoomPendingStartsParams struct {
+	CancelledAt            pgtype.Timestamptz `json:"cancelled_at"`
+	RoomID                 pgtype.UUID        `json:"room_id"`
+	ExpectedOwnershipEpoch int64              `json:"expected_ownership_epoch"`
+}
+
+// CancelActiveRoomPendingStarts
+//
+//	UPDATE room_pending_starts
+//	SET cancelled_at = $1
+//	WHERE room_id = $2
+//	  AND ownership_epoch = $3
+//	  AND cancelled_at IS NULL
+//	  AND consumed_at IS NULL
+func (q *Queries) CancelActiveRoomPendingStarts(ctx context.Context, arg CancelActiveRoomPendingStartsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveRoomPendingStarts, arg.CancelledAt, arg.RoomID, arg.ExpectedOwnershipEpoch)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const cancelRoomPendingStart = `-- name: CancelRoomPendingStart :one
 UPDATE room_pending_starts
 SET cancelled_at = COALESCE(cancelled_at, $1)
@@ -301,6 +332,16 @@ INSERT INTO party_rooms (
     last_finished_game_id,
     selected_game_id,
     ownership_epoch,
+    pause_request_id,
+    pause_request_session_id,
+    pause_requested_by_user_id,
+    pause_requested_at,
+    active_pause_id,
+    active_pause_session_id,
+    active_pause_source,
+    active_pause_requested_by_user_id,
+    active_pause_paused_by_user_id,
+    active_pause_paused_at,
     room_version,
     membership_version,
     created_at,
@@ -323,33 +364,56 @@ INSERT INTO party_rooms (
     $15,
     $16,
     $17,
-    $18
+    $18,
+    $19,
+    $20,
+    $21,
+    $22,
+    $23,
+    $24,
+    $25,
+    $26,
+    $27,
+    $28
 )
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 `
 
 type CreatePartyRoomParams struct {
-	RoomID                pgtype.UUID        `json:"room_id"`
-	RoomCode              string             `json:"room_code"`
-	Visibility            string             `json:"visibility"`
-	Status                string             `json:"status"`
-	HostUserID            pgtype.UUID        `json:"host_user_id"`
-	ParticipantCapacity   int32              `json:"participant_capacity"`
-	ParticipantAdmission  string             `json:"participant_admission"`
-	SpectatorAdmission    string             `json:"spectator_admission"`
-	ActiveSessionID       pgtype.UUID        `json:"active_session_id"`
-	ActiveGameID          pgtype.Text        `json:"active_game_id"`
-	LastFinishedSessionID pgtype.UUID        `json:"last_finished_session_id"`
-	LastFinishedGameID    pgtype.Text        `json:"last_finished_game_id"`
-	SelectedGameID        string             `json:"selected_game_id"`
-	OwnershipEpoch        int64              `json:"ownership_epoch"`
-	RoomVersion           int64              `json:"room_version"`
-	MembershipVersion     int64              `json:"membership_version"`
-	CreatedAt             pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	RoomID                       pgtype.UUID        `json:"room_id"`
+	RoomCode                     string             `json:"room_code"`
+	Visibility                   string             `json:"visibility"`
+	Status                       string             `json:"status"`
+	HostUserID                   pgtype.UUID        `json:"host_user_id"`
+	ParticipantCapacity          int32              `json:"participant_capacity"`
+	ParticipantAdmission         string             `json:"participant_admission"`
+	SpectatorAdmission           string             `json:"spectator_admission"`
+	ActiveSessionID              pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID                 pgtype.Text        `json:"active_game_id"`
+	LastFinishedSessionID        pgtype.UUID        `json:"last_finished_session_id"`
+	LastFinishedGameID           pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID               string             `json:"selected_game_id"`
+	OwnershipEpoch               int64              `json:"ownership_epoch"`
+	PauseRequestID               pgtype.UUID        `json:"pause_request_id"`
+	PauseRequestSessionID        pgtype.UUID        `json:"pause_request_session_id"`
+	PauseRequestedByUserID       pgtype.UUID        `json:"pause_requested_by_user_id"`
+	PauseRequestedAt             pgtype.Timestamptz `json:"pause_requested_at"`
+	ActivePauseID                pgtype.UUID        `json:"active_pause_id"`
+	ActivePauseSessionID         pgtype.UUID        `json:"active_pause_session_id"`
+	ActivePauseSource            pgtype.Text        `json:"active_pause_source"`
+	ActivePauseRequestedByUserID pgtype.UUID        `json:"active_pause_requested_by_user_id"`
+	ActivePausePausedByUserID    pgtype.UUID        `json:"active_pause_paused_by_user_id"`
+	ActivePausePausedAt          pgtype.Timestamptz `json:"active_pause_paused_at"`
+	RoomVersion                  int64              `json:"room_version"`
+	MembershipVersion            int64              `json:"membership_version"`
+	CreatedAt                    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                    pgtype.Timestamptz `json:"updated_at"`
 }
 
 // CreatePartyRoom
@@ -369,6 +433,16 @@ type CreatePartyRoomParams struct {
 //	    last_finished_game_id,
 //	    selected_game_id,
 //	    ownership_epoch,
+//	    pause_request_id,
+//	    pause_request_session_id,
+//	    pause_requested_by_user_id,
+//	    pause_requested_at,
+//	    active_pause_id,
+//	    active_pause_session_id,
+//	    active_pause_source,
+//	    active_pause_requested_by_user_id,
+//	    active_pause_paused_by_user_id,
+//	    active_pause_paused_at,
 //	    room_version,
 //	    membership_version,
 //	    created_at,
@@ -391,12 +465,25 @@ type CreatePartyRoomParams struct {
 //	    $15,
 //	    $16,
 //	    $17,
-//	    $18
+//	    $18,
+//	    $19,
+//	    $20,
+//	    $21,
+//	    $22,
+//	    $23,
+//	    $24,
+//	    $25,
+//	    $26,
+//	    $27,
+//	    $28
 //	)
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, createPartyRoom,
 		arg.RoomID,
@@ -413,6 +500,16 @@ func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams
 		arg.LastFinishedGameID,
 		arg.SelectedGameID,
 		arg.OwnershipEpoch,
+		arg.PauseRequestID,
+		arg.PauseRequestSessionID,
+		arg.PauseRequestedByUserID,
+		arg.PauseRequestedAt,
+		arg.ActivePauseID,
+		arg.ActivePauseSessionID,
+		arg.ActivePauseSource,
+		arg.ActivePauseRequestedByUserID,
+		arg.ActivePausePausedByUserID,
+		arg.ActivePausePausedAt,
 		arg.RoomVersion,
 		arg.MembershipVersion,
 		arg.CreatedAt,
@@ -438,6 +535,16 @@ func (q *Queries) CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }
@@ -1064,6 +1171,16 @@ SET status = 'post_game',
     last_finished_game_id = active_game_id,
     active_session_id = NULL,
     active_game_id = NULL,
+    pause_request_id = NULL,
+    pause_request_session_id = NULL,
+    pause_requested_by_user_id = NULL,
+    pause_requested_at = NULL,
+    active_pause_id = NULL,
+    active_pause_session_id = NULL,
+    active_pause_source = NULL,
+    active_pause_requested_by_user_id = NULL,
+    active_pause_paused_by_user_id = NULL,
+    active_pause_paused_at = NULL,
     room_version = $1,
     updated_at = $2
 WHERE room_id = $3
@@ -1075,7 +1192,10 @@ WHERE room_id = $3
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 `
 
 type FinishPartyRoomCASParams struct {
@@ -1097,6 +1217,16 @@ type FinishPartyRoomCASParams struct {
 //	    last_finished_game_id = active_game_id,
 //	    active_session_id = NULL,
 //	    active_game_id = NULL,
+//	    pause_request_id = NULL,
+//	    pause_request_session_id = NULL,
+//	    pause_requested_by_user_id = NULL,
+//	    pause_requested_at = NULL,
+//	    active_pause_id = NULL,
+//	    active_pause_session_id = NULL,
+//	    active_pause_source = NULL,
+//	    active_pause_requested_by_user_id = NULL,
+//	    active_pause_paused_by_user_id = NULL,
+//	    active_pause_paused_at = NULL,
 //	    room_version = $1,
 //	    updated_at = $2
 //	WHERE room_id = $3
@@ -1108,7 +1238,10 @@ type FinishPartyRoomCASParams struct {
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 func (q *Queries) FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, finishPartyRoomCAS,
 		arg.RoomVersion,
@@ -1139,6 +1272,16 @@ func (q *Queries) FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCAS
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }
@@ -1236,7 +1379,10 @@ const getPartyRoomByCodeForShare = `-- name: GetPartyRoomByCodeForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_code = $1
 FOR SHARE
@@ -1251,7 +1397,10 @@ type GetPartyRoomByCodeForShareParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 //	FROM party_rooms
 //	WHERE room_code = $1
 //	FOR SHARE
@@ -1277,6 +1426,16 @@ func (q *Queries) GetPartyRoomByCodeForShare(ctx context.Context, arg GetPartyRo
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }
@@ -1285,7 +1444,10 @@ const getPartyRoomForShare = `-- name: GetPartyRoomForShare :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_id = $1
 FOR SHARE
@@ -1300,7 +1462,10 @@ type GetPartyRoomForShareParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 //	FROM party_rooms
 //	WHERE room_id = $1
 //	FOR SHARE
@@ -1326,6 +1491,16 @@ func (q *Queries) GetPartyRoomForShare(ctx context.Context, arg GetPartyRoomForS
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }
@@ -1334,7 +1509,10 @@ const getPartyRoomForUpdate = `-- name: GetPartyRoomForUpdate :one
 SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 FROM party_rooms
 WHERE room_id = $1
 FOR UPDATE
@@ -1349,7 +1527,10 @@ type GetPartyRoomForUpdateParams struct {
 //	SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 //	FROM party_rooms
 //	WHERE room_id = $1
 //	FOR UPDATE
@@ -1375,6 +1556,16 @@ func (q *Queries) GetPartyRoomForUpdate(ctx context.Context, arg GetPartyRoomFor
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }
@@ -2279,41 +2470,64 @@ SET visibility = $1,
     last_finished_game_id = $10,
     selected_game_id = $11,
     ownership_epoch = $12,
-    room_version = $13,
-    membership_version = $14,
-    updated_at = $15
-WHERE room_id = $16
-  AND room_code = $17
-  AND ownership_epoch = $18
-  AND room_version = $19
-  AND membership_version = $20
+    pause_request_id = $13,
+    pause_request_session_id = $14,
+    pause_requested_by_user_id = $15,
+    pause_requested_at = $16,
+    active_pause_id = $17,
+    active_pause_session_id = $18,
+    active_pause_source = $19,
+    active_pause_requested_by_user_id = $20,
+    active_pause_paused_by_user_id = $21,
+    active_pause_paused_at = $22,
+    room_version = $23,
+    membership_version = $24,
+    updated_at = $25
+WHERE room_id = $26
+  AND room_code = $27
+  AND ownership_epoch = $28
+  AND room_version = $29
+  AND membership_version = $30
 RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
     participant_admission, spectator_admission, active_session_id, active_game_id,
     room_version, membership_version, created_at, updated_at,
-    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+    active_pause_id, active_pause_session_id, active_pause_source,
+    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 `
 
 type UpdatePartyRoomCASParams struct {
-	Visibility                string             `json:"visibility"`
-	Status                    string             `json:"status"`
-	HostUserID                pgtype.UUID        `json:"host_user_id"`
-	ParticipantCapacity       int32              `json:"participant_capacity"`
-	ParticipantAdmission      string             `json:"participant_admission"`
-	SpectatorAdmission        string             `json:"spectator_admission"`
-	ActiveSessionID           pgtype.UUID        `json:"active_session_id"`
-	ActiveGameID              pgtype.Text        `json:"active_game_id"`
-	LastFinishedSessionID     pgtype.UUID        `json:"last_finished_session_id"`
-	LastFinishedGameID        pgtype.Text        `json:"last_finished_game_id"`
-	SelectedGameID            string             `json:"selected_game_id"`
-	OwnershipEpoch            int64              `json:"ownership_epoch"`
-	RoomVersion               int64              `json:"room_version"`
-	MembershipVersion         int64              `json:"membership_version"`
-	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
-	RoomID                    pgtype.UUID        `json:"room_id"`
-	RoomCode                  string             `json:"room_code"`
-	ExpectedOwnershipEpoch    int64              `json:"expected_ownership_epoch"`
-	ExpectedRoomVersion       int64              `json:"expected_room_version"`
-	ExpectedMembershipVersion int64              `json:"expected_membership_version"`
+	Visibility                   string             `json:"visibility"`
+	Status                       string             `json:"status"`
+	HostUserID                   pgtype.UUID        `json:"host_user_id"`
+	ParticipantCapacity          int32              `json:"participant_capacity"`
+	ParticipantAdmission         string             `json:"participant_admission"`
+	SpectatorAdmission           string             `json:"spectator_admission"`
+	ActiveSessionID              pgtype.UUID        `json:"active_session_id"`
+	ActiveGameID                 pgtype.Text        `json:"active_game_id"`
+	LastFinishedSessionID        pgtype.UUID        `json:"last_finished_session_id"`
+	LastFinishedGameID           pgtype.Text        `json:"last_finished_game_id"`
+	SelectedGameID               string             `json:"selected_game_id"`
+	OwnershipEpoch               int64              `json:"ownership_epoch"`
+	PauseRequestID               pgtype.UUID        `json:"pause_request_id"`
+	PauseRequestSessionID        pgtype.UUID        `json:"pause_request_session_id"`
+	PauseRequestedByUserID       pgtype.UUID        `json:"pause_requested_by_user_id"`
+	PauseRequestedAt             pgtype.Timestamptz `json:"pause_requested_at"`
+	ActivePauseID                pgtype.UUID        `json:"active_pause_id"`
+	ActivePauseSessionID         pgtype.UUID        `json:"active_pause_session_id"`
+	ActivePauseSource            pgtype.Text        `json:"active_pause_source"`
+	ActivePauseRequestedByUserID pgtype.UUID        `json:"active_pause_requested_by_user_id"`
+	ActivePausePausedByUserID    pgtype.UUID        `json:"active_pause_paused_by_user_id"`
+	ActivePausePausedAt          pgtype.Timestamptz `json:"active_pause_paused_at"`
+	RoomVersion                  int64              `json:"room_version"`
+	MembershipVersion            int64              `json:"membership_version"`
+	UpdatedAt                    pgtype.Timestamptz `json:"updated_at"`
+	RoomID                       pgtype.UUID        `json:"room_id"`
+	RoomCode                     string             `json:"room_code"`
+	ExpectedOwnershipEpoch       int64              `json:"expected_ownership_epoch"`
+	ExpectedRoomVersion          int64              `json:"expected_room_version"`
+	ExpectedMembershipVersion    int64              `json:"expected_membership_version"`
 }
 
 // UpdatePartyRoomCAS
@@ -2331,18 +2545,31 @@ type UpdatePartyRoomCASParams struct {
 //	    last_finished_game_id = $10,
 //	    selected_game_id = $11,
 //	    ownership_epoch = $12,
-//	    room_version = $13,
-//	    membership_version = $14,
-//	    updated_at = $15
-//	WHERE room_id = $16
-//	  AND room_code = $17
-//	  AND ownership_epoch = $18
-//	  AND room_version = $19
-//	  AND membership_version = $20
+//	    pause_request_id = $13,
+//	    pause_request_session_id = $14,
+//	    pause_requested_by_user_id = $15,
+//	    pause_requested_at = $16,
+//	    active_pause_id = $17,
+//	    active_pause_session_id = $18,
+//	    active_pause_source = $19,
+//	    active_pause_requested_by_user_id = $20,
+//	    active_pause_paused_by_user_id = $21,
+//	    active_pause_paused_at = $22,
+//	    room_version = $23,
+//	    membership_version = $24,
+//	    updated_at = $25
+//	WHERE room_id = $26
+//	  AND room_code = $27
+//	  AND ownership_epoch = $28
+//	  AND room_version = $29
+//	  AND membership_version = $30
 //	RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 //	    participant_admission, spectator_admission, active_session_id, active_game_id,
 //	    room_version, membership_version, created_at, updated_at,
-//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+//	    last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+//	    pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+//	    active_pause_id, active_pause_session_id, active_pause_source,
+//	    active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error) {
 	row := q.db.QueryRow(ctx, updatePartyRoomCAS,
 		arg.Visibility,
@@ -2357,6 +2584,16 @@ func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCAS
 		arg.LastFinishedGameID,
 		arg.SelectedGameID,
 		arg.OwnershipEpoch,
+		arg.PauseRequestID,
+		arg.PauseRequestSessionID,
+		arg.PauseRequestedByUserID,
+		arg.PauseRequestedAt,
+		arg.ActivePauseID,
+		arg.ActivePauseSessionID,
+		arg.ActivePauseSource,
+		arg.ActivePauseRequestedByUserID,
+		arg.ActivePausePausedByUserID,
+		arg.ActivePausePausedAt,
 		arg.RoomVersion,
 		arg.MembershipVersion,
 		arg.UpdatedAt,
@@ -2386,6 +2623,16 @@ func (q *Queries) UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCAS
 		&i.LastFinishedGameID,
 		&i.SelectedGameID,
 		&i.OwnershipEpoch,
+		&i.PauseRequestID,
+		&i.PauseRequestSessionID,
+		&i.PauseRequestedByUserID,
+		&i.PauseRequestedAt,
+		&i.ActivePauseID,
+		&i.ActivePauseSessionID,
+		&i.ActivePauseSource,
+		&i.ActivePauseRequestedByUserID,
+		&i.ActivePausePausedByUserID,
+		&i.ActivePausePausedAt,
 	)
 	return i, err
 }

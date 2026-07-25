@@ -359,6 +359,11 @@ func createPartyRoomParams(snapshot roomDomain.RoomSnapshot) sqlcgen.CreateParty
 		ActiveGameID: textToPG(snapshot.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(snapshot.LastFinishedSessionID),
 		LastFinishedGameID: textToPG(snapshot.LastFinishedGameID), SelectedGameID: snapshot.SelectedGameID,
 		OwnershipEpoch: int64(snapshot.OwnershipEpoch), RoomVersion: int64(snapshot.RoomVersion),
+		PauseRequestID: optionalUUIDToPG(snapshot.PendingPauseRequest.ID), PauseRequestSessionID: optionalUUIDToPG(snapshot.PendingPauseRequest.SessionID),
+		PauseRequestedByUserID: optionalUUIDToPG(snapshot.PendingPauseRequest.RequestedByUserID), PauseRequestedAt: optionalTimeToPG(snapshot.PendingPauseRequest.RequestedAt),
+		ActivePauseID: optionalUUIDToPG(snapshot.ActivePause.ID), ActivePauseSessionID: optionalUUIDToPG(snapshot.ActivePause.SessionID),
+		ActivePauseSource: textToPG(string(snapshot.ActivePause.Source)), ActivePauseRequestedByUserID: optionalUUIDToPG(snapshot.ActivePause.RequestedByUserID),
+		ActivePausePausedByUserID: optionalUUIDToPG(snapshot.ActivePause.PausedByUserID), ActivePausePausedAt: optionalTimeToPG(snapshot.ActivePause.PausedAt),
 		MembershipVersion: int64(snapshot.MembershipVersion), CreatedAt: timeToPG(snapshot.CreatedAt), UpdatedAt: timeToPG(snapshot.UpdatedAt),
 	}
 }
@@ -371,6 +376,11 @@ func updatePartyRoomParams(before, after roomDomain.RoomSnapshot) sqlcgen.Update
 		ActiveGameID: textToPG(after.ActiveGameID), LastFinishedSessionID: optionalUUIDToPG(after.LastFinishedSessionID),
 		LastFinishedGameID: textToPG(after.LastFinishedGameID), SelectedGameID: after.SelectedGameID,
 		OwnershipEpoch: int64(after.OwnershipEpoch), RoomVersion: int64(after.RoomVersion),
+		PauseRequestID: optionalUUIDToPG(after.PendingPauseRequest.ID), PauseRequestSessionID: optionalUUIDToPG(after.PendingPauseRequest.SessionID),
+		PauseRequestedByUserID: optionalUUIDToPG(after.PendingPauseRequest.RequestedByUserID), PauseRequestedAt: optionalTimeToPG(after.PendingPauseRequest.RequestedAt),
+		ActivePauseID: optionalUUIDToPG(after.ActivePause.ID), ActivePauseSessionID: optionalUUIDToPG(after.ActivePause.SessionID),
+		ActivePauseSource: textToPG(string(after.ActivePause.Source)), ActivePauseRequestedByUserID: optionalUUIDToPG(after.ActivePause.RequestedByUserID),
+		ActivePausePausedByUserID: optionalUUIDToPG(after.ActivePause.PausedByUserID), ActivePausePausedAt: optionalTimeToPG(after.ActivePause.PausedAt),
 		MembershipVersion: int64(after.MembershipVersion), UpdatedAt: timeToPG(after.UpdatedAt),
 		RoomID: uuidToPG(before.ID), RoomCode: before.RoomCode, ExpectedRoomVersion: int64(before.RoomVersion),
 		ExpectedMembershipVersion: int64(before.MembershipVersion), ExpectedOwnershipEpoch: int64(before.OwnershipEpoch),
@@ -383,6 +393,16 @@ func updateRoomAggregateCAS(ctx context.Context, queries QueryHandle, beforeSnap
 	row, err := queries.UpdatePartyRoomCAS(ctx, updatePartyRoomParams(beforeSnapshot, afterSnapshot))
 	if err != nil {
 		return roomDomain.Room{}, err
+	}
+	if afterSnapshot.OwnershipEpoch == beforeSnapshot.OwnershipEpoch+1 {
+		// A transferred host must not inherit a start authorized under the former
+		// ownership fence, even when the pending-start worker races this room CAS.
+		if _, err := queries.CancelActiveRoomPendingStarts(ctx, sqlcgen.CancelActiveRoomPendingStartsParams{
+			CancelledAt: timeToPG(afterSnapshot.UpdatedAt), RoomID: uuidToPG(afterSnapshot.ID),
+			ExpectedOwnershipEpoch: int64(beforeSnapshot.OwnershipEpoch),
+		}); err != nil {
+			return roomDomain.Room{}, err
+		}
 	}
 	existingMembers, err := queries.ListRoomMembers(ctx, sqlcgen.ListRoomMembersParams{RoomID: uuidToPG(afterSnapshot.ID)})
 	if err != nil {
@@ -438,6 +458,16 @@ func roomFromRows(row sqlcgen.PartyRoom, members []sqlcgen.RoomMember) (roomDoma
 		ActiveSessionID: optionalUUIDFromPG(row.ActiveSessionID), ActiveGameID: optionalTextFromPG(row.ActiveGameID),
 		LastFinishedSessionID: optionalUUIDFromPG(row.LastFinishedSessionID), LastFinishedGameID: optionalTextFromPG(row.LastFinishedGameID),
 		SelectedGameID: row.SelectedGameID, OwnershipEpoch: uint64(row.OwnershipEpoch),
+		PendingPauseRequest: roomDomain.PendingPauseRequest{
+			ID: optionalUUIDFromPG(row.PauseRequestID), SessionID: optionalUUIDFromPG(row.PauseRequestSessionID),
+			RequestedByUserID: optionalUUIDFromPG(row.PauseRequestedByUserID), RequestedAt: optionalTimeFromPG(row.PauseRequestedAt),
+		},
+		ActivePause: roomDomain.ActivePause{
+			ID: optionalUUIDFromPG(row.ActivePauseID), SessionID: optionalUUIDFromPG(row.ActivePauseSessionID),
+			Source:            roomDomain.PauseSource(optionalTextFromPG(row.ActivePauseSource)),
+			RequestedByUserID: optionalUUIDFromPG(row.ActivePauseRequestedByUserID),
+			PausedByUserID:    optionalUUIDFromPG(row.ActivePausePausedByUserID), PausedAt: optionalTimeFromPG(row.ActivePausePausedAt),
+		},
 		Members: make([]roomDomain.MemberSnapshot, 0, len(members)),
 	}
 	for _, member := range members {
@@ -507,7 +537,7 @@ func validateRoomTransition(before, after roomDomain.RoomSnapshot) error {
 		return err
 	}
 	if before.ID != after.ID || before.RoomCode != after.RoomCode || !before.CreatedAt.Equal(after.CreatedAt) ||
-		after.OwnershipEpoch < before.OwnershipEpoch ||
+		(after.OwnershipEpoch != before.OwnershipEpoch && after.OwnershipEpoch != before.OwnershipEpoch+1) ||
 		after.RoomVersion != before.RoomVersion+1 ||
 		(after.MembershipVersion != before.MembershipVersion && after.MembershipVersion != before.MembershipVersion+1) {
 		return roomDomain.ErrInvalidRoomInput

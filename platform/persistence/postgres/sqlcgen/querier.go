@@ -195,6 +195,15 @@ type Querier interface {
 	//    AND admin_version = $5
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	BootstrapAdminPasswordCAS(ctx context.Context, arg BootstrapAdminPasswordCASParams) (BootstrapAdminPasswordCASRow, error)
+	//CancelActiveRoomPendingStarts
+	//
+	//  UPDATE room_pending_starts
+	//  SET cancelled_at = $1
+	//  WHERE room_id = $2
+	//    AND ownership_epoch = $3
+	//    AND cancelled_at IS NULL
+	//    AND consumed_at IS NULL
+	CancelActiveRoomPendingStarts(ctx context.Context, arg CancelActiveRoomPendingStartsParams) (int64, error)
 	//CancelRoomPendingStart
 	//
 	//  UPDATE room_pending_starts
@@ -2200,6 +2209,14 @@ type Querier interface {
 	//  WHERE session_id = $1
 	//  ORDER BY timer_id
 	ListGameSessionTimers(ctx context.Context, arg ListGameSessionTimersParams) ([]GameSessionTimer, error)
+	//ListGameSessionTimersForUpdate
+	//
+	//  SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+	//  FROM game_session_timers
+	//  WHERE session_id = $1
+	//  ORDER BY timer_id
+	//  FOR UPDATE
+	ListGameSessionTimersForUpdate(ctx context.Context, arg ListGameSessionTimersForUpdateParams) ([]GameSessionTimer, error)
 	//ListMyRoomCards
 	//
 	//  SELECT room.room_id,
@@ -2854,6 +2871,15 @@ type Querier interface {
 	//  RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
 	//      access.member_snapshot_completed_at, access.created_at, access.updated_at
 	SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGameSessionReplayPolicyCASParams) (GameSessionReplayAccess, error)
+	//ShiftGameSessionTimers
+	//
+	//  UPDATE game_session_timers
+	//  SET due_at = due_at + (
+	//      $1::timestamptz - $2::timestamptz
+	//  )
+	//  WHERE session_id = $3
+	//  RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+	ShiftGameSessionTimers(ctx context.Context, arg ShiftGameSessionTimersParams) ([]GameSessionTimer, error)
 	//TouchAdminSessionCAS
 	//
 	//  UPDATE admin_sessions

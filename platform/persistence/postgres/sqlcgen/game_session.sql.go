@@ -23,7 +23,7 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 `
 
 type AcquireGameSessionOwnershipCASParams struct {
@@ -56,6 +56,7 @@ type AcquireGameSessionOwnershipCASRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -75,7 +76,7 @@ type AcquireGameSessionOwnershipCASRow struct {
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 func (q *Queries) AcquireGameSessionOwnershipCAS(ctx context.Context, arg AcquireGameSessionOwnershipCASParams) (AcquireGameSessionOwnershipCASRow, error) {
 	row := q.db.QueryRow(ctx, acquireGameSessionOwnershipCAS,
 		arg.UpdatedAt,
@@ -107,6 +108,7 @@ func (q *Queries) AcquireGameSessionOwnershipCAS(ctx context.Context, arg Acquir
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,
@@ -405,6 +407,7 @@ INSERT INTO game_sessions (
     start_ownership_epoch,
     cancel_reason,
     next_deadline_at,
+    suspended_at,
     status,
     started_at,
     updated_at,
@@ -435,13 +438,14 @@ INSERT INTO game_sessions (
     $23,
     $24,
     $25,
-    $26
+    $26,
+    $27
 )
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 `
 
 type CreateGameSessionParams struct {
@@ -467,6 +471,7 @@ type CreateGameSessionParams struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -496,6 +501,7 @@ type CreateGameSessionRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -527,6 +533,7 @@ type CreateGameSessionRow struct {
 //	    start_ownership_epoch,
 //	    cancel_reason,
 //	    next_deadline_at,
+//	    suspended_at,
 //	    status,
 //	    started_at,
 //	    updated_at,
@@ -557,13 +564,14 @@ type CreateGameSessionRow struct {
 //	    $23,
 //	    $24,
 //	    $25,
-//	    $26
+//	    $26,
+//	    $27
 //	)
 //	RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 func (q *Queries) CreateGameSession(ctx context.Context, arg CreateGameSessionParams) (CreateGameSessionRow, error) {
 	row := q.db.QueryRow(ctx, createGameSession,
 		arg.SessionID,
@@ -588,6 +596,7 @@ func (q *Queries) CreateGameSession(ctx context.Context, arg CreateGameSessionPa
 		arg.StartOwnershipEpoch,
 		arg.CancelReason,
 		arg.NextDeadlineAt,
+		arg.SuspendedAt,
 		arg.Status,
 		arg.StartedAt,
 		arg.UpdatedAt,
@@ -617,6 +626,7 @@ func (q *Queries) CreateGameSession(ctx context.Context, arg CreateGameSessionPa
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,
@@ -1178,7 +1188,7 @@ SELECT session_id, room_id, game_id, engine_version, protocol_version, client_ve
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 FROM game_sessions
 WHERE session_id = $1
 FOR SHARE
@@ -1211,6 +1221,7 @@ type GetGameSessionForShareRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -1223,7 +1234,7 @@ type GetGameSessionForShareRow struct {
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 //	FROM game_sessions
 //	WHERE session_id = $1
 //	FOR SHARE
@@ -1253,6 +1264,7 @@ func (q *Queries) GetGameSessionForShare(ctx context.Context, arg GetGameSession
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,
@@ -1266,7 +1278,7 @@ SELECT session_id, room_id, game_id, engine_version, protocol_version, client_ve
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 FROM game_sessions
 WHERE session_id = $1
 FOR UPDATE
@@ -1299,6 +1311,7 @@ type GetGameSessionForUpdateRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -1311,7 +1324,7 @@ type GetGameSessionForUpdateRow struct {
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 //	FROM game_sessions
 //	WHERE session_id = $1
 //	FOR UPDATE
@@ -1341,6 +1354,7 @@ func (q *Queries) GetGameSessionForUpdate(ctx context.Context, arg GetGameSessio
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,
@@ -2110,6 +2124,53 @@ func (q *Queries) ListGameSessionTimers(ctx context.Context, arg ListGameSession
 	return items, nil
 }
 
+const listGameSessionTimersForUpdate = `-- name: ListGameSessionTimersForUpdate :many
+SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+FROM game_session_timers
+WHERE session_id = $1
+ORDER BY timer_id
+FOR UPDATE
+`
+
+type ListGameSessionTimersForUpdateParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
+}
+
+// ListGameSessionTimersForUpdate
+//
+//	SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+//	FROM game_session_timers
+//	WHERE session_id = $1
+//	ORDER BY timer_id
+//	FOR UPDATE
+func (q *Queries) ListGameSessionTimersForUpdate(ctx context.Context, arg ListGameSessionTimersForUpdateParams) ([]GameSessionTimer, error) {
+	rows, err := q.db.Query(ctx, listGameSessionTimersForUpdate, arg.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GameSessionTimer{}
+	for rows.Next() {
+		var i GameSessionTimer
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.TimerID,
+			&i.ExpectedStateVersion,
+			&i.DueAt,
+			&i.MessageType,
+			&i.SchemaVersion,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setGameSessionReplayPolicyCAS = `-- name: SetGameSessionReplayPolicyCAS :one
 UPDATE game_session_replay_access AS access
 SET policy = $1,
@@ -2180,27 +2241,80 @@ func (q *Queries) SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGame
 	return i, err
 }
 
+const shiftGameSessionTimers = `-- name: ShiftGameSessionTimers :many
+UPDATE game_session_timers
+SET due_at = due_at + (
+    $1::timestamptz - $2::timestamptz
+)
+WHERE session_id = $3
+RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+`
+
+type ShiftGameSessionTimersParams struct {
+	ResumedAt   pgtype.Timestamptz `json:"resumed_at"`
+	SuspendedAt pgtype.Timestamptz `json:"suspended_at"`
+	SessionID   pgtype.UUID        `json:"session_id"`
+}
+
+// ShiftGameSessionTimers
+//
+//	UPDATE game_session_timers
+//	SET due_at = due_at + (
+//	    $1::timestamptz - $2::timestamptz
+//	)
+//	WHERE session_id = $3
+//	RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
+func (q *Queries) ShiftGameSessionTimers(ctx context.Context, arg ShiftGameSessionTimersParams) ([]GameSessionTimer, error) {
+	rows, err := q.db.Query(ctx, shiftGameSessionTimers, arg.ResumedAt, arg.SuspendedAt, arg.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GameSessionTimer{}
+	for rows.Next() {
+		var i GameSessionTimer
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.TimerID,
+			&i.ExpectedStateVersion,
+			&i.DueAt,
+			&i.MessageType,
+			&i.SchemaVersion,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateGameSessionLifecycleCAS = `-- name: UpdateGameSessionLifecycleCAS :one
 UPDATE game_sessions
 SET next_deadline_at = $1,
     cancel_reason = $2,
-    status = $3,
-    updated_at = $4,
-    ended_at = $5
-WHERE session_id = $6
-  AND state_version = $7
-  AND ownership_epoch = $8
+    suspended_at = $3,
+    status = $4,
+    updated_at = $5,
+    ended_at = $6
+WHERE session_id = $7
+  AND state_version = $8
+  AND ownership_epoch = $9
   AND status IN ('active', 'suspended')
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 `
 
 type UpdateGameSessionLifecycleCASParams struct {
 	NextDeadlineAt         pgtype.Timestamptz `json:"next_deadline_at"`
 	CancelReason           pgtype.Text        `json:"cancel_reason"`
+	SuspendedAt            pgtype.Timestamptz `json:"suspended_at"`
 	Status                 string             `json:"status"`
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 	EndedAt                pgtype.Timestamptz `json:"ended_at"`
@@ -2232,6 +2346,7 @@ type UpdateGameSessionLifecycleCASRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -2243,22 +2358,24 @@ type UpdateGameSessionLifecycleCASRow struct {
 //	UPDATE game_sessions
 //	SET next_deadline_at = $1,
 //	    cancel_reason = $2,
-//	    status = $3,
-//	    updated_at = $4,
-//	    ended_at = $5
-//	WHERE session_id = $6
-//	  AND state_version = $7
-//	  AND ownership_epoch = $8
+//	    suspended_at = $3,
+//	    status = $4,
+//	    updated_at = $5,
+//	    ended_at = $6
+//	WHERE session_id = $7
+//	  AND state_version = $8
+//	  AND ownership_epoch = $9
 //	  AND status IN ('active', 'suspended')
 //	RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 func (q *Queries) UpdateGameSessionLifecycleCAS(ctx context.Context, arg UpdateGameSessionLifecycleCASParams) (UpdateGameSessionLifecycleCASRow, error) {
 	row := q.db.QueryRow(ctx, updateGameSessionLifecycleCAS,
 		arg.NextDeadlineAt,
 		arg.CancelReason,
+		arg.SuspendedAt,
 		arg.Status,
 		arg.UpdatedAt,
 		arg.EndedAt,
@@ -2290,6 +2407,7 @@ func (q *Queries) UpdateGameSessionLifecycleCAS(ctx context.Context, arg UpdateG
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,
@@ -2315,18 +2433,19 @@ SET state_version = $1,
     start_ownership_epoch = $13,
     cancel_reason = $14,
     next_deadline_at = $15,
-    status = $16,
-    updated_at = $17,
-    ended_at = $18
-WHERE session_id = $19
-  AND state_version = $20
-  AND ownership_epoch = $21
+    suspended_at = $16,
+    status = $17,
+    updated_at = $18,
+    ended_at = $19
+WHERE session_id = $20
+  AND state_version = $21
+  AND ownership_epoch = $22
   AND status = 'active'
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
     state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
     start_config_digest, start_config_revision, start_room_version, start_membership_version,
-    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 `
 
 type UpdateGameSessionStateCASParams struct {
@@ -2345,6 +2464,7 @@ type UpdateGameSessionStateCASParams struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 	EndedAt                  pgtype.Timestamptz `json:"ended_at"`
@@ -2376,6 +2496,7 @@ type UpdateGameSessionStateCASRow struct {
 	StartOwnershipEpoch      pgtype.Int8        `json:"start_ownership_epoch"`
 	CancelReason             pgtype.Text        `json:"cancel_reason"`
 	NextDeadlineAt           pgtype.Timestamptz `json:"next_deadline_at"`
+	SuspendedAt              pgtype.Timestamptz `json:"suspended_at"`
 	Status                   string             `json:"status"`
 	StartedAt                pgtype.Timestamptz `json:"started_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
@@ -2400,18 +2521,19 @@ type UpdateGameSessionStateCASRow struct {
 //	    start_ownership_epoch = $13,
 //	    cancel_reason = $14,
 //	    next_deadline_at = $15,
-//	    status = $16,
-//	    updated_at = $17,
-//	    ended_at = $18
-//	WHERE session_id = $19
-//	  AND state_version = $20
-//	  AND ownership_epoch = $21
+//	    suspended_at = $16,
+//	    status = $17,
+//	    updated_at = $18,
+//	    ended_at = $19
+//	WHERE session_id = $20
+//	  AND state_version = $21
+//	  AND ownership_epoch = $22
 //	  AND status = 'active'
 //	RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 //	    state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 //	    start_config_digest, start_config_revision, start_room_version, start_membership_version,
-//	    start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+//	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 func (q *Queries) UpdateGameSessionStateCAS(ctx context.Context, arg UpdateGameSessionStateCASParams) (UpdateGameSessionStateCASRow, error) {
 	row := q.db.QueryRow(ctx, updateGameSessionStateCAS,
 		arg.StateVersion,
@@ -2429,6 +2551,7 @@ func (q *Queries) UpdateGameSessionStateCAS(ctx context.Context, arg UpdateGameS
 		arg.StartOwnershipEpoch,
 		arg.CancelReason,
 		arg.NextDeadlineAt,
+		arg.SuspendedAt,
 		arg.Status,
 		arg.UpdatedAt,
 		arg.EndedAt,
@@ -2460,6 +2583,7 @@ func (q *Queries) UpdateGameSessionStateCAS(ctx context.Context, arg UpdateGameS
 		&i.StartOwnershipEpoch,
 		&i.CancelReason,
 		&i.NextDeadlineAt,
+		&i.SuspendedAt,
 		&i.Status,
 		&i.StartedAt,
 		&i.UpdatedAt,

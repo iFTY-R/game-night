@@ -79,24 +79,11 @@ AFTER INSERT OR UPDATE OR DELETE ON username_claims
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION enforce_username_claim_invariants();
 
+-- This pre-production migration assumes room_members is empty; development data is reset instead of backfilled.
 -- Room membership owns the stable, viewer-independent name shown at that table.
 ALTER TABLE room_members
-    ADD COLUMN display_username text,
-    ADD COLUMN username_key text;
-
-UPDATE room_members AS member
-SET display_username = users.username,
-    username_key = users.current_username_key
-FROM users
-WHERE users.user_id = member.user_id;
-
--- The backfill touches columns on a table with deferred room integrity constraints. Flush those events before
--- changing the same table's shape, otherwise PostgreSQL rejects the ALTER with pending trigger events.
-SET CONSTRAINTS ALL IMMEDIATE;
-
-ALTER TABLE room_members
-    ALTER COLUMN display_username SET NOT NULL,
-    ALTER COLUMN username_key SET NOT NULL,
+    ADD COLUMN display_username text NOT NULL,
+    ADD COLUMN username_key text NOT NULL,
     ADD CONSTRAINT room_members_display_username_nonempty CHECK (display_username <> ''),
     ADD CONSTRAINT room_members_username_key_nonempty CHECK (username_key <> ''),
     ADD CONSTRAINT room_members_username_key_unique UNIQUE (room_id, username_key);

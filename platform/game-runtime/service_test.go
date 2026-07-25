@@ -300,6 +300,31 @@ func TestRuntimeServiceActionSuspendsWhenExactModuleDisappears(t *testing.T) {
 	}
 }
 
+func TestRuntimeServiceExplicitlySuspendsAndResumesSession(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	_, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	suspended, err := fixture.service.Suspend(t.Context(), SuspendCommand{
+		SessionID: session.Snapshot().ID, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	})
+	if err != nil || suspended.Snapshot().Status != StatusSuspended || suspended.Snapshot().SuspendedAt.IsZero() {
+		t.Fatalf("suspended=%+v error=%v", suspended.Snapshot(), err)
+	}
+	_, _ = fixture.clock.Advance(30 * time.Second)
+	resumed, err := fixture.service.Resume(t.Context(), ResumeCommand{
+		SessionID: session.Snapshot().ID, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	})
+	if err != nil || resumed.Snapshot().Status != StatusActive || !resumed.Snapshot().SuspendedAt.IsZero() {
+		t.Fatalf("resumed=%+v error=%v", resumed.Snapshot(), err)
+	}
+}
+
 func TestRuntimeServiceTimerAndSystemReplayBeforeCallingModule(t *testing.T) {
 	t.Run("terminal timer", func(t *testing.T) {
 		fixture := newRuntimeServiceFixture(t)

@@ -282,6 +282,49 @@ func TestSystemCommitBindsOperationSourceAndDigestToActorlessBatch(t *testing.T)
 	}
 }
 
+func TestLifecycleCommitAllowsOnlyUniformResumeTimerShift(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 16, 0, 0, 0, time.UTC)
+	create := testRuntimeCreateRequest(now)
+	create.Transition = testRuntimeTransition(
+		1,
+		false,
+		testRuntimeTimer("round.timeout", now.Add(2*time.Minute)),
+		testRuntimeTimer("turn.timeout", now.Add(time.Minute)),
+	)
+	active, _, err := NewSession(create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active, err = active.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := active.Suspend(1, now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumedAt := now.Add(32 * time.Second)
+	resumed, err := suspended.Resume(1, resumedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := testRuntimeLifecycleOutboxEvent(t, GameSessionResumedEventType, resumed.Snapshot().ID, resumedAt)
+	if commit, err := NewLifecycleCommit(suspended, resumed, []outbox.Event{event}); err != nil || !commit.Valid() {
+		t.Fatalf("uniform resume commit valid = %v, err = %v", commit.Valid(), err)
+	}
+
+	invalidSnapshot := resumed.Snapshot()
+	invalidSnapshot.Timers[0].DueAt = invalidSnapshot.Timers[0].DueAt.Add(time.Second)
+	invalidSnapshot.NextDeadlineAt = invalidSnapshot.Timers[1].DueAt
+	invalid, err := RestoreSession(invalidSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewLifecycleCommit(suspended, invalid, []outbox.Event{event}); !errors.Is(err, ErrInvalidLifecycleCommit) {
+		t.Fatalf("non-uniform resume error = %v", err)
+	}
+}
+
 func testRuntimeTransitionOutboxEvent(t testing.TB, sessionID uuid.UUID, stateVersion uint64, at time.Time) outbox.Event {
 	t.Helper()
 	eventType, err := outbox.ParseEventType("game.session.transitioned.v1")
@@ -295,6 +338,15 @@ func testRuntimeTransitionOutboxEvent(t testing.TB, sessionID uuid.UUID, stateVe
 	event, err := outbox.NewEvent(
 		uuid.New(), eventType, aggregateType, sessionID, []byte(`{"stateVersion":`+strconv.FormatUint(stateVersion, 10)+`}`), at, at,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return event
+}
+
+func testRuntimeLifecycleOutboxEvent(t testing.TB, eventType outbox.EventType, sessionID uuid.UUID, at time.Time) outbox.Event {
+	t.Helper()
+	event, err := outbox.NewEvent(uuid.New(), eventType, GameSessionAggregateType, sessionID, []byte(`{}`), at, at)
 	if err != nil {
 		t.Fatal(err)
 	}

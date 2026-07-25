@@ -641,6 +641,24 @@ type CancelCommand struct {
 	CloseRoom bool
 }
 
+// SuspendCommand identifies one active session and the ownership epoch allowed to freeze execution.
+type SuspendCommand struct {
+	SessionID      uuid.UUID
+	OwnershipEpoch uint64
+}
+
+// Suspend freezes module transitions and persisted timers without requiring the game module to be available.
+func (service *Service) Suspend(ctx context.Context, command SuspendCommand) (Session, error) {
+	if service == nil || ctx == nil || command.SessionID == uuid.Nil || command.OwnershipEpoch == 0 {
+		return Session{}, ErrInvalidSessionInput
+	}
+	before, err := service.sessions.Get(ctx, command.SessionID)
+	if err != nil {
+		return Session{}, err
+	}
+	return service.commitSuspend(ctx, before, command.OwnershipEpoch)
+}
+
 // ResumeCommand identifies one suspended session and the ownership epoch allowed to re-enable execution.
 type ResumeCommand struct {
 	SessionID      uuid.UUID
@@ -1029,27 +1047,31 @@ func (service *Service) prepareRoomFinish(
 }
 
 func (service *Service) suspendMissingModule(ctx context.Context, before Session, ownershipEpoch uint64) error {
+	if _, err := service.commitSuspend(ctx, before, ownershipEpoch); err != nil {
+		return err
+	}
+	return ErrModuleUnavailable
+}
+
+// commitSuspend is shared by host-driven pause and defensive module-unavailable suspension.
+func (service *Service) commitSuspend(ctx context.Context, before Session, ownershipEpoch uint64) (Session, error) {
 	at := service.clock.Now().Round(0).UTC()
 	if !at.After(before.Snapshot().UpdatedAt) {
 		at = before.Snapshot().UpdatedAt.Add(time.Microsecond)
 	}
 	after, err := before.Suspend(ownershipEpoch, at)
 	if err != nil {
-		return err
+		return Session{}, err
 	}
 	event, err := service.newOutboxEvent(GameSessionSuspendedEventType, before.Snapshot().ID, before.Snapshot().State.StateVersion, at)
 	if err != nil {
-		return err
+		return Session{}, err
 	}
 	commit, err := NewLifecycleCommit(before, after, []outbox.Event{event})
 	if err != nil {
-		return err
+		return Session{}, err
 	}
-	_, err = service.sessions.CommitLifecycle(ctx, commit)
-	if err != nil {
-		return err
-	}
-	return ErrModuleUnavailable
+	return service.sessions.CommitLifecycle(ctx, commit)
 }
 
 func (service *Service) newOutboxEvent(eventType outbox.EventType, sessionID uuid.UUID, stateVersion uint64, at time.Time) (outbox.Event, error) {

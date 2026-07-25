@@ -88,8 +88,10 @@ type SessionSnapshot struct {
 	Status         Status
 	StartedAt      time.Time
 	UpdatedAt      time.Time
-	EndedAt        time.Time
-	CancelReason   game.Identifier
+	// SuspendedAt anchors the remaining timer duration while a suspended session is not schedulable.
+	SuspendedAt  time.Time
+	EndedAt      time.Time
+	CancelReason game.Identifier
 }
 
 // Session is immutable; every accepted command returns a new snapshot for one CAS commit.
@@ -196,6 +198,7 @@ func NewSession(request CreateRequest) (Session, EventBatch, error) {
 func RestoreSession(snapshot SessionSnapshot) (Session, error) {
 	snapshot.StartedAt = canonicalRuntimeTime(snapshot.StartedAt)
 	snapshot.UpdatedAt = canonicalRuntimeTime(snapshot.UpdatedAt)
+	snapshot.SuspendedAt = canonicalRuntimeTime(snapshot.SuspendedAt)
 	snapshot.EndedAt = canonicalRuntimeTime(snapshot.EndedAt)
 	snapshot.NextDeadlineAt = canonicalRuntimeTime(snapshot.NextDeadlineAt)
 	var err error
@@ -229,6 +232,13 @@ func RestoreSession(snapshot SessionSnapshot) (Session, error) {
 			return Session{}, ErrInvalidSessionInput
 		}
 	} else if !snapshot.EndedAt.IsZero() || snapshot.CancelReason != "" {
+		return Session{}, ErrInvalidSessionInput
+	}
+	if snapshot.Status == StatusSuspended {
+		if snapshot.SuspendedAt.IsZero() || snapshot.SuspendedAt.Before(snapshot.StartedAt) || snapshot.SuspendedAt.After(snapshot.UpdatedAt) {
+			return Session{}, ErrInvalidSessionInput
+		}
+	} else if !snapshot.SuspendedAt.IsZero() {
 		return Session{}, ErrInvalidSessionInput
 	}
 	snapshot.Participants = participants
@@ -406,10 +416,11 @@ func (session Session) Suspend(expectedEpoch uint64, at time.Time) (Session, err
 	next := session.Snapshot()
 	next.Status = StatusSuspended
 	next.UpdatedAt = at
+	next.SuspendedAt = at
 	return RestoreSession(next)
 }
 
-// Resume re-enables module-driven transitions after the exact retained runtime becomes available again.
+// Resume re-enables transitions and preserves every timer's remaining duration across the pause.
 func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, error) {
 	if session.snapshot.Status.Terminal() {
 		return Session{}, ErrSessionTerminal
@@ -424,9 +435,28 @@ func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, erro
 	if at.IsZero() || !at.After(session.snapshot.UpdatedAt) {
 		return Session{}, ErrInvalidSessionInput
 	}
+	pausedFor := at.Sub(session.snapshot.SuspendedAt)
+	if session.snapshot.SuspendedAt.IsZero() || pausedFor <= 0 {
+		return Session{}, ErrInvalidSessionInput
+	}
 	next := session.Snapshot()
+	for index := range next.Timers {
+		shifted := canonicalRuntimeTime(next.Timers[index].DueAt.Add(pausedFor))
+		if !shifted.After(next.Timers[index].DueAt) {
+			return Session{}, ErrInvalidSessionInput
+		}
+		next.Timers[index].DueAt = shifted
+	}
+	if !next.NextDeadlineAt.IsZero() {
+		shifted := canonicalRuntimeTime(next.NextDeadlineAt.Add(pausedFor))
+		if !shifted.After(next.NextDeadlineAt) {
+			return Session{}, ErrInvalidSessionInput
+		}
+		next.NextDeadlineAt = shifted
+	}
 	next.Status = StatusActive
 	next.UpdatedAt = at
+	next.SuspendedAt = time.Time{}
 	return RestoreSession(next)
 }
 
@@ -447,6 +477,7 @@ func (session Session) Cancel(expectedEpoch uint64, at time.Time, reason game.Id
 	next.Timers = nil
 	next.NextDeadlineAt = time.Time{}
 	next.UpdatedAt = at
+	next.SuspendedAt = time.Time{}
 	next.EndedAt = at
 	next.CancelReason = reason
 	return RestoreSession(next)

@@ -516,18 +516,18 @@ func (commit SystemCommit) OutboxEvents() []outbox.Event {
 	return append([]outbox.Event(nil), commit.outboxEvents...)
 }
 
-// NewLifecycleCommit accepts only suspend, resume, or cancel transitions with unchanged game state and ownership.
+// NewLifecycleCommit accepts only suspend, uniformly timer-shifted resume, or cancel transitions.
 func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (LifecycleCommit, error) {
 	beforeSnapshot, afterSnapshot := before.Snapshot(), after.Snapshot()
 	expectedEventType := GameSessionSuspendedEventType
 	validStatus := beforeSnapshot.Status == StatusActive && afterSnapshot.Status == StatusSuspended &&
 		reflect.DeepEqual(beforeSnapshot.Timers, afterSnapshot.Timers) &&
-		beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero()
+		beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero() &&
+		afterSnapshot.SuspendedAt.Equal(afterSnapshot.UpdatedAt)
 	if beforeSnapshot.Status == StatusSuspended && afterSnapshot.Status == StatusActive {
 		expectedEventType = GameSessionResumedEventType
-		validStatus = reflect.DeepEqual(beforeSnapshot.Timers, afterSnapshot.Timers) &&
-			beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero() &&
-			afterSnapshot.CancelReason == ""
+		validStatus = validResumeTimerShift(beforeSnapshot, afterSnapshot) && afterSnapshot.EndedAt.IsZero() &&
+			afterSnapshot.SuspendedAt.IsZero() && afterSnapshot.CancelReason == ""
 	}
 	if afterSnapshot.Status == StatusCancelled {
 		expectedEventType = GameSessionCancelledEventType
@@ -551,6 +551,25 @@ func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (Lif
 		}
 	}
 	return LifecycleCommit{before: before, after: after, outboxEvents: append([]outbox.Event(nil), outboxEvents...)}, nil
+}
+
+// validResumeTimerShift prevents lifecycle persistence from changing timer payloads or applying uneven deadline shifts.
+func validResumeTimerShift(before, after SessionSnapshot) bool {
+	if before.SuspendedAt.IsZero() || !after.UpdatedAt.After(before.SuspendedAt) || len(before.Timers) != len(after.Timers) {
+		return false
+	}
+	pausedFor := after.UpdatedAt.Sub(before.SuspendedAt)
+	for index := range before.Timers {
+		left, right := before.Timers[index], after.Timers[index]
+		if left.TimerID != right.TimerID || left.ExpectedStateVersion != right.ExpectedStateVersion ||
+			!sameGameMessage(left.Message, right.Message) || !left.DueAt.Add(pausedFor).Equal(right.DueAt) {
+			return false
+		}
+	}
+	if before.NextDeadlineAt.IsZero() || after.NextDeadlineAt.IsZero() {
+		return before.NextDeadlineAt.IsZero() && after.NextDeadlineAt.IsZero()
+	}
+	return before.NextDeadlineAt.Add(pausedFor).Equal(after.NextDeadlineAt)
 }
 
 // Valid reports whether the lifecycle value still satisfies its constructor invariants.

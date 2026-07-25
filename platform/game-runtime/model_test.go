@@ -291,7 +291,12 @@ func TestApplySystemBindsOperationSourceDigestAndProducesActorlessBatch(t *testi
 func TestSuspendResumeAndCancelApplyLifecycleTimerSemantics(t *testing.T) {
 	now := time.Date(2026, time.July, 19, 12, 0, 0, 0, time.UTC)
 	create := testRuntimeCreateRequest(now)
-	create.Transition = testRuntimeTransition(1, false, testRuntimeTimer("turn.timeout", now.Add(time.Minute)))
+	create.Transition = testRuntimeTransition(
+		1,
+		false,
+		testRuntimeTimer("round.timeout", now.Add(2*time.Minute)),
+		testRuntimeTimer("turn.timeout", now.Add(time.Minute)),
+	)
 	session, _, err := NewSession(create)
 	if err != nil {
 		t.Fatal(err)
@@ -306,35 +311,60 @@ func TestSuspendResumeAndCancelApplyLifecycleTimerSemantics(t *testing.T) {
 	}
 	suspendedSnapshot := suspended.Snapshot()
 	if suspendedSnapshot.Status != StatusSuspended || suspendedSnapshot.State.StateVersion != 1 ||
-		len(suspendedSnapshot.Timers) != 1 || suspendedSnapshot.NextDeadlineAt.IsZero() {
+		len(suspendedSnapshot.Timers) != 2 || suspendedSnapshot.NextDeadlineAt.IsZero() ||
+		!suspendedSnapshot.SuspendedAt.Equal(now.Add(2*time.Second)) {
 		t.Fatalf("suspended snapshot = %+v", suspendedSnapshot)
 	}
 	if _, _, err := suspended.ApplySystem(SystemTransitionRequest{}); !errors.Is(err, ErrSessionSuspended) {
 		t.Fatalf("suspended transition error = %v", err)
 	}
-	resumed, err := suspended.Resume(1, now.Add(3*time.Second))
+	resumed, err := suspended.Resume(1, now.Add(32*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resumed.Snapshot().Status != StatusActive || len(resumed.Snapshot().Timers) != 1 {
-		t.Fatalf("resumed snapshot = %+v", resumed.Snapshot())
+	resumedSnapshot := resumed.Snapshot()
+	if resumedSnapshot.Status != StatusActive || len(resumedSnapshot.Timers) != 2 || !resumedSnapshot.SuspendedAt.IsZero() ||
+		!resumedSnapshot.NextDeadlineAt.Equal(now.Add(90*time.Second)) ||
+		!resumedSnapshot.Timers[0].DueAt.Equal(now.Add(150*time.Second)) ||
+		!resumedSnapshot.Timers[1].DueAt.Equal(now.Add(90*time.Second)) {
+		t.Fatalf("resumed snapshot = %+v", resumedSnapshot)
 	}
-	suspended, err = resumed.Suspend(1, now.Add(4*time.Second))
+	suspended, err = resumed.Suspend(1, now.Add(34*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err := suspended.Cancel(1, now.Add(5*time.Second), CancelReasonPlatformCancelled)
+	cancelled, err := suspended.Cancel(1, now.Add(35*time.Second), CancelReasonPlatformCancelled)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cancelledSnapshot := cancelled.Snapshot()
 	if cancelledSnapshot.Status != StatusCancelled || cancelledSnapshot.State.StateVersion != 1 ||
 		len(cancelledSnapshot.Timers) != 0 || !cancelledSnapshot.NextDeadlineAt.IsZero() ||
-		!cancelledSnapshot.EndedAt.Equal(now.Add(5*time.Second)) || cancelledSnapshot.CancelReason != CancelReasonPlatformCancelled {
+		!cancelledSnapshot.SuspendedAt.IsZero() || !cancelledSnapshot.EndedAt.Equal(now.Add(35*time.Second)) ||
+		cancelledSnapshot.CancelReason != CancelReasonPlatformCancelled {
 		t.Fatalf("cancelled snapshot = %+v", cancelledSnapshot)
 	}
-	if _, err := cancelled.Cancel(1, now.Add(6*time.Second), CancelReasonPlatformCancelled); !errors.Is(err, ErrSessionTerminal) {
+	if _, err := cancelled.Cancel(1, now.Add(36*time.Second), CancelReasonPlatformCancelled); !errors.Is(err, ErrSessionTerminal) {
 		t.Fatalf("terminal cancel error = %v", err)
+	}
+}
+
+func TestRestoreSessionRejectsPauseTimestampOutsideSuspendedState(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 12, 15, 0, 0, time.UTC)
+	session, _, err := NewSession(testRuntimeCreateRequest(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := session.Snapshot()
+	snapshot.SuspendedAt = now
+	if _, err := RestoreSession(snapshot); !errors.Is(err, ErrInvalidSessionInput) {
+		t.Fatalf("active pause timestamp error = %v", err)
+	}
+	snapshot.Status = StatusSuspended
+	snapshot.UpdatedAt = now.Add(time.Second)
+	snapshot.SuspendedAt = time.Time{}
+	if _, err := RestoreSession(snapshot); !errors.Is(err, ErrInvalidSessionInput) {
+		t.Fatalf("missing suspended timestamp error = %v", err)
 	}
 }
 

@@ -584,9 +584,9 @@ func persistLifecycleAfterSessionLock(
 	}
 	resuming := before.Status == gameruntime.StatusSuspended && after.Status == gameruntime.StatusActive
 	if resuming {
-		// Resume preserves the database-owned timer rows and moves every deadline by
-		// the exact frozen interval while the session row prevents concurrent work.
-		if err := shiftGameSessionTimersForResume(ctx, queries, before, after); err != nil {
+		// Resume first proves the locked timer pre-image, then persists the exact
+		// module-adjusted payloads and deadlines while the session row prevents concurrent work.
+		if err := persistAdjustedGameSessionTimersForResume(ctx, queries, before, after); err != nil {
 			return gameruntime.Session{}, err
 		}
 	}
@@ -605,9 +605,9 @@ func persistLifecycleAfterSessionLock(
 	return sessionFromUpdatedRow(ctx, queries, row)
 }
 
-// shiftGameSessionTimersForResume proves both the locked pre-image and shifted
-// post-image match the lifecycle commit instead of trusting caller timestamps.
-func shiftGameSessionTimersForResume(
+// persistAdjustedGameSessionTimersForResume proves both the locked pre-image and
+// module-adjusted post-image match the lifecycle commit instead of trusting caller data.
+func persistAdjustedGameSessionTimersForResume(
 	ctx context.Context,
 	queries QueryHandle,
 	before gameruntime.SessionSnapshot,
@@ -625,8 +625,11 @@ func shiftGameSessionTimersForResume(
 	if !samePersistedTimers(locked, before.ID, before.Timers) {
 		return gameruntime.ErrGameSessionIntegrity
 	}
-	shifted, err := queries.ShiftGameSessionTimers(ctx, sqlcgen.ShiftGameSessionTimersParams{
-		ResumedAt: timeToPG(after.UpdatedAt), SuspendedAt: timeToPG(before.SuspendedAt), SessionID: uuidToPG(before.ID),
+	if err := replaceGameSessionTimers(ctx, queries, after.ID, after.Timers); err != nil {
+		return err
+	}
+	shifted, err := queries.ListGameSessionTimersForUpdate(ctx, sqlcgen.ListGameSessionTimersForUpdateParams{
+		SessionID: uuidToPG(after.ID),
 	})
 	if err != nil {
 		return err
@@ -1042,6 +1045,8 @@ func terminalSystemCompletionTime(proposed, sessionUpdatedAt time.Time) time.Tim
 
 func updateGameSessionLifecycleParams(before, after gameruntime.SessionSnapshot) sqlcgen.UpdateGameSessionLifecycleCASParams {
 	return sqlcgen.UpdateGameSessionLifecycleCASParams{
+		SnapshotVersion: int32(after.State.SnapshotVersion), StateMessageType: string(after.State.State.MessageType),
+		StateSchemaVersion: int32(after.State.State.SchemaVersion), StatePayload: requiredBytea(after.State.State.Payload),
 		NextDeadlineAt: optionalTimeToPG(after.NextDeadlineAt), CancelReason: optionalIdentifierToPG(after.CancelReason),
 		SuspendedAt: optionalTimeToPG(after.SuspendedAt), Status: string(after.Status),
 		UpdatedAt: timeToPG(after.UpdatedAt), EndedAt: optionalTimeToPG(after.EndedAt), SessionID: uuidToPG(before.ID),

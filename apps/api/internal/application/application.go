@@ -29,6 +29,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
+	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/identifier"
 	identitydomain "github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres"
@@ -62,13 +63,19 @@ const (
 	gameSessionLeaseTTL = 15 * time.Second
 )
 
+// GameRegistry supplies both room admission manifests and exact runtime modules for pause recovery.
+type GameRegistry interface {
+	roomdomain.ManifestRegistry
+	gameruntime.Registry
+}
+
 // Options supplies process-owned observers, the durable checkpoint probe, and the immutable game registry.
 type Options struct {
 	Logger         *slog.Logger
 	Metrics        *prometheus.Registry
 	CheckpointSink audit.SinkReadiness
 	// Registry is the startup-validated manifest source shared with the realtime runtime.
-	Registry roomdomain.ManifestRegistry
+	Registry GameRegistry
 }
 
 // Application owns the listener and every closeable dependency created for it.
@@ -176,6 +183,12 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	gameGovernance, err := gameruntime.NewService(
+		options.Registry, gameSessionRepository, roomRepository, postgres.NewRoomGameSessionRepository(pool), source, gameruntime.SecureGenerator{},
+	)
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	application.argon2 = argon2Service
 	auditService, checkpointPolicy, err := securityServices(keyrings, config.Shared, options.CheckpointSink)
 	if err != nil {
@@ -205,7 +218,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 		return nil, errInitializeTransport
 	}
 	handler, err := transportHandler(
-		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameSessionRepository, roomRepository,
+		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameGovernance, gameSessionRepository, roomRepository,
 		ruleRepository, replayAccessRepository, gameCoordinator, adminService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
@@ -410,6 +423,7 @@ func transportHandler(
 	roomService *roomdomain.Service,
 	gameCatalog roomdomain.GameCatalog,
 	gameRuntime gametransport.Runtime,
+	gameGovernance roomtransport.GameGovernance,
 	gameSessions *postgres.GameSessionRepository,
 	rooms *postgres.RoomRepository,
 	rules *postgres.RuleRepository,
@@ -463,6 +477,7 @@ func transportHandler(
 		roomAuthenticator, userOrigins, userCSRF,
 		roomtransport.WithRuleRepository(rules),
 		roomtransport.WithRuleClock(source),
+		roomtransport.WithGameGovernance(gameGovernance),
 	)
 	if err != nil {
 		return nil, err

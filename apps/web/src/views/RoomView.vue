@@ -27,7 +27,7 @@ import {
   type Config as ThreeRoundsConfig,
 } from "@game-night/three-rounds-client";
 import { ActionTray, DangerConfirm, GameTable, type TableSeat, type TrayState } from "@game-night/game-ui-kit";
-import { ArrowLeft, Check, ChevronDown, Clock3, DoorClosed, History, LockKeyhole, Play, Save, Share2, SlidersHorizontal, Trash2, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
+import { ArrowLeft, ArrowRightLeft, Check, ChevronDown, Clock3, DoorClosed, History, LockKeyhole, Play, Save, Share2, SlidersHorizontal, Trash2, UserMinus, UserPlus, Users, X } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -63,7 +63,7 @@ const startSaving = ref(false);
 const countdownCancelSaving = ref(false);
 const nowMs = ref(Date.now());
 const isLandscape = ref(false);
-type GovernanceConfirmation = { kind: "remove"; userId: string } | { kind: "close" };
+type GovernanceConfirmation = { kind: "remove" | "transfer"; userId: string } | { kind: "close" };
 const governanceConfirmation = ref<GovernanceConfirmation | null>(null);
 const governanceSaving = ref(false);
 let governanceTrigger: HTMLElement | null = null;
@@ -180,6 +180,7 @@ const tableSeats = computed<readonly TableSeat[]>(() =>
     displayName: displayMemberName(member.userId),
     avatarText: displayMemberName(member.userId).slice(0, 1),
     status: memberStatusLabel(member),
+    statusItems: memberStatusItems(member),
     connected: true,
     host: member.userId === displayHostUserId.value,
   })),
@@ -218,12 +219,25 @@ const memberStatusLabel = (member: RoomMember): string => {
   if (member.role.includes("SPECTATOR")) return "观战";
   return member.userId === displayHostUserId.value ? "房主 · 已入座" : "已入座";
 };
-const governanceTitle = computed(() => governanceConfirmation.value?.kind === "remove" ? "确认移出成员？" : "确认解散房间？");
+const memberStatusItems = (member: RoomMember): readonly string[] => {
+  if (member.role.includes("WAITING")) return ["候场中"];
+  if (member.role.includes("SPECTATOR")) return ["观战"];
+  // The table card is intentionally narrow on portrait phones, so host and seat state rotate instead of stretching the card.
+  return member.userId === displayHostUserId.value ? ["房主", "已入座"] : ["已入座"];
+};
+const governanceTitle = computed(() => {
+  if (governanceConfirmation.value?.kind === "remove") return "确认移出成员？";
+  if (governanceConfirmation.value?.kind === "transfer") return "确认转移房主？";
+  return "确认解散房间？";
+});
 const governanceDescription = computed(() => {
   const confirmation = governanceConfirmation.value;
   if (confirmation?.kind === "remove") {
     const effect = isPlaying.value ? "对局中的冻结座位会保留，并由游戏规则接管离场处理。" : "对方将立即失去这个房间的访问权限。";
     return `${displayMemberName(confirmation.userId)}将被移出。${effect}`;
+  }
+  if (confirmation?.kind === "transfer") {
+    return `转移后，${displayMemberName(confirmation.userId)}会立即获得开局、暂停审批和房间管理权限，你将成为普通玩家。`;
   }
   const sessionEffect = isPlaying.value ? "当前对局会立即终止；取消前已公开的进度会保留，未公开手牌继续保密。" : "";
   return `${sessionEffect}房间码会立即失效，所有成员都需要返回发现页。这项操作无法撤销。`;
@@ -810,6 +824,9 @@ const openGovernanceConfirmation = async (confirmation: GovernanceConfirmation, 
 const requestRemoveMember = (member: RoomMember, event: Event): Promise<void> =>
   openGovernanceConfirmation({ kind: "remove", userId: member.userId }, event);
 
+const requestTransferHost = (member: RoomMember, event: Event): Promise<void> =>
+  openGovernanceConfirmation({ kind: "transfer", userId: member.userId }, event);
+
 const requestCloseRoom = (event: Event): Promise<void> => openGovernanceConfirmation({ kind: "close" }, event);
 
 /** Cancels a pending destructive command and restores focus to the control that opened it. */
@@ -832,6 +849,9 @@ const confirmGovernance = async (): Promise<void> => {
     if (confirmation.kind === "remove") {
       const updated = await room.removeRemoteMember(confirmation.userId);
       if (!updated) throw new Error("成员移出响应不完整");
+    } else if (confirmation.kind === "transfer") {
+      const updated = await room.transferRemoteHost(confirmation.userId);
+      if (!updated || updated.hostUserId !== confirmation.userId) throw new Error("房主转移响应不完整");
     } else {
       const updated = await room.closeRemoteRoom();
       if (!updated?.status.includes("CLOSED")) throw new Error("房间解散响应不完整");
@@ -839,7 +859,8 @@ const confirmGovernance = async (): Promise<void> => {
     }
     governanceConfirmation.value = null;
   } catch (error) {
-    actionError.value = error instanceof Error ? error.message : confirmation.kind === "remove" ? "成员移出失败" : "房间解散失败";
+    const fallback = confirmation.kind === "remove" ? "成员移出失败" : confirmation.kind === "transfer" ? "房主转移失败" : "房间解散失败";
+    actionError.value = error instanceof Error ? error.message : fallback;
     await refreshRoom();
   } finally {
     governanceSaving.value = false;
@@ -1127,6 +1148,16 @@ const leave = async (): Promise<void> => {
               <UserPlus :size="18" aria-hidden="true" />
             </button>
             <button
+              v-if="currentHost && member.userId !== displayHostUserId && member.role.includes('PARTICIPANT')"
+              class="mini-action mini-action--transfer"
+              type="button"
+              :aria-label="`把房主转移给 ${displayMemberName(member.userId)}`"
+              :disabled="governanceSaving"
+              @click="requestTransferHost(member, $event)"
+            >
+              <ArrowRightLeft :size="18" aria-hidden="true" />
+            </button>
+            <button
               v-if="currentHost && member.userId !== displayHostUserId"
               class="mini-action mini-action--danger"
               type="button"
@@ -1166,7 +1197,7 @@ const leave = async (): Promise<void> => {
     <DangerConfirm
       :open="governanceConfirmation !== null"
       :title="governanceTitle"
-      :confirm-label="governanceSaving ? '正在处理' : governanceConfirmation?.kind === 'remove' ? '确认移出' : '确认解散'"
+      :confirm-label="governanceSaving ? '正在处理' : governanceConfirmation?.kind === 'remove' ? '确认移出' : governanceConfirmation?.kind === 'transfer' ? '确认转移' : '确认解散'"
       @cancel="cancelGovernanceConfirmation"
       @confirm="confirmGovernance"
     >
@@ -1404,6 +1435,7 @@ const leave = async (): Promise<void> => {
   border-radius: 12px;
 }
 .mini-action--danger { color: var(--platform-danger); border-color: var(--room-border-danger); }
+.mini-action--transfer { color: var(--room-success); }
 .mini-action:disabled { cursor: not-allowed; opacity: .5; }
 .danger-control {
   min-height: 48px;

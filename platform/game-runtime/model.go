@@ -422,6 +422,16 @@ func (session Session) Suspend(expectedEpoch uint64, at time.Time) (Session, err
 
 // Resume re-enables transitions and preserves every timer's remaining duration across the pause.
 func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, error) {
+	return session.resumeWithAdjustment(expectedEpoch, at, nil)
+}
+
+// resumeWithAdjustment reactivates a suspended session after shifting timers and
+// optionally letting the module rewrite opaque deadline fields inside state and timer payloads.
+func (session Session) resumeWithAdjustment(
+	expectedEpoch uint64,
+	at time.Time,
+	adjust func(game.Snapshot, []game.TimerIntent) (game.Snapshot, []game.TimerIntent, error),
+) (Session, error) {
 	if session.snapshot.Status.Terminal() {
 		return Session{}, ErrSessionTerminal
 	}
@@ -439,21 +449,28 @@ func (session Session) Resume(expectedEpoch uint64, at time.Time) (Session, erro
 	if session.snapshot.SuspendedAt.IsZero() || pausedFor <= 0 {
 		return Session{}, ErrInvalidSessionInput
 	}
+	state := cloneGameSnapshot(session.snapshot.State)
+	shiftedTimers, err := shiftedResumeTimers(session.snapshot.Timers, pausedFor)
+	if err != nil {
+		return Session{}, err
+	}
+	if adjust != nil {
+		state, shiftedTimers, err = adjust(state, shiftedTimers)
+		if err != nil {
+			return Session{}, err
+		}
+	}
+	if !resumeSnapshotEnvelopePreserved(session.snapshot.State, state) {
+		return Session{}, ErrInvalidSessionInput
+	}
+	timers, deadline, err := timersFromIntents(shiftedTimers, session.snapshot.State.StateVersion)
+	if err != nil {
+		return Session{}, err
+	}
 	next := session.Snapshot()
-	for index := range next.Timers {
-		shifted := canonicalRuntimeTime(next.Timers[index].DueAt.Add(pausedFor))
-		if !shifted.After(next.Timers[index].DueAt) {
-			return Session{}, ErrInvalidSessionInput
-		}
-		next.Timers[index].DueAt = shifted
-	}
-	if !next.NextDeadlineAt.IsZero() {
-		shifted := canonicalRuntimeTime(next.NextDeadlineAt.Add(pausedFor))
-		if !shifted.After(next.NextDeadlineAt) {
-			return Session{}, ErrInvalidSessionInput
-		}
-		next.NextDeadlineAt = shifted
-	}
+	next.State = state
+	next.Timers = timers
+	next.NextDeadlineAt = deadline
 	next.Status = StatusActive
 	next.UpdatedAt = at
 	next.SuspendedAt = time.Time{}
@@ -646,6 +663,30 @@ func cloneTimers(values []TimerSnapshot) []TimerSnapshot {
 		timers[index] = timer
 	}
 	return timers
+}
+
+func shiftedResumeTimers(values []TimerSnapshot, pausedFor time.Duration) ([]game.TimerIntent, error) {
+	timers := make([]game.TimerIntent, len(values))
+	for index, timer := range values {
+		shifted := canonicalRuntimeTime(timer.DueAt.Add(pausedFor))
+		if shifted.Before(timer.DueAt) {
+			return nil, ErrInvalidSessionInput
+		}
+		timers[index] = game.TimerIntent{
+			TimerID: timer.TimerID,
+			DueAt:   shifted,
+			Message: timer.Message.Clone(),
+		}
+	}
+	return timers, nil
+}
+
+func resumeSnapshotEnvelopePreserved(before, after game.Snapshot) bool {
+	return before.SnapshotVersion == after.SnapshotVersion &&
+		before.StateVersion == after.StateVersion &&
+		before.State.MessageType == after.State.MessageType &&
+		before.State.SchemaVersion == after.State.SchemaVersion &&
+		after.State.Valid()
 }
 
 func canonicalRuntimeTime(value time.Time) time.Time {

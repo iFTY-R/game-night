@@ -54,6 +54,10 @@ const createStore = () => {
     cancelRemoteGameStart: vi.fn(async () => ({ room: remoteRoom })),
     approveRemoteMember: vi.fn(async () => remoteRoom),
     removeRemoteMember: vi.fn(async () => remoteRoom),
+    transferRemoteHost: vi.fn(async (userId: string) => {
+      roomStore.remoteRoom.hostUserId = userId;
+      return roomStore.remoteRoom;
+    }),
     closeRemoteRoom: vi.fn(async () => ({ ...remoteRoom, status: "ROOM_STATUS_CLOSED" })),
     setAdmissionRemote: vi.fn(async () => undefined),
     saveGameRulePreset: vi.fn(async () => undefined),
@@ -248,6 +252,23 @@ describe("RoomView", () => {
     await nextTick();
     expect(document.body.textContent).toContain("确认移出成员？");
 
+    app.unmount();
+  });
+
+  it("transfers the host from the lobby roster only after confirmation", async () => {
+    vi.useFakeTimers();
+    const { app, root } = await mountRoomView();
+
+    root.querySelector<HTMLButtonElement>('.mini-action--transfer[aria-label*="阿青"]')?.click();
+    await nextTick();
+    expect(roomStore.transferRemoteHost).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("确认转移房主？");
+
+    buttonByText(document.body, "确认转移")?.click();
+    await nextTick();
+    await Promise.resolve();
+
+    expect(roomStore.transferRemoteHost).toHaveBeenCalledWith("seat-2");
     app.unmount();
   });
 

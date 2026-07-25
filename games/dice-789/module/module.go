@@ -55,6 +55,7 @@ var (
 	_ game.RuntimeServerGameModule         = (*Module)(nil)
 	_ game.ParticipantRevocationGameModule = (*Module)(nil)
 	_ game.ReplayProjectingV2GameModule    = (*Module)(nil)
+	_ game.ResumeAdjustingGameModule       = (*Module)(nil)
 )
 
 // Manifest declares the exact retained release and public projection capabilities.
@@ -386,6 +387,42 @@ func (m *Module) Migrate(snapshot game.Snapshot, fromVersion, toVersion uint32) 
 	return snapshot, nil
 }
 
+// AdjustResumed keeps opaque deadline fields aligned with the runtime-shifted timer set after a pause.
+func (m *Module) AdjustResumed(snapshot game.Snapshot, timers []game.TimerIntent) (game.Snapshot, []game.TimerIntent, error) {
+	if !snapshot.Valid() {
+		return game.Snapshot{}, nil, malformed("resume snapshot is invalid")
+	}
+	state, err := DecodeState(snapshot.State)
+	if err != nil {
+		return game.Snapshot{}, nil, err
+	}
+	adjusted := cloneResumeTimers(timers)
+	current := engine.CurrentTimer(state)
+	if current == nil {
+		return snapshot, adjusted, nil
+	}
+	if len(adjusted) != 1 || adjusted[0].TimerID != TimerID {
+		return game.Snapshot{}, nil, malformed("resume timer set is invalid")
+	}
+	token, err := actionTimerFromProto(actionTimerPayload(adjusted[0].Message))
+	if err != nil {
+		return game.Snapshot{}, nil, err
+	}
+	deadline := adjusted[0].DueAt.UnixMilli()
+	state.ActionDeadlineUnixMillis = deadline
+	token.DeadlineUnixMillis = deadline
+	snapshot.State, err = EncodeState(normalizeState(state))
+	if err != nil {
+		return game.Snapshot{}, nil, err
+	}
+	payload, err := marshalDeterministic(actionTimerToProto(&token))
+	if err != nil {
+		return game.Snapshot{}, nil, malformed("timer encoding failed")
+	}
+	adjusted[0].Message = game.Message{MessageType: TimerMessageType, SchemaVersion: ProtocolSchemaVersion, Payload: payload}
+	return snapshot, adjusted, nil
+}
+
 // transition owns canonical state/events and the complete replacement timer set.
 func (m *Module) transition(version uint64, state engine.State, facts []engine.Event, now time.Time) (game.Transition, error) {
 	if version == 0 {
@@ -424,4 +461,21 @@ func (m *Module) transition(version uint64, state engine.State, facts []engine.E
 		return game.Transition{}, malformed("transition violates sdk contract")
 	}
 	return transition, nil
+}
+
+func actionTimerPayload(message game.Message) *dice789v1.ActionTimer {
+	var value dice789v1.ActionTimer
+	if err := unmarshalStrict(message.Payload, &value); err != nil {
+		return nil
+	}
+	return &value
+}
+
+func cloneResumeTimers(values []game.TimerIntent) []game.TimerIntent {
+	timers := make([]game.TimerIntent, len(values))
+	for index, timer := range values {
+		timer.Message = timer.Message.Clone()
+		timers[index] = timer
+	}
+	return timers
 }

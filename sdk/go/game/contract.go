@@ -349,10 +349,10 @@ func (meta ReplayTerminalMeta) Valid() bool {
 
 // ReplayRequest keeps replay inputs bounded to ordered committed events plus runtime-owned terminal metadata.
 type ReplayRequest struct {
-	Events        []Event
-	Viewer        Viewer
-	Policy        ReplayAccessPolicy
-	TerminalMeta  ReplayTerminalMeta
+	Events       []Event
+	Viewer       Viewer
+	Policy       ReplayAccessPolicy
+	TerminalMeta ReplayTerminalMeta
 }
 
 // Valid rejects non-replay viewers, invalid terminal metadata, and malformed event payloads before a module projects them.
@@ -448,4 +448,12 @@ type RuntimeServerGameModule interface {
 	ServerGameModule
 	SystemGameModule
 	EventProjectingGameModule
+}
+
+// ResumeAdjustingGameModule lets a module rewrite opaque state and timer payloads
+// after the runtime has already shifted durable timer deadlines across a pause.
+// Implementations must preserve state_version, timer identities, and message envelopes;
+// only embedded deadline-like values may change.
+type ResumeAdjustingGameModule interface {
+	AdjustResumed(Snapshot, []TimerIntent) (Snapshot, []TimerIntent, error)
 }

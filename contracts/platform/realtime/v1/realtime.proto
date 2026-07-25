@@ -190,6 +190,8 @@ message SessionSnapshot {
   google.protobuf.Timestamp ended_at = 15;
   FrozenStartConfig start = 16;
   string cancel_reason = 17;
+  // suspended_at is required to restore suspended runtime invariants across the API/realtime boundary.
+  google.protobuf.Timestamp suspended_at = 18;
 }
 
 message Participant {

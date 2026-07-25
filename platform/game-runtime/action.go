@@ -520,6 +520,7 @@ func (commit SystemCommit) OutboxEvents() []outbox.Event {
 func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (LifecycleCommit, error) {
 	beforeSnapshot, afterSnapshot := before.Snapshot(), after.Snapshot()
 	expectedEventType := GameSessionSuspendedEventType
+	stateUnchanged := sameSnapshotState(beforeSnapshot.State, afterSnapshot.State)
 	validStatus := beforeSnapshot.Status == StatusActive && afterSnapshot.Status == StatusSuspended &&
 		reflect.DeepEqual(beforeSnapshot.Timers, afterSnapshot.Timers) &&
 		beforeSnapshot.NextDeadlineAt.Equal(afterSnapshot.NextDeadlineAt) && afterSnapshot.EndedAt.IsZero() &&
@@ -528,6 +529,7 @@ func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (Lif
 		expectedEventType = GameSessionResumedEventType
 		validStatus = validResumeTimerShift(beforeSnapshot, afterSnapshot) && afterSnapshot.EndedAt.IsZero() &&
 			afterSnapshot.SuspendedAt.IsZero() && afterSnapshot.CancelReason == ""
+		stateUnchanged = resumeSnapshotStateShape(beforeSnapshot.State, afterSnapshot.State)
 	}
 	if afterSnapshot.Status == StatusCancelled {
 		expectedEventType = GameSessionCancelledEventType
@@ -538,7 +540,7 @@ func NewLifecycleCommit(before, after Session, outboxEvents []outbox.Event) (Lif
 	}
 	if !validStatus || !sameSessionIdentity(beforeSnapshot, afterSnapshot) ||
 		beforeSnapshot.OwnershipEpoch == 0 || beforeSnapshot.OwnershipEpoch != afterSnapshot.OwnershipEpoch ||
-		!sameSnapshotState(beforeSnapshot.State, afterSnapshot.State) ||
+		!stateUnchanged ||
 		!afterSnapshot.UpdatedAt.After(beforeSnapshot.UpdatedAt) || len(outboxEvents) == 0 {
 		return LifecycleCommit{}, ErrInvalidLifecycleCommit
 	}
@@ -562,7 +564,8 @@ func validResumeTimerShift(before, after SessionSnapshot) bool {
 	for index := range before.Timers {
 		left, right := before.Timers[index], after.Timers[index]
 		if left.TimerID != right.TimerID || left.ExpectedStateVersion != right.ExpectedStateVersion ||
-			!sameGameMessage(left.Message, right.Message) || !left.DueAt.Add(pausedFor).Equal(right.DueAt) {
+			left.Message.MessageType != right.Message.MessageType || left.Message.SchemaVersion != right.Message.SchemaVersion ||
+			!right.Message.Valid() || !left.DueAt.Add(pausedFor).Equal(right.DueAt) {
 			return false
 		}
 	}
@@ -570,6 +573,14 @@ func validResumeTimerShift(before, after SessionSnapshot) bool {
 		return before.NextDeadlineAt.IsZero() && after.NextDeadlineAt.IsZero()
 	}
 	return before.NextDeadlineAt.Add(pausedFor).Equal(after.NextDeadlineAt)
+}
+
+func resumeSnapshotStateShape(before, after game.Snapshot) bool {
+	return before.SnapshotVersion == after.SnapshotVersion &&
+		before.StateVersion == after.StateVersion &&
+		before.State.MessageType == after.State.MessageType &&
+		before.State.SchemaVersion == after.State.SchemaVersion &&
+		after.State.Valid()
 }
 
 // Valid reports whether the lifecycle value still satisfies its constructor invariants.

@@ -70,9 +70,11 @@ type FanoutPublisher interface {
 type Service struct {
 	// Embedding the generated fallback keeps contract-only RPC additions buildable until their explicit handlers land.
 	roomv1connect.UnimplementedRoomServiceHandler
-	domain        *roomDomain.Service
-	catalog       roomDomain.GameCatalog
-	runtime       GameRuntime
+	domain  *roomDomain.Service
+	catalog roomDomain.GameCatalog
+	runtime GameRuntime
+	// governance owns the cross-aggregate pause/resume transaction while ordinary game actions remain on the realtime owner.
+	governance    GameGovernance
 	sessions      GameSessionReader
 	rooms         RoomReader
 	fanout        FanoutPublisher
@@ -118,6 +120,17 @@ func WithRuleClock(source clock.Clock) ServiceOption {
 			return roomDomain.ErrInvalidRoomInput
 		}
 		service.ruleClock = source
+		return nil
+	}
+}
+
+// WithGameGovernance injects the local PostgreSQL-backed pause/resume coordinator.
+func WithGameGovernance(governance GameGovernance) ServiceOption {
+	return func(service *Service) error {
+		if governance == nil {
+			return roomDomain.ErrInvalidRoomInput
+		}
+		service.governance = governance
 		return nil
 	}
 }
@@ -862,8 +875,45 @@ func roomWire(room roomDomain.Room, usernames map[uuid.UUID]string) *roomv1.Room
 		ActiveSessionId: activeSessionID, ActiveGameId: snapshot.ActiveGameID,
 		LastFinishedSessionId: lastFinishedSessionID, LastFinishedGameId: snapshot.LastFinishedGameID,
 		SelectedGameId: snapshot.SelectedGameID, OwnershipEpoch: snapshot.OwnershipEpoch,
-		Version:   &roomv1.RoomVersion{RoomVersion: snapshot.RoomVersion, MembershipVersion: snapshot.MembershipVersion},
-		CreatedAt: timestamppb.New(snapshot.CreatedAt), UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
+		PendingPauseRequest: pendingPauseRequestWire(snapshot.PendingPauseRequest),
+		ActivePause:         activePauseWire(snapshot.ActivePause),
+		Version:             &roomv1.RoomVersion{RoomVersion: snapshot.RoomVersion, MembershipVersion: snapshot.MembershipVersion},
+		CreatedAt:           timestamppb.New(snapshot.CreatedAt), UpdatedAt: timestamppb.New(snapshot.UpdatedAt),
+	}
+}
+
+func pendingPauseRequestWire(value roomDomain.PendingPauseRequest) *roomv1.PendingPauseRequest {
+	if value.ID == uuid.Nil {
+		return nil
+	}
+	return &roomv1.PendingPauseRequest{
+		RequestId: value.ID.String(), SessionId: value.SessionID.String(), RequestedByUserId: value.RequestedByUserID.String(),
+		RequestedAt: timestamppb.New(value.RequestedAt),
+	}
+}
+
+func activePauseWire(value roomDomain.ActivePause) *roomv1.ActivePause {
+	if value.ID == uuid.Nil {
+		return nil
+	}
+	requestedBy := ""
+	if value.RequestedByUserID != uuid.Nil {
+		requestedBy = value.RequestedByUserID.String()
+	}
+	return &roomv1.ActivePause{
+		PauseId: value.ID.String(), SessionId: value.SessionID.String(), Source: pauseSourceWire(value.Source),
+		RequestedByUserId: requestedBy, PausedByUserId: value.PausedByUserID.String(), PausedAt: timestamppb.New(value.PausedAt),
+	}
+}
+
+func pauseSourceWire(value roomDomain.PauseSource) roomv1.PauseSource {
+	switch value {
+	case roomDomain.PauseSourceHost:
+		return roomv1.PauseSource_PAUSE_SOURCE_HOST
+	case roomDomain.PauseSourceApprovedRequest:
+		return roomv1.PauseSource_PAUSE_SOURCE_APPROVED_REQUEST
+	default:
+		return roomv1.PauseSource_PAUSE_SOURCE_UNSPECIFIED
 	}
 }
 

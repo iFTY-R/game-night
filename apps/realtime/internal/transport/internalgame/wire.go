@@ -114,6 +114,7 @@ func sessionToWire(session gameruntime.Session) *realtimev1.SessionSnapshot {
 		NextDeadlineAt: timeToWire(snapshot.NextDeadlineAt), Status: statusToWire(snapshot.Status),
 		StartedAt: timeToWire(snapshot.StartedAt), UpdatedAt: timeToWire(snapshot.UpdatedAt), EndedAt: timeToWire(snapshot.EndedAt),
 		Start: startToWire(snapshot.VersionKey, snapshot.Start), CancelReason: string(snapshot.CancelReason),
+		SuspendedAt: timeToWire(snapshot.SuspendedAt),
 	}
 }
 
@@ -185,6 +186,10 @@ func sessionFromWire(value *realtimev1.SessionSnapshot) (gameruntime.Session, er
 	if err != nil {
 		return gameruntime.Session{}, err
 	}
+	suspendedAt, err := optionalTime(value.GetSuspendedAt())
+	if err != nil {
+		return gameruntime.Session{}, err
+	}
 	status, err := statusFromWire(value.GetStatus())
 	if err != nil {
 		return gameruntime.Session{}, err
@@ -202,7 +207,8 @@ func sessionFromWire(value *realtimev1.SessionSnapshot) (gameruntime.Session, er
 			SnapshotVersion: value.GetSnapshotVersion(), StateVersion: value.GetStateVersion(), State: stateMessage,
 		},
 		Timers: timers, NextDeadlineAt: nextDeadlineAt, Status: status,
-		StartedAt: startedAt, UpdatedAt: updatedAt, EndedAt: endedAt, CancelReason: game.Identifier(value.GetCancelReason()),
+		StartedAt: startedAt, UpdatedAt: updatedAt, EndedAt: endedAt, SuspendedAt: suspendedAt,
+		CancelReason: game.Identifier(value.GetCancelReason()),
 	})
 }
 
@@ -401,9 +407,9 @@ func projectionFromWire(value *gamev1.GameProjection) (game.Projection, error) {
 func replayTerminalMetaToWire(session gameruntime.Session) *gamev1.ReplayTerminalMeta {
 	snapshot := session.Snapshot()
 	meta := &gamev1.ReplayTerminalMeta{
-		Finished: snapshot.Status == gameruntime.StatusFinished,
+		Finished:  snapshot.Status == gameruntime.StatusFinished,
 		Cancelled: snapshot.Status == gameruntime.StatusCancelled,
-		EndedAt: timeToWire(snapshot.EndedAt), CancelReason: string(snapshot.CancelReason),
+		EndedAt:   timeToWire(snapshot.EndedAt), CancelReason: string(snapshot.CancelReason),
 	}
 	if snapshot.Status == gameruntime.StatusFinished {
 		meta.CancelReason = ""

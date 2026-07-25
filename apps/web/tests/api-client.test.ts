@@ -207,6 +207,55 @@ describe("Connect JSON mutation requests", () => {
     expect(calls[0]?.body.requestDigest).toBe("XICV/mY8PglL1TVFqbbS7JaV2PTHkcCeLxPtDG/JVEU=");
   });
 
+  it("binds pause governance and host transfer to room and ownership fences", async () => {
+    const { calls } = captureRequest();
+
+    await roomClient.requestRoomPause(room, room.activeSessionId);
+    await roomClient.rejectRoomPauseRequest(room, "pause-request-1");
+    await roomClient.pauseRoomGame(room, room.activeSessionId, "pause-request-1", "7");
+    await roomClient.resumeRoomGame(room, room.activeSessionId, "7");
+    await roomClient.transferRoomHost(room, "00000000-0000-4000-8000-000000000006");
+
+    expect(calls).toEqual([
+      {
+        url: "/platform.room.v1.RoomService/RequestRoomPause",
+        body: { roomId: room.roomId, sessionId: room.activeSessionId, expectedVersion: room.version },
+      },
+      {
+        url: "/platform.room.v1.RoomService/RejectRoomPauseRequest",
+        body: { roomId: room.roomId, requestId: "pause-request-1", expectedVersion: room.version },
+      },
+      {
+        url: "/platform.room.v1.RoomService/PauseRoomGame",
+        body: {
+          roomId: room.roomId,
+          sessionId: room.activeSessionId,
+          requestId: "pause-request-1",
+          expectedVersion: room.version,
+          ownershipEpoch: "7",
+        },
+      },
+      {
+        url: "/platform.room.v1.RoomService/ResumeRoomGame",
+        body: {
+          roomId: room.roomId,
+          sessionId: room.activeSessionId,
+          expectedVersion: room.version,
+          ownershipEpoch: "7",
+        },
+      },
+      {
+        url: "/platform.room.v1.RoomService/TransferRoomHost",
+        body: {
+          roomId: room.roomId,
+          targetUserId: "00000000-0000-4000-8000-000000000006",
+          expectedVersion: room.version,
+          ownershipEpoch: "2",
+        },
+      },
+    ]);
+  });
+
   it("binds member removal and room closure to the current room version", async () => {
     const { calls } = captureRequest();
 

@@ -616,6 +616,26 @@ func TestEveryRoomRPCIsImplemented(t *testing.T) {
 			return err
 		},
 		func() error {
+			_, err := client.RequestRoomPause(t.Context(), connect.NewRequest(&roomv1.RequestRoomPauseRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.RejectRoomPauseRequest(t.Context(), connect.NewRequest(&roomv1.RejectRoomPauseRequestRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.PauseRoomGame(t.Context(), connect.NewRequest(&roomv1.PauseRoomGameRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.ResumeRoomGame(t.Context(), connect.NewRequest(&roomv1.ResumeRoomGameRequest{}))
+			return err
+		},
+		func() error {
+			_, err := client.TransferRoomHost(t.Context(), connect.NewRequest(&roomv1.TransferRoomHostRequest{}))
+			return err
+		},
+		func() error {
 			_, err := client.FinishGame(t.Context(), connect.NewRequest(&roomv1.FinishGameRequest{}))
 			return err
 		},
@@ -666,7 +686,7 @@ func newRoomTransportFixture(t testing.TB, actors map[string]uuid.UUID) roomTran
 	service, err := NewService(
 		domainService, transportGameCatalog{}, runtime, runtime, repository, fanout,
 		&transportAuthenticator{actors: actors}, origins, csrf.NewUserValidator(),
-		WithRuleRepository(rules), WithRuleClock(source),
+		WithRuleRepository(rules), WithRuleClock(source), WithGameGovernance(runtime),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -881,16 +901,93 @@ func (runtime *transportGameRuntime) Get(_ context.Context, sessionID uuid.UUID)
 	return session, nil
 }
 
+func (runtime *transportGameRuntime) PauseRoom(
+	ctx context.Context,
+	command gameruntime.PauseRoomCommand,
+) (roomDomain.Room, gameruntime.Session, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	beforeSession, exists := runtime.sessions[command.SessionID]
+	if !exists {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrSessionNotFound
+	}
+	beforeRoom, err := runtime.rooms.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	at := beforeSession.Snapshot().UpdatedAt.Add(time.Microsecond)
+	if !at.After(beforeRoom.Snapshot().UpdatedAt) {
+		at = beforeRoom.Snapshot().UpdatedAt.Add(time.Microsecond)
+	}
+	afterRoom, err := beforeRoom.Pause(
+		command.ActorUserID, uuid.New(), command.SessionID, command.RequestID, command.Expected, at,
+	)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	afterSession, err := beforeSession.Suspend(command.OwnershipEpoch, at)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	storedRoom, err := runtime.rooms.UpdateCAS(ctx, beforeRoom, afterRoom)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	runtime.sessions[command.SessionID] = afterSession
+	return storedRoom, afterSession, nil
+}
+
+func (runtime *transportGameRuntime) ResumeRoom(
+	ctx context.Context,
+	command gameruntime.ResumeRoomCommand,
+) (roomDomain.Room, gameruntime.Session, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	beforeSession, exists := runtime.sessions[command.SessionID]
+	if !exists {
+		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrSessionNotFound
+	}
+	beforeRoom, err := runtime.rooms.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	at := beforeSession.Snapshot().UpdatedAt.Add(time.Microsecond)
+	if !at.After(beforeRoom.Snapshot().UpdatedAt) {
+		at = beforeRoom.Snapshot().UpdatedAt.Add(time.Microsecond)
+	}
+	afterRoom, err := beforeRoom.Resume(command.ActorUserID, command.SessionID, command.Expected, at)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	afterSession, err := beforeSession.Resume(command.OwnershipEpoch, at)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	storedRoom, err := runtime.rooms.UpdateCAS(ctx, beforeRoom, afterRoom)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
+	runtime.sessions[command.SessionID] = afterSession
+	return storedRoom, afterSession, nil
+}
+
 type transportFanout struct {
 	mu     sync.Mutex
 	events []redisstore.SessionFanoutEvent
+	err    error
 }
 
 func (fanout *transportFanout) PublishSessionFanout(_ context.Context, event redisstore.SessionFanoutEvent) error {
 	fanout.mu.Lock()
 	defer fanout.mu.Unlock()
 	fanout.events = append(fanout.events, event)
-	return nil
+	return fanout.err
+}
+
+func (fanout *transportFanout) setError(err error) {
+	fanout.mu.Lock()
+	defer fanout.mu.Unlock()
+	fanout.err = err
 }
 
 func roomTransportOperationID(t testing.TB, marker byte) idempotency.OperationID {

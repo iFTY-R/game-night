@@ -73,7 +73,7 @@ type Querier interface {
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	AcquireGameSessionOwnershipCAS(ctx context.Context, arg AcquireGameSessionOwnershipCASParams) (AcquireGameSessionOwnershipCASRow, error)
 	//AcquireKeyRotationJobLease
 	//
@@ -830,6 +830,7 @@ type Querier interface {
 	//      start_ownership_epoch,
 	//      cancel_reason,
 	//      next_deadline_at,
+	//      suspended_at,
 	//      status,
 	//      started_at,
 	//      updated_at,
@@ -860,13 +861,14 @@ type Querier interface {
 	//      $23,
 	//      $24,
 	//      $25,
-	//      $26
+	//      $26,
+	//      $27
 	//  )
 	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	CreateGameSession(ctx context.Context, arg CreateGameSessionParams) (CreateGameSessionRow, error)
 	//CreateGameSessionEvent
 	//
@@ -1079,6 +1081,16 @@ type Querier interface {
 	//      last_finished_game_id,
 	//      selected_game_id,
 	//      ownership_epoch,
+	//      pause_request_id,
+	//      pause_request_session_id,
+	//      pause_requested_by_user_id,
+	//      pause_requested_at,
+	//      active_pause_id,
+	//      active_pause_session_id,
+	//      active_pause_source,
+	//      active_pause_requested_by_user_id,
+	//      active_pause_paused_by_user_id,
+	//      active_pause_paused_at,
 	//      room_version,
 	//      membership_version,
 	//      created_at,
@@ -1101,12 +1113,25 @@ type Querier interface {
 	//      $15,
 	//      $16,
 	//      $17,
-	//      $18
+	//      $18,
+	//      $19,
+	//      $20,
+	//      $21,
+	//      $22,
+	//      $23,
+	//      $24,
+	//      $25,
+	//      $26,
+	//      $27,
+	//      $28
 	//  )
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	CreatePartyRoom(ctx context.Context, arg CreatePartyRoomParams) (PartyRoom, error)
 	//CreatePendingAdminTotpEnrollment
 	//
@@ -1518,6 +1543,16 @@ type Querier interface {
 	//      last_finished_game_id = active_game_id,
 	//      active_session_id = NULL,
 	//      active_game_id = NULL,
+	//      pause_request_id = NULL,
+	//      pause_request_session_id = NULL,
+	//      pause_requested_by_user_id = NULL,
+	//      pause_requested_at = NULL,
+	//      active_pause_id = NULL,
+	//      active_pause_session_id = NULL,
+	//      active_pause_source = NULL,
+	//      active_pause_requested_by_user_id = NULL,
+	//      active_pause_paused_by_user_id = NULL,
+	//      active_pause_paused_at = NULL,
 	//      room_version = $1,
 	//      updated_at = $2
 	//  WHERE room_id = $3
@@ -1529,7 +1564,10 @@ type Querier interface {
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	FinishPartyRoomCAS(ctx context.Context, arg FinishPartyRoomCASParams) (PartyRoom, error)
 	//GetActiveAdminTotpEnrollmentForUpdate
 	//
@@ -1751,7 +1789,7 @@ type Querier interface {
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	//  FROM game_sessions
 	//  WHERE session_id = $1
 	//  FOR SHARE
@@ -1762,7 +1800,7 @@ type Querier interface {
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	//  FROM game_sessions
 	//  WHERE session_id = $1
 	//  FOR UPDATE
@@ -1909,7 +1947,10 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	//  FROM party_rooms
 	//  WHERE room_code = $1
 	//  FOR SHARE
@@ -1919,7 +1960,10 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR SHARE
@@ -1929,7 +1973,10 @@ type Querier interface {
 	//  SELECT room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	//  FROM party_rooms
 	//  WHERE room_id = $1
 	//  FOR UPDATE
@@ -2892,15 +2939,6 @@ type Querier interface {
 	//  RETURNING access.session_id, access.room_id, access.policy, access.policy_version,
 	//      access.member_snapshot_completed_at, access.created_at, access.updated_at
 	SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGameSessionReplayPolicyCASParams) (GameSessionReplayAccess, error)
-	//ShiftGameSessionTimers
-	//
-	//  UPDATE game_session_timers
-	//  SET due_at = due_at + (
-	//      $1::timestamptz - $2::timestamptz
-	//  )
-	//  WHERE session_id = $3
-	//  RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
-	ShiftGameSessionTimers(ctx context.Context, arg ShiftGameSessionTimersParams) ([]GameSessionTimer, error)
 	//TouchAdminSessionCAS
 	//
 	//  UPDATE admin_sessions
@@ -3009,20 +3047,25 @@ type Querier interface {
 	//UpdateGameSessionLifecycleCAS
 	//
 	//  UPDATE game_sessions
-	//  SET next_deadline_at = $1,
-	//      cancel_reason = $2,
-	//      status = $3,
-	//      updated_at = $4,
-	//      ended_at = $5
-	//  WHERE session_id = $6
-	//    AND state_version = $7
-	//    AND ownership_epoch = $8
+	//  SET snapshot_version = $1,
+	//      state_message_type = $2,
+	//      state_schema_version = $3,
+	//      state_payload = $4,
+	//      next_deadline_at = $5,
+	//      cancel_reason = $6,
+	//      suspended_at = $7,
+	//      status = $8,
+	//      updated_at = $9,
+	//      ended_at = $10
+	//  WHERE session_id = $11
+	//    AND state_version = $12
+	//    AND ownership_epoch = $13
 	//    AND status IN ('active', 'suspended')
 	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	UpdateGameSessionLifecycleCAS(ctx context.Context, arg UpdateGameSessionLifecycleCASParams) (UpdateGameSessionLifecycleCASRow, error)
 	//UpdateGameSessionStateCAS
 	//
@@ -3042,18 +3085,19 @@ type Querier interface {
 	//      start_ownership_epoch = $13,
 	//      cancel_reason = $14,
 	//      next_deadline_at = $15,
-	//      status = $16,
-	//      updated_at = $17,
-	//      ended_at = $18
-	//  WHERE session_id = $19
-	//    AND state_version = $20
-	//    AND ownership_epoch = $21
+	//      suspended_at = $16,
+	//      status = $17,
+	//      updated_at = $18,
+	//      ended_at = $19
+	//  WHERE session_id = $20
+	//    AND state_version = $21
+	//    AND ownership_epoch = $22
 	//    AND status = 'active'
 	//  RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 	//      state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
 	//      state_payload, start_config_message_type, start_config_schema_version, start_config_payload,
 	//      start_config_digest, start_config_revision, start_room_version, start_membership_version,
-	//      start_ownership_epoch, cancel_reason, next_deadline_at, status, started_at, updated_at, ended_at
+	//      start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 	UpdateGameSessionStateCAS(ctx context.Context, arg UpdateGameSessionStateCASParams) (UpdateGameSessionStateCASRow, error)
 	//UpdatePartyRoomCAS
 	//
@@ -3070,18 +3114,31 @@ type Querier interface {
 	//      last_finished_game_id = $10,
 	//      selected_game_id = $11,
 	//      ownership_epoch = $12,
-	//      room_version = $13,
-	//      membership_version = $14,
-	//      updated_at = $15
-	//  WHERE room_id = $16
-	//    AND room_code = $17
-	//    AND ownership_epoch = $18
-	//    AND room_version = $19
-	//    AND membership_version = $20
+	//      pause_request_id = $13,
+	//      pause_request_session_id = $14,
+	//      pause_requested_by_user_id = $15,
+	//      pause_requested_at = $16,
+	//      active_pause_id = $17,
+	//      active_pause_session_id = $18,
+	//      active_pause_source = $19,
+	//      active_pause_requested_by_user_id = $20,
+	//      active_pause_paused_by_user_id = $21,
+	//      active_pause_paused_at = $22,
+	//      room_version = $23,
+	//      membership_version = $24,
+	//      updated_at = $25
+	//  WHERE room_id = $26
+	//    AND room_code = $27
+	//    AND ownership_epoch = $28
+	//    AND room_version = $29
+	//    AND membership_version = $30
 	//  RETURNING room_id, room_code, visibility, status, host_user_id, participant_capacity,
 	//      participant_admission, spectator_admission, active_session_id, active_game_id,
 	//      room_version, membership_version, created_at, updated_at,
-	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch
+	//      last_finished_session_id, last_finished_game_id, selected_game_id, ownership_epoch,
+	//      pause_request_id, pause_request_session_id, pause_requested_by_user_id, pause_requested_at,
+	//      active_pause_id, active_pause_session_id, active_pause_source,
+	//      active_pause_requested_by_user_id, active_pause_paused_by_user_id, active_pause_paused_at
 	UpdatePartyRoomCAS(ctx context.Context, arg UpdatePartyRoomCASParams) (PartyRoom, error)
 	//UpdateRoomGameConfigDraft
 	//

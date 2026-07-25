@@ -311,6 +311,22 @@ func remoteSessionWire(sessionID, roomID, actorID uuid.UUID, now time.Time) *rea
 	}
 }
 
+func TestSessionFromRemoteRestoresSuspendedAt(t *testing.T) {
+	now := time.Date(2026, time.July, 20, 13, 2, 0, 0, time.UTC)
+	value := remoteSessionWire(uuid.New(), uuid.New(), uuid.New(), now)
+	value.Status = gamev1.GameSessionStatus_GAME_SESSION_STATUS_SUSPENDED
+	value.UpdatedAt = timestamppb.New(now.Add(time.Second))
+	value.SuspendedAt = timestamppb.New(now.Add(time.Second))
+
+	session, err := sessionFromRemote(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !session.Snapshot().SuspendedAt.Equal(now.Add(time.Second)) {
+		t.Fatalf("suspended_at=%v", session.Snapshot().SuspendedAt)
+	}
+}
+
 func runtimeStartDigest(now time.Time, revision uint64) []byte {
 	session, err := gameruntime.RestoreSession(gameruntime.SessionSnapshot{
 		ID: uuid.New(), RoomID: uuid.New(), VersionKey: remoteVersion(), OwnershipEpoch: 7,

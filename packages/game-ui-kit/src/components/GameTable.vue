@@ -129,7 +129,16 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
         :seat="item.seat"
         :edge="item.edge"
         :self="item.position.seatIndex === selfSeatIndex"
-      />
+      >
+        <template #details>
+          <slot
+            name="seat-details"
+            :user-id="item.seat.userId"
+            :display-name="item.seat.displayName"
+            :self="item.position.seatIndex === selfSeatIndex"
+          />
+        </template>
+      </PlayerSeat>
     </div>
     <div class="gn-table__private">
       <slot name="private" />

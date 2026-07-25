@@ -230,6 +230,41 @@ func TestDisabledTimerAndPastDueRevocationReplacement(t *testing.T) {
 	}
 }
 
+func TestAdjustResumedShiftsDeadlineInStateAndTimerToken(t *testing.T) {
+	m := New()
+	created, err := m.Create(createRequest(t, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	shiftedTimers := append([]game.TimerIntent(nil), created.Timers...)
+	shiftedTimers[0].Message = shiftedTimers[0].Message.Clone()
+	shiftedTimers[0].DueAt = shiftedTimers[0].DueAt.Add(30 * time.Second)
+	adjustedSnapshot, adjustedTimers, err := m.AdjustResumed(created.Snapshot, shiftedTimers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := DecodeState(adjustedSnapshot.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ActionDeadlineUnixMillis != shiftedTimers[0].DueAt.UnixMilli() {
+		t.Fatalf("state deadline=%d want=%d", state.ActionDeadlineUnixMillis, shiftedTimers[0].DueAt.UnixMilli())
+	}
+	var timer liarsdicev1.ActionTimer
+	if err := proto.Unmarshal(adjustedTimers[0].Message.Payload, &timer); err != nil {
+		t.Fatal(err)
+	}
+	if timer.GetDeadlineUnixMillis() != shiftedTimers[0].DueAt.UnixMilli() {
+		t.Fatalf("timer deadline=%d want=%d", timer.GetDeadlineUnixMillis(), shiftedTimers[0].DueAt.UnixMilli())
+	}
+	if _, err := m.HandleTimer(adjustedSnapshot, game.TimerRequest{
+		Context: executionAt(shiftedTimers[0].DueAt, 9), TimerID: adjustedTimers[0].TimerID,
+		ExpectedStateVersion: adjustedSnapshot.StateVersion, Timer: adjustedTimers[0].Message,
+	}); err != nil {
+		t.Fatalf("adjusted timer error=%v", err)
+	}
+}
+
 func TestProjectEventsEmitsCurrentViewerSafeDeltaFromMidRoundCursor(t *testing.T) {
 	m := New()
 	created, err := m.Create(createRequest(t, 3))

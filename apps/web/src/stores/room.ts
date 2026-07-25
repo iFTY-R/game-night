@@ -553,6 +553,46 @@ export const useRoomStore = defineStore("room", {
       return response.room ?? null;
     },
 
+    /** Records the current participant's pause request and adopts the request ID returned by the server. */
+    async requestRemotePause(sessionId: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) return null;
+      const response = await roomClient.requestRoomPause(this.remoteRoom, sessionId);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
+    },
+
+    /** Rejects the exact pending pause request so a stale host decision cannot clear a newer request. */
+    async rejectRemotePauseRequest(requestId: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) return null;
+      const response = await roomClient.rejectRoomPauseRequest(this.remoteRoom, requestId);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
+    },
+
+    /** Pauses directly or approves one pending request through the shared atomic room/session command. */
+    async pauseRemoteGame(sessionId: string, requestId: string, sessionOwnershipEpoch: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) return null;
+      const response = await roomClient.pauseRoomGame(this.remoteRoom, sessionId, requestId, sessionOwnershipEpoch);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
+    },
+
+    /** Resumes the current session and adopts the room version advanced by the atomic lifecycle commit. */
+    async resumeRemoteGame(sessionId: string, sessionOwnershipEpoch: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) return null;
+      const response = await roomClient.resumeRoomGame(this.remoteRoom, sessionId, sessionOwnershipEpoch);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
+    },
+
+    /** Transfers all host powers to another participant using both room and ownership fences. */
+    async transferRemoteHost(targetUserId: string): Promise<RoomSnapshot | null> {
+      if (!this.remoteRoom) return null;
+      const response = await roomClient.transferRoomHost(this.remoteRoom, targetUserId);
+      if (response.room) this.setRemoteRoom(response.room);
+      return response.room ?? null;
+    },
+
     /** Promotes one waiting member after the host's current membership version is checked. */
     async approveRemoteMember(userId: string): Promise<RoomSnapshot | null> {
       if (!this.remoteRoom) {

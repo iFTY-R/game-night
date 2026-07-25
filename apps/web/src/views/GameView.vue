@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -24,14 +24,15 @@ import {
 import { classicTheme, liarsDiceSoundProfile, liarsDiceThemes } from "@game-night/liars-dice-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
-import { useLiveGameTable } from "../composables/use-live-game-table";
+import { useLiveGameTable, type LiveSessionLifecycle } from "../composables/use-live-game-table";
 import { useRoomStore } from "../stores/room";
 
 type FixtureState = "active" | "revealed" | "spectator" | "reconnecting" | "timeout" | "replay";
 
-const props = withDefaults(defineProps<{ roomId: string; sessionId: string; fixtureState?: FixtureState }>(), {
+const props = withDefaults(defineProps<{ roomId: string; sessionId: string; fixtureState?: FixtureState; pausedAt?: string | undefined }>(), {
   fixtureState: "active",
 });
+const emit = defineEmits<{ lifecycleChange: [state: LiveSessionLifecycle] }>();
 const router = useRouter();
 const room = useRoomStore();
 const themeRuntime = new ThemeRuntime();
@@ -71,6 +72,10 @@ const liveTable = useLiveGameTable<LiarsDiceView, LiarsDiceTableContext>({
 });
 const allowedActions = liveTable.allowedActions;
 const pendingAction = liveTable.pendingAction;
+const effectivePausedAt = computed(() => fixtureMode.value
+  ? props.pausedAt
+  : liveTable.isPaused.value ? liveTable.suspendedAt.value ?? props.pausedAt : undefined);
+watch(liveTable.lifecycle, (state) => emit("lifecycleChange", state), { immediate: true });
 
 const applyTheme = (): void => {
   const manifest = liarsDiceThemes[themeIndex.value] ?? classicTheme;
@@ -163,11 +168,15 @@ const leaveTable = async (): Promise<void> => {
     :allowed-actions="allowedActions"
     :pending-action="pendingAction"
     :muted="muted"
+    :paused-at="effectivePausedAt"
     @submit="submitAction"
     @finish="finishSession"
     @retry="liveTable.retry"
     @leave="leaveTable"
     @toggle-sound="toggleSound"
     @cycle-theme="cycleTheme"
-  />
+  >
+    <template #governance><slot name="governance" /></template>
+    <template #seat-details="seat"><slot name="seat-details" v-bind="seat" /></template>
+  </LiarsDiceTable>
 </template>

@@ -38,6 +38,8 @@ type RoomSessionStore interface {
 	FinishAction(context.Context, roomDomain.Room, roomDomain.Room, ActionCommit) (roomDomain.Room, ActionCommitResult, error)
 	FinishTimer(context.Context, roomDomain.Room, roomDomain.Room, TimerCommit) (roomDomain.Room, TimerCommitResult, error)
 	FinishSystem(context.Context, roomDomain.Room, roomDomain.Room, uuid.UUID, SystemCommit) (roomDomain.Room, SystemCommitResult, error)
+	Suspend(context.Context, roomDomain.Room, roomDomain.Room, LifecycleCommit) (roomDomain.Room, Session, error)
+	Resume(context.Context, roomDomain.Room, roomDomain.Room, LifecycleCommit) (roomDomain.Room, Session, error)
 	Cancel(context.Context, roomDomain.Room, roomDomain.Room, LifecycleCommit) (roomDomain.Room, Session, error)
 }
 
@@ -641,13 +643,107 @@ type CancelCommand struct {
 	CloseRoom bool
 }
 
-// SuspendCommand identifies one active session and the ownership epoch allowed to freeze execution.
+// PauseRoomCommand identifies one room-governed active session and the caller allowed to pause it.
+type PauseRoomCommand struct {
+	ActorUserID    uuid.UUID
+	RoomID         uuid.UUID
+	SessionID      uuid.UUID
+	RequestID      uuid.UUID
+	Expected       roomDomain.Version
+	OwnershipEpoch uint64
+}
+
+// PauseRoom atomically records room governance and freezes the runtime session under the same timestamp fence.
+func (service *Service) PauseRoom(ctx context.Context, command PauseRoomCommand) (roomDomain.Room, Session, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil ||
+		command.SessionID == uuid.Nil || command.Expected.Room == 0 || command.Expected.Membership == 0 ||
+		command.OwnershipEpoch == 0 {
+		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	room, before, err := service.loadRoomSession(ctx, command.RoomID, command.SessionID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	pauseID, err := service.generator.NewID()
+	if err != nil {
+		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	at := governedLifecycleTime(service.clock.Now(), room.Snapshot().UpdatedAt, before.Snapshot().UpdatedAt)
+	afterRoom, err := room.Pause(
+		command.ActorUserID, pauseID, command.SessionID, command.RequestID, command.Expected, at,
+	)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	after, err := before.Suspend(command.OwnershipEpoch, at)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	event, err := service.newOutboxEvent(GameSessionSuspendedEventType, command.SessionID, after.Snapshot().State.StateVersion, at)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	commit, err := NewLifecycleCommit(before, after, []outbox.Event{event})
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	return service.roomSessions.Suspend(ctx, room, afterRoom, commit)
+}
+
+// ResumeRoomCommand identifies one room-governed suspended session and the caller allowed to reactivate it.
+type ResumeRoomCommand struct {
+	ActorUserID    uuid.UUID
+	RoomID         uuid.UUID
+	SessionID      uuid.UUID
+	Expected       roomDomain.Version
+	OwnershipEpoch uint64
+}
+
+// ResumeRoom re-enables a room-governed suspended session only after the exact retained runtime module resolves again.
+func (service *Service) ResumeRoom(ctx context.Context, command ResumeRoomCommand) (roomDomain.Room, Session, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil ||
+		command.SessionID == uuid.Nil || command.Expected.Room == 0 || command.Expected.Membership == 0 ||
+		command.OwnershipEpoch == 0 {
+		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	room, before, err := service.loadRoomSession(ctx, command.RoomID, command.SessionID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	module, err := service.registry.Resolve(before.Snapshot().VersionKey)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, ErrModuleUnavailable
+	}
+	if runtimeModule, ok := module.(game.RuntimeServerGameModule); !ok || runtimeModule.Manifest().Key() != before.Snapshot().VersionKey {
+		return roomDomain.Room{}, Session{}, ErrModuleUnavailable
+	}
+	at := governedLifecycleTime(service.clock.Now(), room.Snapshot().UpdatedAt, before.Snapshot().UpdatedAt)
+	afterRoom, err := room.Resume(command.ActorUserID, command.SessionID, command.Expected, at)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	after, err := service.resumeWithModule(before, command.OwnershipEpoch, at, module)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	event, err := service.newOutboxEvent(GameSessionResumedEventType, command.SessionID, after.Snapshot().State.StateVersion, at)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	commit, err := NewLifecycleCommit(before, after, []outbox.Event{event})
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	return service.roomSessions.Resume(ctx, room, afterRoom, commit)
+}
+
+// SuspendCommand keeps the legacy session-only lifecycle surface used by defensive runtime recovery.
 type SuspendCommand struct {
 	SessionID      uuid.UUID
 	OwnershipEpoch uint64
 }
 
-// Suspend freezes module transitions and persisted timers without requiring the game module to be available.
+// Suspend freezes module transitions and persisted timers without requiring room-governed pause metadata.
 func (service *Service) Suspend(ctx context.Context, command SuspendCommand) (Session, error) {
 	if service == nil || ctx == nil || command.SessionID == uuid.Nil || command.OwnershipEpoch == 0 {
 		return Session{}, ErrInvalidSessionInput
@@ -659,7 +755,7 @@ func (service *Service) Suspend(ctx context.Context, command SuspendCommand) (Se
 	return service.commitSuspend(ctx, before, command.OwnershipEpoch)
 }
 
-// ResumeCommand identifies one suspended session and the ownership epoch allowed to re-enable execution.
+// ResumeCommand keeps the legacy session-only lifecycle surface used after fail-closed module suspension.
 type ResumeCommand struct {
 	SessionID      uuid.UUID
 	OwnershipEpoch uint64
@@ -685,7 +781,7 @@ func (service *Service) Resume(ctx context.Context, command ResumeCommand) (Sess
 	if !at.After(before.Snapshot().UpdatedAt) {
 		at = before.Snapshot().UpdatedAt.Add(time.Microsecond)
 	}
-	after, err := before.Resume(command.OwnershipEpoch, at)
+	after, err := service.resumeWithModule(before, command.OwnershipEpoch, at, module)
 	if err != nil {
 		return Session{}, err
 	}
@@ -1072,6 +1168,48 @@ func (service *Service) commitSuspend(ctx context.Context, before Session, owner
 		return Session{}, err
 	}
 	return service.sessions.CommitLifecycle(ctx, commit)
+}
+
+func (service *Service) resumeWithModule(
+	before Session,
+	ownershipEpoch uint64,
+	at time.Time,
+	module game.ServerGameModule,
+) (Session, error) {
+	adjuster, ok := module.(game.ResumeAdjustingGameModule)
+	if !ok {
+		return before.Resume(ownershipEpoch, at)
+	}
+	return before.resumeWithAdjustment(ownershipEpoch, at, adjuster.AdjustResumed)
+}
+
+// loadRoomSession reads the authoritative room and session pair and fail-closes if they no longer point at each other.
+func (service *Service) loadRoomSession(ctx context.Context, roomID, sessionID uuid.UUID) (roomDomain.Room, Session, error) {
+	room, err := service.rooms.GetByID(ctx, roomID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	session, err := service.sessions.Get(ctx, sessionID)
+	if err != nil {
+		return roomDomain.Room{}, Session{}, err
+	}
+	if session.Snapshot().RoomID != roomID {
+		return roomDomain.Room{}, Session{}, ErrGameSessionIntegrity
+	}
+	return room, session, nil
+}
+
+// governedLifecycleTime keeps room and runtime lifecycle rows on one strictly increasing shared timestamp.
+func governedLifecycleTime(now, roomUpdatedAt, sessionUpdatedAt time.Time) time.Time {
+	at := canonicalRuntimeTime(now)
+	latest := roomUpdatedAt
+	if sessionUpdatedAt.After(latest) {
+		latest = sessionUpdatedAt
+	}
+	if !at.After(latest) {
+		at = latest.Add(time.Microsecond)
+	}
+	return at
 }
 
 func (service *Service) newOutboxEvent(eventType outbox.EventType, sessionID uuid.UUID, stateVersion uint64, at time.Time) (outbox.Event, error) {

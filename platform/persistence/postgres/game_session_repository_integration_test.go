@@ -831,11 +831,21 @@ func TestGameSessionRepositoryPersistsSuspendResumeAndAtomicCancel(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Game modules rewrite opaque deadline fields during resume; persistence must keep those payloads exactly.
+	resumedSnapshot := resumed.Snapshot()
+	resumedSnapshot.State.State.Payload = []byte("resumed-state")
+	resumedSnapshot.Timers[0].Message.Payload = []byte("resumed-timer")
+	resumed, err = gameruntime.RestoreSession(resumedSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
 	resumed, err = repository.CommitLifecycle(ctx, newGameLifecycleCommit(t, suspended, resumed, gameruntime.GameSessionResumedEventType))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !resumed.Snapshot().SuspendedAt.IsZero() || !resumed.Snapshot().NextDeadlineAt.Equal(now.Add(31*time.Second)) {
+	if !resumed.Snapshot().SuspendedAt.IsZero() || !resumed.Snapshot().NextDeadlineAt.Equal(now.Add(31*time.Second)) ||
+		string(resumed.Snapshot().State.State.Payload) != "resumed-state" ||
+		string(resumed.Snapshot().Timers[0].Message.Payload) != "resumed-timer" {
 		t.Fatalf("resumed lifecycle=%+v", resumed.Snapshot())
 	}
 	due, err = repository.ListDueTimers(ctx, now.Add(31*time.Second), 10)

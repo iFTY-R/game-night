@@ -51,6 +51,14 @@ func TestWireRoundTripsDomainValues(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(restoredSession.Snapshot(), session.Snapshot()) {
 		t.Fatalf("session=%+v restored=%+v error=%v", session.Snapshot(), restoredSession.Snapshot(), err)
 	}
+	suspended, err := session.Suspend(session.Snapshot().OwnershipEpoch, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoredSuspended, err := sessionFromWire(sessionToWire(suspended))
+	if err != nil || !reflect.DeepEqual(restoredSuspended.Snapshot(), suspended.Snapshot()) {
+		t.Fatalf("suspended=%+v restored=%+v error=%v", suspended.Snapshot(), restoredSuspended.Snapshot(), err)
+	}
 
 	version := session.Snapshot().VersionKey
 	message := internalMessage("round.roll", []byte("payload"))

@@ -349,6 +349,42 @@ func TestSuspendResumeAndCancelApplyLifecycleTimerSemantics(t *testing.T) {
 	}
 }
 
+func TestResumeWithAdjustmentCanRewriteStateAndTimerPayloads(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 12, 45, 0, 0, time.UTC)
+	create := testRuntimeCreateRequest(now)
+	create.Transition = testRuntimeTransition(1, false, testRuntimeTimer("turn.timeout", now.Add(time.Minute)))
+	session, _, err := NewSession(create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = session.AcquireOwnership(0, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := session.Suspend(1, now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumedAt := now.Add(32 * time.Second)
+	resumed, err := suspended.resumeWithAdjustment(1, resumedAt, func(
+		snapshot game.Snapshot,
+		timers []game.TimerIntent,
+	) (game.Snapshot, []game.TimerIntent, error) {
+		snapshot.State.Payload = []byte("resumed-state")
+		timers[0].Message.Payload = []byte("resumed-timer")
+		return snapshot, timers, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumedSnapshot := resumed.Snapshot()
+	if resumedSnapshot.State.StateVersion != 1 || !bytes.Equal(resumedSnapshot.State.State.Payload, []byte("resumed-state")) ||
+		!bytes.Equal(resumedSnapshot.Timers[0].Message.Payload, []byte("resumed-timer")) ||
+		!resumedSnapshot.Timers[0].DueAt.Equal(now.Add(90*time.Second)) {
+		t.Fatalf("resumed snapshot = %+v", resumedSnapshot)
+	}
+}
+
 func TestRestoreSessionRejectsPauseTimestampOutsideSuspendedState(t *testing.T) {
 	now := time.Date(2026, time.July, 19, 12, 15, 0, 0, time.UTC)
 	session, _, err := NewSession(testRuntimeCreateRequest(now))

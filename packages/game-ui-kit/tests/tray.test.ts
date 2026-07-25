@@ -21,6 +21,16 @@ describe("ActionTray", () => {
     handle.element.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientY: 150 }));
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual(["expanded"]);
   });
+
+  it("projects room governance on the tray edge without adding it to scrollable action content", () => {
+    const wrapper = mount(ActionTray, {
+      props: { modelValue: "compact" },
+      slots: { governance: "申请暂停" },
+    });
+
+    expect(wrapper.get(".gn-tray__governance").text()).toBe("申请暂停");
+    expect(wrapper.get(".gn-tray__content").text()).not.toContain("申请暂停");
+  });
 });
 
 describe("DangerConfirm", () => {

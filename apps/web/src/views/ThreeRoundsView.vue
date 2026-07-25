@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -22,14 +22,15 @@ import {
 import { classicTheme, threeRoundsSoundProfile, threeRoundsThemes } from "@game-night/three-rounds-themes";
 import { ThemeRuntime, safeTheme } from "@game-night/theme-system";
 
-import { useLiveGameTable } from "../composables/use-live-game-table";
+import { useLiveGameTable, type LiveSessionLifecycle } from "../composables/use-live-game-table";
 import { useRoomStore } from "../stores/room";
 
-const props = withDefaults(defineProps<{ roomId?: string; sessionId?: string; fixtureState?: ThreeRoundsFixtureState }>(), {
+const props = withDefaults(defineProps<{ roomId?: string; sessionId?: string; fixtureState?: ThreeRoundsFixtureState; pausedAt?: string | undefined }>(), {
   roomId: "fixture-room",
   sessionId: "fixture-session",
   fixtureState: "active",
 });
+const emit = defineEmits<{ lifecycleChange: [state: LiveSessionLifecycle] }>();
 
 const router = useRouter();
 const room = useRoomStore();
@@ -56,6 +57,10 @@ const liveTable = useLiveGameTable<ThreeRoundsView, ThreeRoundsTableContext>({
 });
 const allowedActions = liveTable.allowedActions;
 const pendingAction = liveTable.pendingAction;
+const effectivePausedAt = computed(() => fixtureMode.value
+  ? props.pausedAt
+  : liveTable.isPaused.value ? liveTable.suspendedAt.value ?? props.pausedAt : undefined);
+watch(liveTable.lifecycle, (state) => emit("lifecycleChange", state), { immediate: true });
 const muted = ref(false);
 const themeIndex = ref(0);
 let pendingTimer: number | undefined;
@@ -147,11 +152,15 @@ const leave = async (): Promise<void> => {
     :allowed-actions="allowedActions"
     :pending-action="pendingAction"
     :muted="muted"
+    :paused-at="effectivePausedAt"
     @submit="submitAction"
     @retry="liveTable.retry"
     @finish="finishSession"
     @leave="leave"
     @toggle-sound="toggleSound"
     @cycle-theme="cycleTheme"
-  />
+  >
+    <template #governance><slot name="governance" /></template>
+    <template #seat-details="seat"><slot name="seat-details" v-bind="seat" /></template>
+  </ThreeRoundsTable>
 </template>

@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { h, nextTick } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GameTable } from "../src";
@@ -47,6 +48,28 @@ describe("GameTable", () => {
 
     await vi.waitFor(() => expect(wrapper.findAll(".gn-table__seat")).toHaveLength(1));
     expect(wrapper.text()).toContain("小满");
+    wrapper.unmount();
+  });
+
+  it("keeps projected seat actions interactive inside the player detail popover", async () => {
+    installResizeObserver();
+    const transfer = vi.fn();
+    const wrapper = mount(GameTable, {
+      attachTo: document.body,
+      props: {
+        seats: [{ seatIndex: 0, userId: "u-1", displayName: "小满", connected: true }],
+        selfSeatIndex: 0,
+      },
+      slots: {
+        "seat-details": ({ userId }: { userId: string }) => h("button", { class: "seat-action", onClick: transfer }, `转移 ${userId}`),
+      },
+    });
+
+    await wrapper.get(".gn-seat__card").trigger("click");
+    expect(wrapper.get(".seat-action").text()).toBe("转移 u-1");
+    await wrapper.get(".seat-action").trigger("click");
+    expect(transfer).toHaveBeenCalledTimes(1);
+
     wrapper.unmount();
   });
 
@@ -263,6 +286,43 @@ describe("GameTable", () => {
     expect(selfSeat?.find('.gn-seat__indicator[aria-label="你的座位"]').exists()).toBe(true);
     expect(selfSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
     expect(selfSeat?.find(".gn-seat__status").text()).toBe("已准备");
+    wrapper.unmount();
+  });
+
+  it("rotates compact status items and opens full seat information on tap", async () => {
+    vi.useFakeTimers();
+    installResizeObserver(390, 844);
+    const wrapper = mount(GameTable, {
+      attachTo: document.body,
+      props: {
+        seats: [{
+          seatIndex: 0,
+          userId: "u-1",
+          displayName: "郝大侠",
+          avatarText: "郝",
+          status: "房主 · 已入座",
+          statusItems: ["房主", "已入座"],
+          connected: true,
+          host: true,
+        }],
+        selfSeatIndex: 0,
+      },
+    });
+
+    await vi.waitFor(() => expect(wrapper.find(".gn-seat").exists()).toBe(true));
+    expect(wrapper.find(".gn-seat__status").text()).toBe("房主");
+
+    vi.advanceTimersByTime(2200);
+    await nextTick();
+    expect(wrapper.find(".gn-seat__status").text()).toBe("已入座");
+
+    await wrapper.get(".gn-seat__card").trigger("click");
+    expect(wrapper.get(".gn-seat__card").attributes("aria-expanded")).toBe("true");
+    expect(wrapper.get(".gn-seat__details").text()).toContain("房主 · 已入座");
+    expect(wrapper.get(".gn-seat__details").text()).toContain("已入座");
+
+    await wrapper.get(".gn-seat__card").trigger("keydown", { key: "Escape" });
+    expect(wrapper.find(".gn-seat__details").exists()).toBe(false);
     wrapper.unmount();
   });
 

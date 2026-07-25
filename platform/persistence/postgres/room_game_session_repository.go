@@ -751,13 +751,21 @@ func validateRoomGameSessionGovernance(
 	}
 	roomBefore, roomAfter := before.Snapshot(), after.Snapshot()
 	sessionBefore, sessionAfter := beforeSession.Snapshot(), afterSession.Snapshot()
+	stateValid := reflect.DeepEqual(sessionBefore.State, sessionAfter.State)
+	if wantBefore == gameruntime.StatusSuspended && wantAfter == gameruntime.StatusActive {
+		// The lifecycle commit has already validated the module-owned resume adjustment;
+		// this boundary only needs to preserve the versioned envelope around its opaque payload.
+		stateValid = sessionBefore.State.SnapshotVersion == sessionAfter.State.SnapshotVersion &&
+			sessionBefore.State.StateVersion == sessionAfter.State.StateVersion &&
+			sessionBefore.State.State.MessageType == sessionAfter.State.State.MessageType &&
+			sessionBefore.State.State.SchemaVersion == sessionAfter.State.State.SchemaVersion
+	}
 	if roomBefore.Status != roomDomain.RoomStatusPlaying || roomAfter.Status != roomDomain.RoomStatusPlaying ||
 		roomBefore.ActiveSessionID == uuid.Nil || roomBefore.ActiveSessionID != roomAfter.ActiveSessionID ||
 		roomBefore.ActiveSessionID != sessionBefore.ID || sessionBefore.RoomID != roomBefore.ID ||
 		string(sessionBefore.VersionKey.GameID) != roomBefore.ActiveGameID ||
 		sessionBefore.Status != wantBefore || sessionAfter.Status != wantAfter ||
-		!sameTerminatingSessionIdentity(sessionBefore, sessionAfter) ||
-		!reflect.DeepEqual(sessionBefore.State, sessionAfter.State) ||
+		!sameTerminatingSessionIdentity(sessionBefore, sessionAfter) || !stateValid ||
 		!sessionAfter.UpdatedAt.Equal(roomAfter.UpdatedAt) || !sameRoomOutsidePauseGovernance(roomBefore, roomAfter) {
 		return gameruntime.ErrInvalidLifecycleCommit
 	}

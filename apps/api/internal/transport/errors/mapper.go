@@ -178,6 +178,18 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, "room.username.taken"}
 	case stderrors.Is(err, room.ErrRoomVersionConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.version.conflict"}
+	case stderrors.Is(err, room.ErrPauseRequestExists):
+		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_EXISTS, "room.pause.request_exists"}
+	case stderrors.Is(err, room.ErrPauseRequestNotFound):
+		return descriptor{connect.CodeNotFound, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_NOT_FOUND, "room.pause.request_not_found"}
+	case stderrors.Is(err, room.ErrGameAlreadyPaused):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_GAME_ALREADY_PAUSED, "room.game.already_paused"}
+	case stderrors.Is(err, room.ErrGameNotPaused):
+		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_GAME_NOT_PAUSED, "room.game.not_paused"}
+	case stderrors.Is(err, room.ErrHostTransferTargetInvalid):
+		return descriptor{connect.CodeInvalidArgument, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_HOST_TRANSFER_TARGET_INVALID, "room.host.transfer_target_invalid"}
+	case stderrors.Is(err, room.ErrPauseParticipantRequired):
+		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PARTICIPANT_NOT_ACTIVE, "room.pause.participant_required"}
 	case stderrors.Is(err, room.ErrRuleRevisionConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, "room.rule.revision_conflict"}
 	case stderrors.Is(err, room.ErrAdmissionClosed):

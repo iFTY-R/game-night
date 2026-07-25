@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -14,7 +14,7 @@ import {
 } from "@game-night/game-client";
 
 import { BrowserRealtimeAdapter } from "../api/browser-realtime";
-import { ApiError, gameClient, type GameEnvelopeInput, type RoomSnapshot } from "../api/client";
+import { ApiError, gameClient, type GameEnvelopeInput, type GameSessionSummaryWire, type RoomSnapshot } from "../api/client";
 import { gameProjectionFromConnect } from "../api/game-projection";
 import { memberDisplayName } from "../member-display";
 import { useRoomStore } from "../stores/room";
@@ -72,10 +72,21 @@ interface LiveActionFence {
   readonly userId: string;
 }
 
+/** Reports the latest room or session lifecycle observation to the game shell. */
+export interface LiveSessionLifecycle {
+  readonly known: boolean;
+  readonly paused: boolean;
+  readonly suspendedAt: string | null;
+  /** Fences lifecycle writes against realtime ownership changes; this is distinct from the room host epoch. */
+  readonly ownershipEpoch: string | null;
+}
+
 /** Simultaneous card-selection games may transparently replay at most two times after the initial conflicted write. */
 const simultaneousActionRetryLimit = 2;
 /** Only this canonical platform error proves that refreshing before a bounded retry is appropriate. */
 const gameStateVersionConflictCode = "game.state.version_conflict";
+// This business key is the only action failure that means the room should remain mounted while controls are withdrawn.
+const gameSessionSuspendedKey = "game.session.suspended";
 
 /** A game route remains valid only while the room still points at that exact active session. */
 export const isActiveRoomSession = (snapshot: RoomSnapshot, sessionId: string): boolean =>
@@ -90,6 +101,8 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   const pendingAction = ref<string | null>(null);
   // The outer projection includes platform-owned commands that are intentionally absent from the opaque game view.
   const authoritativeActions = ref<readonly string[]>([]);
+  // Session lifecycle is delivered by full projections while room polling independently restores governance after missed fanout.
+  const sessionSummary = ref<GameSessionSummaryWire | null>(null);
   const subscriptionRunner = new SubscriptionRunner<TView>();
   const lifecycleController = new AbortController();
   let subscriptionController: AbortController | undefined;
@@ -98,6 +111,30 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   let roomReconciliationTimer: number | undefined;
   let roomReconciliationPending = false;
   let returningToRoom = false;
+  const roomPause = computed(() => {
+    const activePause = room.remoteRoom?.activePause;
+    return activePause?.sessionId === options.sessionId ? activePause : null;
+  });
+  const summaryPaused = computed(() => sessionSummary.value?.status.includes("SUSPENDED") ?? false);
+  // Room and session notifications may arrive in either order; the latest authoritative observation drives presentation.
+  const pauseObservation = ref({
+    paused: roomPause.value !== null,
+    suspendedAt: roomPause.value?.pausedAt ?? null,
+  });
+  const isPaused = computed(() => pauseObservation.value.paused);
+  const suspendedAt = computed(() => pauseObservation.value.suspendedAt);
+
+  /** Applies lifecycle metadata together so controls and countdowns cannot observe a mixed pause state. */
+  const observeSessionSummary = (summary: GameSessionSummaryWire | null | undefined): void => {
+    if (summary === undefined) return;
+    sessionSummary.value = summary;
+    if (summary === null) return;
+    const paused = summary.status.includes("SUSPENDED");
+    pauseObservation.value = {
+      paused,
+      suspendedAt: paused ? summary.suspendedAt ?? roomPause.value?.pausedAt ?? null : null,
+    };
+  };
 
   // Mutations use authenticated Connect commands; this SDK instance owns only viewer-safe projection state.
   const liveClient = new ViewerGameClient<TView>({
@@ -168,7 +205,15 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     roomReconciliationPending = true;
     try {
       const snapshot = await room.loadRoom(options.roomId);
-      if (snapshot !== null && !isActiveRoomSession(snapshot, options.sessionId)) await returnToRoom(snapshot);
+      if (snapshot !== null && !isActiveRoomSession(snapshot, options.sessionId)) {
+        await returnToRoom(snapshot);
+        return;
+      }
+      const snapshotPaused = snapshot?.activePause?.sessionId === options.sessionId;
+      if (snapshot !== null && snapshotPaused !== summaryPaused.value) {
+        // Pure lifecycle changes keep the game state version stable, so a room mismatch explicitly refreshes session metadata.
+        liveClient.accept(await fetchProjection(lifecycleController.signal));
+      }
     } catch (error) {
       if (error instanceof ApiError && [403, 404].includes(error.status)) {
         await exitUnavailableRoom("你已无法继续访问这个房间");
@@ -240,6 +285,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
       viewerKind(viewerRoleForRoom()),
       signal,
     );
+    observeSessionSummary(response.session ?? null);
     return gameProjectionFromConnect(response.projection);
   };
 
@@ -294,6 +340,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
       }
     }
     try {
+      observeSessionSummary(response.session);
       return { ticket: response.ticket, grant: response.grant, projection: gameProjectionFromConnect(response.projection) };
     } catch (error) {
       throw new SubscriptionFailure("invalid_subscription_projection", "订阅投影无效", false, "reconnecting", null, { cause: error });
@@ -368,7 +415,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   /** Submits one authoritative action and immediately accepts the returned projection. */
   const submitLiveAction = async (input: ActionInput): Promise<boolean> => {
     if (options.fixtureMode.value) return false;
-    if (pendingAction.value !== null || options.context.value.connection !== "online") return true;
+    if (pendingAction.value !== null || options.context.value.connection !== "online" || isPaused.value) return true;
     pendingAction.value = input.action;
     const controller = new AbortController();
     actionController?.abort();
@@ -393,6 +440,10 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
           break;
         } catch (error) {
           if (!isGameStateVersionConflict(error)) {
+            if (error instanceof ApiError && (error.businessKey === gameSessionSuspendedKey || error.code === gameSessionSuspendedKey)) {
+              await reconcileRoomSession();
+              break;
+            }
             if (canContinueLiveAction(controller, fence)) {
               liveClient.markReconnecting(error instanceof ApiError ? error.code : "action_failed");
             }
@@ -420,7 +471,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   /** Finishes through the room aggregate so room and game status change atomically. */
   const finishLiveSession = async (command: GameEnvelopeInput): Promise<boolean> => {
     if (options.fixtureMode.value) return false;
-    if (pendingAction.value !== null) return true;
+    if (pendingAction.value !== null || isPaused.value) return true;
     pendingAction.value = "session.finish";
     try {
       if (room.remoteRoom?.version === undefined) throw new Error("room_snapshot_missing");
@@ -442,6 +493,20 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
     options.context.value = { ...options.context.value, connection: "reconnecting" };
     startLiveSubscription();
   };
+
+  watch(roomPause, (pause) => {
+    pauseObservation.value = { paused: pause !== null, suspendedAt: pause?.pausedAt ?? null };
+    // Room governance writes do not advance game state, so align the session summary immediately instead of waiting for polling.
+    if (!options.fixtureMode.value) void reconcileRoomSession();
+  });
+
+  watch(isPaused, (paused) => {
+    if (!paused) return;
+    // A pause racing an optimistic command cancels the local request; the server remains authoritative if it committed first.
+    actionController?.abort();
+    authoritativeActions.value = [];
+    pendingAction.value = null;
+  });
 
   onMounted(() => {
     if (options.fixtureMode.value) return;
@@ -471,7 +536,16 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
   return {
     allowedActions: computed(() => options.fixtureMode.value
       ? options.viewActions(options.view.value)
-      : authoritativeActions.value),
+      : isPaused.value ? [] : authoritativeActions.value),
+    isPaused,
+    suspendedAt,
+    lifecycle: computed<LiveSessionLifecycle>(() => ({
+      known: sessionSummary.value !== null || (room.remoteRoom !== null && isActiveRoomSession(room.remoteRoom, options.sessionId)),
+      paused: isPaused.value,
+      suspendedAt: suspendedAt.value,
+      ownershipEpoch: sessionSummary.value?.ownershipEpoch ?? null,
+    })),
+    sessionStatus: computed(() => sessionSummary.value?.status ?? ""),
     pendingAction,
     submitLiveAction,
     finishLiveSession,

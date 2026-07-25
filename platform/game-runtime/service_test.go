@@ -300,7 +300,52 @@ func TestRuntimeServiceActionSuspendsWhenExactModuleDisappears(t *testing.T) {
 	}
 }
 
-func TestRuntimeServiceExplicitlySuspendsAndResumesSession(t *testing.T) {
+func TestRuntimeServicePauseRoomAndResumeRoomAtomically(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	dueAt := fixture.clock.Now().Add(10 * time.Second)
+	fixture.module.createTimers = []game.TimerIntent{{
+		TimerID: "session.finish", DueAt: dueAt, Message: runtimeServiceMessage("session.finish", nil),
+	}}
+	startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	pausedRoom, suspended, err := fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+		ActorUserID: fixture.hostID, RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+		Expected: startedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pausedRoom.Snapshot().ActivePause.ID == uuid.Nil || pausedRoom.Snapshot().ActivePause.Source != roomDomain.PauseSourceHost ||
+		pausedRoom.Snapshot().ActivePause.PausedByUserID != fixture.hostID ||
+		suspended.Snapshot().Status != StatusSuspended || suspended.Snapshot().SuspendedAt.IsZero() ||
+		fixture.authority.suspendCalls != 1 || fixture.authority.commitLifecycleCalls != 0 {
+		t.Fatalf("paused room=%+v session=%+v suspend_calls=%d lifecycle_calls=%d", pausedRoom.Snapshot(), suspended.Snapshot(), fixture.authority.suspendCalls, fixture.authority.commitLifecycleCalls)
+	}
+
+	_, _ = fixture.clock.Advance(30 * time.Second)
+	resumedRoom, resumed, err := fixture.service.ResumeRoom(t.Context(), ResumeRoomCommand{
+		ActorUserID: fixture.hostID, RoomID: pausedRoom.Snapshot().ID, SessionID: suspended.Snapshot().ID,
+		Expected: pausedRoom.Version(), OwnershipEpoch: suspended.Snapshot().OwnershipEpoch,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDueAt := dueAt.Add(30 * time.Second)
+	if resumedRoom.Snapshot().ActivePause.ID != uuid.Nil || resumed.Snapshot().Status != StatusActive ||
+		!resumed.Snapshot().SuspendedAt.IsZero() || len(resumed.Snapshot().Timers) != 1 ||
+		!resumed.Snapshot().Timers[0].DueAt.Equal(wantDueAt) || !resumed.Snapshot().NextDeadlineAt.Equal(wantDueAt) ||
+		fixture.authority.resumeCalls != 1 || fixture.authority.commitLifecycleCalls != 0 {
+		t.Fatalf("resumed room=%+v session=%+v want_due_at=%v resume_calls=%d lifecycle_calls=%d", resumedRoom.Snapshot(), resumed.Snapshot(), wantDueAt, fixture.authority.resumeCalls, fixture.authority.commitLifecycleCalls)
+	}
+}
+
+func TestRuntimeServicePauseRoomApprovesPendingRequest(t *testing.T) {
 	fixture := newRuntimeServiceFixture(t)
 	_, session, err := fixture.service.Start(t.Context(), StartCommand{
 		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
@@ -310,19 +355,134 @@ func TestRuntimeServiceExplicitlySuspendsAndResumesSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _ = fixture.clock.Advance(time.Second)
-	suspended, err := fixture.service.Suspend(t.Context(), SuspendCommand{
-		SessionID: session.Snapshot().ID, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	requestID := uuid.New()
+	requestedRoom, err := fixture.authority.room.RequestPause(
+		fixture.playerID, requestID, session.Snapshot().ID, fixture.authority.room.Version(), fixture.clock.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.authority.room = requestedRoom
+
+	pausedRoom, suspended, err := fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+		ActorUserID: fixture.hostID, RoomID: requestedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+		RequestID: requestID, Expected: requestedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
 	})
-	if err != nil || suspended.Snapshot().Status != StatusSuspended || suspended.Snapshot().SuspendedAt.IsZero() {
-		t.Fatalf("suspended=%+v error=%v", suspended.Snapshot(), err)
+	if err != nil || pausedRoom.Snapshot().PendingPauseRequest.ID != uuid.Nil ||
+		pausedRoom.Snapshot().ActivePause.Source != roomDomain.PauseSourceApprovedRequest ||
+		pausedRoom.Snapshot().ActivePause.RequestedByUserID != fixture.playerID ||
+		suspended.Snapshot().Status != StatusSuspended {
+		t.Fatalf("paused room=%+v session=%+v error=%v", pausedRoom.Snapshot(), suspended.Snapshot(), err)
+	}
+}
+
+func TestRuntimeServiceResumeUsesModuleResumeAdjustment(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	fixture.module.adjustResume = true
+	fixture.module.createTimers = []game.TimerIntent{{
+		TimerID: "turn.timeout", DueAt: fixture.clock.Now().Add(10 * time.Second), Message: runtimeServiceMessage("turn.timeout", []byte("original-timer")),
+	}}
+	startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fixture.clock.Advance(time.Second)
+	pausedRoom, suspended, err := fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+		ActorUserID: fixture.hostID, RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+		Expected: startedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	_, _ = fixture.clock.Advance(30 * time.Second)
-	resumed, err := fixture.service.Resume(t.Context(), ResumeCommand{
-		SessionID: session.Snapshot().ID, OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+	_, resumed, err := fixture.service.ResumeRoom(t.Context(), ResumeRoomCommand{
+		ActorUserID: fixture.hostID, RoomID: pausedRoom.Snapshot().ID, SessionID: suspended.Snapshot().ID,
+		Expected: pausedRoom.Version(), OwnershipEpoch: suspended.Snapshot().OwnershipEpoch,
 	})
-	if err != nil || resumed.Snapshot().Status != StatusActive || !resumed.Snapshot().SuspendedAt.IsZero() {
-		t.Fatalf("resumed=%+v error=%v", resumed.Snapshot(), err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if fixture.module.adjustResumeCalls != 1 || string(resumed.Snapshot().State.State.Payload) != "resumed-state" ||
+		string(resumed.Snapshot().Timers[0].Message.Payload) != "resumed-timer" {
+		t.Fatalf("adjust_calls=%d snapshot=%+v", fixture.module.adjustResumeCalls, resumed.Snapshot())
+	}
+}
+
+func TestRuntimeServicePauseRoomAndResumeRoomErrors(t *testing.T) {
+	t.Run("pause requires current host", func(t *testing.T) {
+		fixture := newRuntimeServiceFixture(t)
+		startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+			ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+			Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = fixture.clock.Advance(time.Second)
+		_, _, err = fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+			ActorUserID: fixture.playerID, RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+			Expected: startedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+		})
+		if !errors.Is(err, roomDomain.ErrHostRequired) || fixture.authority.suspendCalls != 0 ||
+			fixture.authority.commitLifecycleCalls != 0 || fixture.authority.session.Snapshot().Status != StatusActive {
+			t.Fatalf("error=%v suspend_calls=%d lifecycle_calls=%d session=%+v", err, fixture.authority.suspendCalls, fixture.authority.commitLifecycleCalls, fixture.authority.session.Snapshot())
+		}
+	})
+
+	t.Run("resume requires exact module", func(t *testing.T) {
+		fixture := newRuntimeServiceFixture(t)
+		startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+			ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+			Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = fixture.clock.Advance(time.Second)
+		pausedRoom, suspended, err := fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+			ActorUserID: fixture.hostID, RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+			Expected: startedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixture.registry.missing = true
+		_, _ = fixture.clock.Advance(time.Second)
+		_, _, err = fixture.service.ResumeRoom(t.Context(), ResumeRoomCommand{
+			ActorUserID: fixture.hostID, RoomID: pausedRoom.Snapshot().ID, SessionID: suspended.Snapshot().ID,
+			Expected: pausedRoom.Version(), OwnershipEpoch: suspended.Snapshot().OwnershipEpoch,
+		})
+		if !errors.Is(err, ErrModuleUnavailable) || fixture.authority.resumeCalls != 0 ||
+			fixture.authority.commitLifecycleCalls != 0 || fixture.authority.room.Snapshot().ActivePause.ID == uuid.Nil ||
+			fixture.authority.session.Snapshot().Status != StatusSuspended {
+			t.Fatalf("error=%v resume_calls=%d lifecycle_calls=%d room=%+v session=%+v", err, fixture.authority.resumeCalls, fixture.authority.commitLifecycleCalls, fixture.authority.room.Snapshot(), fixture.authority.session.Snapshot())
+		}
+	})
+
+	t.Run("atomic suspend port failure leaves authoritative state unchanged", func(t *testing.T) {
+		fixture := newRuntimeServiceFixture(t)
+		startedRoom, session, err := fixture.service.Start(t.Context(), StartCommand{
+			ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+			Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixture.authority.suspendErr = errors.New("suspend failed")
+		_, _ = fixture.clock.Advance(time.Second)
+		_, _, err = fixture.service.PauseRoom(t.Context(), PauseRoomCommand{
+			ActorUserID: fixture.hostID, RoomID: startedRoom.Snapshot().ID, SessionID: session.Snapshot().ID,
+			Expected: startedRoom.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+		})
+		if err == nil || err.Error() != "suspend failed" || fixture.authority.suspendCalls != 1 ||
+			fixture.authority.commitLifecycleCalls != 0 || fixture.authority.room.Snapshot().ActivePause.ID != uuid.Nil ||
+			fixture.authority.session.Snapshot().Status != StatusActive {
+			t.Fatalf("error=%v suspend_calls=%d lifecycle_calls=%d room=%+v session=%+v", err, fixture.authority.suspendCalls, fixture.authority.commitLifecycleCalls, fixture.authority.room.Snapshot(), fixture.authority.session.Snapshot())
+		}
+	})
 }
 
 func TestRuntimeServiceTimerAndSystemReplayBeforeCallingModule(t *testing.T) {
@@ -900,6 +1060,8 @@ type runtimeServiceModule struct {
 	projectReplayV2Calls   int
 	replayEvents           []game.Event
 	replayTerminalMeta     game.ReplayTerminalMeta
+	adjustResume           bool
+	adjustResumeCalls      int
 }
 
 func (module *runtimeServiceModule) Manifest() game.Manifest { return module.manifest.Clone() }
@@ -970,6 +1132,18 @@ func (*runtimeServiceModule) Migrate(snapshot game.Snapshot, _, _ uint32) (game.
 	return snapshot, nil
 }
 
+func (module *runtimeServiceModule) AdjustResumed(snapshot game.Snapshot, timers []game.TimerIntent) (game.Snapshot, []game.TimerIntent, error) {
+	module.adjustResumeCalls++
+	if !module.adjustResume {
+		return snapshot, timers, nil
+	}
+	snapshot.State.Payload = []byte("resumed-state")
+	if len(timers) > 0 {
+		timers[0].Message.Payload = []byte("resumed-timer")
+	}
+	return snapshot, timers, nil
+}
+
 type runtimeServiceGenerator struct{ next uint64 }
 
 func (generator *runtimeServiceGenerator) NewID() (uuid.UUID, error) {
@@ -988,17 +1162,22 @@ func (generator *runtimeServiceGenerator) NewExecution(at time.Time) (game.Deter
 }
 
 type runtimeServiceAuthority struct {
-	room            roomDomain.Room
-	session         Session
-	startProof      *PendingStartProof
-	startReceipts   map[StartKey]StartReceipt
-	actionReceipts  map[ActionKey]ActionReceipt
-	timerReceipts   map[TimerKey]TimerReceipt
-	systemReceipts  map[SystemKey]SystemReceipt
-	eventBatches    []EventBatch
-	retrySystemOnce bool
-	systemDigests   []idempotency.Digest
-	oversizedReplay bool
+	room                 roomDomain.Room
+	session              Session
+	startProof           *PendingStartProof
+	startReceipts        map[StartKey]StartReceipt
+	actionReceipts       map[ActionKey]ActionReceipt
+	timerReceipts        map[TimerKey]TimerReceipt
+	systemReceipts       map[SystemKey]SystemReceipt
+	eventBatches         []EventBatch
+	retrySystemOnce      bool
+	systemDigests        []idempotency.Digest
+	oversizedReplay      bool
+	suspendCalls         int
+	resumeCalls          int
+	suspendErr           error
+	resumeErr            error
+	commitLifecycleCalls int
 }
 
 func (authority *runtimeServiceAuthority) Create(context.Context, CreationCommit) (Session, error) {
@@ -1111,6 +1290,7 @@ func (authority *runtimeServiceAuthority) CompleteSystemNoop(
 }
 
 func (authority *runtimeServiceAuthority) CommitLifecycle(_ context.Context, commit LifecycleCommit) (Session, error) {
+	authority.commitLifecycleCalls++
 	authority.session = commit.After()
 	return authority.session, nil
 }
@@ -1196,6 +1376,30 @@ func (authority *runtimeServiceAuthority) Cancel(
 	return after, session, err
 }
 
+func (authority *runtimeServiceAuthority) Suspend(
+	_ context.Context, _ roomDomain.Room, after roomDomain.Room, commit LifecycleCommit,
+) (roomDomain.Room, Session, error) {
+	authority.suspendCalls++
+	if authority.suspendErr != nil {
+		return authority.room, authority.session, authority.suspendErr
+	}
+	session := commit.After()
+	authority.room, authority.session = after, session
+	return after, session, nil
+}
+
+func (authority *runtimeServiceAuthority) Resume(
+	_ context.Context, _ roomDomain.Room, after roomDomain.Room, commit LifecycleCommit,
+) (roomDomain.Room, Session, error) {
+	authority.resumeCalls++
+	if authority.resumeErr != nil {
+		return authority.room, authority.session, authority.resumeErr
+	}
+	session := commit.After()
+	authority.room, authority.session = after, session
+	return after, session, nil
+}
+
 type runtimeServiceRooms struct{ authority *runtimeServiceAuthority }
 
 func (rooms *runtimeServiceRooms) Create(_ context.Context, room roomDomain.Room) (roomDomain.Room, error) {
@@ -1267,6 +1471,7 @@ func runtimeServiceOperationID(t testing.TB, marker byte) idempotency.OperationI
 }
 
 var _ game.RuntimeServerGameModule = (*runtimeServiceModule)(nil)
+var _ game.ResumeAdjustingGameModule = (*runtimeServiceModule)(nil)
 var _ Store = (*runtimeServiceAuthority)(nil)
 var _ roomDomain.Repository = (*runtimeServiceRooms)(nil)
 var _ RoomSessionStore = (*runtimeServiceAuthority)(nil)

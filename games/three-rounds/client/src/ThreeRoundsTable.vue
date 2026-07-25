@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   allowedActions: readonly string[];
   pendingAction?: string | null;
   muted?: boolean;
+  pausedAt?: string | undefined;
 }>(), { pendingAction: null, muted: false });
 
 const emit = defineEmits<{
@@ -38,7 +39,7 @@ let clockTimer: number | undefined;
 
 const selectionLimit = computed(() => selectionLimitForPhase(props.view.phase));
 const canSubmitSelection = computed(() => props.context.viewerRole === "player" && props.allowedActions.includes(THREE_ROUNDS_SUBMIT_SELECTION_ACTION));
-const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online");
+const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online" || props.pausedAt !== undefined);
 const isSelecting = computed(() => selectionLimit.value > 0);
 const playerMap = computed(() => new Map(props.context.players.map((player) => [player.userId, player])));
 const publicPlayers = computed(() => [...props.view.publicPlayers].sort((left, right) => left.seatIndex - right.seatIndex));
@@ -56,9 +57,14 @@ const seats = computed<readonly TableSeat[]>(() =>
   })),
 );
 const selfSeatIndex = computed(() => selfPlayer.value?.seatIndex ?? publicPlayers.value[0]?.seatIndex ?? 0);
+// Freeze the visible phase clock at the authoritative pause instant while the table remains mounted.
+const countdownClock = computed(() => {
+  const pausedAt = Date.parse(props.pausedAt ?? "");
+  return Number.isFinite(pausedAt) ? pausedAt : clockNow.value;
+});
 const deadlineSeconds = computed(() => {
   const deadline = Number(props.view.phaseDeadlineUnixMillis);
-  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - clockNow.value) / 1000));
+  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - countdownClock.value) / 1000));
 });
 const pendingLabel = computed(() => props.pendingAction === THREE_ROUNDS_SUBMIT_SELECTION_ACTION ? "正在确认选牌" : null);
 const selectionHint = computed(() => {
@@ -212,10 +218,14 @@ const cardMeta = (cardId: string) => parseCard(cardId);
             </div>
           </PrivateZone>
         </template>
+        <template #seat-details="seat">
+          <slot name="seat-details" v-bind="seat" />
+        </template>
       </GameTable>
     </section>
 
     <ActionTray v-model="trayState" :pending="pendingAction !== null" label="三关操作区">
+      <template #governance><slot name="governance" /></template>
       <template #summary>
         <div class="tray-summary">
           <span :class="{ active: canSubmitSelection }" />

@@ -104,6 +104,22 @@ export type GameRulePresetWriteMode =
   | "GAME_RULE_PRESET_WRITE_MODE_OVERWRITE"
   | "GAME_RULE_PRESET_WRITE_MODE_COPY";
 
+export interface PendingPauseRequestWire {
+  requestId: string;
+  sessionId: string;
+  requestedByUserId: string;
+  requestedAt?: string;
+}
+
+export interface ActivePauseWire {
+  pauseId: string;
+  sessionId: string;
+  source: string;
+  requestedByUserId?: string;
+  pausedByUserId: string;
+  pausedAt?: string;
+}
+
 export interface RoomSnapshot {
   roomId: string;
   roomCode: string;
@@ -122,7 +138,10 @@ export interface RoomSnapshot {
   selectedGameId?: string;
   gameConfigDrafts?: RoomGameConfigDraftWire[];
   pendingStart?: PendingGameStartWire;
+  pendingPauseRequest?: PendingPauseRequestWire;
+  activePause?: ActivePauseWire;
   ownershipEpoch?: string | number | bigint;
+  updatedAt?: string;
 }
 
 export interface RoomResponse {
@@ -137,6 +156,7 @@ export interface RoomResponse {
   participants?: Array<{ userId: string; seatIndex: number }>;
   frozenConfig?: GameEnvelopeWire;
   configRevision?: string;
+  session?: GameSessionSummaryWire;
 }
 
 export interface GameRulePresetListResponse {
@@ -230,6 +250,7 @@ export interface GameProjectionWire {
 
 export interface GameProjectionResponse {
   projection?: GameProjectionWire;
+  session?: GameSessionSummaryWire;
 }
 
 export interface GameSessionSummaryWire {
@@ -238,7 +259,9 @@ export interface GameSessionSummaryWire {
   gameId: string;
   version?: { engine: string; protocol: string; client: string };
   stateVersion: string;
+  ownershipEpoch?: string;
   status: string;
+  suspendedAt?: string;
 }
 
 export interface ReplayTerminalMetaWire {
@@ -299,6 +322,12 @@ const localizedErrorMessages: Record<string, string> = {
   "identity.username.invalid": "用户名需要 2-4 个汉字、英文字母或数字",
   // Room-scoped duplicate names are safe to present directly in localized form.
   "room.username.taken": "房间内已有同名玩家",
+  "room.pause.request_exists": "已有玩家申请暂停，请等待房主处理",
+  "room.pause.request_not_found": "暂停申请已处理，请刷新后重试",
+  "room.game.already_paused": "游戏已经暂停",
+  "room.game.not_paused": "游戏当前没有暂停",
+  "room.host.transfer_target_invalid": "只能把房主转移给其他在座玩家",
+  "game.session.suspended": "游戏已暂停，请等待房主恢复",
 };
 
 type ConnectErrorWire = {
@@ -784,6 +813,50 @@ export const roomClient = {
         expectedStateVersion,
         command,
       }),
+    }, true);
+  },
+  /** Records one seated participant's pause request against the exact active session. */
+  requestRoomPause(room: RoomSnapshot, sessionId: string): Promise<RoomResponse> {
+    return callRoom("RequestRoomPause", {
+      roomId: room.roomId,
+      sessionId,
+      expectedVersion: room.version,
+    }, true);
+  },
+  /** Rejects only the pending pause request currently visible in the host snapshot. */
+  rejectRoomPauseRequest(room: RoomSnapshot, requestId: string): Promise<RoomResponse> {
+    return callRoom("RejectRoomPauseRequest", {
+      roomId: room.roomId,
+      requestId,
+      expectedVersion: room.version,
+    }, true);
+  },
+  /** Pauses under both the room CAS version and the current realtime session ownership fence. */
+  pauseRoomGame(room: RoomSnapshot, sessionId: string, requestId: string, sessionOwnershipEpoch: string): Promise<RoomResponse> {
+    return callRoom("PauseRoomGame", {
+      roomId: room.roomId,
+      sessionId,
+      requestId,
+      expectedVersion: room.version,
+      ownershipEpoch: sessionOwnershipEpoch,
+    }, true);
+  },
+  /** Resumes the exact suspended room session under its current realtime ownership fence. */
+  resumeRoomGame(room: RoomSnapshot, sessionId: string, sessionOwnershipEpoch: string): Promise<RoomResponse> {
+    return callRoom("ResumeRoomGame", {
+      roomId: room.roomId,
+      sessionId,
+      expectedVersion: room.version,
+      ownershipEpoch: sessionOwnershipEpoch,
+    }, true);
+  },
+  /** Transfers room governance to another current participant and advances the ownership fence. */
+  transferRoomHost(room: RoomSnapshot, targetUserId: string): Promise<RoomResponse> {
+    return callRoom("TransferRoomHost", {
+      roomId: room.roomId,
+      targetUserId,
+      expectedVersion: room.version,
+      ownershipEpoch: String(room.ownershipEpoch ?? ""),
     }, true);
   },
   approveMember(room: RoomSnapshot, userId: string): Promise<RoomResponse> {

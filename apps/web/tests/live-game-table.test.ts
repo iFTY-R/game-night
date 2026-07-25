@@ -26,6 +26,13 @@ const shared = vi.hoisted(() => {
     lastFinishedSessionId: "",
     lastFinishedGameId: "",
     version: { roomVersion: "1", membershipVersion: "1" },
+    activePause: undefined as undefined | {
+      pauseId: string;
+      sessionId: string;
+      source: string;
+      pausedByUserId: string;
+      pausedAt: string;
+    },
   };
   const roomStore = {
     userId: "user-1",
@@ -138,6 +145,13 @@ const createRemoteRoom = () => ({
   lastFinishedSessionId: "",
   lastFinishedGameId: "",
   version: { roomVersion: "1", membershipVersion: "1" },
+  activePause: undefined as undefined | {
+    pauseId: string;
+    sessionId: string;
+    source: string;
+    pausedByUserId: string;
+    pausedAt: string;
+  },
 });
 
 const roomSnapshot = (status: string, activeSessionId: string): RoomSnapshot => ({
@@ -317,6 +331,74 @@ describe("live game route lifecycle", () => {
 
     expect(harness.liveTable.allowedActions.value).toEqual([]);
     subscriptionGate.resolve();
+    harness.app.unmount();
+  });
+
+  it("keeps the table mounted while a suspended session withdraws every game action", async () => {
+    const pausedAt = "2026-07-26T02:00:00Z";
+    shared.roomStore.remoteRoom = {
+      ...createRemoteRoom(),
+      activePause: {
+        pauseId: "pause-1",
+        sessionId: "session-1",
+        source: "PAUSE_SOURCE_HOST",
+        pausedByUserId: "user-1",
+        pausedAt,
+      },
+    };
+    shared.api.getProjection.mockResolvedValueOnce({
+      ...projectionResponse(baseView(), 1),
+      session: {
+        sessionId: "session-1",
+        roomId: "room-1",
+        gameId: "three-rounds",
+        stateVersion: "1",
+        ownershipEpoch: "7",
+        status: "GAME_SESSION_STATUS_SUSPENDED",
+        suspendedAt: pausedAt,
+      },
+    });
+    const harness = await mountLiveTable();
+
+    expect(harness.liveTable.isPaused.value).toBe(true);
+    expect(harness.liveTable.lifecycle.value.ownershipEpoch).toBe("7");
+    expect(harness.liveTable.suspendedAt.value).toBe(pausedAt);
+    expect(harness.liveTable.allowedActions.value).toEqual([]);
+    await harness.liveTable.submitLiveAction(actionInput());
+    expect(shared.api.action).not.toHaveBeenCalled();
+    expect(shared.router.replace).not.toHaveBeenCalled();
+
+    harness.app.unmount();
+  });
+
+  it("accepts a newer active session lifecycle while the room pause snapshot is stale", async () => {
+    shared.roomStore.remoteRoom = {
+      ...createRemoteRoom(),
+      activePause: {
+        pauseId: "pause-1",
+        sessionId: "session-1",
+        source: "PAUSE_SOURCE_HOST",
+        pausedByUserId: "user-1",
+        pausedAt: "2026-07-26T02:00:00Z",
+      },
+    };
+    shared.api.getProjection.mockResolvedValueOnce({
+      ...projectionResponse(baseView(), 1),
+      session: {
+        sessionId: "session-1",
+        roomId: "room-1",
+        gameId: "three-rounds",
+        stateVersion: "1",
+        ownershipEpoch: "8",
+        status: "GAME_SESSION_STATUS_ACTIVE",
+      },
+    });
+    const harness = await mountLiveTable();
+
+    expect(harness.liveTable.lifecycle.value.known).toBe(true);
+    expect(harness.liveTable.lifecycle.value.ownershipEpoch).toBe("8");
+    expect(harness.liveTable.isPaused.value).toBe(false);
+    expect(harness.liveTable.suspendedAt.value).toBeNull();
     harness.app.unmount();
   });
 

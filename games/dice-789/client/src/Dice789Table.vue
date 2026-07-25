@@ -48,6 +48,7 @@ const props = withDefaults(defineProps<{
   allowedActions: readonly string[];
   pendingAction?: string | null;
   muted?: boolean;
+  pausedAt?: string | undefined;
 }>(), { pendingAction: null, muted: false });
 const emit = defineEmits<{
   submit: [input: ActionInput];
@@ -78,7 +79,7 @@ onBeforeUnmount(() => {
 const presentations = computed(() => new Map(props.context.players.map((player) => [player.userId, player])));
 const displayName = (userId: string): string => presentations.value.get(userId)?.displayName ?? `玩家 ${userId.slice(-4)}`;
 const isOnline = computed(() => props.context.connection === "online");
-const actionLocked = computed(() => props.pendingAction !== null || !isOnline.value);
+const actionLocked = computed(() => props.pendingAction !== null || !isOnline.value || props.pausedAt !== undefined);
 const can = (action: string): boolean => props.allowedActions.includes(action);
 const hostUserId = computed(() => props.context.players.find((player) => player.host)?.userId ?? "");
 // The confirmation window belongs to the host; all other actionable phases remain with the projected current player.
@@ -97,9 +98,14 @@ const turnDirection = computed<TableTurnDirection | undefined>(() => {
 });
 const isCurrentPlayer = computed(() => props.context.viewerRole === "player" && turnUserId.value === props.context.selfUserId);
 const turnUserName = computed(() => turnUserId.value === "" ? "" : displayName(turnUserId.value));
+// Freeze the visible turn clock at the authoritative pause instant while the table remains mounted.
+const countdownClock = computed(() => {
+  const pausedAt = Date.parse(props.pausedAt ?? "");
+  return Number.isFinite(pausedAt) ? pausedAt : now.value;
+});
 const countdown = computed(() => {
   const deadline = Number(props.view.actionDeadlineUnixMillis);
-  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - now.value) / 1000));
+  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - countdownClock.value) / 1000));
 });
 const addValues = computed(() => legalAddValues(props.view.actionConstraints));
 const addTicks = computed(() => addValues.value[addIndex.value] ?? addValues.value[0] ?? 0);
@@ -116,15 +122,20 @@ watch(
 
 const seats = computed<readonly TableSeat[]>(() => props.view.players.map((player) => {
   const presentation = presentations.value.get(player.userId);
+  const status = player.active
+    ? (player.userId === turnUserId.value ? (props.view.phase === Phase.RESULT_PENDING ? "等待确认" : "正在操作") : `累计 ${formatTicks(player.penaltyTicks)}`)
+    : "已离桌";
+  const statusItems = player.active
+    ? (player.userId === turnUserId.value ? [status] : ["累计罚点", formatTicks(player.penaltyTicks)])
+    : ["已离桌"];
   return {
     seatIndex: player.seatIndex,
     userId: player.userId,
     displayName: presentation?.displayName ?? displayName(player.userId),
     connected: presentation?.connected ?? true,
     turn: player.userId === turnUserId.value,
-    status: player.active
-      ? (player.userId === turnUserId.value ? (props.view.phase === Phase.RESULT_PENDING ? "等待确认" : "正在操作") : `累计 ${formatTicks(player.penaltyTicks)}`)
-      : "已离桌",
+    status,
+    statusItems,
     ...(presentation?.avatarText === undefined ? {} : { avatarText: presentation.avatarText }),
     ...(presentation?.host === undefined ? {} : { host: presentation.host }),
   };
@@ -224,10 +235,14 @@ const confirmDropped = (): void => {
         <template #private>
           <PoolStack :layers="view.pool" :total-ticks="view.totalPoolTicks" :layer-capacity-ticks="view.config?.layerCapacityTicks ?? 0" />
         </template>
+        <template #seat-details="seat">
+          <slot name="seat-details" v-bind="seat" />
+        </template>
       </GameTable>
     </section>
 
     <ActionTray v-model="trayState" :pending="pendingAction !== null" label="本回合操作">
+      <template #governance><slot name="governance" /></template>
       <template #summary>
         <div class="turn-summary"><span :class="{ active: isCurrentPlayer }" /><strong>{{ pendingLabel ?? phaseLabel }}</strong></div>
         <button v-if="!isOnline" class="retry-button" type="button" title="立即重连" @click="emit('retry')"><RefreshCw :size="17" aria-hidden="true" /></button>

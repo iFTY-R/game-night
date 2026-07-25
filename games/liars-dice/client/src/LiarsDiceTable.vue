@@ -30,6 +30,7 @@ const props = withDefaults(
     allowedActions: readonly string[];
     pendingAction?: string | null;
     muted?: boolean;
+    pausedAt?: string | undefined;
   }>(),
   { pendingAction: null, muted: false },
 );
@@ -79,16 +80,21 @@ const displayName = (userId: string): string => presentations.value.get(userId)?
 const activePlayers = computed(() => props.view.players.filter((player) => player.active));
 const config = computed(() => props.view.config);
 const totalDice = computed(() => activePlayers.value.length * (config.value?.dicePerPlayer ?? 0));
+// The pause timestamp freezes the visible clock before resume delivers shifted authoritative deadlines.
+const countdownClock = computed(() => {
+  const pausedAt = Date.parse(props.pausedAt ?? "");
+  return Number.isFinite(pausedAt) ? pausedAt : clockNow.value;
+});
 const countdown = computed(() => {
   const deadline = Number(props.view.actionDeadlineUnixMillis);
   if (deadline <= 0) return null;
-  return Math.max(0, Math.ceil((deadline - clockNow.value) / 1000));
+  return Math.max(0, Math.ceil((deadline - countdownClock.value) / 1000));
 });
 const currentActorName = computed(() => displayName(props.view.currentActorUserId));
 const isCurrentPlayer = computed(
   () => props.view.phase === Phase.BIDDING && props.context.viewerRole === "player" && props.view.currentActorUserId === props.context.selfUserId,
 );
-const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online");
+const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online" || props.pausedAt !== undefined);
 const canBid = computed(() => isCurrentPlayer.value && props.allowedActions.includes(LIARS_DICE_BID_ACTION));
 const canOpen = computed(() => isCurrentPlayer.value && props.allowedActions.includes(LIARS_DICE_OPEN_ACTION));
 const canFinish = computed(() => props.allowedActions.includes(SESSION_FINISH_ACTION));
@@ -104,6 +110,11 @@ const seats = computed<readonly TableSeat[]>(() =>
       : player.userId === turnUserId.value
         ? "正在叫骰"
         : `${config.value?.dicePerPlayer ?? 0} 颗已摇 · ${player.penaltyTicks} 罚点`;
+    const statusItems = !player.active
+      ? ["已离桌"]
+      : player.userId === turnUserId.value
+        ? ["正在叫骰"]
+        : [`${config.value?.dicePerPlayer ?? 0} 颗已摇`, `${player.penaltyTicks} 罚点`];
     return {
       seatIndex: player.seatIndex,
       userId: player.userId,
@@ -111,6 +122,7 @@ const seats = computed<readonly TableSeat[]>(() =>
       connected: presentation?.connected ?? true,
       turn: player.userId === turnUserId.value,
       status,
+      statusItems,
       ...(presentation?.avatarText === undefined ? {} : { avatarText: presentation.avatarText }),
       ...(presentation?.host === undefined ? {} : { host: presentation.host }),
     };
@@ -224,10 +236,14 @@ const confirmFinish = (): void => {
             </div>
           </PrivateZone>
         </template>
+        <template #seat-details="seat">
+          <slot name="seat-details" v-bind="seat" />
+        </template>
       </GameTable>
     </section>
 
     <ActionTray v-model="trayState" :pending="pendingAction !== null" label="本轮操作">
+      <template #governance><slot name="governance" /></template>
       <template #summary>
         <div class="turn-summary">
           <span class="turn-light" :class="{ active: isCurrentPlayer }" />
@@ -514,9 +530,22 @@ const confirmFinish = (): void => {
   .current-bid strong { font-size: 34px; }
   :deep(.liars-die--focus) { --die-size: 34px; }
   :deep(.liars-die--private) { --die-size: 28px; }
+  /* A bounded two-column tray keeps compact phone landscapes from stacking action controls over each other. */
+  :deep(.gn-tray__primary) {
+    width: 100%;
+    max-width: none;
+    display: grid;
+    grid-template-areas: "controls actions" "feedback actions";
+    grid-template-columns: minmax(0, 680px) minmax(240px, 330px);
+    column-gap: 12px;
+    justify-content: space-between;
+    padding-top: 4px;
+  }
   .bid-controls { grid-template-columns: 90px minmax(0, 1fr) 76px; }
-  .action-row { position: absolute; right: max(12px, env(safe-area-inset-right)); top: 48px; width: min(38%, 330px); }
-  .bid-feedback { min-height: 10px; margin-top: 0; padding-right: min(40%, 350px); line-height: 10px; }
+  .bid-controls { grid-area: controls; }
+  .action-row { position: static; grid-area: actions; width: auto; margin-top: 0; }
+  .action-row button { min-height: 40px; }
+  .bid-feedback { grid-area: feedback; min-height: 10px; margin-top: 0; padding-right: 0; line-height: 10px; }
   .round-details { grid-template-columns: 1.3fr 1fr auto; }
 }
 

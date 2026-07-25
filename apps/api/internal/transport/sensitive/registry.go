@@ -54,6 +54,11 @@ var RoomOperations = []string{
 	roomv1connect.RoomServiceFinishGameProcedure,
 	roomv1connect.RoomServiceRemoveMemberProcedure,
 	roomv1connect.RoomServiceCloseRoomProcedure,
+	roomv1connect.RoomServiceRequestRoomPauseProcedure,
+	roomv1connect.RoomServiceRejectRoomPauseRequestProcedure,
+	roomv1connect.RoomServicePauseRoomGameProcedure,
+	roomv1connect.RoomServiceResumeRoomGameProcedure,
+	roomv1connect.RoomServiceTransferRoomHostProcedure,
 }
 
 // GameOperations contains every viewer-scoped game read, mutation, replay, and ticket handshake.

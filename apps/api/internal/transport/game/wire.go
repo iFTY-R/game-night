@@ -74,13 +74,17 @@ func envelopeMessage(value *gamev1.GameEnvelope) (gameSDK.VersionKey, gameSDK.Me
 
 func sessionWire(session gameruntime.Session) *gamev1.GameSessionSummary {
 	snapshot := session.Snapshot()
-	return &gamev1.GameSessionSummary{
+	wire := &gamev1.GameSessionSummary{
 		SessionId: snapshot.ID.String(), RoomId: snapshot.RoomID.String(), GameId: string(snapshot.VersionKey.GameID),
 		Version: &gamev1.VersionTuple{
 			Engine: string(snapshot.VersionKey.Engine), Protocol: string(snapshot.VersionKey.Protocol), Client: string(snapshot.VersionKey.Client),
 		},
 		StateVersion: snapshot.State.StateVersion, OwnershipEpoch: snapshot.OwnershipEpoch, Status: statusWire(snapshot.Status),
 	}
+	if !snapshot.SuspendedAt.IsZero() {
+		wire.SuspendedAt = timestamppb.New(snapshot.SuspendedAt)
+	}
+	return wire
 }
 
 func statusWire(status gameruntime.Status) gamev1.GameSessionStatus {
@@ -100,7 +104,12 @@ func statusWire(status gameruntime.Status) gamev1.GameSessionStatus {
 
 func projectionWire(session gameruntime.Session, viewerKind gameSDK.ViewerKind, projection gameSDK.Projection, canFinish bool) *gamev1.GameProjection {
 	snapshot := session.Snapshot()
-	projection = decorateProjection(projection, canFinish && snapshot.Status == gameruntime.StatusActive)
+	if snapshot.Status == gameruntime.StatusSuspended {
+		// Runtime suspension is authoritative even when a module projects actions from its retained state.
+		projection.AllowedActions = nil
+	} else {
+		projection = decorateProjection(projection, canFinish && snapshot.Status == gameruntime.StatusActive)
+	}
 	actions := make([]string, len(projection.AllowedActions))
 	for index, action := range projection.AllowedActions {
 		actions[index] = string(action)

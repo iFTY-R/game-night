@@ -66,6 +66,9 @@ onBeforeUnmount(() => {
     :aria-busy="pending"
     :data-state="modelValue"
   >
+    <div v-if="$slots.governance" class="gn-tray__governance">
+      <slot name="governance" />
+    </div>
     <button
       class="gn-tray__handle"
       type="button"
@@ -137,6 +140,18 @@ onBeforeUnmount(() => {
 .gn-tray__handle:focus-visible {
   outline: 3px solid var(--platform-focus, #86d6ca);
   outline-offset: 2px;
+}
+
+/* Room governance lives on the tray edge so it stays reachable without consuming game-action space. */
+.gn-tray__governance {
+  position: absolute;
+  top: -24px;
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 1;
+  max-width: calc(50% - 38px);
+  height: 48px;
+  display: flex;
+  align-items: center;
 }
 
 .gn-tray__content {

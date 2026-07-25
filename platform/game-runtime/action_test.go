@@ -313,6 +313,17 @@ func TestLifecycleCommitAllowsOnlyUniformResumeTimerShift(t *testing.T) {
 		t.Fatalf("uniform resume commit valid = %v, err = %v", commit.Valid(), err)
 	}
 
+	adjustedSnapshot := resumed.Snapshot()
+	adjustedSnapshot.State.State.Payload = []byte("resumed-state")
+	adjustedSnapshot.Timers[0].Message.Payload = []byte("resumed-timer")
+	adjusted, err := RestoreSession(adjustedSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit, err := NewLifecycleCommit(suspended, adjusted, []outbox.Event{event}); err != nil || !commit.Valid() {
+		t.Fatalf("adjusted resume commit valid = %v, err = %v", commit.Valid(), err)
+	}
+
 	invalidSnapshot := resumed.Snapshot()
 	invalidSnapshot.Timers[0].DueAt = invalidSnapshot.Timers[0].DueAt.Add(time.Second)
 	invalidSnapshot.NextDeadlineAt = invalidSnapshot.Timers[1].DueAt

@@ -2241,68 +2241,21 @@ func (q *Queries) SetGameSessionReplayPolicyCAS(ctx context.Context, arg SetGame
 	return i, err
 }
 
-const shiftGameSessionTimers = `-- name: ShiftGameSessionTimers :many
-UPDATE game_session_timers
-SET due_at = due_at + (
-    $1::timestamptz - $2::timestamptz
-)
-WHERE session_id = $3
-RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
-`
-
-type ShiftGameSessionTimersParams struct {
-	ResumedAt   pgtype.Timestamptz `json:"resumed_at"`
-	SuspendedAt pgtype.Timestamptz `json:"suspended_at"`
-	SessionID   pgtype.UUID        `json:"session_id"`
-}
-
-// ShiftGameSessionTimers
-//
-//	UPDATE game_session_timers
-//	SET due_at = due_at + (
-//	    $1::timestamptz - $2::timestamptz
-//	)
-//	WHERE session_id = $3
-//	RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload
-func (q *Queries) ShiftGameSessionTimers(ctx context.Context, arg ShiftGameSessionTimersParams) ([]GameSessionTimer, error) {
-	rows, err := q.db.Query(ctx, shiftGameSessionTimers, arg.ResumedAt, arg.SuspendedAt, arg.SessionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GameSessionTimer{}
-	for rows.Next() {
-		var i GameSessionTimer
-		if err := rows.Scan(
-			&i.SessionID,
-			&i.TimerID,
-			&i.ExpectedStateVersion,
-			&i.DueAt,
-			&i.MessageType,
-			&i.SchemaVersion,
-			&i.Payload,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateGameSessionLifecycleCAS = `-- name: UpdateGameSessionLifecycleCAS :one
 UPDATE game_sessions
-SET next_deadline_at = $1,
-    cancel_reason = $2,
-    suspended_at = $3,
-    status = $4,
-    updated_at = $5,
-    ended_at = $6
-WHERE session_id = $7
-  AND state_version = $8
-  AND ownership_epoch = $9
+SET snapshot_version = $1,
+    state_message_type = $2,
+    state_schema_version = $3,
+    state_payload = $4,
+    next_deadline_at = $5,
+    cancel_reason = $6,
+    suspended_at = $7,
+    status = $8,
+    updated_at = $9,
+    ended_at = $10
+WHERE session_id = $11
+  AND state_version = $12
+  AND ownership_epoch = $13
   AND status IN ('active', 'suspended')
 RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
     state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
@@ -2312,6 +2265,10 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
 `
 
 type UpdateGameSessionLifecycleCASParams struct {
+	SnapshotVersion        int32              `json:"snapshot_version"`
+	StateMessageType       string             `json:"state_message_type"`
+	StateSchemaVersion     int32              `json:"state_schema_version"`
+	StatePayload           []byte             `json:"state_payload"`
 	NextDeadlineAt         pgtype.Timestamptz `json:"next_deadline_at"`
 	CancelReason           pgtype.Text        `json:"cancel_reason"`
 	SuspendedAt            pgtype.Timestamptz `json:"suspended_at"`
@@ -2356,15 +2313,19 @@ type UpdateGameSessionLifecycleCASRow struct {
 // UpdateGameSessionLifecycleCAS
 //
 //	UPDATE game_sessions
-//	SET next_deadline_at = $1,
-//	    cancel_reason = $2,
-//	    suspended_at = $3,
-//	    status = $4,
-//	    updated_at = $5,
-//	    ended_at = $6
-//	WHERE session_id = $7
-//	  AND state_version = $8
-//	  AND ownership_epoch = $9
+//	SET snapshot_version = $1,
+//	    state_message_type = $2,
+//	    state_schema_version = $3,
+//	    state_payload = $4,
+//	    next_deadline_at = $5,
+//	    cancel_reason = $6,
+//	    suspended_at = $7,
+//	    status = $8,
+//	    updated_at = $9,
+//	    ended_at = $10
+//	WHERE session_id = $11
+//	  AND state_version = $12
+//	  AND ownership_epoch = $13
 //	  AND status IN ('active', 'suspended')
 //	RETURNING session_id, room_id, game_id, engine_version, protocol_version, client_version,
 //	    state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
@@ -2373,6 +2334,10 @@ type UpdateGameSessionLifecycleCASRow struct {
 //	    start_ownership_epoch, cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 func (q *Queries) UpdateGameSessionLifecycleCAS(ctx context.Context, arg UpdateGameSessionLifecycleCASParams) (UpdateGameSessionLifecycleCASRow, error) {
 	row := q.db.QueryRow(ctx, updateGameSessionLifecycleCAS,
+		arg.SnapshotVersion,
+		arg.StateMessageType,
+		arg.StateSchemaVersion,
+		arg.StatePayload,
 		arg.NextDeadlineAt,
 		arg.CancelReason,
 		arg.SuspendedAt,

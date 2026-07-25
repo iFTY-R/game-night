@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+type resumeAdjusterFixture struct{}
+
+func (resumeAdjusterFixture) AdjustResumed(snapshot Snapshot, timers []TimerIntent) (Snapshot, []TimerIntent, error) {
+	return snapshot, timers, nil
+}
+
 func TestMessageAndDeterministicContextValidation(t *testing.T) {
 	message := Message{MessageType: "roll_dice", SchemaVersion: 1, Payload: []byte{1, 2, 3}}
 	if !message.Valid() {
@@ -191,6 +197,16 @@ func TestEventProjectionContainsOnlyBoundedViewerSafeMessages(t *testing.T) {
 	projection.Messages[0].SchemaVersion = 0
 	if projection.Valid() {
 		t.Fatal("invalid viewer-safe message accepted")
+	}
+}
+
+func TestResumeAdjustingGameModuleMayRewriteOpaqueResumePayloads(t *testing.T) {
+	var adjuster ResumeAdjustingGameModule = resumeAdjusterFixture{}
+	snapshot := Snapshot{SnapshotVersion: 1, StateVersion: 2, State: Message{MessageType: "authoritative_state", SchemaVersion: 1}}
+	timers := []TimerIntent{{TimerID: "turn-1", DueAt: deterministicContextFixture().Now.Add(time.Second), Message: Message{MessageType: "turn_timeout", SchemaVersion: 1}}}
+	adjustedSnapshot, adjustedTimers, err := adjuster.AdjustResumed(snapshot, timers)
+	if err != nil || !adjustedSnapshot.Valid() || len(adjustedTimers) != 1 || adjustedTimers[0].TimerID != timers[0].TimerID {
+		t.Fatalf("adjustedSnapshot=%+v adjustedTimers=%+v err=%v", adjustedSnapshot, adjustedTimers, err)
 	}
 }
 

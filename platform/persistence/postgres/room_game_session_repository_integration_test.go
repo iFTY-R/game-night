@@ -396,6 +396,14 @@ func TestRoomGameSessionRepositoryPersistsApprovedPauseAndResumesTimersAtomicall
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A real game module adjusts opaque state and timer deadlines before the governed resume commit.
+	resumedSnapshot := resumed.Snapshot()
+	resumedSnapshot.State.State.Payload = []byte("room-resumed-state")
+	resumedSnapshot.Timers[0].Message.Payload = []byte("room-resumed-timer")
+	resumed, err = gameruntime.RestoreSession(resumedSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
 	resumedRoom, resumed, err = repository.Resume(
 		fixture.ctx, transferredRoom, resumedRoom,
 		newGameLifecycleCommit(t, suspended, resumed, gameruntime.GameSessionResumedEventType),
@@ -406,7 +414,9 @@ func TestRoomGameSessionRepositoryPersistsApprovedPauseAndResumesTimersAtomicall
 	wantDueAt := session.Snapshot().Timers[0].DueAt.Add(30 * time.Second)
 	if resumedRoom.Snapshot().ActivePause.ID != uuid.Nil || resumed.Snapshot().Status != gameruntime.StatusActive ||
 		!resumed.Snapshot().SuspendedAt.IsZero() || len(resumed.Snapshot().Timers) != 1 ||
-		!resumed.Snapshot().Timers[0].DueAt.Equal(wantDueAt) || !resumed.Snapshot().NextDeadlineAt.Equal(wantDueAt) {
+		!resumed.Snapshot().Timers[0].DueAt.Equal(wantDueAt) || !resumed.Snapshot().NextDeadlineAt.Equal(wantDueAt) ||
+		string(resumed.Snapshot().State.State.Payload) != "room-resumed-state" ||
+		string(resumed.Snapshot().Timers[0].Message.Payload) != "room-resumed-timer" {
 		t.Fatalf("resumed room=%+v session=%+v want_due_at=%v", resumedRoom.Snapshot(), resumed.Snapshot(), wantDueAt)
 	}
 }

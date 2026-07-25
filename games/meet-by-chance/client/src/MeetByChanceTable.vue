@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<{
   allowedActions: readonly string[];
   pendingAction?: string | null;
   muted?: boolean;
+  pausedAt?: string | undefined;
 }>(), { pendingAction: null, muted: false });
 
 const emit = defineEmits<{
@@ -52,10 +53,15 @@ const displayName = (userId: string): string => presentations.value.get(userId)?
 const selfSeatIndex = computed(() => props.view.publicPlayers.find((player) => player.userId === props.context.selfUserId)?.seatIndex ?? 0);
 const targetName = computed(() => displayName(props.view.targetUserId));
 const isSelfTarget = computed(() => props.context.viewerRole === "player" && props.view.targetUserId === props.context.selfUserId);
-const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online");
+const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online" || props.pausedAt !== undefined);
+// Freeze the visible target clock at the authoritative pause instant while the table remains mounted.
+const countdownClock = computed(() => {
+  const pausedAt = Date.parse(props.pausedAt ?? "");
+  return Number.isFinite(pausedAt) ? pausedAt : clockNow.value;
+});
 const countdown = computed(() => {
   const deadline = Number(props.view.actionDeadlineUnixMillis);
-  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - clockNow.value) / 1000));
+  return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - countdownClock.value) / 1000));
 });
 const can = (action: string): boolean => props.context.viewerRole === "player" && props.allowedActions.includes(action);
 const rerollsRemaining = computed(() => Math.max(0, props.view.targetRerollLimit - props.view.targetRerollCount));
@@ -113,26 +119,32 @@ const confirmStand = (): void => {
         :target-user-id="view.targetUserId"
         :match-batch="view.lastMatchBatch"
       >
-        <div class="table-focus" aria-live="polite">
-          <span>本轮靶子</span>
-          <div class="target-focus"><Target :size="20" aria-hidden="true" /><strong>{{ targetName }}</strong></div>
-          <small>重摇 {{ view.targetRerollCount }} / {{ view.targetRerollLimit }} · 连续 {{ view.targetStreak }}</small>
-          <div v-if="matchNotice" class="resolution-note" :class="{ capped: view.lastMatchBatch?.capped }">
-            <b>{{ matchNotice }}</b>
-            <template v-if="!view.lastMatchBatch?.capped">
-              <span v-for="(group, index) in view.lastMatchBatch?.groups" :key="index">
-                {{ matchKindLabel(group.kind) }} · {{ group.userIds.map(displayName).join('、') }}
-                <template v-if="group.weakestUserId"> · {{ displayName(group.weakestUserId) }} 额外 {{ formatTicks(group.weakExtraPenaltyTicks) }}</template>
-              </span>
-            </template>
+        <template #default>
+          <div class="table-focus" aria-live="polite">
+            <span>本轮靶子</span>
+            <div class="target-focus"><Target :size="20" aria-hidden="true" /><strong>{{ targetName }}</strong></div>
+            <small>重摇 {{ view.targetRerollCount }} / {{ view.targetRerollLimit }} · 连续 {{ view.targetStreak }}</small>
+            <div v-if="matchNotice" class="resolution-note" :class="{ capped: view.lastMatchBatch?.capped }">
+              <b>{{ matchNotice }}</b>
+              <template v-if="!view.lastMatchBatch?.capped">
+                <span v-for="(group, index) in view.lastMatchBatch?.groups" :key="index">
+                  {{ matchKindLabel(group.kind) }} · {{ group.userIds.map(displayName).join('、') }}
+                  <template v-if="group.weakestUserId"> · {{ displayName(group.weakestUserId) }} 额外 {{ formatTicks(group.weakExtraPenaltyTicks) }}</template>
+                </span>
+              </template>
+            </div>
+            <p v-if="specialNotice" class="special-note">{{ specialNotice }}</p>
+            <p v-else-if="wildNotice" class="wild-note">{{ wildNotice }}</p>
           </div>
-          <p v-if="specialNotice" class="special-note">{{ specialNotice }}</p>
-          <p v-else-if="wildNotice" class="wild-note">{{ wildNotice }}</p>
-        </div>
+        </template>
+        <template #seat-details="seat">
+          <slot name="seat-details" v-bind="seat" />
+        </template>
       </MeetTable>
     </section>
 
     <ActionTray v-model="trayState" :pending="pendingAction !== null" label="靶子操作">
+      <template #governance><slot name="governance" /></template>
       <template #summary>
         <div class="turn-summary"><span :class="{ active: isSelfTarget }" /><strong>{{ pendingLabel ?? summaryLabel }}</strong></div>
         <button v-if="context.connection !== 'online'" class="retry-button" type="button" title="立即重连" @click="emit('retry')"><RefreshCw :size="17" aria-hidden="true" /></button>

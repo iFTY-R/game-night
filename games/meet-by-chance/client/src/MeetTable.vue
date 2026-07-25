@@ -79,7 +79,16 @@ onBeforeUnmount(() => observer?.disconnect());
         :target="item.player.userId === targetUserId"
         :matched="matchUsers.has(item.player.userId)"
         :density="density"
-      />
+      >
+        <template #details>
+          <slot
+            name="seat-details"
+            :user-id="item.player.userId"
+            :display-name="presentations.get(item.player.userId)?.displayName ?? `玩家 ${item.player.userId.slice(-4)}`"
+            :self="item.position.seatIndex === selfSeatIndex"
+          />
+        </template>
+      </MeetPlayerSeat>
     </div>
   </section>
 </template>

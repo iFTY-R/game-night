@@ -200,7 +200,11 @@ RETURNING session_id, room_id, game_id, engine_version, protocol_version, client
 
 -- name: UpdateGameSessionLifecycleCAS :one
 UPDATE game_sessions
-SET next_deadline_at = sqlc.narg(next_deadline_at),
+SET snapshot_version = sqlc.arg(snapshot_version),
+    state_message_type = sqlc.arg(state_message_type),
+    state_schema_version = sqlc.arg(state_schema_version),
+    state_payload = sqlc.arg(state_payload),
+    next_deadline_at = sqlc.narg(next_deadline_at),
     cancel_reason = sqlc.narg(cancel_reason),
     suspended_at = sqlc.narg(suspended_at),
     status = sqlc.arg(status),
@@ -312,14 +316,6 @@ FROM game_session_timers
 WHERE session_id = sqlc.arg(session_id)
 ORDER BY timer_id
 FOR UPDATE;
-
--- name: ShiftGameSessionTimers :many
-UPDATE game_session_timers
-SET due_at = due_at + (
-    sqlc.arg(resumed_at)::timestamptz - sqlc.arg(suspended_at)::timestamptz
-)
-WHERE session_id = sqlc.arg(session_id)
-RETURNING session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload;
 
 -- name: GetGameSessionTimerForUpdate :one
 SELECT session_id, timer_id, expected_state_version, due_at, message_type, schema_version, payload

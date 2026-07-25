@@ -392,6 +392,7 @@ func sessionFromRemote(value *realtimev1.SessionSnapshot) (gameruntime.Session, 
 		Timers: timers, NextDeadlineAt: remoteOptionalTime(value.GetNextDeadlineAt()),
 		Status: statusFromRemote(value.GetStatus()), StartedAt: value.GetStartedAt().AsTime().Round(0).UTC(),
 		UpdatedAt: value.GetUpdatedAt().AsTime().Round(0).UTC(), EndedAt: remoteOptionalTime(value.GetEndedAt()),
+		SuspendedAt:  remoteOptionalTime(value.GetSuspendedAt()),
 		CancelReason: gameSDK.Identifier(value.GetCancelReason()),
 	})
 	if err != nil {

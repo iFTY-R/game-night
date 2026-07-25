@@ -75,15 +75,18 @@ func (repository *adminChallengeRepository) RecordFailureCAS(ctx context.Context
 	return next, nil
 }
 
-// ConsumeCAS applies live account-generation and status CAS for first use, with optional exact-result replay metadata.
-func (repository *adminChallengeRepository) ConsumeCAS(ctx context.Context, consumed adminDomain.Challenge) (adminDomain.Challenge, error) {
+// ConsumeCAS verifies both the proved challenge generation and the current post-work account generation before first use commits.
+func (repository *adminChallengeRepository) ConsumeCAS(ctx context.Context, consumed adminDomain.Challenge, currentSubject challenge.SubjectBinding) (adminDomain.Challenge, error) {
 	snapshot := consumed.Snapshot()
-	if snapshot.ConsumedAt.IsZero() || !snapshot.RevokedAt.IsZero() || !snapshot.Binding.Subject.Bound() {
+	provedSubject := snapshot.Binding.Subject
+	if snapshot.ConsumedAt.IsZero() || !snapshot.RevokedAt.IsZero() || !provedSubject.Bound() || !currentSubject.Bound() ||
+		currentSubject.ID != provedSubject.ID || currentSubject.Version < provedSubject.Version || currentSubject.CredentialVersion < provedSubject.CredentialVersion {
 		return adminDomain.Challenge{}, challenge.ErrInvalidInput
 	}
 	params := sqlcgen.ConsumeAdminChallengeCASParams{
 		ConsumedAt: timeToPG(snapshot.ConsumedAt), ChallengeID: uuidToPG(snapshot.ID),
 		ExpectedAdminVersion: snapshot.Binding.Subject.Version, ExpectedPasswordVersion: snapshot.Binding.Subject.CredentialVersion,
+		PostWorkAdminVersion: currentSubject.Version, PostWorkPasswordVersion: currentSubject.CredentialVersion,
 	}
 	if snapshot.Replay != nil {
 		params.ReplayUntil = timeToPG(snapshot.Replay.ReplayUntil)

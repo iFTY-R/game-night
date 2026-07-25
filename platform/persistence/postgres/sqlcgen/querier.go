@@ -385,10 +385,12 @@ type Querier interface {
 	//ConsumeAdminChallengeCAS
 	//
 	//  WITH current_admin AS MATERIALIZED (
-	//      -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
-	//      SELECT admin_id, admin_version, password_version
-	//      FROM admin_accounts
-	//      WHERE singleton_id = 1
+	//      -- Lock and verify the post-work account generation before consuming the challenge in the same transaction.
+	//      SELECT account.admin_id, account.admin_version, account.password_version
+	//      FROM admin_accounts AS account
+	//      WHERE account.singleton_id = 1
+	//        AND account.admin_version = $9
+	//        AND account.password_version = $10
 	//      FOR UPDATE
 	//  )
 	//  UPDATE admin_challenges AS challenge
@@ -406,8 +408,6 @@ type Querier interface {
 	//    AND challenge.attempt_count < challenge.max_attempts
 	//    AND challenge.admin_version = $7
 	//    AND challenge.password_version = $8
-	//    AND challenge.admin_version = current_admin.admin_version
-	//    AND challenge.password_version = current_admin.password_version
 	//  RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
 	//            challenge.replay_until, challenge.operation_id, challenge.request_digest,
 	//            challenge.result_id

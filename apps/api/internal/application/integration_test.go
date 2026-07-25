@@ -66,12 +66,13 @@ const (
 	applicationAdminOrigin             = "https://admin.example.test"
 	applicationBootstrapPassword       = "Night-admin-bootstrap-2026!"
 	applicationActivePassword          = "Night-admin-active-2026!"
+	applicationRotatedPassword         = "Night-admin-rotated-2026!"
 	applicationTestRealName            = "Integration Real Name"
 )
 
 // TestApplicationConnectIdentityAndAdminIntegration exercises the real application graph through browser-style TLS Connect clients.
 func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
-	runtime := newApplicationIntegrationRuntime(t)
+	runtime := newApplicationIntegrationRuntime(t, false)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -140,6 +141,144 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 		strings.Contains(runtime.logs.String(), applicationActivePassword) ||
 		strings.Contains(runtime.logs.String(), applicationTestRealName) {
 		t.Fatal("application logs contain a configured password or real name")
+	}
+}
+
+// TestApplicationAdminPasswordOnlyIntegration proves an explicit MFA override still issues and persists full administrator sessions.
+func TestApplicationAdminPasswordOnlyIntegration(t *testing.T) {
+	runtime := newApplicationIntegrationRuntime(t, true)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	client := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
+
+	bootstrapLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationBootstrapPassword)
+	if bootstrapLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_CHANGE_PASSWORD {
+		t.Fatalf("administrator bootstrap login: next=%s", bootstrapLogin.Msg.GetNextStep())
+	}
+	initialPasswordRequest := connect.NewRequest(&adminv1.ChangeInitialPasswordRequest{NewPassword: applicationActivePassword})
+	runtime.authorizeAdminSession(t, initialPasswordRequest)
+	initialPassword, err := client.ChangeInitialPassword(ctx, initialPasswordRequest)
+	if err != nil {
+		t.Fatalf("password-only initial password change: %v", err)
+	}
+	if initialPassword.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
+		t.Fatalf("password-only initial password change: next=%s", initialPassword.Msg.GetNextStep())
+	}
+	requireAuthenticatedAdminSession(t, ctx, runtime, client)
+	logoutAdministrator(t, ctx, runtime, client)
+
+	activeLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationActivePassword)
+	if activeLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
+		t.Fatalf("password-only active login: next=%s", activeLogin.Msg.GetNextStep())
+	}
+	requireAuthenticatedAdminSession(t, ctx, runtime, client)
+
+	rotationRequest := connect.NewRequest(&adminv1.ChangeAdminPasswordRequest{
+		CurrentPassword: applicationActivePassword,
+		NewPassword:     applicationRotatedPassword,
+	})
+	runtime.authorizeAdminSession(t, rotationRequest)
+	rotation, err := client.ChangeAdminPassword(ctx, rotationRequest)
+	if err != nil {
+		t.Fatalf("password-only password rotation: %v", err)
+	}
+	if rotation.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED ||
+		rotation.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL {
+		t.Fatalf("password-only password rotation: next=%s session=%s", rotation.Msg.GetNextStep(), rotation.Msg.GetSession().GetKind())
+	}
+	logoutAdministrator(t, ctx, runtime, client)
+
+	// Simulate an account left in the durable recovery state before a deployment temporarily disables MFA.
+	commandTag, err := runtime.application.pool.Exec(ctx, `
+		UPDATE admin_accounts
+		SET status = 'recovery_pending', admin_version = admin_version + 1, updated_at = transaction_timestamp()
+		WHERE singleton_id = 1 AND status = 'active'
+	`)
+	if err != nil || commandTag.RowsAffected() != 1 {
+		t.Fatalf("prepare recovery-pending administrator: rows=%d err=%v", commandTag.RowsAffected(), err)
+	}
+	recoveryLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationRotatedPassword)
+	if recoveryLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
+		t.Fatalf("password-only recovery login: next=%s", recoveryLogin.Msg.GetNextStep())
+	}
+	requireAuthenticatedAdminSession(t, ctx, runtime, client)
+	var status string
+	if err := runtime.application.pool.QueryRow(ctx, "SELECT status FROM admin_accounts WHERE singleton_id = 1").Scan(&status); err != nil || status != "active" {
+		t.Fatalf("administrator status after password-only recovery login: status=%q err=%v", status, err)
+	}
+
+	for _, secret := range []string{applicationBootstrapPassword, applicationActivePassword, applicationRotatedPassword} {
+		if strings.Contains(runtime.logs.String(), secret) {
+			t.Fatal("password-only application logs contain an administrator password")
+		}
+	}
+}
+
+// loginAdministratorWithPassword completes the browser-style challenge and preserves the resulting Cookie state in the shared client.
+func loginAdministratorWithPassword(
+	t testing.TB,
+	ctx context.Context,
+	runtime *applicationIntegrationRuntime,
+	client adminv1connect.AdminAuthServiceClient,
+	password string,
+) *connect.Response[adminv1.LoginPasswordResponse] {
+	t.Helper()
+	flowID := "admin-login-" + uuid.NewString()
+	beginRequest := connect.NewRequest(&adminv1.BeginAdminLoginRequest{RequestFlowId: flowID})
+	runtime.setOrigin(beginRequest, applicationAdminOrigin)
+	begin, err := client.BeginAdminLogin(ctx, beginRequest)
+	if err != nil {
+		t.Fatalf("begin administrator login: %v", err)
+	}
+	loginRequest := connect.NewRequest(&adminv1.LoginPasswordRequest{
+		ChallengeProof: begin.Msg.GetChallenge().GetChallengeProof(),
+		Password:       password,
+	})
+	runtime.setOrigin(loginRequest, applicationAdminOrigin)
+	loginRequest.Header().Set(adminauth.RequestFlowIDHeader, flowID)
+	login, err := client.LoginPassword(ctx, loginRequest)
+	if err != nil {
+		t.Fatalf("administrator password login: %v", err)
+	}
+	return login
+}
+
+// requireAuthenticatedAdminSession verifies that response Cookies resolve to the durable unrestricted session returned by the API.
+func requireAuthenticatedAdminSession(
+	t testing.TB,
+	ctx context.Context,
+	runtime *applicationIntegrationRuntime,
+	client adminv1connect.AdminAuthServiceClient,
+) {
+	t.Helper()
+	request := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
+	runtime.authorizeAdminSession(t, request)
+	response, err := client.GetCurrentAdminSession(ctx, request)
+	if err != nil {
+		t.Fatalf("authenticated administrator session: %v", err)
+	}
+	if response.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED ||
+		response.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL {
+		t.Fatalf("authenticated administrator session: next=%s session=%s", response.Msg.GetNextStep(), response.Msg.GetSession().GetKind())
+	}
+}
+
+// logoutAdministrator revokes the current session and clears the browser Cookie before the next login scenario.
+func logoutAdministrator(
+	t testing.TB,
+	ctx context.Context,
+	runtime *applicationIntegrationRuntime,
+	client adminv1connect.AdminAuthServiceClient,
+) {
+	t.Helper()
+	request := connect.NewRequest(&adminv1.LogoutAdminRequest{})
+	runtime.authorizeAdminSession(t, request)
+	response, err := client.LogoutAdmin(ctx, request)
+	if err != nil {
+		t.Fatalf("logout administrator: %v", err)
+	}
+	if !response.Msg.GetLoggedOut() {
+		t.Fatal("logout administrator: logged_out=false")
 	}
 }
 
@@ -404,9 +543,14 @@ func activateAdministrator(
 	if complete.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL || len(complete.Msg.GetRecoveryCodes()) == 0 {
 		t.Fatalf("complete TOTP enrollment: session=%s codes=%d", complete.Msg.GetSession().GetKind(), len(complete.Msg.GetRecoveryCodes()))
 	}
-	fullSessionState, err := client.GetCurrentAdminSession(ctx, connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{}))
-	if err != nil || fullSessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("current administrator session after enrollment: next=%s err=%v", fullSessionState.Msg.GetNextStep(), err)
+	fullSessionRequest := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
+	runtime.authorizeAdminSession(t, fullSessionRequest)
+	fullSessionState, err := client.GetCurrentAdminSession(ctx, fullSessionRequest)
+	if err != nil {
+		t.Fatalf("current administrator session after enrollment: %v", err)
+	}
+	if fullSessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
+		t.Fatalf("current administrator session after enrollment: next=%s", fullSessionState.Msg.GetNextStep())
 	}
 	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT, enrollment.Msg.GetResult())
 	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES, complete.Msg.GetResult())
@@ -548,8 +692,8 @@ type applicationIntegrationRuntime struct {
 	logs *bytes.Buffer
 }
 
-// newApplicationIntegrationRuntime starts the production dependency graph while retaining TLS and Cookie behavior in-process.
-func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRuntime {
+// newApplicationIntegrationRuntime starts the production dependency graph with an explicit administrator MFA policy.
+func newApplicationIntegrationRuntime(t testing.TB, adminPasswordOnly bool) *applicationIntegrationRuntime {
 	t.Helper()
 	values := integrationtest.RequireEnvironment(t, integrationtest.DependencyPostgres, applicationTestDatabaseEnvironment)
 	redisValues := integrationtest.RequireEnvironment(t, integrationtest.DependencyRedis, applicationTestRedisEnvironment)
@@ -588,6 +732,7 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 		Realtime: apiConfig.RealtimeConfig{
 			BootstrapURL: realtimeServer.URL, PeerURLs: []string{realtimeServer.URL}, InternalToken: strings.Repeat("r", 32),
 		},
+		AdminPasswordOnly: adminPasswordOnly,
 	}
 	logs := &bytes.Buffer{}
 	registry, err := gameregistry.New()

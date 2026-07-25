@@ -132,10 +132,12 @@ RETURNING challenge_id, attempt_count, max_attempts, status, expires_at;
 
 -- name: ConsumeAdminChallengeCAS :one
 WITH current_admin AS MATERIALIZED (
-    -- Direct CAS callers must acquire the same account-first lock as GetAdminChallengeForUpdate.
-    SELECT admin_id, admin_version, password_version
-    FROM admin_accounts
-    WHERE singleton_id = 1
+    -- Lock and verify the post-work account generation before consuming the challenge in the same transaction.
+    SELECT account.admin_id, account.admin_version, account.password_version
+    FROM admin_accounts AS account
+    WHERE account.singleton_id = 1
+      AND account.admin_version = sqlc.arg(post_work_admin_version)
+      AND account.password_version = sqlc.arg(post_work_password_version)
     FOR UPDATE
 )
 UPDATE admin_challenges AS challenge
@@ -153,8 +155,6 @@ WHERE challenge.challenge_id = sqlc.arg(challenge_id)
   AND challenge.attempt_count < challenge.max_attempts
   AND challenge.admin_version = sqlc.arg(expected_admin_version)
   AND challenge.password_version = sqlc.arg(expected_password_version)
-  AND challenge.admin_version = current_admin.admin_version
-  AND challenge.password_version = current_admin.password_version
 RETURNING challenge.challenge_id, challenge.status, challenge.consumed_at,
           challenge.replay_until, challenge.operation_id, challenge.request_digest,
           challenge.result_id;

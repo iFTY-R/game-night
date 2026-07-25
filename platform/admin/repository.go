@@ -15,7 +15,7 @@ type ChallengeRepository interface {
 	Insert(context.Context, Challenge) error
 	GetForUpdate(context.Context, identifier.Selector) (Challenge, error)
 	RecordFailureCAS(context.Context, Challenge, time.Time) (Challenge, error)
-	ConsumeCAS(context.Context, Challenge) (Challenge, error)
+	ConsumeCAS(context.Context, Challenge, challenge.SubjectBinding) (Challenge, error)
 	RevokeActiveByAdminID(context.Context, uuid.UUID, time.Time) (int64, error)
 }
 
@@ -32,13 +32,22 @@ type ChallengeTransactionWork func(context.Context, ChallengeTransaction) error
 // AuthorizedChallengeCompletion carries either a no-result terminal decision or the exact persisted replay result.
 // Private fields force application workflows through the reviewed constructors.
 type AuthorizedChallengeCompletion struct {
-	withoutReplay bool
-	result        secretresult.Result
+	withoutReplay  bool
+	result         secretresult.Result
+	currentSubject challenge.SubjectBinding
 }
 
 // NoReplayCompletion terminates a successful administrator operation that returns no one-time secret.
 func NoReplayCompletion() AuthorizedChallengeCompletion {
 	return AuthorizedChallengeCompletion{withoutReplay: true}
+}
+
+// NoReplayCompletionAtGeneration lets trusted first-use work advance account generations before consuming its challenge atomically.
+func NoReplayCompletionAtGeneration(current challenge.SubjectBinding) (AuthorizedChallengeCompletion, error) {
+	if !current.Bound() || current.Version <= 0 || current.CredentialVersion < 0 {
+		return AuthorizedChallengeCompletion{}, challenge.ErrInvalidInput
+	}
+	return AuthorizedChallengeCompletion{withoutReplay: true, currentSubject: current}, nil
 }
 
 // NewReplayCompletion binds first-use completion to a validated secret result value.

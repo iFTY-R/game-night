@@ -317,7 +317,10 @@ func (service *Service) LoginPassword(ctx context.Context, command LoginPassword
 				return AuthorizedChallengeCompletion{}, insertErr
 			}
 			result.Session, result.ExpiresAt = issued, issued.Session.Snapshot().AbsoluteExpiresAt
-			return NoReplayCompletion(), nil
+			currentSnapshot := currentAccount.Snapshot()
+			return NoReplayCompletionAtGeneration(challenge.SubjectBinding{
+				ID: currentSnapshot.ID, Version: currentSnapshot.AdminVersion, CredentialVersion: currentSnapshot.PasswordVersion,
+			})
 		})
 	if err != nil {
 		return LoginPasswordResult{}, normalizeAuthError(err)

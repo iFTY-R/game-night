@@ -154,7 +154,7 @@ func (repository *adminMemoryChallengeRepository) RecordFailureCAS(_ context.Con
 	return updated, err
 }
 
-func (repository *adminMemoryChallengeRepository) ConsumeCAS(_ context.Context, record Challenge) (Challenge, error) {
+func (repository *adminMemoryChallengeRepository) ConsumeCAS(_ context.Context, record Challenge, _ challenge.SubjectBinding) (Challenge, error) {
 	repository.record = record
 	return record, nil
 }

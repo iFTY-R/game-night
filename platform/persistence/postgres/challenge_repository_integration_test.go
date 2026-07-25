@@ -328,7 +328,7 @@ func TestAdminChallengeRejectsStaleAccountGenerations(t *testing.T) {
 				t.Fatal(err)
 			}
 			err = unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.ChallengeTransaction) error {
-				_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed)
+				_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed, consumed.Snapshot().Binding.Subject)
 				return consumeErr
 			})
 			if !errors.Is(err, challenge.ErrConcurrentTransition) {
@@ -411,7 +411,7 @@ func TestAdminChallengeConsumeWaitsForAccountGenerationLock(t *testing.T) {
 	const accountLockProbeTimeout = 250 * time.Millisecond
 	lockProbeContext, cancelLockProbe := context.WithTimeout(ctx, accountLockProbeTimeout)
 	err = unitOfWork.Run(lockProbeContext, func(ctx context.Context, transaction adminDomain.ChallengeTransaction) error {
-		_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed)
+		_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed, consumed.Snapshot().Binding.Subject)
 		return consumeErr
 	})
 	cancelLockProbe()
@@ -422,7 +422,7 @@ func TestAdminChallengeConsumeWaitsForAccountGenerationLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.ChallengeTransaction) error {
-		_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed)
+		_, consumeErr := transaction.Challenges().ConsumeCAS(ctx, consumed, consumed.Snapshot().Binding.Subject)
 		return consumeErr
 	})
 	if !errors.Is(err, challenge.ErrConcurrentTransition) {

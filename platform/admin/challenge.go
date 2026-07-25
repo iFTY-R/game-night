@@ -228,11 +228,20 @@ func (service *ChallengeService) completeFirstUse(
 			return err
 		}
 	}
+	recordSubject := record.Snapshot().Binding.Subject
+	currentSubject := completion.currentSubject
+	if !currentSubject.Bound() {
+		currentSubject = recordSubject
+	}
+	if currentSubject.ID != recordSubject.ID || currentSubject.Version < recordSubject.Version ||
+		currentSubject.CredentialVersion < recordSubject.CredentialVersion {
+		return challenge.ErrInvalidInput
+	}
 	consumed, err := service.core.CompleteFirstUse(record, operationID, requestDigest, coreCompletion)
 	if err != nil {
 		return err
 	}
-	_, err = repository.ConsumeCAS(ctx, consumed)
+	_, err = repository.ConsumeCAS(ctx, consumed, currentSubject)
 	return err
 }
 

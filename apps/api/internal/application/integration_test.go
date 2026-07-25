@@ -376,7 +376,9 @@ func activateAdministrator(
 	if err != nil || password.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
 		t.Fatalf("change initial administrator password: next=%s err=%v", password.Msg.GetNextStep(), err)
 	}
-	sessionState, err := client.GetCurrentAdminSession(ctx, connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{}))
+	sessionRequest := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
+	runtime.authorizeAdminSession(t, sessionRequest)
+	sessionState, err := client.GetCurrentAdminSession(ctx, sessionRequest)
 	if err != nil || sessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
 		t.Fatalf("current administrator session after password change: next=%s err=%v", sessionState.Msg.GetNextStep(), err)
 	}

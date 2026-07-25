@@ -64,20 +64,23 @@ type ServiceDependencies struct {
 	Clock          clock.Clock
 	UnitOfWork     UnitOfWork
 	Limiter        ratelimit.RateLimiter
+	// AllowPasswordOnly is an explicit security downgrade used by controlled deployments that temporarily disable MFA.
+	AllowPasswordOnly bool
 }
 
 // Service coordinates administrator authentication workflows while repositories own durable CAS.
 type Service struct {
-	challenge      *ChallengeService
-	passwords      PasswordHasher
-	passwordPolicy PasswordPolicy
-	totp           *TOTPService
-	sessions       *SessionService
-	recoveryCodes  *RecoveryCodeService
-	results        *secretresult.Service
-	clock          clock.Clock
-	unitOfWork     UnitOfWork
-	limiter        ratelimit.RateLimiter
+	challenge         *ChallengeService
+	passwords         PasswordHasher
+	passwordPolicy    PasswordPolicy
+	totp              *TOTPService
+	sessions          *SessionService
+	recoveryCodes     *RecoveryCodeService
+	results           *secretresult.Service
+	clock             clock.Clock
+	unitOfWork        UnitOfWork
+	limiter           ratelimit.RateLimiter
+	allowPasswordOnly bool
 }
 
 func NewService(deps ServiceDependencies) (*Service, error) {
@@ -91,6 +94,7 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 	return &Service{
 		challenge: deps.Challenge, passwords: deps.Passwords, passwordPolicy: deps.PasswordPolicy, totp: deps.TOTP,
 		sessions: deps.Sessions, recoveryCodes: deps.RecoveryCodes, results: deps.Results, clock: deps.Clock, unitOfWork: deps.UnitOfWork, limiter: deps.Limiter,
+		allowPasswordOnly: deps.AllowPasswordOnly,
 	}, nil
 }
 
@@ -217,7 +221,7 @@ func (service *Service) BeginAdminLogin(ctx context.Context, request AdminChalle
 			return err
 		}
 		snapshot := account.Snapshot()
-		if snapshot.Status != AccountStatusSetupRequired && snapshot.Status != AccountStatusActive {
+		if _, _, stateErr := passwordLoginSessionState(snapshot.Status, service.allowPasswordOnly); stateErr != nil {
 			return ErrUnavailable
 		}
 		issued, err = service.challenge.Issue(ChallengePurposeLogin, snapshot.ID, snapshot.AdminVersion, snapshot.PasswordVersion, request.CanonicalOrigin, request.RequestFlowID, request.MaxAttempts)
@@ -248,7 +252,7 @@ type LoginPasswordResult struct {
 	ExpiresAt time.Time
 }
 
-// LoginPassword verifies the first factor and creates either a setup or MFA-pending session.
+// LoginPassword verifies the password and issues the session kind required by the configured MFA policy.
 func (service *Service) LoginPassword(ctx context.Context, command LoginPasswordCommand) (LoginPasswordResult, error) {
 	if !command.OperationID.Valid() || command.ClientIP == "" {
 		return LoginPasswordResult{}, ErrInvalidInput
@@ -292,11 +296,19 @@ func (service *Service) LoginPassword(ctx context.Context, command LoginPassword
 					return AuthorizedChallengeCompletion{}, hashErr
 				}
 			}
-			kind := SessionKindMFAPending
-			result.NextStep = NextStepVerifyMFA
-			if currentAccount.Snapshot().Status == AccountStatusSetupRequired {
-				kind, result.NextStep = SessionKindSetupPasswordPending, NextStepChangePassword
+			// A recovery-pending account can resume normal password login when MFA is intentionally disabled.
+			if service.allowPasswordOnly && currentAccount.Snapshot().Status == AccountStatusRecoveryPending {
+				var transitionErr error
+				currentAccount, transitionErr = adminTransaction.Accounts().TransitionStatusCAS(ctx, currentAccount, AccountStatusActive, service.clock.Now())
+				if transitionErr != nil {
+					return AuthorizedChallengeCompletion{}, transitionErr
+				}
 			}
+			kind, nextStep, stateErr := passwordLoginSessionState(currentAccount.Snapshot().Status, service.allowPasswordOnly)
+			if stateErr != nil {
+				return AuthorizedChallengeCompletion{}, stateErr
+			}
+			result.NextStep = nextStep
 			issued, issueErr := service.sessions.Issue(currentAccount.Snapshot().ID, kind, currentAccount.Snapshot().AdminVersion, currentAccount.Snapshot().PasswordVersion, service.clock.Now())
 			if issueErr != nil {
 				return AuthorizedChallengeCompletion{}, issueErr
@@ -322,7 +334,8 @@ type VerifyTOTPCommand struct {
 }
 
 type SessionResult struct {
-	Session IssuedSession
+	Session  IssuedSession
+	NextStep NextStep
 }
 
 // VerifyTotp atomically consumes the accepted moving-factor step and replaces MFA-pending with full access.
@@ -371,7 +384,7 @@ func (service *Service) VerifyTotp(ctx context.Context, command VerifyTOTPComman
 		if _, err = transaction.Sessions().RevokeCAS(ctx, command.Session, "mfa_completed", service.clock.Now()); err != nil {
 			return err
 		}
-		result.Session = issued
+		result = SessionResult{Session: issued, NextStep: NextStepAuthenticated}
 		return nil
 	})
 	return result, mapAdminUoWError(err)
@@ -386,7 +399,7 @@ type ChangePasswordCommand struct {
 	ClientIP     string
 }
 
-// ChangeInitialPassword replaces the bootstrap password and narrows the session to TOTP enrollment.
+// ChangeInitialPassword replaces the bootstrap password and follows the configured MFA policy.
 func (service *Service) ChangeInitialPassword(ctx context.Context, command ChangePasswordCommand) (SessionResult, error) {
 	return service.changePassword(ctx, command, true)
 }
@@ -433,10 +446,18 @@ func (service *Service) changePassword(ctx context.Context, command ChangePasswo
 		if err != nil {
 			return err
 		}
-		nextKind := SessionKindTOTPEnrollmentPending
-		if !initial {
-			nextKind = SessionKindRecoveryPending
+		// TOTP completion normally activates setup/recovery accounts; password-only mode must finalize that lifecycle here.
+		if service.allowPasswordOnly && updated.Snapshot().Status != AccountStatusActive {
+			status := updated.Snapshot().Status
+			if status != AccountStatusSetupRequired && status != AccountStatusRecoveryPending {
+				return ErrIntegrity
+			}
+			updated, err = transaction.Accounts().TransitionStatusCAS(ctx, updated, AccountStatusActive, service.clock.Now())
+			if err != nil {
+				return err
+			}
 		}
+		nextKind, nextStep := passwordChangeSessionState(initial, service.allowPasswordOnly)
 		issued, err := service.sessions.Issue(updated.Snapshot().ID, nextKind, updated.Snapshot().AdminVersion, updated.Snapshot().PasswordVersion, service.clock.Now())
 		if err != nil {
 			return err
@@ -445,7 +466,7 @@ func (service *Service) changePassword(ctx context.Context, command ChangePasswo
 			return err
 		}
 		_, err = transaction.Sessions().RevokeCAS(ctx, command.Session, "password_changed", service.clock.Now())
-		result.Session = issued
+		result = SessionResult{Session: issued, NextStep: nextStep}
 		return err
 	})
 	return result, mapAdminUoWError(err)
@@ -786,7 +807,7 @@ func (service *Service) RecoverAdmin(ctx context.Context, command RecoverCommand
 		if err = transaction.Sessions().Insert(ctx, issued.Session); err != nil {
 			return err
 		}
-		result.Session = issued
+		result = SessionResult{Session: issued, NextStep: NextStepRebindTOTP}
 		return nil
 	})
 	return result, mapAdminUoWError(err)
@@ -1052,6 +1073,35 @@ func nextStepFromSessionKind(kind SessionKind) (NextStep, error) {
 	default:
 		return "", ErrAuthentication
 	}
+}
+
+// passwordLoginSessionState keeps the security default MFA-required while allowing an explicit password-only policy.
+func passwordLoginSessionState(status AccountStatus, allowPasswordOnly bool) (SessionKind, NextStep, error) {
+	switch status {
+	case AccountStatusSetupRequired:
+		return SessionKindSetupPasswordPending, NextStepChangePassword, nil
+	case AccountStatusActive:
+		if allowPasswordOnly {
+			return SessionKindFull, NextStepAuthenticated, nil
+		}
+		return SessionKindMFAPending, NextStepVerifyMFA, nil
+	case AccountStatusRecoveryPending:
+		if allowPasswordOnly {
+			return SessionKindFull, NextStepAuthenticated, nil
+		}
+	}
+	return "", "", ErrUnavailable
+}
+
+// passwordChangeSessionState identifies the replacement session after a successful password rotation.
+func passwordChangeSessionState(initial, allowPasswordOnly bool) (SessionKind, NextStep) {
+	if allowPasswordOnly {
+		return SessionKindFull, NextStepAuthenticated
+	}
+	if initial {
+		return SessionKindTOTPEnrollmentPending, NextStepEnrollTOTP
+	}
+	return SessionKindRecoveryPending, NextStepRebindTOTP
 }
 
 func sessionMatchesAccount(session Session, account Account) bool {

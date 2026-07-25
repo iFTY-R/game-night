@@ -74,6 +74,7 @@ if ($LASTEXITCODE -ne 0) { throw 'frozen pnpm install failed' }
 - 用户端开发服务器由 `apps/web` 负责，继续使用既有 `pnpm dev` 流程。
 - 管理端开发服务器固定运行在 `http://127.0.0.1:4174`，使用 `pnpm dev:admin` 启动。
 - 本地 API 仍通过 edge 暴露在 `http://127.0.0.1:8080`；管理端 Origin 必须与 `GAME_NIGHT_ADMIN_ORIGINS=http://127.0.0.1:4174` 保持一致。
+- 当前开发部署通过 `GAME_NIGHT_API_ADMIN_MFA_REQUIRED=false` 暂停后台 TOTP；改为 `true` 并重启 API 即可恢复强制验证。
 
 ## Docker Compose 本地部署
 

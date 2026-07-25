@@ -109,6 +109,20 @@ export const useAuthStore = defineStore("admin-auth", () => {
     commit();
   };
 
+  const syncAuthenticatedSession = async (token: number, signal: AbortSignal): Promise<void> => {
+    // Some auth mutations only confirm the next step and require a follow-up self introspection
+    // to hydrate the full admin session before the UI enters the unrestricted backend.
+    const current = await getCurrentAdminSession();
+    if (signal.aborted) {
+      return;
+    }
+    guardCommit(token, () => {
+      applySession(current.session ?? null, AdminNextStep.AUTHENTICATED);
+      clearSensitive();
+      errorMessage.value = "";
+    });
+  };
+
   const failClosed = (message: string): void => {
     clearSensitive();
     session.value = null;
@@ -195,6 +209,10 @@ export const useAuthStore = defineStore("admin-auth", () => {
     if (signal.aborted) {
       return;
     }
+    if (response.nextStep === AdminNextStep.AUTHENTICATED) {
+      await syncAuthenticatedSession(token, signal);
+      return;
+    }
     guardCommit(token, () => {
       nextStep.value = response.nextStep;
       currentStep.value = nextStepToUi(response.nextStep, setupState.value);
@@ -203,10 +221,20 @@ export const useAuthStore = defineStore("admin-auth", () => {
   };
 
   const submitInitialPassword = async (newPassword: string): Promise<void> => {
+    const { token, signal } = beginRequest();
     const response = await changeInitialPassword(newPassword);
-    nextStep.value = response.nextStep;
-    currentStep.value = nextStepToUi(response.nextStep, setupState.value);
-    clearSensitive();
+    if (signal.aborted) {
+      return;
+    }
+    if (response.nextStep === AdminNextStep.AUTHENTICATED) {
+      await syncAuthenticatedSession(token, signal);
+      return;
+    }
+    guardCommit(token, () => {
+      nextStep.value = response.nextStep;
+      currentStep.value = nextStepToUi(response.nextStep, setupState.value);
+      clearSensitive();
+    });
   };
 
   const openTotpEnrollment = async (): Promise<void> => {

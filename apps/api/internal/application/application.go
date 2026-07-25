@@ -183,7 +183,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 		return nil, errInitializeServices
 	}
 	userService, adminService, adminIdentityService, err := domainServices(
-		keyrings, source, pool, userLimiter, adminLimiter, argon2Service, auditService, checkpointPolicy,
+		keyrings, source, pool, userLimiter, adminLimiter, argon2Service, auditService, checkpointPolicy, config.AdminPasswordOnly,
 	)
 	if err != nil {
 		return nil, errInitializeServices
@@ -335,6 +335,7 @@ func domainServices(
 	argon2Service *security.Argon2Service,
 	auditService *audit.Service,
 	checkpointPolicy *audit.CheckpointHealthPolicy,
+	allowAdminPasswordOnly bool,
 ) (*identitydomain.Service, *admin.Service, *admin.IdentityService, error) {
 	userChallenges, err := identitydomain.NewChallengeService(keyrings.UserChallenge, source)
 	if err != nil {
@@ -395,7 +396,7 @@ func domainServices(
 	adminService, err := admin.NewService(admin.ServiceDependencies{
 		Challenge: adminChallenges, Passwords: argon2Service, PasswordPolicy: admin.DefaultPasswordPolicy(),
 		TOTP: totpService, Sessions: sessions, RecoveryCodes: adminRecovery, Results: adminResults,
-		Clock: source, UnitOfWork: adminUnitOfWork, Limiter: adminLimiter,
+		Clock: source, UnitOfWork: adminUnitOfWork, Limiter: adminLimiter, AllowPasswordOnly: allowAdminPasswordOnly,
 	})
 	if err != nil {
 		return nil, nil, nil, err

@@ -162,7 +162,7 @@ func (adapter *ConnectAdminService) ChangeInitialPassword(ctx context.Context, r
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	response := connect.NewResponse(&adminv1.ChangeInitialPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP, ExpiresAt: timestamppb.New(result.Session.Session.Snapshot().AbsoluteExpiresAt)})
+	response := connect.NewResponse(&adminv1.ChangeInitialPasswordResponse{NextStep: nextStepWire(result.NextStep), ExpiresAt: timestamppb.New(result.Session.Session.Snapshot().AbsoluteExpiresAt)})
 	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
 		return nil, adminConnectError(err)
 	}
@@ -238,7 +238,7 @@ func (adapter *ConnectAdminService) RecoverAdmin(ctx context.Context, request *c
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	response := connect.NewResponse(&adminv1.RecoverAdminResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)})
+	response := connect.NewResponse(&adminv1.RecoverAdminResponse{NextStep: nextStepWire(result.NextStep), Session: sessionSummary(result.Session)})
 	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
 		return nil, adminConnectError(err)
 	}
@@ -255,7 +255,7 @@ func (adapter *ConnectAdminService) ChangeAdminPassword(ctx context.Context, req
 	if err != nil {
 		return nil, adminConnectError(err)
 	}
-	response := connect.NewResponse(&adminv1.ChangeAdminPasswordResponse{NextStep: adminv1.AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP, Session: sessionSummary(result.Session)})
+	response := connect.NewResponse(&adminv1.ChangeAdminPasswordResponse{NextStep: nextStepWire(result.NextStep), Session: sessionSummary(result.Session)})
 	if err := adapter.setSessionCookie(response.Header(), result.Session); err != nil {
 		return nil, adminConnectError(err)
 	}

@@ -90,4 +90,95 @@ describe("auth store", () => {
 
     expect(store.currentStep).toBe("bootstrap");
   });
+
+  it("hydrates the full session when password login returns authenticated directly", async () => {
+    const beginAdminLogin = vi.fn(async () => ({
+      challenge: {
+        challengeProof: "proof-1"
+      }
+    }));
+    const loginPassword = vi.fn(async () => ({
+      nextStep: AdminNextStep.AUTHENTICATED
+    }));
+    const getCurrentAdminSession = vi.fn(async () => ({
+      session: buildSession(),
+      nextStep: AdminNextStep.AUTHENTICATED
+    }));
+    vi.doMock("../src/api/admin-auth", () => ({
+      beginAdminLogin,
+      beginTotpEnrollment: vi.fn(),
+      beginTotpRebind: vi.fn(),
+      changeInitialPassword: vi.fn(),
+      completeTotpEnrollment: vi.fn(),
+      completeTotpRebind: vi.fn(),
+      confirmAdminSecretReceipt: vi.fn(),
+      getCurrentAdminSession,
+      getSetupState: vi.fn(),
+      loginPassword,
+      logoutAdmin: vi.fn(),
+      logoutAllAdminSessions: vi.fn(),
+      recoverAdmin: vi.fn(),
+      verifyTotp: vi.fn()
+    }));
+    vi.doMock("../src/api/connect", () => ({
+      createRequestId: () => "req-1",
+      installSessionInvalidHandler: vi.fn()
+    }));
+
+    const { useAuthStore } = await import("../src/stores/auth");
+    const store = useAuthStore();
+    await store.submitPassword("secret");
+
+    expect(loginPassword).toHaveBeenCalledWith({
+      challengeProof: "proof-1",
+      password: "secret",
+      requestFlowId: "req-1"
+    });
+    expect(getCurrentAdminSession).toHaveBeenCalledTimes(1);
+    expect(store.currentStep).toBe("authenticated");
+    expect(store.nextStep).toBe(AdminNextStep.AUTHENTICATED);
+    expect(store.session?.kind).toBe(AdminSessionKind.FULL);
+    expect(store.permissions).toEqual([1, 10]);
+  });
+
+  it("hydrates the full session when initial password change returns authenticated directly", async () => {
+    const changeInitialPassword = vi.fn(async () => ({
+      nextStep: AdminNextStep.AUTHENTICATED
+    }));
+    const getCurrentAdminSession = vi.fn(async () => ({
+      session: buildSession(),
+      nextStep: AdminNextStep.AUTHENTICATED
+    }));
+    vi.doMock("../src/api/admin-auth", () => ({
+      beginAdminLogin: vi.fn(),
+      beginTotpEnrollment: vi.fn(),
+      beginTotpRebind: vi.fn(),
+      changeInitialPassword,
+      completeTotpEnrollment: vi.fn(),
+      completeTotpRebind: vi.fn(),
+      confirmAdminSecretReceipt: vi.fn(),
+      getCurrentAdminSession,
+      getSetupState: vi.fn(),
+      loginPassword: vi.fn(),
+      logoutAdmin: vi.fn(),
+      logoutAllAdminSessions: vi.fn(),
+      recoverAdmin: vi.fn(),
+      verifyTotp: vi.fn()
+    }));
+    vi.doMock("../src/api/connect", () => ({
+      createRequestId: () => "req-1",
+      installSessionInvalidHandler: vi.fn()
+    }));
+
+    const { useAuthStore } = await import("../src/stores/auth");
+    const store = useAuthStore();
+    await store.submitInitialPassword("new-secret");
+
+    expect(changeInitialPassword).toHaveBeenCalledWith("new-secret");
+    expect(getCurrentAdminSession).toHaveBeenCalledTimes(1);
+    expect(store.currentStep).toBe("authenticated");
+    expect(store.nextStep).toBe(AdminNextStep.AUTHENTICATED);
+    expect(store.session?.kind).toBe(AdminSessionKind.FULL);
+    expect(store.permissions).toEqual([1, 10]);
+  });
 });

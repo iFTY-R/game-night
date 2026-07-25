@@ -5,6 +5,8 @@ import { computeSeatLayout } from "../layout";
 import type { TableSeat, TableShape } from "../types";
 import PlayerSeat from "./PlayerSeat.vue";
 
+type SeatEdge = "top" | "right" | "bottom" | "left";
+
 const props = withDefaults(
   defineProps<{
     seats: readonly TableSeat[];
@@ -13,14 +15,15 @@ const props = withDefaults(
     label?: string;
     bottomInset?: number;
     seatWidth?: number;
+    seatHeight?: number;
   }>(),
-  { shape: "adaptive", label: "共同游戏桌", bottomInset: 0, seatWidth: 118 },
+  { shape: "adaptive", label: "共同游戏桌", bottomInset: 0, seatWidth: 118, seatHeight: 50 },
 );
 
 const root = ref<HTMLElement>();
 const size = ref({ width: 390, height: 520 });
 // Shared seats keep one compact geometry so every game view can align cards, action trays, and hit areas consistently.
-const seatHeight = 50;
+const resolvedSeatHeight = computed(() => Math.max(props.seatHeight, 48));
 // The center card only needs to react to the tray overflow beyond the local seat stack; larger shifts would make the table feel detached.
 const centerShiftRatio = 0.35;
 const maxCenterShift = 96;
@@ -28,9 +31,9 @@ let observer: ResizeObserver | undefined;
 
 const resolvedSeatWidth = computed(() => Math.max(props.seatWidth, 48));
 
-const safeBottomInset = computed(() => Math.max(0, Math.min(props.bottomInset, Math.max(size.value.height - seatHeight - 1, 0))));
+const safeBottomInset = computed(() => Math.max(0, Math.min(props.bottomInset, Math.max(size.value.height - resolvedSeatHeight.value - 1, 0))));
 const safeCenterShift = computed(() => {
-  const trayOverflow = Math.max(safeBottomInset.value - seatHeight - 18, 0);
+  const trayOverflow = Math.max(safeBottomInset.value - resolvedSeatHeight.value - 18, 0);
   return Math.min(Math.round(trayOverflow * centerShiftRatio), Math.floor(size.value.height * 0.16), maxCenterShift);
 });
 const tableStyle = computed(() => ({
@@ -45,16 +48,16 @@ const positions = computed(() =>
       ? [{
         seatIndex: props.seats[0]?.seatIndex ?? props.selfSeatIndex,
         x: size.value.width / 2,
-        y: Math.max(seatHeight / 2 + 24, size.value.height - safeBottomInset.value - seatHeight / 2 - 18),
+        y: Math.max(resolvedSeatHeight.value / 2 + 24, size.value.height - safeBottomInset.value - resolvedSeatHeight.value / 2 - 18),
         angle: Math.PI / 2,
       }]
       : computeSeatLayout({
         seatIndexes: props.seats.map((seat) => seat.seatIndex),
         selfSeatIndex: props.selfSeatIndex,
         width: size.value.width,
-        height: Math.max(size.value.height - safeBottomInset.value, seatHeight + 1),
+        height: Math.max(size.value.height - safeBottomInset.value, resolvedSeatHeight.value + 1),
         seatWidth: resolvedSeatWidth.value,
-        seatHeight,
+        seatHeight: resolvedSeatHeight.value,
         shape: props.shape,
       }),
 );
@@ -63,6 +66,7 @@ const positionedSeats = computed(() =>
   positions.value.map((position) => ({
     position,
     seat: props.seats.find((seat) => seat.seatIndex === position.seatIndex),
+    edge: resolveSeatEdge(position.angle),
   })),
 );
 
@@ -71,7 +75,7 @@ onMounted(() => {
     if (
       entry !== undefined &&
       entry.contentRect.width > resolvedSeatWidth.value &&
-      entry.contentRect.height > seatHeight + safeBottomInset.value
+      entry.contentRect.height > resolvedSeatHeight.value + safeBottomInset.value
     ) {
       // Route and orientation transitions may briefly collapse the table; preserve the last valid positions during that frame.
       size.value = { width: entry.contentRect.width, height: entry.contentRect.height };
@@ -83,6 +87,16 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => observer?.disconnect());
+
+// Seats keep their text horizontal, so the radial layout angle is reduced to the nearest outward edge for connector and marker placement.
+const resolveSeatEdge = (angle: number): SeatEdge => {
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  if (Math.abs(sine) >= Math.abs(cosine)) {
+    return sine >= 0 ? "bottom" : "top";
+  }
+  return cosine >= 0 ? "right" : "left";
+};
 </script>
 
 <template>
@@ -95,11 +109,12 @@ onBeforeUnmount(() => observer?.disconnect());
       v-for="item in positionedSeats"
       :key="item.position.seatIndex"
       class="gn-table__seat"
-      :style="{ left: `${item.position.x}px`, top: `${item.position.y}px`, '--gn-seat-width': `${resolvedSeatWidth}px`, '--gn-seat-height': `${seatHeight}px` }"
+      :style="{ left: `${item.position.x}px`, top: `${item.position.y}px`, '--gn-seat-width': `${resolvedSeatWidth}px`, '--gn-seat-height': `${resolvedSeatHeight}px` }"
     >
       <PlayerSeat
         v-if="item.seat"
         :seat="item.seat"
+        :edge="item.edge"
         :self="item.position.seatIndex === selfSeatIndex"
       />
     </div>

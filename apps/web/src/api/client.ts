@@ -288,6 +288,8 @@ declare global {
 const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const userCSRFName = "__Host-gn_csrf";
 const localizedErrorMessages: Record<string, string> = {
+  "identity.device.invalid": "设备登录已失效，请重新设置用户名",
+  "identity.device.revoked": "这台设备的登录已失效，请重新设置用户名",
   // Room-scoped duplicate names are safe to present directly in localized form.
   "room.username.taken": "房间内已有同名玩家",
 };

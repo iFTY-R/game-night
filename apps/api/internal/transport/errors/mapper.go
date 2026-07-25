@@ -4,6 +4,7 @@ package errors
 import (
 	"context"
 	stderrors "errors"
+	"net/http"
 	"time"
 
 	"connectrpc.com/connect"
@@ -31,9 +32,62 @@ func Interceptor() connect.Interceptor {
 	return connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, request connect.AnyRequest) (connect.AnyResponse, error) {
 			response, err := next(ctx, request)
-			return response, Map(err)
+			cookieExpiries := errorCookieExpiries(err)
+			mapped := Map(err)
+			attachErrorSetCookies(mapped, cookieExpiries)
+			return response, mapped
 		}
 	})
+}
+
+// cookieExpiryError is an internal opt-in carrier for destructive Cookie writes on failed responses.
+type cookieExpiryError struct {
+	cause  error
+	values []string
+}
+
+func (err *cookieExpiryError) Error() string { return err.cause.Error() }
+func (err *cookieExpiryError) Unwrap() error { return err.cause }
+
+// WithCookieExpiries explicitly carries destructive Cookie cleanup across an error response without permitting credential issuance.
+func WithCookieExpiries(cause error, values []string) error {
+	if cause == nil {
+		return nil
+	}
+	expiries := make([]string, 0, len(values))
+	for _, value := range values {
+		parsed, err := http.ParseSetCookie(value)
+		if err == nil && parsed.Value == "" && parsed.MaxAge < 0 {
+			expiries = append(expiries, value)
+		}
+	}
+	if len(expiries) == 0 {
+		return cause
+	}
+	return &cookieExpiryError{cause: cause, values: expiries}
+}
+
+// errorCookieExpiries unwraps only the explicit carrier; ordinary response headers never cross the error boundary.
+func errorCookieExpiries(err error) []string {
+	var expiryError *cookieExpiryError
+	if !stderrors.As(err, &expiryError) {
+		return nil
+	}
+	return expiryError.values
+}
+
+// attachErrorSetCookies preserves explicitly approved Cookie expiry without forwarding arbitrary response headers on failures.
+func attachErrorSetCookies(err error, values []string) {
+	if err == nil || len(values) == 0 {
+		return
+	}
+	var connectError *connect.Error
+	if !stderrors.As(err, &connectError) {
+		return
+	}
+	for _, value := range values {
+		connectError.Meta().Add("Set-Cookie", value)
+	}
 }
 
 // Map returns one stable Connect code and BusinessErrorDetail without retaining the original error message.

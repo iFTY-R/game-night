@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -124,6 +125,65 @@ func TestAccountInstructionClearsCookiesOnConnectError(t *testing.T) {
 	detail := errorBusinessDetail(t, err)
 	if detail.GetCode() != commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ACCOUNT_SUSPENDED {
 		t.Fatalf("business detail = %+v", detail)
+	}
+}
+
+// TestGetCurrentIdentityClearsInvalidDeviceCookies prevents a deleted database row from trapping the browser on stale HttpOnly credentials.
+func TestGetCurrentIdentityClearsInvalidDeviceCookies(t *testing.T) {
+	service := invalidRequestService(t)
+	path, handler := identityv1connect.NewIdentityServiceHandler(service, connect.WithInterceptors(transporterrors.Interceptor()))
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := identityv1connect.NewIdentityServiceClient(server.Client(), server.URL)
+
+	_, err := client.GetCurrentIdentity(t.Context(), connect.NewRequest(&identityv1.GetCurrentIdentityRequest{}))
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("current identity error = %v", err)
+	}
+	var connectError *connect.Error
+	if !stderrors.As(err, &connectError) {
+		t.Fatalf("current identity error type = %T", err)
+	}
+	setCookies := connectError.Meta().Values("Set-Cookie")
+	if len(setCookies) != 2 {
+		t.Fatalf("clear Cookie headers = %v", setCookies)
+	}
+	cleared := make(map[string]bool, len(setCookies))
+	for _, value := range setCookies {
+		parsed, parseErr := http.ParseSetCookie(value)
+		if parseErr != nil || parsed.MaxAge != -1 || parsed.Value != "" || !parsed.Secure || parsed.Path != "/" {
+			t.Fatalf("invalid clear Cookie %q: parsed=%+v err=%v", value, parsed, parseErr)
+		}
+		cleared[parsed.Name] = true
+	}
+	if !cleared[cookies.UserDeviceCookieName] || !cleared[cookies.UserCSRFCookieName] {
+		t.Fatalf("cleared Cookie names = %v", cleared)
+	}
+}
+
+// TestGetCurrentIdentityClearsUnavailableDeviceCookies covers verified credentials that were revoked or expired after issuance.
+func TestGetCurrentIdentityClearsUnavailableDeviceCookies(t *testing.T) {
+	service := invalidRequestService(t)
+	intercepted := transporterrors.Interceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+		return service.clearInvalidCurrentDevice(domain.ErrDeviceUnavailable)
+	})
+
+	_, err := intercepted(t.Context(), connect.NewRequest(&identityv1.GetCurrentIdentityRequest{}))
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("unavailable device error = %v", err)
+	}
+	var connectError *connect.Error
+	if !stderrors.As(err, &connectError) {
+		t.Fatalf("unavailable device error type = %T", err)
+	}
+	if values := connectError.Meta().Values("Set-Cookie"); len(values) != 2 {
+		t.Fatalf("unavailable device clear Cookie headers = %v", values)
+	}
+	detail := errorBusinessDetail(t, err)
+	if detail.GetCode() != commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_DEVICE_REVOKED || detail.GetMessageKey() != "identity.device.revoked" {
+		t.Fatalf("unavailable device detail = %+v", detail)
 	}
 }
 

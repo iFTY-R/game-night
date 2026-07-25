@@ -164,7 +164,8 @@ onMounted(async () => {
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : "身份恢复失败";
   }
-  displayName.value = room.displayName || displayName.value;
+  // An authentication rejection clears the viewer-safe store, so the form must not retain its pre-recovery snapshot.
+  displayName.value = room.hasIdentity ? room.displayName : "";
   if (room.hasIdentity && /^[A-Z0-9]{4,8}$/.test(inviteCode.value)) {
     await enterRoom(inviteCode.value);
     return;

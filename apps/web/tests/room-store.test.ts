@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEY, useRoomStore } from "../src/stores/room";
 
@@ -7,6 +7,10 @@ describe("room context recovery", () => {
   beforeEach(() => {
     window.localStorage.clear();
     setActivePinia(createPinia());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("persists only the viewer-safe room context", () => {
@@ -36,6 +40,11 @@ describe("room context recovery", () => {
 
   it("completes first-device onboarding through the server challenge sequence", async () => {
     const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const lockRequest = vi.fn(async (_name: string, _options: LockOptions, callback: () => Promise<unknown>) => callback());
+    const browserNavigator = new Proxy(window.navigator, {
+      get: (target, property) => property === "locks" ? { request: lockRequest } : Reflect.get(target, property, target),
+    });
+    vi.stubGlobal("navigator", browserNavigator);
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       calls.push({ url: String(input), body });
@@ -63,29 +72,75 @@ describe("room context recovery", () => {
     expect(room.userId).toBe("user-1");
     expect(room.displayName).toBe("小满");
     expect(room.hasIdentity).toBe(true);
+    expect(lockRequest).toHaveBeenCalledTimes(2);
+    expect(lockRequest).toHaveBeenNthCalledWith(1, "game-night.identity-flow.v1", { mode: "exclusive" }, expect.any(Function));
   });
 
-  it("does not trust stale local identity when the device credential is rejected", async () => {
+  it("clears stale local identity when the device credential is rejected", async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
       schemaVersion: 1,
       displayName: "旧用户名",
       userId: "guest-stale",
-      roomId: null,
-      roomCode: null,
-      sessionId: null,
+      roomId: "room-stale",
+      roomCode: "STALE1",
+      sessionId: "session-stale",
     }));
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      code: "permission_denied",
-      message: "request.origin.not_allowed",
-    }), { status: 403, headers: { "Content-Type": "application/json" } })));
+      code: "unauthenticated",
+      message: "identity.device.invalid",
+    }), { status: 401, headers: { "Content-Type": "application/json" } })));
 
     const room = useRoomStore();
     room.recover();
+    room.$patch({
+      selectedGameId: "liars-dice",
+      gameConfigDrafts: [{ gameId: "liars-dice", revision: "3", updatedBy: "guest-stale" }],
+      gameRulePresets: [{ presetId: "preset-stale", gameId: "liars-dice", name: "旧预设" }],
+      gameRulePresetsLoading: true,
+    });
     expect(room.hasIdentity).toBe(true);
 
     await room.recoverIdentity();
 
     expect(room.hasIdentity).toBe(false);
+    expect(room.identityState).toBe("anonymous");
+    expect(room.displayName).toBe("");
+    expect(room.userId).toBe("");
+    expect(room.roomId).toBeNull();
+    expect(room.roomCode).toBeNull();
+    expect(room.sessionId).toBeNull();
+    expect(room.selectedGameId).toBe("");
+    expect(room.gameConfigDrafts).toEqual([]);
+    expect(room.gameRulePresets).toEqual([]);
+    expect(room.gameRulePresetsLoading).toBe(false);
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it("deduplicates concurrent recovery without caching settled Cookie authority", async () => {
+    let resolveRequest: ((response: Response) => void) | undefined;
+    let requestCount = 0;
+    const rejectedResponse = (): Response => new Response(JSON.stringify({
+      code: "unauthenticated",
+      message: "identity.device.invalid",
+    }), { status: 401, headers: { "Content-Type": "application/json" } });
+    const fetchSpy = vi.fn(() => {
+      requestCount += 1;
+      if (requestCount > 1) return Promise.resolve(rejectedResponse());
+      return new Promise<Response>((resolve) => {
+        resolveRequest = resolve;
+      });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const room = useRoomStore();
+
+    const first = room.recoverIdentity();
+    const second = room.recoverIdentity();
+    await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    resolveRequest?.(rejectedResponse());
+    await Promise.all([first, second]);
+    await room.recoverIdentity();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(room.identityState).toBe("anonymous");
   });
 

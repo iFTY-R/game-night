@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	stderrors "errors"
 	"strings"
 	"testing"
@@ -62,6 +63,42 @@ func TestMapDoesNotExposeWrappedInternalMessage(t *testing.T) {
 	}
 	if connect.CodeOf(mapped) != connect.CodeUnavailable {
 		t.Fatalf("mapped code = %s, want unavailable", connect.CodeOf(mapped))
+	}
+}
+
+func TestInterceptorDoesNotForwardUnwrappedErrorCookies(t *testing.T) {
+	intercepted := Interceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+		response := connect.NewResponse(&commonv1.BusinessErrorDetail{})
+		response.Header().Add("Set-Cookie", "__Host-gn_device=credential; Path=/; Secure; HttpOnly")
+		return response, identity.ErrDeviceAuthentication
+	})
+
+	_, err := intercepted(t.Context(), connect.NewRequest(&commonv1.BusinessErrorDetail{}))
+	var connectError *connect.Error
+	if !stderrors.As(err, &connectError) {
+		t.Fatalf("mapped error type = %T", err)
+	}
+	if values := connectError.Meta().Values("Set-Cookie"); len(values) != 0 {
+		t.Fatalf("unwrapped error Cookies = %v", values)
+	}
+}
+
+func TestWithCookieExpiriesOnlyForwardsDestructiveCookies(t *testing.T) {
+	intercepted := Interceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+		return nil, WithCookieExpiries(identity.ErrDeviceAuthentication, []string{
+			"__Host-gn_device=credential; Path=/; Secure; HttpOnly",
+			"__Host-gn_device=; Path=/; Max-Age=0; Secure; HttpOnly",
+		})
+	})
+
+	_, err := intercepted(t.Context(), connect.NewRequest(&commonv1.BusinessErrorDetail{}))
+	var connectError *connect.Error
+	if !stderrors.As(err, &connectError) {
+		t.Fatalf("mapped error type = %T", err)
+	}
+	values := connectError.Meta().Values("Set-Cookie")
+	if len(values) != 1 || !strings.Contains(values[0], "__Host-gn_device=;") {
+		t.Fatalf("approved error Cookie expiries = %v", values)
 	}
 }
 

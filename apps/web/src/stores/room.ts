@@ -18,6 +18,19 @@ import { USERNAME_RULE_MESSAGE, validateUsernameInput } from "../username";
 
 const STORAGE_KEY = "game-night.room-context.v1";
 const STORAGE_SCHEMA_VERSION = 1;
+// Device probes and credential mutations share this origin-wide lock so an old tab cannot clear a newly issued Cookie.
+const IDENTITY_FLOW_LOCK_NAME = "game-night.identity-flow.v1";
+
+// Startup and route-level callers share one in-flight authoritative Cookie probe without caching settled authority.
+const identityRecoveryRequests = new WeakMap<object, Promise<void>>();
+
+/** Serializes identity flows across tabs when the browser exposes the standard Web Locks API. */
+const withIdentityFlowLock = async <T>(task: () => Promise<T>): Promise<T> => {
+  if (typeof navigator === "undefined" || navigator.locks === undefined) {
+    return task();
+  }
+  return navigator.locks.request(IDENTITY_FLOW_LOCK_NAME, { mode: "exclusive" }, async () => task());
+};
 
 interface PersistedRoomContext {
   schemaVersion: number;
@@ -117,25 +130,68 @@ export const useRoomStore = defineStore("room", {
       return true;
     },
 
+    /** Clears all user-owned recovery and game state after the server rejects the device that owned it. */
+    clearRecoveredIdentity(): void {
+      this.$patch({
+        ...blankContext(),
+        identityState: "anonymous",
+        remoteRoom: null,
+        error: "",
+        notice: "",
+        myRooms: [],
+        publicRooms: [],
+        myRoomsNextPageToken: "",
+        publicRoomsNextPageToken: "",
+        myRoomsLoading: false,
+        publicRoomsLoading: false,
+        selectedGameId: "",
+        gameConfigDrafts: [],
+        pendingStart: null,
+        ownershipEpoch: "",
+        gameRulePresets: [],
+        gameRulePresetsLoading: false,
+      });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
+    },
+
     /** Restores the server-owned device identity without trusting local room context as authentication. */
     async recoverIdentity(): Promise<void> {
+      // Pinia may expose different action wrappers during app bootstrap; the shared state tree is the stable store identity.
+      const recoveryKey = this.$state;
+      const pending = identityRecoveryRequests.get(recoveryKey);
+      if (pending !== undefined) {
+        return pending;
+      }
+      const recovery = withIdentityFlowLock(async (): Promise<void> => {
+        try {
+          const response = await identityClient.current();
+          const user = response.user;
+          if (!user?.userId) {
+            this.clearRecoveredIdentity();
+            return;
+          }
+          this.userId = user.userId;
+          this.displayName = user.username ?? "";
+          this.identityState = normalizeIdentityState(user.status, this.displayName);
+          this.persist();
+        } catch (error) {
+          if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+            this.clearRecoveredIdentity();
+            return;
+          }
+          throw error;
+        }
+      });
+      identityRecoveryRequests.set(recoveryKey, recovery);
       try {
-        const response = await identityClient.current();
-        const user = response.user;
-        if (!user?.userId) {
-          this.identityState = "anonymous";
-          return;
+        await recovery;
+      } finally {
+        // Only in-flight work is shared; a later call must observe any Cookie authority changed by another tab.
+        if (identityRecoveryRequests.get(recoveryKey) === recovery) {
+          identityRecoveryRequests.delete(recoveryKey);
         }
-        this.userId = user.userId;
-        this.displayName = user.username ?? "";
-        this.identityState = normalizeIdentityState(user.status, this.displayName);
-        this.persist();
-      } catch (error) {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          this.identityState = "anonymous";
-          return;
-        }
-        throw error;
       }
     },
 
@@ -156,23 +212,25 @@ export const useRoomStore = defineStore("room", {
         if (this.identityState === "active" && this.displayName.length > 0) {
           return;
         }
-        if (String(this.identityState) === "onboarding") {
-          const onboarded = await identityClient.completeOnboarding(normalized);
-          this.applyIdentity(onboarded.user, normalized);
-          return;
-        }
-        const requestFlowId = requestID();
-        const begun = await identityClient.beginBootstrap(requestFlowId);
-        const proof = begun.challenge?.challengeProof;
-        if (!proof) {
-          throw new Error("设备身份挑战无效");
-        }
-        const bootstrapped = await identityClient.bootstrap(proof, requestID(), requestFlowId);
-        this.applyIdentity(bootstrapped.user, "");
-        if (String(this.identityState) === "onboarding") {
-          const onboarded = await identityClient.completeOnboarding(normalized);
-          this.applyIdentity(onboarded.user, normalized);
-        }
+        await withIdentityFlowLock(async () => {
+          if (String(this.identityState) === "onboarding") {
+            const onboarded = await identityClient.completeOnboarding(normalized);
+            this.applyIdentity(onboarded.user, normalized);
+            return;
+          }
+          const requestFlowId = requestID();
+          const begun = await identityClient.beginBootstrap(requestFlowId);
+          const proof = begun.challenge?.challengeProof;
+          if (!proof) {
+            throw new Error("设备身份挑战无效");
+          }
+          const bootstrapped = await identityClient.bootstrap(proof, requestID(), requestFlowId);
+          this.applyIdentity(bootstrapped.user, "");
+          if (String(this.identityState) === "onboarding") {
+            const onboarded = await identityClient.completeOnboarding(normalized);
+            this.applyIdentity(onboarded.user, normalized);
+          }
+        });
       } catch (error) {
         this.error = error instanceof Error ? error.message : "身份初始化失败";
         throw error;

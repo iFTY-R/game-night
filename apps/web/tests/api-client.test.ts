@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, gameClient, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../src/api/client";
+import { ApiError, gameClient, identityClient, roomClient, type GameEnvelopeInput, type RoomSnapshot } from "../src/api/client";
 import { gameProjectionFromConnect } from "../src/api/game-projection";
 
 const room: RoomSnapshot = {
@@ -66,6 +66,28 @@ describe("Connect JSON mutation requests", () => {
       status: 409,
       code: "already_exists",
       message: "房间内已有同名玩家",
+    } satisfies Partial<ApiError>);
+  });
+
+  it("translates invalid device credentials without exposing an internal message key", async () => {
+    captureFailedRequest(401, { code: "unauthenticated", message: "identity.device.invalid" });
+
+    await expect(identityClient.current()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401,
+      code: "unauthenticated",
+      message: "设备登录已失效，请重新设置用户名",
+    } satisfies Partial<ApiError>);
+  });
+
+  it("translates revoked device credentials without exposing an internal message key", async () => {
+    captureFailedRequest(401, { code: "unauthenticated", message: "identity.device.revoked" });
+
+    await expect(identityClient.current()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401,
+      code: "unauthenticated",
+      message: "这台设备的登录已失效，请重新设置用户名",
     } satisfies Partial<ApiError>);
   });
 

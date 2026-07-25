@@ -157,10 +157,13 @@ func (service *Service) CompleteOnboarding(ctx context.Context, request *connect
 func (service *Service) GetCurrentIdentity(ctx context.Context, request *connect.Request[identityv1.GetCurrentIdentityRequest]) (*connect.Response[identityv1.GetCurrentIdentityResponse], error) {
 	credentials, err := cookies.ReadUserDevice(requestHTTP(request))
 	if err != nil {
-		return nil, domain.ErrDeviceAuthentication
+		return service.clearInvalidCurrentDevice(domain.ErrDeviceAuthentication)
 	}
 	result, err := service.domain.GetCurrentIdentity(ctx, domain.GetCurrentIdentityCommand{DeviceToken: credentials.CookieToken()})
 	if err != nil {
+		if stderrors.Is(err, domain.ErrDeviceAuthentication) || stderrors.Is(err, domain.ErrDeviceUnavailable) {
+			return service.clearInvalidCurrentDevice(err)
+		}
 		return nil, err
 	}
 	response := connect.NewResponse(&identityv1.GetCurrentIdentityResponse{User: userWire(result.User), CurrentDevice: credentialWire(result.Device, service.clock.Now())})
@@ -168,6 +171,18 @@ func (service *Service) GetCurrentIdentity(ctx context.Context, request *connect
 		return nil, err
 	}
 	return response, nil
+}
+
+// clearInvalidCurrentDevice explicitly carries only destructive Cookie expiry through the mapped authentication error.
+// The original authentication error remains authoritative; callers must start a new challenge on a later request.
+func (service *Service) clearInvalidCurrentDevice(
+	cause error,
+) (*connect.Response[identityv1.GetCurrentIdentityResponse], error) {
+	header := make(http.Header)
+	if err := service.cookies.ClearUserDevice(header); err != nil {
+		return nil, err
+	}
+	return nil, transporterrors.WithCookieExpiries(cause, header.Values("Set-Cookie"))
 }
 
 // ChangeUsername applies the three-bucket policy only after Origin and double-submit CSRF validation.

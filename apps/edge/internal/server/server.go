@@ -399,7 +399,8 @@ func isUserRPCPath(path string) bool {
 }
 
 func isAdminRPCPath(path string) bool {
-	return strings.HasPrefix(path, "/platform.admin.v1.AdminAuthService/")
+	return strings.HasPrefix(path, "/platform.admin.v1.AdminAuthService/") ||
+		strings.HasPrefix(path, "/platform.admin.v1.AdminUserService/")
 }
 
 func copyForwardingHeaders(destination, source http.Header) {

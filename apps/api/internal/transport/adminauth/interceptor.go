@@ -132,6 +132,9 @@ func (interceptor *ContextInterceptor) WrapUnary(next connect.UnaryFunc) connect
 			if err = enforceStaticPolicy(policy, actor); err != nil {
 				return nil, err
 			}
+			if err = enforceRequestPolicy(policy, actor, request.Any(), time.Now().UTC()); err != nil {
+				return nil, err
+			}
 		}
 		return next(withRequestContext(ctx, state), request)
 	}
@@ -167,6 +170,18 @@ func enforceStaticPolicy(policy procedurePolicy, actor admin.ActorContext) error
 	if policy.permission != "" {
 		if err := actor.Require(policy.permission); err != nil {
 			return err
+		}
+	}
+	if len(policy.permissionsAny) > 0 {
+		allowed := false
+		for _, permission := range policy.permissionsAny {
+			if actor.Require(permission) == nil {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return admin.ErrPermissionDenied
 		}
 	}
 	if policy.elevation != "" {

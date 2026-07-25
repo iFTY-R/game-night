@@ -53,6 +53,32 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"RevokeOtherAdminSessions",
 		"LogoutAdmin",
 	})
+	assertServiceMethods(t, adminv1.File_platform_admin_v1_admin_user_proto, "AdminUserService", []string{
+		"ListUsers",
+		"GetUser",
+		"GetUserPII",
+		"ListUserTags",
+		"CreateUserTag",
+		"UpdateUserTag",
+		"DeleteUserTag",
+		"SetUserTags",
+		"ListUserNotes",
+		"AppendUserNote",
+		"PreviewUserCommand",
+		"ExecuteUserCommand",
+		"PreviewBatchUserOperation",
+		"StartBatchUserOperation",
+		"GetBatchUserOperation",
+		"ListBatchUserOperations",
+		"ListBatchUserOperationItems",
+		"CancelBatchUserOperation",
+		"RetryBatchUserOperation",
+		"CreateUserExport",
+		"GetUserExport",
+		"ListUserExports",
+		"CreateExportDownloadGrant",
+		"DeleteExportResult",
+	})
 	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
 		"CreateRoom",
 		"GetRoom",
@@ -278,6 +304,7 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		identityv1.File_platform_identity_v1_identity_proto,
 		adminv1.File_platform_admin_v1_admin_common_proto,
 		adminv1.File_platform_admin_v1_admin_auth_proto,
+		adminv1.File_platform_admin_v1_admin_user_proto,
 		auditv1.File_platform_audit_v1_audit_proto,
 		roomv1.File_platform_room_v1_room_proto,
 	}
@@ -339,6 +366,23 @@ func TestAdminCommonContractShape(t *testing.T) {
 		"ADMIN_ELEVATION_SCOPE_SECURITY_REVOKE_SESSIONS",
 		"ADMIN_ELEVATION_SCOPE_AUDIT_EXPORT_SENSITIVE",
 	})
+	assertEnumValues(t, file.Enums().ByName("AdminSortDirection"), []string{
+		"ADMIN_SORT_DIRECTION_UNSPECIFIED",
+		"ADMIN_SORT_DIRECTION_ASCENDING",
+		"ADMIN_SORT_DIRECTION_DESCENDING",
+	})
+	assertEnumValues(t, file.Enums().ByName("AdminJobState"), []string{
+		"ADMIN_JOB_STATE_UNSPECIFIED",
+		"ADMIN_JOB_STATE_QUEUED",
+		"ADMIN_JOB_STATE_RUNNING",
+		"ADMIN_JOB_STATE_SUCCEEDED",
+		"ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED",
+		"ADMIN_JOB_STATE_FAILED",
+		"ADMIN_JOB_STATE_CANCELING",
+		"ADMIN_JOB_STATE_CANCELED",
+		"ADMIN_JOB_STATE_EXPIRED",
+		"ADMIN_JOB_STATE_DELETED",
+	})
 
 	assertMessageFieldShapes(t, file.Messages().ByName("AdminElevationSummary"), []fieldShape{
 		{name: "scope", kind: protoreflect.EnumKind, typeName: "platform.admin.v1.AdminElevationScope"},
@@ -377,6 +421,15 @@ func TestAdminCommonContractShape(t *testing.T) {
 		{name: "user_agent", kind: protoreflect.StringKind},
 		{name: "active_elevation_scopes", kind: protoreflect.EnumKind, list: true, typeName: "platform.admin.v1.AdminElevationScope"},
 	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminPageInfo"), []fieldShape{
+		{name: "next_page_token", kind: protoreflect.StringKind},
+		{name: "sampled_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminOperationReceipt"), []fieldShape{
+		{name: "operation_id", kind: protoreflect.StringKind},
+		{name: "audit_event_id", kind: protoreflect.StringKind},
+		{name: "completed_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
 }
 
 func TestAdminCurrentSessionContractShape(t *testing.T) {
@@ -400,6 +453,85 @@ func TestAdminCurrentSessionContractShape(t *testing.T) {
 	}
 	if field := response.Fields().ByName("next_step"); field != nil {
 		t.Fatalf("GetCurrentAdminSessionResponse must not expose next_step: %v", field)
+	}
+}
+
+func TestAdminUserPIIIsIsolatedFromOrdinaryDetails(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_user_proto
+	assertMessageFields(t, file.Messages().ByName("GetUserRequest"), "user_id")
+	assertMessageFields(t, file.Messages().ByName("GetUserResponse"), "user", "sampled_at")
+	detail := file.Messages().ByName("AdminUserDetail")
+	if detail == nil {
+		t.Fatal("AdminUserDetail is missing")
+	}
+	for _, forbidden := range []protoreflect.Name{"real_name", "pii_values", "values"} {
+		if field := detail.Fields().ByName(forbidden); field != nil {
+			t.Fatalf("GetUser detail exposes PII field %s", field.FullName())
+		}
+	}
+	assertMessageFields(t, file.Messages().ByName("GetUserPIIRequest"), "user_id", "fields", "reason")
+	assertMessageFields(t, file.Messages().ByName("GetUserPIIResponse"), "user_id", "values", "access_audit_event_id", "accessed_at")
+}
+
+func TestAdminUserWritesCarryIdempotencyReasonAndVersion(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_user_proto
+	for _, messageName := range []protoreflect.Name{
+		"CreateUserTagRequest",
+		"UpdateUserTagRequest",
+		"DeleteUserTagRequest",
+		"SetUserTagsRequest",
+		"AppendUserNoteRequest",
+		"ExecuteUserCommandRequest",
+		"StartBatchUserOperationRequest",
+		"CancelBatchUserOperationRequest",
+		"RetryBatchUserOperationRequest",
+		"CreateUserExportRequest",
+		"CreateExportDownloadGrantRequest",
+		"DeleteExportResultRequest",
+	} {
+		message := file.Messages().ByName(messageName)
+		if message == nil {
+			t.Fatalf("%s is missing", messageName)
+		}
+		if message.Fields().ByName("operation_id") == nil || message.Fields().ByName("reason") == nil {
+			t.Fatalf("%s must carry operation_id and reason", messageName)
+		}
+		if message.Fields().ByName("expected_version") == nil && message.Fields().ByName("expected_user_version") == nil {
+			t.Fatalf("%s must carry an expected version", messageName)
+		}
+	}
+}
+
+func TestAdminUserBatchAndDownloadContractsStayBounded(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_user_proto
+	assertMessageFields(t, file.Messages().ByName("ListUsersRequest"), "filter", "sort", "page_size", "page_token")
+	assertMessageFields(t, file.Messages().ByName("ListUsersResponse"), "users", "page")
+	assertMessageFields(t, file.Messages().ByName("AdminUserCommand"),
+		"type", "room_id", "expected_room_version", "expected_membership_version",
+	)
+	assertEnumValues(t, file.Enums().ByName("AdminBatchUserCommandType"), []string{
+		"ADMIN_BATCH_USER_COMMAND_TYPE_UNSPECIFIED",
+		"ADMIN_BATCH_USER_COMMAND_TYPE_SUSPEND",
+		"ADMIN_BATCH_USER_COMMAND_TYPE_UNSUSPEND",
+		"ADMIN_BATCH_USER_COMMAND_TYPE_REMOVE_FROM_CURRENT_ROOM",
+	})
+	selection := file.Messages().ByName("AdminUserSelection")
+	if selection == nil || selection.Oneofs().Len() != 1 || selection.Oneofs().ByName("selection").Fields().Len() != 2 {
+		t.Fatalf("AdminUserSelection must contain exactly filter or explicit targets: %v", selection)
+	}
+	grant := file.Messages().ByName("CreateExportDownloadGrantResponse")
+	assertMessageFields(t, grant, "receipt", "download_grant", "expires_at")
+	assertMessageFields(t, file.Messages().ByName("CreateExportDownloadGrantRequest"),
+		"operation_id", "export_id", "reason", "expected_version", "expected_masking_policy",
+	)
+	if grant.Fields().ByName("url") != nil || grant.Fields().ByName("download_url") != nil {
+		t.Fatal("download grant response must not expose an object URL")
 	}
 }
 

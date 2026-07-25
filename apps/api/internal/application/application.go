@@ -26,6 +26,7 @@ import (
 	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
@@ -508,6 +509,7 @@ func transportHandler(
 		return nil, err
 	}
 	adminOperations := append([]string(nil), sensitive.AdminAuthOperations...)
+	adminOperations = append(adminOperations, sensitive.AdminUserOperations...)
 	adminSensitive, err := sensitive.New(adminOperations...)
 	if err != nil {
 		return nil, err
@@ -527,8 +529,11 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	// The contract-first route fails closed until a domain-backed user-center transport replaces this generated handler.
+	adminUserHandler := &adminv1connect.UnimplementedAdminUserServiceHandler{}
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
 		Auth:         adminAuthHandler,
+		User:         adminUserHandler,
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {

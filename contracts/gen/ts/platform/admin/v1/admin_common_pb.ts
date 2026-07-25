@@ -12,7 +12,60 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/admin/v1/admin_common.proto.
  */
 export const file_platform_admin_v1_admin_common: GenFile = /*@__PURE__*/
-  fileDesc("CiRwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9jb21tb24ucHJvdG8SEXBsYXRmb3JtLmFkbWluLnYxIq4BChVBZG1pbkVsZXZhdGlvblN1bW1hcnkSNQoFc2NvcGUYASABKA4yJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkVsZXZhdGlvblNjb3BlEi4KCmdyYW50ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIn4KDUFkbWluTWZhU3RhdGUSDwoHZW5hYmxlZBgBIAEoCBIgChhyZWNvdmVyeV9jb2Rlc19yZW1haW5pbmcYAiABKAUSGgoSZW5yb2xsbWVudF92ZXJzaW9uGAMgASgEEh4KFnJlY292ZXJ5X2NvZGVzX3ZlcnNpb24YBCABKAQizAMKE0FkbWluU2Vzc2lvblN1bW1hcnkSEAoIYWRtaW5faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIxCgRraW5kGAMgASgOMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uS2luZBI3CgtwZXJtaXNzaW9ucxgEIAMoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluUGVybWlzc2lvbhItCgNtZmEYBSABKAsyIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk1mYVN0YXRlEjwKCmVsZXZhdGlvbnMYBiADKAsyKC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkVsZXZhdGlvblN1bW1hcnkSFQoNYWRtaW5fdmVyc2lvbhgHIAEoBBIYChBwYXNzd29yZF92ZXJzaW9uGAggASgEEhcKD3Nlc3Npb25fdmVyc2lvbhgJIAEoBBIzCg9pZGxlX2V4cGlyZXNfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjcKE2Fic29sdXRlX2V4cGlyZXNfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIscDChBBZG1pblNlc3Npb25JbmZvEhIKCnNlc3Npb25faWQYASABKAkSMQoEa2luZBgCIAEoDjIjLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvbktpbmQSDwoHY3VycmVudBgDIAEoCBIXCg9zZXNzaW9uX3ZlcnNpb24YBCABKAQSLgoKY3JlYXRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNAoQbGFzdF9hY3Rpdml0eV9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoPaWRsZV9leHBpcmVzX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI3ChNhYnNvbHV0ZV9leHBpcmVzX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCgljbGllbnRfaXAYCSABKAkSEgoKdXNlcl9hZ2VudBgKIAEoCRJHChdhY3RpdmVfZWxldmF0aW9uX3Njb3BlcxgLIAMoDjImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluRWxldmF0aW9uU2NvcGUqqwEKEUFkbWluQWNjb3VudFN0YXRlEiMKH0FETUlOX0FDQ09VTlRfU1RBVEVfVU5TUEVDSUZJRUQQABIpCiVBRE1JTl9BQ0NPVU5UX1NUQVRFX0JPT1RTVFJBUF9QRU5ESU5HEAESJgoiQURNSU5fQUNDT1VOVF9TVEFURV9TRVRVUF9SRVFVSVJFRBACEh4KGkFETUlOX0FDQ09VTlRfU1RBVEVfQUNUSVZFEAMqpgEKEEFkbWluU2Vzc2lvbktpbmQSIgoeQURNSU5fU0VTU0lPTl9LSU5EX1VOU1BFQ0lGSUVEEAASLQopQURNSU5fU0VTU0lPTl9LSU5EX1NFVFVQX1BBU1NXT1JEX1BFTkRJTkcQARIiCh5BRE1JTl9TRVNTSU9OX0tJTkRfTUZBX1BFTkRJTkcQAhIbChdBRE1JTl9TRVNTSU9OX0tJTkRfRlVMTBADKvUFCg9BZG1pblBlcm1pc3Npb24SIAocQURNSU5fUEVSTUlTU0lPTl9VTlNQRUNJRklFRBAAEiIKHkFETUlOX1BFUk1JU1NJT05fT1ZFUlZJRVdfUkVBRBABEh8KG0FETUlOX1BFUk1JU1NJT05fVVNFUlNfUkVBRBACEiMKH0FETUlOX1BFUk1JU1NJT05fVVNFUlNfUkVBRF9QSUkQAxIjCh9BRE1JTl9QRVJNSVNTSU9OX1VTRVJTX0FOTk9UQVRFEAQSIQodQURNSU5fUEVSTUlTU0lPTl9VU0VSU19HT1ZFUk4QBRIhCh1BRE1JTl9QRVJNSVNTSU9OX1VTRVJTX0VYUE9SVBAGEh8KG0FETUlOX1BFUk1JU1NJT05fUk9PTVNfUkVBRBAHEiIKHkFETUlOX1BFUk1JU1NJT05fUk9PTVNfQ09OVFJPTBAIEh8KG0FETUlOX1BFUk1JU1NJT05fR0FNRVNfUkVBRBAJEiIKHkFETUlOX1BFUk1JU1NJT05fR0FNRVNfQ09OVFJPTBAKEiEKHUFETUlOX1BFUk1JU1NJT05fR0FNRVNfUkVQQUlSEAsSIgoeQURNSU5fUEVSTUlTU0lPTl9TRUNVUklUWV9SRUFEEAwSLQopQURNSU5fUEVSTUlTU0lPTl9TRUNVUklUWV9NQU5BR0VfUEFTU1dPUkQQDRIoCiRBRE1JTl9QRVJNSVNTSU9OX1NFQ1VSSVRZX01BTkFHRV9NRkEQDhItCilBRE1JTl9QRVJNSVNTSU9OX1NFQ1VSSVRZX01BTkFHRV9TRVNTSU9OUxAPEh8KG0FETUlOX1BFUk1JU1NJT05fQVVESVRfUkVBRBAQEiEKHUFETUlOX1BFUk1JU1NJT05fQVVESVRfRVhQT1JUEBESJAogQURNSU5fUEVSTUlTU0lPTl9PUEVSQVRJT05TX1JFQUQQEhIoCiRBRE1JTl9QRVJNSVNTSU9OX09QRVJBVElPTlNfTUFJTlRBSU4QEyrbBAoTQWRtaW5FbGV2YXRpb25TY29wZRIlCiFBRE1JTl9FTEVWQVRJT05fU0NPUEVfVU5TUEVDSUZJRUQQABIvCitBRE1JTl9FTEVWQVRJT05fU0NPUEVfVVNFUlNfQlVMS19HT1ZFUk5BTkNFEAESLgoqQURNSU5fRUxFVkFUSU9OX1NDT1BFX1VTRVJTX1JFVk9LRV9ERVZJQ0VTEAISJgoiQURNSU5fRUxFVkFUSU9OX1NDT1BFX1VTRVJTX0RFTEVURRADEisKJ0FETUlOX0VMRVZBVElPTl9TQ09QRV9ST09NU19GT1JDRV9DTE9TRRAEEi8KK0FETUlOX0VMRVZBVElPTl9TQ09QRV9HQU1FU19GT1JDRV9URVJNSU5BVEUQBRIwCixBRE1JTl9FTEVWQVRJT05fU0NPUEVfR0FNRVNfRU1FUkdFTkNZX1JFUEFJUhAGEjAKLEFETUlOX0VMRVZBVElPTl9TQ09QRV9PUEVSQVRJT05TX01BSU5URU5BTkNFEAcSLgoqQURNSU5fRUxFVkFUSU9OX1NDT1BFX1NFQ1VSSVRZX0RJU0FCTEVfTUZBEAgSPAo4QURNSU5fRUxFVkFUSU9OX1NDT1BFX1NFQ1VSSVRZX1JFR0VORVJBVEVfUkVDT1ZFUllfQ09ERVMQCRIyCi5BRE1JTl9FTEVWQVRJT05fU0NPUEVfU0VDVVJJVFlfUkVWT0tFX1NFU1NJT05TEAoSMAosQURNSU5fRUxFVkFUSU9OX1NDT1BFX0FVRElUX0VYUE9SVF9TRU5TSVRJVkUQC0JJWkdnaXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2NvbnRyYWN0cy9nZW4vZ28vcGxhdGZvcm0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("CiRwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9jb21tb24ucHJvdG8SEXBsYXRmb3JtLmFkbWluLnYxIlgKDUFkbWluUGFnZUluZm8SFwoPbmV4dF9wYWdlX3Rva2VuGAEgASgJEi4KCnNhbXBsZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIncKFUFkbWluT3BlcmF0aW9uUmVjZWlwdBIUCgxvcGVyYXRpb25faWQYASABKAkSFgoOYXVkaXRfZXZlbnRfaWQYAiABKAkSMAoMY29tcGxldGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKuAQoVQWRtaW5FbGV2YXRpb25TdW1tYXJ5EjUKBXNjb3BlGAEgASgOMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5FbGV2YXRpb25TY29wZRIuCgpncmFudGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJ+Cg1BZG1pbk1mYVN0YXRlEg8KB2VuYWJsZWQYASABKAgSIAoYcmVjb3ZlcnlfY29kZXNfcmVtYWluaW5nGAIgASgFEhoKEmVucm9sbG1lbnRfdmVyc2lvbhgDIAEoBBIeChZyZWNvdmVyeV9jb2Rlc192ZXJzaW9uGAQgASgEIswDChNBZG1pblNlc3Npb25TdW1tYXJ5EhAKCGFkbWluX2lkGAEgASgJEhIKCnNlc3Npb25faWQYAiABKAkSMQoEa2luZBgDIAEoDjIjLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvbktpbmQSNwoLcGVybWlzc2lvbnMYBCADKA4yIi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblBlcm1pc3Npb24SLQoDbWZhGAUgASgLMiAucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5NZmFTdGF0ZRI8CgplbGV2YXRpb25zGAYgAygLMigucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5FbGV2YXRpb25TdW1tYXJ5EhUKDWFkbWluX3ZlcnNpb24YByABKAQSGAoQcGFzc3dvcmRfdmVyc2lvbhgIIAEoBBIXCg9zZXNzaW9uX3ZlcnNpb24YCSABKAQSMwoPaWRsZV9leHBpcmVzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI3ChNhYnNvbHV0ZV9leHBpcmVzX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLHAwoQQWRtaW5TZXNzaW9uSW5mbxISCgpzZXNzaW9uX2lkGAEgASgJEjEKBGtpbmQYAiABKA4yIy5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25LaW5kEg8KB2N1cnJlbnQYAyABKAgSFwoPc2Vzc2lvbl92ZXJzaW9uGAQgASgEEi4KCmNyZWF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxhc3RfYWN0aXZpdHlfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2lkbGVfZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNwoTYWJzb2x1dGVfZXhwaXJlc19hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJY2xpZW50X2lwGAkgASgJEhIKCnVzZXJfYWdlbnQYCiABKAkSRwoXYWN0aXZlX2VsZXZhdGlvbl9zY29wZXMYCyADKA4yJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkVsZXZhdGlvblNjb3BlKqsBChFBZG1pbkFjY291bnRTdGF0ZRIjCh9BRE1JTl9BQ0NPVU5UX1NUQVRFX1VOU1BFQ0lGSUVEEAASKQolQURNSU5fQUNDT1VOVF9TVEFURV9CT09UU1RSQVBfUEVORElORxABEiYKIkFETUlOX0FDQ09VTlRfU1RBVEVfU0VUVVBfUkVRVUlSRUQQAhIeChpBRE1JTl9BQ0NPVU5UX1NUQVRFX0FDVElWRRADKqYBChBBZG1pblNlc3Npb25LaW5kEiIKHkFETUlOX1NFU1NJT05fS0lORF9VTlNQRUNJRklFRBAAEi0KKUFETUlOX1NFU1NJT05fS0lORF9TRVRVUF9QQVNTV09SRF9QRU5ESU5HEAESIgoeQURNSU5fU0VTU0lPTl9LSU5EX01GQV9QRU5ESU5HEAISGwoXQURNSU5fU0VTU0lPTl9LSU5EX0ZVTEwQAyr1BQoPQWRtaW5QZXJtaXNzaW9uEiAKHEFETUlOX1BFUk1JU1NJT05fVU5TUEVDSUZJRUQQABIiCh5BRE1JTl9QRVJNSVNTSU9OX09WRVJWSUVXX1JFQUQQARIfChtBRE1JTl9QRVJNSVNTSU9OX1VTRVJTX1JFQUQQAhIjCh9BRE1JTl9QRVJNSVNTSU9OX1VTRVJTX1JFQURfUElJEAMSIwofQURNSU5fUEVSTUlTU0lPTl9VU0VSU19BTk5PVEFURRAEEiEKHUFETUlOX1BFUk1JU1NJT05fVVNFUlNfR09WRVJOEAUSIQodQURNSU5fUEVSTUlTU0lPTl9VU0VSU19FWFBPUlQQBhIfChtBRE1JTl9QRVJNSVNTSU9OX1JPT01TX1JFQUQQBxIiCh5BRE1JTl9QRVJNSVNTSU9OX1JPT01TX0NPTlRST0wQCBIfChtBRE1JTl9QRVJNSVNTSU9OX0dBTUVTX1JFQUQQCRIiCh5BRE1JTl9QRVJNSVNTSU9OX0dBTUVTX0NPTlRST0wQChIhCh1BRE1JTl9QRVJNSVNTSU9OX0dBTUVTX1JFUEFJUhALEiIKHkFETUlOX1BFUk1JU1NJT05fU0VDVVJJVFlfUkVBRBAMEi0KKUFETUlOX1BFUk1JU1NJT05fU0VDVVJJVFlfTUFOQUdFX1BBU1NXT1JEEA0SKAokQURNSU5fUEVSTUlTU0lPTl9TRUNVUklUWV9NQU5BR0VfTUZBEA4SLQopQURNSU5fUEVSTUlTU0lPTl9TRUNVUklUWV9NQU5BR0VfU0VTU0lPTlMQDxIfChtBRE1JTl9QRVJNSVNTSU9OX0FVRElUX1JFQUQQEBIhCh1BRE1JTl9QRVJNSVNTSU9OX0FVRElUX0VYUE9SVBAREiQKIEFETUlOX1BFUk1JU1NJT05fT1BFUkFUSU9OU19SRUFEEBISKAokQURNSU5fUEVSTUlTU0lPTl9PUEVSQVRJT05TX01BSU5UQUlOEBMq2wQKE0FkbWluRWxldmF0aW9uU2NvcGUSJQohQURNSU5fRUxFVkFUSU9OX1NDT1BFX1VOU1BFQ0lGSUVEEAASLworQURNSU5fRUxFVkFUSU9OX1NDT1BFX1VTRVJTX0JVTEtfR09WRVJOQU5DRRABEi4KKkFETUlOX0VMRVZBVElPTl9TQ09QRV9VU0VSU19SRVZPS0VfREVWSUNFUxACEiYKIkFETUlOX0VMRVZBVElPTl9TQ09QRV9VU0VSU19ERUxFVEUQAxIrCidBRE1JTl9FTEVWQVRJT05fU0NPUEVfUk9PTVNfRk9SQ0VfQ0xPU0UQBBIvCitBRE1JTl9FTEVWQVRJT05fU0NPUEVfR0FNRVNfRk9SQ0VfVEVSTUlOQVRFEAUSMAosQURNSU5fRUxFVkFUSU9OX1NDT1BFX0dBTUVTX0VNRVJHRU5DWV9SRVBBSVIQBhIwCixBRE1JTl9FTEVWQVRJT05fU0NPUEVfT1BFUkFUSU9OU19NQUlOVEVOQU5DRRAHEi4KKkFETUlOX0VMRVZBVElPTl9TQ09QRV9TRUNVUklUWV9ESVNBQkxFX01GQRAIEjwKOEFETUlOX0VMRVZBVElPTl9TQ09QRV9TRUNVUklUWV9SRUdFTkVSQVRFX1JFQ09WRVJZX0NPREVTEAkSMgouQURNSU5fRUxFVkFUSU9OX1NDT1BFX1NFQ1VSSVRZX1JFVk9LRV9TRVNTSU9OUxAKEjAKLEFETUlOX0VMRVZBVElPTl9TQ09QRV9BVURJVF9FWFBPUlRfU0VOU0lUSVZFEAsqgwEKEkFkbWluU29ydERpcmVjdGlvbhIkCiBBRE1JTl9TT1JUX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEiIKHkFETUlOX1NPUlRfRElSRUNUSU9OX0FTQ0VORElORxABEiMKH0FETUlOX1NPUlRfRElSRUNUSU9OX0RFU0NFTkRJTkcQAirEAgoNQWRtaW5Kb2JTdGF0ZRIfChtBRE1JTl9KT0JfU1RBVEVfVU5TUEVDSUZJRUQQABIaChZBRE1JTl9KT0JfU1RBVEVfUVVFVUVEEAESGwoXQURNSU5fSk9CX1NUQVRFX1JVTk5JTkcQAhIdChlBRE1JTl9KT0JfU1RBVEVfU1VDQ0VFREVEEAMSJwojQURNSU5fSk9CX1NUQVRFX1BBUlRJQUxMWV9TVUNDRUVERUQQBBIaChZBRE1JTl9KT0JfU1RBVEVfRkFJTEVEEAUSHQoZQURNSU5fSk9CX1NUQVRFX0NBTkNFTElORxAGEhwKGEFETUlOX0pPQl9TVEFURV9DQU5DRUxFRBAHEhsKF0FETUlOX0pPQl9TVEFURV9FWFBJUkVEEAgSGwoXQURNSU5fSk9CX1NUQVRFX0RFTEVURUQQCUJJWkdnaXRodWIuY29tL2lGVFktUi9nYW1lLW5pZ2h0L2NvbnRyYWN0cy9nZW4vZ28vcGxhdGZvcm0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+
+/**
+ * AdminPageInfo binds an opaque continuation token to the server snapshot sampled for a list response.
+ *
+ * @generated from message platform.admin.v1.AdminPageInfo
+ */
+export type AdminPageInfo = Message<"platform.admin.v1.AdminPageInfo"> & {
+  /**
+   * @generated from field: string next_page_token = 1;
+   */
+  nextPageToken: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp sampled_at = 2;
+   */
+  sampledAt?: Timestamp;
+};
+
+/**
+ * Describes the message platform.admin.v1.AdminPageInfo.
+ * Use `create(AdminPageInfoSchema)` to create a new message.
+ */
+export const AdminPageInfoSchema: GenMessage<AdminPageInfo> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_common, 0);
+
+/**
+ * AdminOperationReceipt identifies an idempotent mutation and its durable audit record without exposing audit payloads.
+ *
+ * @generated from message platform.admin.v1.AdminOperationReceipt
+ */
+export type AdminOperationReceipt = Message<"platform.admin.v1.AdminOperationReceipt"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string audit_event_id = 2;
+   */
+  auditEventId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp completed_at = 3;
+   */
+  completedAt?: Timestamp;
+};
+
+/**
+ * Describes the message platform.admin.v1.AdminOperationReceipt.
+ * Use `create(AdminOperationReceiptSchema)` to create a new message.
+ */
+export const AdminOperationReceiptSchema: GenMessage<AdminOperationReceipt> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_common, 1);
 
 /**
  * AdminElevationSummary exposes only the current grant scope and lifetime to the browser.
@@ -41,7 +94,7 @@ export type AdminElevationSummary = Message<"platform.admin.v1.AdminElevationSum
  * Use `create(AdminElevationSummarySchema)` to create a new message.
  */
 export const AdminElevationSummarySchema: GenMessage<AdminElevationSummary> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_common, 0);
+  messageDesc(file_platform_admin_v1_admin_common, 2);
 
 /**
  * AdminMfaState describes whether MFA is enabled and the current versions that guard security mutations.
@@ -75,7 +128,7 @@ export type AdminMfaState = Message<"platform.admin.v1.AdminMfaState"> & {
  * Use `create(AdminMfaStateSchema)` to create a new message.
  */
 export const AdminMfaStateSchema: GenMessage<AdminMfaState> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_common, 1);
+  messageDesc(file_platform_admin_v1_admin_common, 3);
 
 /**
  * AdminSessionSummary is the canonical introspection shape used by auth, security, and future admin modules.
@@ -144,7 +197,7 @@ export type AdminSessionSummary = Message<"platform.admin.v1.AdminSessionSummary
  * Use `create(AdminSessionSummarySchema)` to create a new message.
  */
 export const AdminSessionSummarySchema: GenMessage<AdminSessionSummary> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_common, 2);
+  messageDesc(file_platform_admin_v1_admin_common, 4);
 
 /**
  * AdminSessionInfo lists one concrete browser session for session management flows.
@@ -213,7 +266,7 @@ export type AdminSessionInfo = Message<"platform.admin.v1.AdminSessionInfo"> & {
  * Use `create(AdminSessionInfoSchema)` to create a new message.
  */
 export const AdminSessionInfoSchema: GenMessage<AdminSessionInfo> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_common, 3);
+  messageDesc(file_platform_admin_v1_admin_common, 5);
 
 /**
  * AdminAccountState models the only durable administrator account states supported by the rebuilt console.
@@ -466,4 +519,95 @@ export enum AdminElevationScope {
  */
 export const AdminElevationScopeSchema: GenEnum<AdminElevationScope> = /*@__PURE__*/
   enumDesc(file_platform_admin_v1_admin_common, 3);
+
+/**
+ * AdminSortDirection gives every management list a stable, closed ordering direction.
+ *
+ * @generated from enum platform.admin.v1.AdminSortDirection
+ */
+export enum AdminSortDirection {
+  /**
+   * @generated from enum value: ADMIN_SORT_DIRECTION_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ADMIN_SORT_DIRECTION_ASCENDING = 1;
+   */
+  ASCENDING = 1,
+
+  /**
+   * @generated from enum value: ADMIN_SORT_DIRECTION_DESCENDING = 2;
+   */
+  DESCENDING = 2,
+}
+
+/**
+ * Describes the enum platform.admin.v1.AdminSortDirection.
+ */
+export const AdminSortDirectionSchema: GenEnum<AdminSortDirection> = /*@__PURE__*/
+  enumDesc(file_platform_admin_v1_admin_common, 4);
+
+/**
+ * AdminJobState is the shared lifecycle used by durable batch and export jobs.
+ *
+ * @generated from enum platform.admin.v1.AdminJobState
+ */
+export enum AdminJobState {
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_QUEUED = 1;
+   */
+  QUEUED = 1,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_RUNNING = 2;
+   */
+  RUNNING = 2,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_SUCCEEDED = 3;
+   */
+  SUCCEEDED = 3,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED = 4;
+   */
+  PARTIALLY_SUCCEEDED = 4,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_FAILED = 5;
+   */
+  FAILED = 5,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_CANCELING = 6;
+   */
+  CANCELING = 6,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_CANCELED = 7;
+   */
+  CANCELED = 7,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_EXPIRED = 8;
+   */
+  EXPIRED = 8,
+
+  /**
+   * @generated from enum value: ADMIN_JOB_STATE_DELETED = 9;
+   */
+  DELETED = 9,
+}
+
+/**
+ * Describes the enum platform.admin.v1.AdminJobState.
+ */
+export const AdminJobStateSchema: GenEnum<AdminJobState> = /*@__PURE__*/
+  enumDesc(file_platform_admin_v1_admin_common, 5);
 

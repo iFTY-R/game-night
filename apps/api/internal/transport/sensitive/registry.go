@@ -98,6 +98,34 @@ var AdminAuthOperations = []string{
 	adminv1connect.AdminAuthServiceLogoutAdminProcedure,
 }
 
+// AdminUserOperations contains every user-center procedure because detail, annotation, governance, and export data must not be cached.
+var AdminUserOperations = []string{
+	adminv1connect.AdminUserServiceListUsersProcedure,
+	adminv1connect.AdminUserServiceGetUserProcedure,
+	adminv1connect.AdminUserServiceGetUserPIIProcedure,
+	adminv1connect.AdminUserServiceListUserTagsProcedure,
+	adminv1connect.AdminUserServiceCreateUserTagProcedure,
+	adminv1connect.AdminUserServiceUpdateUserTagProcedure,
+	adminv1connect.AdminUserServiceDeleteUserTagProcedure,
+	adminv1connect.AdminUserServiceSetUserTagsProcedure,
+	adminv1connect.AdminUserServiceListUserNotesProcedure,
+	adminv1connect.AdminUserServiceAppendUserNoteProcedure,
+	adminv1connect.AdminUserServicePreviewUserCommandProcedure,
+	adminv1connect.AdminUserServiceExecuteUserCommandProcedure,
+	adminv1connect.AdminUserServicePreviewBatchUserOperationProcedure,
+	adminv1connect.AdminUserServiceStartBatchUserOperationProcedure,
+	adminv1connect.AdminUserServiceGetBatchUserOperationProcedure,
+	adminv1connect.AdminUserServiceListBatchUserOperationsProcedure,
+	adminv1connect.AdminUserServiceListBatchUserOperationItemsProcedure,
+	adminv1connect.AdminUserServiceCancelBatchUserOperationProcedure,
+	adminv1connect.AdminUserServiceRetryBatchUserOperationProcedure,
+	adminv1connect.AdminUserServiceCreateUserExportProcedure,
+	adminv1connect.AdminUserServiceGetUserExportProcedure,
+	adminv1connect.AdminUserServiceListUserExportsProcedure,
+	adminv1connect.AdminUserServiceCreateExportDownloadGrantProcedure,
+	adminv1connect.AdminUserServiceDeleteExportResultProcedure,
+}
+
 // Registry is immutable after construction so concurrent interceptors cannot change observation policy.
 type Registry struct{ operations map[string]struct{} }
 
@@ -121,11 +149,12 @@ func New(operations ...string) (*Registry, error) {
 
 // AllOperations returns an independent list suitable for metrics and the process-wide cache policy registry.
 func AllOperations() []string {
-	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations))
+	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminUserOperations))
 	operations = append(operations, IdentityOperations...)
 	operations = append(operations, RoomOperations...)
 	operations = append(operations, GameOperations...)
 	operations = append(operations, AdminAuthOperations...)
+	operations = append(operations, AdminUserOperations...)
 	return operations
 }
 

@@ -306,6 +306,241 @@ func (AdminElevationScope) EnumDescriptor() ([]byte, []int) {
 	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{3}
 }
 
+// AdminSortDirection gives every management list a stable, closed ordering direction.
+type AdminSortDirection int32
+
+const (
+	AdminSortDirection_ADMIN_SORT_DIRECTION_UNSPECIFIED AdminSortDirection = 0
+	AdminSortDirection_ADMIN_SORT_DIRECTION_ASCENDING   AdminSortDirection = 1
+	AdminSortDirection_ADMIN_SORT_DIRECTION_DESCENDING  AdminSortDirection = 2
+)
+
+// Enum value maps for AdminSortDirection.
+var (
+	AdminSortDirection_name = map[int32]string{
+		0: "ADMIN_SORT_DIRECTION_UNSPECIFIED",
+		1: "ADMIN_SORT_DIRECTION_ASCENDING",
+		2: "ADMIN_SORT_DIRECTION_DESCENDING",
+	}
+	AdminSortDirection_value = map[string]int32{
+		"ADMIN_SORT_DIRECTION_UNSPECIFIED": 0,
+		"ADMIN_SORT_DIRECTION_ASCENDING":   1,
+		"ADMIN_SORT_DIRECTION_DESCENDING":  2,
+	}
+)
+
+func (x AdminSortDirection) Enum() *AdminSortDirection {
+	p := new(AdminSortDirection)
+	*p = x
+	return p
+}
+
+func (x AdminSortDirection) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AdminSortDirection) Descriptor() protoreflect.EnumDescriptor {
+	return file_platform_admin_v1_admin_common_proto_enumTypes[4].Descriptor()
+}
+
+func (AdminSortDirection) Type() protoreflect.EnumType {
+	return &file_platform_admin_v1_admin_common_proto_enumTypes[4]
+}
+
+func (x AdminSortDirection) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AdminSortDirection.Descriptor instead.
+func (AdminSortDirection) EnumDescriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{4}
+}
+
+// AdminJobState is the shared lifecycle used by durable batch and export jobs.
+type AdminJobState int32
+
+const (
+	AdminJobState_ADMIN_JOB_STATE_UNSPECIFIED         AdminJobState = 0
+	AdminJobState_ADMIN_JOB_STATE_QUEUED              AdminJobState = 1
+	AdminJobState_ADMIN_JOB_STATE_RUNNING             AdminJobState = 2
+	AdminJobState_ADMIN_JOB_STATE_SUCCEEDED           AdminJobState = 3
+	AdminJobState_ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED AdminJobState = 4
+	AdminJobState_ADMIN_JOB_STATE_FAILED              AdminJobState = 5
+	AdminJobState_ADMIN_JOB_STATE_CANCELING           AdminJobState = 6
+	AdminJobState_ADMIN_JOB_STATE_CANCELED            AdminJobState = 7
+	AdminJobState_ADMIN_JOB_STATE_EXPIRED             AdminJobState = 8
+	AdminJobState_ADMIN_JOB_STATE_DELETED             AdminJobState = 9
+)
+
+// Enum value maps for AdminJobState.
+var (
+	AdminJobState_name = map[int32]string{
+		0: "ADMIN_JOB_STATE_UNSPECIFIED",
+		1: "ADMIN_JOB_STATE_QUEUED",
+		2: "ADMIN_JOB_STATE_RUNNING",
+		3: "ADMIN_JOB_STATE_SUCCEEDED",
+		4: "ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED",
+		5: "ADMIN_JOB_STATE_FAILED",
+		6: "ADMIN_JOB_STATE_CANCELING",
+		7: "ADMIN_JOB_STATE_CANCELED",
+		8: "ADMIN_JOB_STATE_EXPIRED",
+		9: "ADMIN_JOB_STATE_DELETED",
+	}
+	AdminJobState_value = map[string]int32{
+		"ADMIN_JOB_STATE_UNSPECIFIED":         0,
+		"ADMIN_JOB_STATE_QUEUED":              1,
+		"ADMIN_JOB_STATE_RUNNING":             2,
+		"ADMIN_JOB_STATE_SUCCEEDED":           3,
+		"ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED": 4,
+		"ADMIN_JOB_STATE_FAILED":              5,
+		"ADMIN_JOB_STATE_CANCELING":           6,
+		"ADMIN_JOB_STATE_CANCELED":            7,
+		"ADMIN_JOB_STATE_EXPIRED":             8,
+		"ADMIN_JOB_STATE_DELETED":             9,
+	}
+)
+
+func (x AdminJobState) Enum() *AdminJobState {
+	p := new(AdminJobState)
+	*p = x
+	return p
+}
+
+func (x AdminJobState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AdminJobState) Descriptor() protoreflect.EnumDescriptor {
+	return file_platform_admin_v1_admin_common_proto_enumTypes[5].Descriptor()
+}
+
+func (AdminJobState) Type() protoreflect.EnumType {
+	return &file_platform_admin_v1_admin_common_proto_enumTypes[5]
+}
+
+func (x AdminJobState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AdminJobState.Descriptor instead.
+func (AdminJobState) EnumDescriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{5}
+}
+
+// AdminPageInfo binds an opaque continuation token to the server snapshot sampled for a list response.
+type AdminPageInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NextPageToken string                 `protobuf:"bytes,1,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	SampledAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=sampled_at,json=sampledAt,proto3" json:"sampled_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdminPageInfo) Reset() {
+	*x = AdminPageInfo{}
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminPageInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminPageInfo) ProtoMessage() {}
+
+func (x *AdminPageInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminPageInfo.ProtoReflect.Descriptor instead.
+func (*AdminPageInfo) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AdminPageInfo) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+func (x *AdminPageInfo) GetSampledAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SampledAt
+	}
+	return nil
+}
+
+// AdminOperationReceipt identifies an idempotent mutation and its durable audit record without exposing audit payloads.
+type AdminOperationReceipt struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	AuditEventId  string                 `protobuf:"bytes,2,opt,name=audit_event_id,json=auditEventId,proto3" json:"audit_event_id,omitempty"`
+	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdminOperationReceipt) Reset() {
+	*x = AdminOperationReceipt{}
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminOperationReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminOperationReceipt) ProtoMessage() {}
+
+func (x *AdminOperationReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminOperationReceipt.ProtoReflect.Descriptor instead.
+func (*AdminOperationReceipt) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AdminOperationReceipt) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *AdminOperationReceipt) GetAuditEventId() string {
+	if x != nil {
+		return x.AuditEventId
+	}
+	return ""
+}
+
+func (x *AdminOperationReceipt) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
 // AdminElevationSummary exposes only the current grant scope and lifetime to the browser.
 type AdminElevationSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -318,7 +553,7 @@ type AdminElevationSummary struct {
 
 func (x *AdminElevationSummary) Reset() {
 	*x = AdminElevationSummary{}
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[0]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +565,7 @@ func (x *AdminElevationSummary) String() string {
 func (*AdminElevationSummary) ProtoMessage() {}
 
 func (x *AdminElevationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[0]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +578,7 @@ func (x *AdminElevationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminElevationSummary.ProtoReflect.Descriptor instead.
 func (*AdminElevationSummary) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{0}
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AdminElevationSummary) GetScope() AdminElevationScope {
@@ -380,7 +615,7 @@ type AdminMfaState struct {
 
 func (x *AdminMfaState) Reset() {
 	*x = AdminMfaState{}
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[1]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +627,7 @@ func (x *AdminMfaState) String() string {
 func (*AdminMfaState) ProtoMessage() {}
 
 func (x *AdminMfaState) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[1]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +640,7 @@ func (x *AdminMfaState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminMfaState.ProtoReflect.Descriptor instead.
 func (*AdminMfaState) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{1}
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AdminMfaState) GetEnabled() bool {
@@ -456,7 +691,7 @@ type AdminSessionSummary struct {
 
 func (x *AdminSessionSummary) Reset() {
 	*x = AdminSessionSummary{}
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[2]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +703,7 @@ func (x *AdminSessionSummary) String() string {
 func (*AdminSessionSummary) ProtoMessage() {}
 
 func (x *AdminSessionSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[2]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -481,7 +716,7 @@ func (x *AdminSessionSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminSessionSummary.ProtoReflect.Descriptor instead.
 func (*AdminSessionSummary) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{2}
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AdminSessionSummary) GetAdminId() string {
@@ -581,7 +816,7 @@ type AdminSessionInfo struct {
 
 func (x *AdminSessionInfo) Reset() {
 	*x = AdminSessionInfo{}
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[3]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -593,7 +828,7 @@ func (x *AdminSessionInfo) String() string {
 func (*AdminSessionInfo) ProtoMessage() {}
 
 func (x *AdminSessionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[3]
+	mi := &file_platform_admin_v1_admin_common_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -606,7 +841,7 @@ func (x *AdminSessionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminSessionInfo.ProtoReflect.Descriptor instead.
 func (*AdminSessionInfo) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{3}
+	return file_platform_admin_v1_admin_common_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AdminSessionInfo) GetSessionId() string {
@@ -690,7 +925,15 @@ var File_platform_admin_v1_admin_common_proto protoreflect.FileDescriptor
 
 const file_platform_admin_v1_admin_common_proto_rawDesc = "" +
 	"\n" +
-	"$platform/admin/v1/admin_common.proto\x12\x11platform.admin.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcb\x01\n" +
+	"$platform/admin/v1/admin_common.proto\x12\x11platform.admin.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"r\n" +
+	"\rAdminPageInfo\x12&\n" +
+	"\x0fnext_page_token\x18\x01 \x01(\tR\rnextPageToken\x129\n" +
+	"\n" +
+	"sampled_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tsampledAt\"\x9f\x01\n" +
+	"\x15AdminOperationReceipt\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12$\n" +
+	"\x0eaudit_event_id\x18\x02 \x01(\tR\fauditEventId\x12=\n" +
+	"\fcompleted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\"\xcb\x01\n" +
 	"\x15AdminElevationSummary\x12<\n" +
 	"\x05scope\x18\x01 \x01(\x0e2&.platform.admin.v1.AdminElevationScopeR\x05scope\x129\n" +
 	"\n" +
@@ -779,7 +1022,22 @@ const file_platform_admin_v1_admin_common_proto_rawDesc = "" +
 	"8ADMIN_ELEVATION_SCOPE_SECURITY_REGENERATE_RECOVERY_CODES\x10\t\x122\n" +
 	".ADMIN_ELEVATION_SCOPE_SECURITY_REVOKE_SESSIONS\x10\n" +
 	"\x120\n" +
-	",ADMIN_ELEVATION_SCOPE_AUDIT_EXPORT_SENSITIVE\x10\vBIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1b\x06proto3"
+	",ADMIN_ELEVATION_SCOPE_AUDIT_EXPORT_SENSITIVE\x10\v*\x83\x01\n" +
+	"\x12AdminSortDirection\x12$\n" +
+	" ADMIN_SORT_DIRECTION_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eADMIN_SORT_DIRECTION_ASCENDING\x10\x01\x12#\n" +
+	"\x1fADMIN_SORT_DIRECTION_DESCENDING\x10\x02*\xc4\x02\n" +
+	"\rAdminJobState\x12\x1f\n" +
+	"\x1bADMIN_JOB_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16ADMIN_JOB_STATE_QUEUED\x10\x01\x12\x1b\n" +
+	"\x17ADMIN_JOB_STATE_RUNNING\x10\x02\x12\x1d\n" +
+	"\x19ADMIN_JOB_STATE_SUCCEEDED\x10\x03\x12'\n" +
+	"#ADMIN_JOB_STATE_PARTIALLY_SUCCEEDED\x10\x04\x12\x1a\n" +
+	"\x16ADMIN_JOB_STATE_FAILED\x10\x05\x12\x1d\n" +
+	"\x19ADMIN_JOB_STATE_CANCELING\x10\x06\x12\x1c\n" +
+	"\x18ADMIN_JOB_STATE_CANCELED\x10\a\x12\x1b\n" +
+	"\x17ADMIN_JOB_STATE_EXPIRED\x10\b\x12\x1b\n" +
+	"\x17ADMIN_JOB_STATE_DELETED\x10\tBIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_platform_admin_v1_admin_common_proto_rawDescOnce sync.Once
@@ -793,40 +1051,46 @@ func file_platform_admin_v1_admin_common_proto_rawDescGZIP() []byte {
 	return file_platform_admin_v1_admin_common_proto_rawDescData
 }
 
-var file_platform_admin_v1_admin_common_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_platform_admin_v1_admin_common_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_platform_admin_v1_admin_common_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_platform_admin_v1_admin_common_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_platform_admin_v1_admin_common_proto_goTypes = []any{
 	(AdminAccountState)(0),        // 0: platform.admin.v1.AdminAccountState
 	(AdminSessionKind)(0),         // 1: platform.admin.v1.AdminSessionKind
 	(AdminPermission)(0),          // 2: platform.admin.v1.AdminPermission
 	(AdminElevationScope)(0),      // 3: platform.admin.v1.AdminElevationScope
-	(*AdminElevationSummary)(nil), // 4: platform.admin.v1.AdminElevationSummary
-	(*AdminMfaState)(nil),         // 5: platform.admin.v1.AdminMfaState
-	(*AdminSessionSummary)(nil),   // 6: platform.admin.v1.AdminSessionSummary
-	(*AdminSessionInfo)(nil),      // 7: platform.admin.v1.AdminSessionInfo
-	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
+	(AdminSortDirection)(0),       // 4: platform.admin.v1.AdminSortDirection
+	(AdminJobState)(0),            // 5: platform.admin.v1.AdminJobState
+	(*AdminPageInfo)(nil),         // 6: platform.admin.v1.AdminPageInfo
+	(*AdminOperationReceipt)(nil), // 7: platform.admin.v1.AdminOperationReceipt
+	(*AdminElevationSummary)(nil), // 8: platform.admin.v1.AdminElevationSummary
+	(*AdminMfaState)(nil),         // 9: platform.admin.v1.AdminMfaState
+	(*AdminSessionSummary)(nil),   // 10: platform.admin.v1.AdminSessionSummary
+	(*AdminSessionInfo)(nil),      // 11: platform.admin.v1.AdminSessionInfo
+	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
 }
 var file_platform_admin_v1_admin_common_proto_depIdxs = []int32{
-	3,  // 0: platform.admin.v1.AdminElevationSummary.scope:type_name -> platform.admin.v1.AdminElevationScope
-	8,  // 1: platform.admin.v1.AdminElevationSummary.granted_at:type_name -> google.protobuf.Timestamp
-	8,  // 2: platform.admin.v1.AdminElevationSummary.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 3: platform.admin.v1.AdminSessionSummary.kind:type_name -> platform.admin.v1.AdminSessionKind
-	2,  // 4: platform.admin.v1.AdminSessionSummary.permissions:type_name -> platform.admin.v1.AdminPermission
-	5,  // 5: platform.admin.v1.AdminSessionSummary.mfa:type_name -> platform.admin.v1.AdminMfaState
-	4,  // 6: platform.admin.v1.AdminSessionSummary.elevations:type_name -> platform.admin.v1.AdminElevationSummary
-	8,  // 7: platform.admin.v1.AdminSessionSummary.idle_expires_at:type_name -> google.protobuf.Timestamp
-	8,  // 8: platform.admin.v1.AdminSessionSummary.absolute_expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 9: platform.admin.v1.AdminSessionInfo.kind:type_name -> platform.admin.v1.AdminSessionKind
-	8,  // 10: platform.admin.v1.AdminSessionInfo.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 11: platform.admin.v1.AdminSessionInfo.last_activity_at:type_name -> google.protobuf.Timestamp
-	8,  // 12: platform.admin.v1.AdminSessionInfo.idle_expires_at:type_name -> google.protobuf.Timestamp
-	8,  // 13: platform.admin.v1.AdminSessionInfo.absolute_expires_at:type_name -> google.protobuf.Timestamp
-	3,  // 14: platform.admin.v1.AdminSessionInfo.active_elevation_scopes:type_name -> platform.admin.v1.AdminElevationScope
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	12, // 0: platform.admin.v1.AdminPageInfo.sampled_at:type_name -> google.protobuf.Timestamp
+	12, // 1: platform.admin.v1.AdminOperationReceipt.completed_at:type_name -> google.protobuf.Timestamp
+	3,  // 2: platform.admin.v1.AdminElevationSummary.scope:type_name -> platform.admin.v1.AdminElevationScope
+	12, // 3: platform.admin.v1.AdminElevationSummary.granted_at:type_name -> google.protobuf.Timestamp
+	12, // 4: platform.admin.v1.AdminElevationSummary.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 5: platform.admin.v1.AdminSessionSummary.kind:type_name -> platform.admin.v1.AdminSessionKind
+	2,  // 6: platform.admin.v1.AdminSessionSummary.permissions:type_name -> platform.admin.v1.AdminPermission
+	9,  // 7: platform.admin.v1.AdminSessionSummary.mfa:type_name -> platform.admin.v1.AdminMfaState
+	8,  // 8: platform.admin.v1.AdminSessionSummary.elevations:type_name -> platform.admin.v1.AdminElevationSummary
+	12, // 9: platform.admin.v1.AdminSessionSummary.idle_expires_at:type_name -> google.protobuf.Timestamp
+	12, // 10: platform.admin.v1.AdminSessionSummary.absolute_expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 11: platform.admin.v1.AdminSessionInfo.kind:type_name -> platform.admin.v1.AdminSessionKind
+	12, // 12: platform.admin.v1.AdminSessionInfo.created_at:type_name -> google.protobuf.Timestamp
+	12, // 13: platform.admin.v1.AdminSessionInfo.last_activity_at:type_name -> google.protobuf.Timestamp
+	12, // 14: platform.admin.v1.AdminSessionInfo.idle_expires_at:type_name -> google.protobuf.Timestamp
+	12, // 15: platform.admin.v1.AdminSessionInfo.absolute_expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 16: platform.admin.v1.AdminSessionInfo.active_elevation_scopes:type_name -> platform.admin.v1.AdminElevationScope
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_platform_admin_v1_admin_common_proto_init() }
@@ -839,8 +1103,8 @@ func file_platform_admin_v1_admin_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_admin_v1_admin_common_proto_rawDesc), len(file_platform_admin_v1_admin_common_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   4,
+			NumEnums:      6,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

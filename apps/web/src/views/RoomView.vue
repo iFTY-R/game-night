@@ -32,6 +32,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router";
 
 import { gameClient, type GameEnvelopeWire, type GameRulePresetWire, type PendingGameStartWire, type RoomGameConfigDraftWire, type ReplayAccessPolicy, type ReplayAccessWire, type RoomMember, type RoomSnapshot } from "../api/client";
+import ProfileTrigger from "../components/ProfileTrigger.vue";
+import UsernameDialog, { type UsernameChangedEvent, type UsernameDialogHandle } from "../components/UsernameDialog.vue";
 import { useRoomStore } from "../stores/room";
 import { gameById, gameCatalog, isGameId, type GameId } from "../game-catalog";
 import { memberDisplayName } from "../member-display";
@@ -46,6 +48,8 @@ const shared = ref(false);
 const entryOpen = ref(true);
 const loading = ref(true);
 const actionError = ref("");
+const profileSyncNotice = ref("");
+const usernameDialog = ref<UsernameDialogHandle | null>(null);
 const selectedGameId = ref<GameId>("liars-dice");
 const replayAccess = ref<ReplayAccessWire | null>(null);
 const replayAccessLoading = ref(false);
@@ -133,6 +137,7 @@ const isRemote = computed(() => remoteRoom.value !== null);
 const roomStatus = computed(() => remoteRoom.value?.status ?? "ROOM_STATUS_LOBBY");
 const isPlaying = computed(() => roomStatus.value.includes("PLAYING"));
 const isPostGame = computed(() => roomStatus.value.includes("POST_GAME"));
+const profileAvailable = computed(() => remoteRoom.value !== null && !isPlaying.value);
 // A table exit sets this query flag so hosts can reach governance controls without being auto-routed back into the game.
 const stayInRoom = computed(() => route.query.manage === "1");
 const currentHost = computed(() => remoteRoom.value?.hostUserId === room.userId);
@@ -594,6 +599,27 @@ const refreshRoom = async (): Promise<void> => {
   }
 };
 
+/** Rehydrates every username projection independently after the identity transaction has already committed. */
+const handleUsernameChanged = async (_event: UsernameChangedEvent): Promise<void> => {
+  profileSyncNotice.value = "";
+  const results = await Promise.allSettled([
+    room.loadRoom(props.roomId),
+    room.loadMyRooms(true),
+    room.loadPublicRooms(true),
+  ]);
+  const currentRoomResult = results[0];
+  if (currentRoomResult.status === "fulfilled" && currentRoomResult.value !== null) {
+    const snapshot = currentRoomResult.value;
+    if (await exitClosedRoom(snapshot)) return;
+    entryOpen.value = !snapshot.participantAdmission.includes("CLOSED");
+    initializeGameSelection(snapshot);
+    syncTuningFromDraft();
+  }
+  if (results.some((result) => result.status === "rejected")) {
+    profileSyncNotice.value = "用户名已更新，部分房间信息同步失败，可稍后刷新";
+  }
+};
+
 onMounted(async () => {
   orientationQuery = window.matchMedia("(orientation: landscape)");
   syncLandscape();
@@ -842,7 +868,10 @@ const leave = async (): Promise<void> => {
           <Share2 v-else :size="17" aria-hidden="true" />
         </button>
       </div>
-      <span v-if="remoteRoom" class="room-count"><Users :size="16" aria-hidden="true" /> {{ participantCount }} / {{ remoteRoom.participantCapacity }}</span>
+      <div v-if="remoteRoom" class="room-topbar__tools">
+        <span class="room-count"><Users :size="16" aria-hidden="true" /> {{ participantCount }} / {{ remoteRoom.participantCapacity }}</span>
+        <ProfileTrigger v-if="profileAvailable" :username="room.displayName" @activate="usernameDialog?.open('profile')" />
+      </div>
     </header>
 
     <section v-if="loading" class="room-hero" aria-labelledby="room-loading-title">
@@ -870,6 +899,7 @@ const leave = async (): Promise<void> => {
         <History :size="18" aria-hidden="true" /> 查看上一局复盘
       </button>
       <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
+      <p v-if="profileSyncNotice" class="profile-sync-notice" role="status">{{ profileSyncNotice }}</p>
     </section>
 
     <section class="room-stage panel" aria-labelledby="players-title">
@@ -1146,6 +1176,7 @@ const leave = async (): Promise<void> => {
       </div>
     </DangerConfirm>
     </template>
+    <UsernameDialog ref="usernameDialog" @changed="handleUsernameChanged" />
   </main>
 </template>
 
@@ -1160,6 +1191,7 @@ const leave = async (): Promise<void> => {
 .room-code > span { color: var(--platform-muted); font-size: 11px; }
 .room-code strong { color: var(--platform-accent); font-size: 19px; letter-spacing: .08em; }
 .room-code button { width: 34px; height: 34px; display: grid; place-items: center; color: var(--platform-muted); background: transparent; border: 0; }
+.room-topbar__tools { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
 .room-count { display: inline-flex; align-items: center; gap: 5px; color: var(--platform-muted); font-size: 12px; }
 .room-hero { padding: clamp(10px, 3vh, 28px) 0 0; }
 .room-hero .display-title { max-width: 760px; }
@@ -1167,6 +1199,7 @@ const leave = async (): Promise<void> => {
 .room-hero__enter { width: fit-content; margin-top: 10px; }
 .loading-note { color: var(--platform-muted); font-size: 13px; }
 .form-error { margin: 0; color: var(--platform-danger); font-size: 13px; }
+.profile-sync-notice { width: fit-content; margin: 10px 0 0; padding: 8px 10px; color: var(--platform-muted); border-left: 2px solid var(--platform-accent); font-size: 12px; }
 .room-stage,
 .member-roster,
 .host-controls {
@@ -1432,6 +1465,11 @@ const leave = async (): Promise<void> => {
 
 @media (max-width: 720px) {
   .room-screen { --room-stage-min-height: clamp(520px, 70dvh, 600px); gap: 14px; }
+  .room-screen > .topbar { gap: 7px; }
+  .room-code { gap: 4px; }
+  .room-code > span { display: none; }
+  .room-code strong { font-size: 17px; }
+  .room-topbar__tools { gap: 6px; }
   .room-hero { padding-top: 0; }
   .room-hero > .eyebrow { margin-bottom: 4px; }
   .room-hero .display-title { font-size: 32px; line-height: 1; }

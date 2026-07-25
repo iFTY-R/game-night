@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { ArrowRight, Crown, Dices, DoorOpen, Eye, Globe2, LockKeyhole, RefreshCw, ShieldCheck, Users, X } from "lucide-vue-next";
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import type { MyRoomCardWire, PublicRoomCardWire } from "../api/client";
+import { ApiError, type MyRoomCardWire, type PublicRoomCardWire, type RoomSnapshot } from "../api/client";
+import ProfileTrigger from "../components/ProfileTrigger.vue";
+import UsernameDialog, { type UsernameChangedEvent, type UsernameDialogHandle } from "../components/UsernameDialog.vue";
 import { gameById, gameCatalog, type GameId } from "../game-catalog";
 import { useRoomStore } from "../stores/room";
 import { USERNAME_RULE_MESSAGE, validateUsernameInput } from "../username";
+
+type JoinIntent = "JOIN_INTENT_PARTICIPANT" | "JOIN_INTENT_SPECTATOR";
+/** Stores only the original target and intent needed for one explicit post-rename retry. */
+type PendingRoomEntry =
+  | { kind: "code"; roomCode: string }
+  | { kind: "public-existing"; roomId: string }
+  | { kind: "public-join"; roomId: string; intent: JoinIntent };
 
 const router = useRouter();
 const room = useRoomStore();
@@ -16,6 +25,13 @@ const inviteCode = computed(() => props.inviteCode.trim().toUpperCase());
 const roomCode = ref(inviteCode.value);
 const error = ref("");
 const listError = ref("");
+const syncNotice = ref("");
+// Pending entry state remains page-local so refreshing an invite can restart from the URL without persisting stale actions.
+const pendingRoomEntry = ref<PendingRoomEntry | null>(null);
+const roomUsernameConflict = ref(false);
+const roomEntryPending = ref(false);
+const usernameDialog = ref<UsernameDialogHandle | null>(null);
+const conflictAction = ref<HTMLButtonElement | null>(null);
 const ready = computed(() => room.hasIdentity);
 const usernameValidation = computed(() => validateUsernameInput(displayName.value));
 const usernameInvalid = computed(() => displayName.value.length > 0 && !usernameValidation.value.isValid);
@@ -41,17 +57,58 @@ const saveIdentity = async (): Promise<boolean> => {
   }
 };
 
-const enterRoom = async (code: string): Promise<void> => {
+const entryFallback = (entry: PendingRoomEntry): string => entry.kind === "code" ? "加入房间失败" : "公开房间进入失败";
+
+const setEntryError = (entry: PendingRoomEntry, message: string): void => {
+  if (entry.kind === "code") error.value = message;
+  else listError.value = message;
+};
+
+/** Resolves every join surface through one data-only context so a rename can retry the exact original action once. */
+const executeRoomEntry = async (entry: PendingRoomEntry): Promise<RoomSnapshot> => {
+  if (entry.kind === "code") return room.joinRemote(entry.roomCode);
+  if (entry.kind === "public-join") return room.joinPublicRemote(entry.roomId, entry.intent);
+  const snapshot = await room.loadRoom(entry.roomId);
+  if (!snapshot) throw new Error("房间响应缺少状态");
+  return snapshot;
+};
+
+/** Attempts one entry without recursively opening the rename flow when an automatic retry also conflicts. */
+const attemptRoomEntry = async (entry: PendingRoomEntry): Promise<void> => {
+  if (roomEntryPending.value) return;
+  let focusConflict = false;
+  pendingRoomEntry.value = entry;
+  roomUsernameConflict.value = false;
+  setEntryError(entry, "");
+  roomEntryPending.value = true;
   try {
-    if (!room.hasIdentity && !(await saveIdentity())) return;
-    const joined = await room.joinRemote(code);
+    const joined = await executeRoomEntry(entry);
     const resolvedRoomId = joined.roomId;
     room.enterRoom(resolvedRoomId, joined.roomCode);
     room.setRemoteRoom(joined);
+    pendingRoomEntry.value = null;
     await router.push({ name: "room", params: { roomId: resolvedRoomId } });
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : "加入房间失败";
+    if (reason instanceof ApiError && reason.businessKey === "room.username.taken") {
+      roomUsernameConflict.value = true;
+      focusConflict = true;
+      return;
+    }
+    pendingRoomEntry.value = null;
+    setEntryError(entry, reason instanceof Error ? reason.message : entryFallback(entry));
+    if (entry.kind !== "code") await room.loadPublicRooms(true).catch(() => undefined);
+  } finally {
+    roomEntryPending.value = false;
+    if (focusConflict) {
+      await nextTick();
+      conflictAction.value?.focus();
+    }
   }
+};
+
+const enterRoom = async (code: string): Promise<void> => {
+  if (!room.hasIdentity && !(await saveIdentity())) return;
+  await attemptRoomEntry({ kind: "code", roomCode: code });
 };
 
 /** Refreshes both discovery lanes independently so one unavailable list does not hide the other. */
@@ -132,21 +189,42 @@ const publicActionEnabled = (action: string): boolean =>
 /** Executes the server-computed public-card action without duplicating admission policy in the browser. */
 const openPublicRoom = async (card: PublicRoomCardWire): Promise<void> => {
   if (!publicActionEnabled(card.primaryAction)) return;
-  try {
-    let snapshot = null;
-    if (card.primaryAction.includes("ENTER_ROOM")) {
-      snapshot = await room.loadRoom(card.roomId);
-    } else {
-      const intent = card.primaryAction.includes("SPECTATE") ? "JOIN_INTENT_SPECTATOR" : "JOIN_INTENT_PARTICIPANT";
-      snapshot = await room.joinPublicRemote(card.roomId, intent);
-    }
-    room.enterRoom(card.roomId, snapshot?.roomCode);
-    if (snapshot) room.setRemoteRoom(snapshot);
-    await router.push({ name: "room", params: { roomId: card.roomId } });
-  } catch (reason) {
-    listError.value = reason instanceof Error ? reason.message : "公开房间进入失败";
-    await room.loadPublicRooms(true).catch(() => undefined);
+  const entry: PendingRoomEntry = card.primaryAction.includes("ENTER_ROOM")
+    ? { kind: "public-existing", roomId: card.roomId }
+    : {
+        kind: "public-join",
+        roomId: card.roomId,
+        intent: card.primaryAction.includes("SPECTATE") ? "JOIN_INTENT_SPECTATOR" : "JOIN_INTENT_PARTICIPANT",
+      };
+  await attemptRoomEntry(entry);
+};
+
+const openProfileDialog = (): void => {
+  // A normal profile edit is deliberately detached from any earlier failed room entry.
+  pendingRoomEntry.value = null;
+  roomUsernameConflict.value = false;
+  usernameDialog.value?.open("profile");
+};
+
+const openConflictDialog = (): void => {
+  if (pendingRoomEntry.value !== null) usernameDialog.value?.open("room-conflict");
+};
+
+/** Refresh failures affect only derived room cards; the committed identity remains authoritative in the store. */
+const refreshListsAfterRename = async (): Promise<void> => {
+  syncNotice.value = "";
+  const results = await Promise.allSettled([room.loadMyRooms(true), room.loadPublicRooms(true)]);
+  if (results.some((result) => result.status === "rejected")) {
+    syncNotice.value = "用户名已更新，部分房间信息同步失败，可稍后刷新";
   }
+};
+
+const handleUsernameChanged = async (event: UsernameChangedEvent): Promise<void> => {
+  const entry = event.mode === "room-conflict" ? pendingRoomEntry.value : null;
+  const refresh = refreshListsAfterRename();
+  // One successful form submission produces exactly one retry; a second conflict waits for another explicit rename.
+  if (entry !== null) await attemptRoomEntry(entry);
+  await refresh;
 };
 
 const roomStatusLabel = (status: string): string => {
@@ -178,16 +256,24 @@ onMounted(async () => {
   <main class="screen-shell home-screen">
     <header class="topbar">
       <RouterLink class="brand" to="/" aria-label="Game Night 首页">
-        <img src="/brand-mark.svg" alt="" />
+        <img :src="'/brand-mark.svg'" alt="" />
         <span>GAME NIGHT</span>
       </RouterLink>
-      <span class="device-badge"><ShieldCheck :size="15" aria-hidden="true" /> {{ ready ? "设备已识别" : "设备登录" }}</span>
+      <ProfileTrigger v-if="ready" :username="room.displayName" @activate="openProfileDialog" />
+      <span v-else class="device-badge"><ShieldCheck :size="15" aria-hidden="true" /> 设备登录</span>
     </header>
 
     <div v-if="room.notice" class="home-notice" role="status">
       <span>{{ room.notice }}</span>
       <button class="icon-button" type="button" title="关闭提示" @click="room.clearNotice"><X :size="18" aria-hidden="true" /></button>
     </div>
+
+    <div v-if="roomUsernameConflict" class="username-conflict" role="alert">
+      <div><strong>房间内已有同名玩家</strong><span>换一个用户名后，可以继续刚才的进房操作。</span></div>
+      <button ref="conflictAction" class="button button--quiet" type="button" :disabled="roomEntryPending" @click="openConflictDialog">修改用户名后重试</button>
+    </div>
+
+    <p v-if="syncNotice" class="sync-notice" role="status">{{ syncNotice }}</p>
 
     <section class="home-intro" aria-labelledby="home-title">
       <p class="eyebrow">朋友在线，今晚开桌</p>
@@ -251,7 +337,7 @@ onMounted(async () => {
           <label for="room-code">房间码</label>
           <div class="field-row">
             <input id="room-code" v-model="roomCode" inputmode="text" maxlength="8" autocapitalize="characters" placeholder="例如 N789" />
-            <button class="button" type="submit"><DoorOpen :size="18" aria-hidden="true" /> 进房</button>
+            <button class="button" type="submit" :disabled="roomEntryPending"><DoorOpen :size="18" aria-hidden="true" /> 进房</button>
           </div>
         </form>
         <div class="create-row">
@@ -276,13 +362,15 @@ onMounted(async () => {
             <span class="room-card__icon"><Globe2 :size="19" aria-hidden="true" /></span>
             <div class="room-card__body"><strong>{{ card.hostUsername }} 的房间</strong><small>{{ roomGameName(card.activeGameId) }} · {{ roomStatusLabel(card.status) }}</small></div>
             <span class="public-room-card__count"><Users :size="15" aria-hidden="true" /> {{ card.participantCount }} / {{ card.participantCapacity }}</span>
-            <button class="button button--quiet" type="button" :disabled="!publicActionEnabled(card.primaryAction)" @click="openPublicRoom(card)"><Eye v-if="card.primaryAction.includes('SPECTATE')" :size="16" aria-hidden="true" />{{ publicActionLabel(card.primaryAction) }}</button>
+            <button class="button button--quiet" type="button" :disabled="roomEntryPending || !publicActionEnabled(card.primaryAction)" @click="openPublicRoom(card)"><Eye v-if="card.primaryAction.includes('SPECTATE')" :size="16" aria-hidden="true" />{{ publicActionLabel(card.primaryAction) }}</button>
           </article>
         </div>
         <button v-if="room.publicRoomsNextPageToken" class="button button--quiet list-more" type="button" :disabled="room.publicRoomsLoading" @click="room.loadPublicRooms(false)">加载更多</button>
         <p v-if="listError" class="form-error" role="alert">{{ listError }}</p>
       </section>
     </template>
+
+    <UsernameDialog ref="usernameDialog" @changed="handleUsernameChanged" />
   </main>
 </template>
 
@@ -290,6 +378,13 @@ onMounted(async () => {
 .home-screen { display: grid; align-content: start; gap: 30px; }
 .device-badge { display: inline-flex; align-items: center; gap: 6px; color: #99d8b1; font-size: 12px; }
 .home-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; color: var(--platform-ink); background: rgb(255 138 126 / 10%); border: 1px solid rgb(255 138 126 / 38%); border-radius: 7px; font-size: 13px; }
+.username-conflict { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; background: rgb(230 181 102 / 10%); border: 1px solid rgb(230 181 102 / 42%); border-radius: 7px; }
+.username-conflict > div { min-width: 0; display: grid; gap: 3px; }
+.username-conflict strong { color: var(--platform-ink); font-size: 14px; }
+.username-conflict span,
+.sync-notice { color: var(--platform-muted); font-size: 12px; }
+.username-conflict .button { min-height: 42px; flex: 0 0 auto; }
+.sync-notice { margin: 0; padding: 10px 12px; border-left: 2px solid var(--platform-accent); }
 .home-intro { padding: clamp(26px, 8vh, 72px) 0 4px; }
 .home-intro__copy { max-width: 620px; margin: 20px 0 0; color: var(--platform-muted); font-size: 16px; line-height: 1.7; }
 .join-panel { display: grid; gap: 18px; padding: 20px; border-left: 3px solid var(--platform-accent); }
@@ -349,6 +444,8 @@ onMounted(async () => {
 @media (max-width: 390px) {
   .field-row { grid-template-columns: 1fr; }
   .field-row .button { width: 100%; }
+  .username-conflict { align-items: stretch; flex-direction: column; }
+  .username-conflict .button { width: 100%; }
   .my-room-card { grid-template-columns: 36px minmax(0, 1fr) auto; }
   .room-card__icon { width: 36px; height: 36px; }
   .visibility-control { grid-template-columns: 1fr; }

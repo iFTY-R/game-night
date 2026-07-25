@@ -1,6 +1,7 @@
-import { createApp, nextTick } from "vue";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createApp, nextTick, reactive } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../src/api/client";
 import RoomView from "../src/views/RoomView.vue";
 
 const createRemoteRoom = () => ({
@@ -37,10 +38,15 @@ const createStore = () => {
     roomId: "room-1",
     roomCode: "ABCD12",
     remoteRoom,
+    changeUsername: vi.fn(async (username: string) => {
+      roomStore.displayName = username;
+    }),
     leaveRoom: vi.fn(),
     exitRoom: vi.fn(),
     setSession: vi.fn(),
-    loadRoom: vi.fn(async () => remoteRoom),
+    loadRoom: vi.fn(async () => roomStore.remoteRoom),
+    loadMyRooms: vi.fn(async () => undefined),
+    loadPublicRooms: vi.fn(async () => undefined),
     listGameRulePresets: vi.fn(async () => []),
     selectRemoteGame: vi.fn(async () => remoteRoom),
     updateRemoteGameConfig: vi.fn(async () => ({ room: remoteRoom })),
@@ -55,7 +61,7 @@ const createStore = () => {
   };
 };
 
-const roomStore = createStore();
+const roomStore = reactive(createStore()) as ReturnType<typeof createStore>;
 
 vi.mock("../src/stores/room", () => ({
   useRoomStore: () => roomStore,
@@ -106,6 +112,24 @@ const mountRoomView = async (): Promise<{ app: ReturnType<typeof createApp>; roo
   return { app, root };
 };
 
+const buttonByText = (scope: ParentNode, text: string): HTMLButtonElement | undefined =>
+  Array.from(scope.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes(text));
+
+const submitChangedUsername = async (username: string): Promise<void> => {
+  const input = document.body.querySelector<HTMLInputElement>("#username-dialog-input");
+  if (input) {
+    input.value = username;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  await nextTick();
+  document.body.querySelector<HTMLFormElement>(".username-dialog__form")
+    ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+};
+
+beforeEach(() => {
+  Object.assign(roomStore, createStore());
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   vi.clearAllTimers();
@@ -115,6 +139,92 @@ afterEach(() => {
 });
 
 describe("RoomView", () => {
+  it("shows the profile trigger in lobby and post-game states but hides it while playing", async () => {
+    vi.useFakeTimers();
+    const lobby = await mountRoomView();
+    expect(lobby.root.querySelector(".profile-trigger")).not.toBeNull();
+    lobby.app.unmount();
+    lobby.root.remove();
+
+    roomStore.remoteRoom.status = "ROOM_STATUS_POST_GAME";
+    roomStore.remoteRoom.lastFinishedGameId = "liars-dice";
+    const postGame = await mountRoomView();
+    expect(postGame.root.querySelector(".profile-trigger")).not.toBeNull();
+    postGame.app.unmount();
+    postGame.root.remove();
+
+    roomStore.remoteRoom.status = "ROOM_STATUS_PLAYING";
+    roomStore.remoteRoom.activeGameId = "liars-dice";
+    roomStore.remoteRoom.activeSessionId = "session-1";
+    const playing = await mountRoomView();
+    expect(playing.root.querySelector(".profile-trigger")).toBeNull();
+    playing.app.unmount();
+  });
+
+  it("refreshes the current room and both discovery lists after a successful rename", async () => {
+    vi.useFakeTimers();
+    const { app, root } = await mountRoomView();
+    roomStore.loadRoom.mockClear();
+    roomStore.loadMyRooms.mockClear();
+    roomStore.loadPublicRooms.mockClear();
+
+    root.querySelector<HTMLButtonElement>(".profile-trigger")?.click();
+    await nextTick();
+    await submitChangedUsername("阿青");
+
+    await vi.waitFor(() => expect(roomStore.changeUsername).toHaveBeenCalledWith("阿青"));
+    await vi.waitFor(() => expect(roomStore.loadRoom).toHaveBeenCalledWith("room-1"));
+    expect(roomStore.loadMyRooms).toHaveBeenCalledWith(true);
+    expect(roomStore.loadPublicRooms).toHaveBeenCalledWith(true);
+    expect(root.querySelector(".profile-trigger")?.textContent?.trim()).toBe("阿");
+
+    app.unmount();
+  });
+
+  it("keeps the committed username when derived room refreshes fail", async () => {
+    vi.useFakeTimers();
+    const { app, root } = await mountRoomView();
+    roomStore.loadRoom.mockRejectedValueOnce(new Error("房间同步失败"));
+    roomStore.loadMyRooms.mockRejectedValueOnce(new Error("我的房间同步失败"));
+    roomStore.loadPublicRooms.mockResolvedValueOnce(undefined);
+
+    root.querySelector<HTMLButtonElement>(".profile-trigger")?.click();
+    await nextTick();
+    await submitChangedUsername("北屿");
+
+    await vi.waitFor(() => expect(root.textContent).toContain("用户名已更新，部分房间信息同步失败"));
+    expect(roomStore.displayName).toBe("北屿");
+    expect(roomStore.remoteRoom.members[0]?.username).toBe("小满");
+    expect(roomStore.changeUsername).toHaveBeenCalledOnce();
+
+    app.unmount();
+  });
+
+  it("keeps the original identity and room snapshot when the rename transaction conflicts", async () => {
+    vi.useFakeTimers();
+    roomStore.changeUsername.mockRejectedValueOnce(
+      new ApiError(409, "already_exists", "房间内已有同名玩家", "room.username.taken"),
+    );
+    const { app, root } = await mountRoomView();
+    roomStore.loadRoom.mockClear();
+    roomStore.loadMyRooms.mockClear();
+    roomStore.loadPublicRooms.mockClear();
+
+    root.querySelector<HTMLButtonElement>(".profile-trigger")?.click();
+    await nextTick();
+    await submitChangedUsername("阿青");
+
+    await vi.waitFor(() => expect(document.body.textContent).toContain("房间内已有同名玩家"));
+    expect(roomStore.displayName).toBe("小满");
+    expect(roomStore.remoteRoom.members[0]?.username).toBe("小满");
+    expect(roomStore.loadRoom).not.toHaveBeenCalled();
+    expect(roomStore.loadMyRooms).not.toHaveBeenCalled();
+    expect(roomStore.loadPublicRooms).not.toHaveBeenCalled();
+    expect(buttonByText(document.body, "保存用户名")).toBeDefined();
+
+    app.unmount();
+  });
+
   it("renders seated participants around the shared table and keeps waiting members in the roster", async () => {
     vi.useFakeTimers();
     const { app, root } = await mountRoomView();

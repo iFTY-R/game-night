@@ -48,42 +48,54 @@ const (
 	// AdminAuthServiceLoginPasswordProcedure is the fully-qualified name of the AdminAuthService's
 	// LoginPassword RPC.
 	AdminAuthServiceLoginPasswordProcedure = "/platform.admin.v1.AdminAuthService/LoginPassword"
-	// AdminAuthServiceVerifyTotpProcedure is the fully-qualified name of the AdminAuthService's
-	// VerifyTotp RPC.
-	AdminAuthServiceVerifyTotpProcedure = "/platform.admin.v1.AdminAuthService/VerifyTotp"
+	// AdminAuthServiceVerifyAdminTotpProcedure is the fully-qualified name of the AdminAuthService's
+	// VerifyAdminTotp RPC.
+	AdminAuthServiceVerifyAdminTotpProcedure = "/platform.admin.v1.AdminAuthService/VerifyAdminTotp"
+	// AdminAuthServiceVerifyAdminRecoveryCodeProcedure is the fully-qualified name of the
+	// AdminAuthService's VerifyAdminRecoveryCode RPC.
+	AdminAuthServiceVerifyAdminRecoveryCodeProcedure = "/platform.admin.v1.AdminAuthService/VerifyAdminRecoveryCode"
 	// AdminAuthServiceChangeInitialPasswordProcedure is the fully-qualified name of the
 	// AdminAuthService's ChangeInitialPassword RPC.
 	AdminAuthServiceChangeInitialPasswordProcedure = "/platform.admin.v1.AdminAuthService/ChangeInitialPassword"
+	// AdminAuthServiceChangeAdminPasswordProcedure is the fully-qualified name of the
+	// AdminAuthService's ChangeAdminPassword RPC.
+	AdminAuthServiceChangeAdminPasswordProcedure = "/platform.admin.v1.AdminAuthService/ChangeAdminPassword"
 	// AdminAuthServiceBeginTotpEnrollmentProcedure is the fully-qualified name of the
 	// AdminAuthService's BeginTotpEnrollment RPC.
 	AdminAuthServiceBeginTotpEnrollmentProcedure = "/platform.admin.v1.AdminAuthService/BeginTotpEnrollment"
 	// AdminAuthServiceCompleteTotpEnrollmentProcedure is the fully-qualified name of the
 	// AdminAuthService's CompleteTotpEnrollment RPC.
 	AdminAuthServiceCompleteTotpEnrollmentProcedure = "/platform.admin.v1.AdminAuthService/CompleteTotpEnrollment"
-	// AdminAuthServiceConfirmAdminSecretReceiptProcedure is the fully-qualified name of the
-	// AdminAuthService's ConfirmAdminSecretReceipt RPC.
-	AdminAuthServiceConfirmAdminSecretReceiptProcedure = "/platform.admin.v1.AdminAuthService/ConfirmAdminSecretReceipt"
-	// AdminAuthServiceRecoverAdminProcedure is the fully-qualified name of the AdminAuthService's
-	// RecoverAdmin RPC.
-	AdminAuthServiceRecoverAdminProcedure = "/platform.admin.v1.AdminAuthService/RecoverAdmin"
-	// AdminAuthServiceChangeAdminPasswordProcedure is the fully-qualified name of the
-	// AdminAuthService's ChangeAdminPassword RPC.
-	AdminAuthServiceChangeAdminPasswordProcedure = "/platform.admin.v1.AdminAuthService/ChangeAdminPassword"
-	// AdminAuthServiceBeginTotpRebindProcedure is the fully-qualified name of the AdminAuthService's
-	// BeginTotpRebind RPC.
-	AdminAuthServiceBeginTotpRebindProcedure = "/platform.admin.v1.AdminAuthService/BeginTotpRebind"
-	// AdminAuthServiceCompleteTotpRebindProcedure is the fully-qualified name of the AdminAuthService's
-	// CompleteTotpRebind RPC.
-	AdminAuthServiceCompleteTotpRebindProcedure = "/platform.admin.v1.AdminAuthService/CompleteTotpRebind"
+	// AdminAuthServiceDisableTotpProcedure is the fully-qualified name of the AdminAuthService's
+	// DisableTotp RPC.
+	AdminAuthServiceDisableTotpProcedure = "/platform.admin.v1.AdminAuthService/DisableTotp"
 	// AdminAuthServiceRegenerateAdminRecoveryCodesProcedure is the fully-qualified name of the
 	// AdminAuthService's RegenerateAdminRecoveryCodes RPC.
 	AdminAuthServiceRegenerateAdminRecoveryCodesProcedure = "/platform.admin.v1.AdminAuthService/RegenerateAdminRecoveryCodes"
+	// AdminAuthServiceConfirmAdminSecretReceiptProcedure is the fully-qualified name of the
+	// AdminAuthService's ConfirmAdminSecretReceipt RPC.
+	AdminAuthServiceConfirmAdminSecretReceiptProcedure = "/platform.admin.v1.AdminAuthService/ConfirmAdminSecretReceipt"
+	// AdminAuthServiceElevateAdminSessionProcedure is the fully-qualified name of the
+	// AdminAuthService's ElevateAdminSession RPC.
+	AdminAuthServiceElevateAdminSessionProcedure = "/platform.admin.v1.AdminAuthService/ElevateAdminSession"
+	// AdminAuthServiceRevokeCurrentAdminElevationProcedure is the fully-qualified name of the
+	// AdminAuthService's RevokeCurrentAdminElevation RPC.
+	AdminAuthServiceRevokeCurrentAdminElevationProcedure = "/platform.admin.v1.AdminAuthService/RevokeCurrentAdminElevation"
+	// AdminAuthServiceListAdminSessionsProcedure is the fully-qualified name of the AdminAuthService's
+	// ListAdminSessions RPC.
+	AdminAuthServiceListAdminSessionsProcedure = "/platform.admin.v1.AdminAuthService/ListAdminSessions"
+	// AdminAuthServiceRevokeAdminSessionProcedure is the fully-qualified name of the AdminAuthService's
+	// RevokeAdminSession RPC.
+	AdminAuthServiceRevokeAdminSessionProcedure = "/platform.admin.v1.AdminAuthService/RevokeAdminSession"
+	// AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure is the fully-qualified name of the
+	// AdminAuthService's PreviewRevokeOtherAdminSessions RPC.
+	AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure = "/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions"
+	// AdminAuthServiceRevokeOtherAdminSessionsProcedure is the fully-qualified name of the
+	// AdminAuthService's RevokeOtherAdminSessions RPC.
+	AdminAuthServiceRevokeOtherAdminSessionsProcedure = "/platform.admin.v1.AdminAuthService/RevokeOtherAdminSessions"
 	// AdminAuthServiceLogoutAdminProcedure is the fully-qualified name of the AdminAuthService's
 	// LogoutAdmin RPC.
 	AdminAuthServiceLogoutAdminProcedure = "/platform.admin.v1.AdminAuthService/LogoutAdmin"
-	// AdminAuthServiceLogoutAllAdminSessionsProcedure is the fully-qualified name of the
-	// AdminAuthService's LogoutAllAdminSessions RPC.
-	AdminAuthServiceLogoutAllAdminSessionsProcedure = "/platform.admin.v1.AdminAuthService/LogoutAllAdminSessions"
 )
 
 // AdminAuthServiceClient is a client for the platform.admin.v1.AdminAuthService service.
@@ -93,18 +105,22 @@ type AdminAuthServiceClient interface {
 	GetRuntimeReadiness(context.Context, *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error)
 	BeginAdminLogin(context.Context, *connect.Request[v1.BeginAdminLoginRequest]) (*connect.Response[v1.BeginAdminLoginResponse], error)
 	LoginPassword(context.Context, *connect.Request[v1.LoginPasswordRequest]) (*connect.Response[v1.LoginPasswordResponse], error)
-	VerifyTotp(context.Context, *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error)
+	VerifyAdminTotp(context.Context, *connect.Request[v1.VerifyAdminTotpRequest]) (*connect.Response[v1.VerifyAdminTotpResponse], error)
+	VerifyAdminRecoveryCode(context.Context, *connect.Request[v1.VerifyAdminRecoveryCodeRequest]) (*connect.Response[v1.VerifyAdminRecoveryCodeResponse], error)
 	ChangeInitialPassword(context.Context, *connect.Request[v1.ChangeInitialPasswordRequest]) (*connect.Response[v1.ChangeInitialPasswordResponse], error)
+	ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error)
 	BeginTotpEnrollment(context.Context, *connect.Request[v1.BeginTotpEnrollmentRequest]) (*connect.Response[v1.BeginTotpEnrollmentResponse], error)
 	CompleteTotpEnrollment(context.Context, *connect.Request[v1.CompleteTotpEnrollmentRequest]) (*connect.Response[v1.CompleteTotpEnrollmentResponse], error)
-	ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error)
-	RecoverAdmin(context.Context, *connect.Request[v1.RecoverAdminRequest]) (*connect.Response[v1.RecoverAdminResponse], error)
-	ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error)
-	BeginTotpRebind(context.Context, *connect.Request[v1.BeginTotpRebindRequest]) (*connect.Response[v1.BeginTotpRebindResponse], error)
-	CompleteTotpRebind(context.Context, *connect.Request[v1.CompleteTotpRebindRequest]) (*connect.Response[v1.CompleteTotpRebindResponse], error)
+	DisableTotp(context.Context, *connect.Request[v1.DisableTotpRequest]) (*connect.Response[v1.DisableTotpResponse], error)
 	RegenerateAdminRecoveryCodes(context.Context, *connect.Request[v1.RegenerateAdminRecoveryCodesRequest]) (*connect.Response[v1.RegenerateAdminRecoveryCodesResponse], error)
+	ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error)
+	ElevateAdminSession(context.Context, *connect.Request[v1.ElevateAdminSessionRequest]) (*connect.Response[v1.ElevateAdminSessionResponse], error)
+	RevokeCurrentAdminElevation(context.Context, *connect.Request[v1.RevokeCurrentAdminElevationRequest]) (*connect.Response[v1.RevokeCurrentAdminElevationResponse], error)
+	ListAdminSessions(context.Context, *connect.Request[v1.ListAdminSessionsRequest]) (*connect.Response[v1.ListAdminSessionsResponse], error)
+	RevokeAdminSession(context.Context, *connect.Request[v1.RevokeAdminSessionRequest]) (*connect.Response[v1.RevokeAdminSessionResponse], error)
+	PreviewRevokeOtherAdminSessions(context.Context, *connect.Request[v1.PreviewRevokeOtherAdminSessionsRequest]) (*connect.Response[v1.PreviewRevokeOtherAdminSessionsResponse], error)
+	RevokeOtherAdminSessions(context.Context, *connect.Request[v1.RevokeOtherAdminSessionsRequest]) (*connect.Response[v1.RevokeOtherAdminSessionsResponse], error)
 	LogoutAdmin(context.Context, *connect.Request[v1.LogoutAdminRequest]) (*connect.Response[v1.LogoutAdminResponse], error)
-	LogoutAllAdminSessions(context.Context, *connect.Request[v1.LogoutAllAdminSessionsRequest]) (*connect.Response[v1.LogoutAllAdminSessionsResponse], error)
 }
 
 // NewAdminAuthServiceClient constructs a client for the platform.admin.v1.AdminAuthService service.
@@ -148,16 +164,28 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(adminAuthServiceMethods.ByName("LoginPassword")),
 			connect.WithClientOptions(opts...),
 		),
-		verifyTotp: connect.NewClient[v1.VerifyTotpRequest, v1.VerifyTotpResponse](
+		verifyAdminTotp: connect.NewClient[v1.VerifyAdminTotpRequest, v1.VerifyAdminTotpResponse](
 			httpClient,
-			baseURL+AdminAuthServiceVerifyTotpProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("VerifyTotp")),
+			baseURL+AdminAuthServiceVerifyAdminTotpProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("VerifyAdminTotp")),
+			connect.WithClientOptions(opts...),
+		),
+		verifyAdminRecoveryCode: connect.NewClient[v1.VerifyAdminRecoveryCodeRequest, v1.VerifyAdminRecoveryCodeResponse](
+			httpClient,
+			baseURL+AdminAuthServiceVerifyAdminRecoveryCodeProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("VerifyAdminRecoveryCode")),
 			connect.WithClientOptions(opts...),
 		),
 		changeInitialPassword: connect.NewClient[v1.ChangeInitialPasswordRequest, v1.ChangeInitialPasswordResponse](
 			httpClient,
 			baseURL+AdminAuthServiceChangeInitialPasswordProcedure,
 			connect.WithSchema(adminAuthServiceMethods.ByName("ChangeInitialPassword")),
+			connect.WithClientOptions(opts...),
+		),
+		changeAdminPassword: connect.NewClient[v1.ChangeAdminPasswordRequest, v1.ChangeAdminPasswordResponse](
+			httpClient,
+			baseURL+AdminAuthServiceChangeAdminPasswordProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("ChangeAdminPassword")),
 			connect.WithClientOptions(opts...),
 		),
 		beginTotpEnrollment: connect.NewClient[v1.BeginTotpEnrollmentRequest, v1.BeginTotpEnrollmentResponse](
@@ -172,34 +200,10 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(adminAuthServiceMethods.ByName("CompleteTotpEnrollment")),
 			connect.WithClientOptions(opts...),
 		),
-		confirmAdminSecretReceipt: connect.NewClient[v1.ConfirmAdminSecretReceiptRequest, v1.ConfirmAdminSecretReceiptResponse](
+		disableTotp: connect.NewClient[v1.DisableTotpRequest, v1.DisableTotpResponse](
 			httpClient,
-			baseURL+AdminAuthServiceConfirmAdminSecretReceiptProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("ConfirmAdminSecretReceipt")),
-			connect.WithClientOptions(opts...),
-		),
-		recoverAdmin: connect.NewClient[v1.RecoverAdminRequest, v1.RecoverAdminResponse](
-			httpClient,
-			baseURL+AdminAuthServiceRecoverAdminProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("RecoverAdmin")),
-			connect.WithClientOptions(opts...),
-		),
-		changeAdminPassword: connect.NewClient[v1.ChangeAdminPasswordRequest, v1.ChangeAdminPasswordResponse](
-			httpClient,
-			baseURL+AdminAuthServiceChangeAdminPasswordProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("ChangeAdminPassword")),
-			connect.WithClientOptions(opts...),
-		),
-		beginTotpRebind: connect.NewClient[v1.BeginTotpRebindRequest, v1.BeginTotpRebindResponse](
-			httpClient,
-			baseURL+AdminAuthServiceBeginTotpRebindProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("BeginTotpRebind")),
-			connect.WithClientOptions(opts...),
-		),
-		completeTotpRebind: connect.NewClient[v1.CompleteTotpRebindRequest, v1.CompleteTotpRebindResponse](
-			httpClient,
-			baseURL+AdminAuthServiceCompleteTotpRebindProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("CompleteTotpRebind")),
+			baseURL+AdminAuthServiceDisableTotpProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("DisableTotp")),
 			connect.WithClientOptions(opts...),
 		),
 		regenerateAdminRecoveryCodes: connect.NewClient[v1.RegenerateAdminRecoveryCodesRequest, v1.RegenerateAdminRecoveryCodesResponse](
@@ -208,16 +212,52 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(adminAuthServiceMethods.ByName("RegenerateAdminRecoveryCodes")),
 			connect.WithClientOptions(opts...),
 		),
+		confirmAdminSecretReceipt: connect.NewClient[v1.ConfirmAdminSecretReceiptRequest, v1.ConfirmAdminSecretReceiptResponse](
+			httpClient,
+			baseURL+AdminAuthServiceConfirmAdminSecretReceiptProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("ConfirmAdminSecretReceipt")),
+			connect.WithClientOptions(opts...),
+		),
+		elevateAdminSession: connect.NewClient[v1.ElevateAdminSessionRequest, v1.ElevateAdminSessionResponse](
+			httpClient,
+			baseURL+AdminAuthServiceElevateAdminSessionProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("ElevateAdminSession")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeCurrentAdminElevation: connect.NewClient[v1.RevokeCurrentAdminElevationRequest, v1.RevokeCurrentAdminElevationResponse](
+			httpClient,
+			baseURL+AdminAuthServiceRevokeCurrentAdminElevationProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("RevokeCurrentAdminElevation")),
+			connect.WithClientOptions(opts...),
+		),
+		listAdminSessions: connect.NewClient[v1.ListAdminSessionsRequest, v1.ListAdminSessionsResponse](
+			httpClient,
+			baseURL+AdminAuthServiceListAdminSessionsProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("ListAdminSessions")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeAdminSession: connect.NewClient[v1.RevokeAdminSessionRequest, v1.RevokeAdminSessionResponse](
+			httpClient,
+			baseURL+AdminAuthServiceRevokeAdminSessionProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("RevokeAdminSession")),
+			connect.WithClientOptions(opts...),
+		),
+		previewRevokeOtherAdminSessions: connect.NewClient[v1.PreviewRevokeOtherAdminSessionsRequest, v1.PreviewRevokeOtherAdminSessionsResponse](
+			httpClient,
+			baseURL+AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("PreviewRevokeOtherAdminSessions")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeOtherAdminSessions: connect.NewClient[v1.RevokeOtherAdminSessionsRequest, v1.RevokeOtherAdminSessionsResponse](
+			httpClient,
+			baseURL+AdminAuthServiceRevokeOtherAdminSessionsProcedure,
+			connect.WithSchema(adminAuthServiceMethods.ByName("RevokeOtherAdminSessions")),
+			connect.WithClientOptions(opts...),
+		),
 		logoutAdmin: connect.NewClient[v1.LogoutAdminRequest, v1.LogoutAdminResponse](
 			httpClient,
 			baseURL+AdminAuthServiceLogoutAdminProcedure,
 			connect.WithSchema(adminAuthServiceMethods.ByName("LogoutAdmin")),
-			connect.WithClientOptions(opts...),
-		),
-		logoutAllAdminSessions: connect.NewClient[v1.LogoutAllAdminSessionsRequest, v1.LogoutAllAdminSessionsResponse](
-			httpClient,
-			baseURL+AdminAuthServiceLogoutAllAdminSessionsProcedure,
-			connect.WithSchema(adminAuthServiceMethods.ByName("LogoutAllAdminSessions")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -225,23 +265,27 @@ func NewAdminAuthServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // adminAuthServiceClient implements AdminAuthServiceClient.
 type adminAuthServiceClient struct {
-	getSetupState                *connect.Client[v1.GetSetupStateRequest, v1.GetSetupStateResponse]
-	getCurrentAdminSession       *connect.Client[v1.GetCurrentAdminSessionRequest, v1.GetCurrentAdminSessionResponse]
-	getRuntimeReadiness          *connect.Client[v1.GetRuntimeReadinessRequest, v1.GetRuntimeReadinessResponse]
-	beginAdminLogin              *connect.Client[v1.BeginAdminLoginRequest, v1.BeginAdminLoginResponse]
-	loginPassword                *connect.Client[v1.LoginPasswordRequest, v1.LoginPasswordResponse]
-	verifyTotp                   *connect.Client[v1.VerifyTotpRequest, v1.VerifyTotpResponse]
-	changeInitialPassword        *connect.Client[v1.ChangeInitialPasswordRequest, v1.ChangeInitialPasswordResponse]
-	beginTotpEnrollment          *connect.Client[v1.BeginTotpEnrollmentRequest, v1.BeginTotpEnrollmentResponse]
-	completeTotpEnrollment       *connect.Client[v1.CompleteTotpEnrollmentRequest, v1.CompleteTotpEnrollmentResponse]
-	confirmAdminSecretReceipt    *connect.Client[v1.ConfirmAdminSecretReceiptRequest, v1.ConfirmAdminSecretReceiptResponse]
-	recoverAdmin                 *connect.Client[v1.RecoverAdminRequest, v1.RecoverAdminResponse]
-	changeAdminPassword          *connect.Client[v1.ChangeAdminPasswordRequest, v1.ChangeAdminPasswordResponse]
-	beginTotpRebind              *connect.Client[v1.BeginTotpRebindRequest, v1.BeginTotpRebindResponse]
-	completeTotpRebind           *connect.Client[v1.CompleteTotpRebindRequest, v1.CompleteTotpRebindResponse]
-	regenerateAdminRecoveryCodes *connect.Client[v1.RegenerateAdminRecoveryCodesRequest, v1.RegenerateAdminRecoveryCodesResponse]
-	logoutAdmin                  *connect.Client[v1.LogoutAdminRequest, v1.LogoutAdminResponse]
-	logoutAllAdminSessions       *connect.Client[v1.LogoutAllAdminSessionsRequest, v1.LogoutAllAdminSessionsResponse]
+	getSetupState                   *connect.Client[v1.GetSetupStateRequest, v1.GetSetupStateResponse]
+	getCurrentAdminSession          *connect.Client[v1.GetCurrentAdminSessionRequest, v1.GetCurrentAdminSessionResponse]
+	getRuntimeReadiness             *connect.Client[v1.GetRuntimeReadinessRequest, v1.GetRuntimeReadinessResponse]
+	beginAdminLogin                 *connect.Client[v1.BeginAdminLoginRequest, v1.BeginAdminLoginResponse]
+	loginPassword                   *connect.Client[v1.LoginPasswordRequest, v1.LoginPasswordResponse]
+	verifyAdminTotp                 *connect.Client[v1.VerifyAdminTotpRequest, v1.VerifyAdminTotpResponse]
+	verifyAdminRecoveryCode         *connect.Client[v1.VerifyAdminRecoveryCodeRequest, v1.VerifyAdminRecoveryCodeResponse]
+	changeInitialPassword           *connect.Client[v1.ChangeInitialPasswordRequest, v1.ChangeInitialPasswordResponse]
+	changeAdminPassword             *connect.Client[v1.ChangeAdminPasswordRequest, v1.ChangeAdminPasswordResponse]
+	beginTotpEnrollment             *connect.Client[v1.BeginTotpEnrollmentRequest, v1.BeginTotpEnrollmentResponse]
+	completeTotpEnrollment          *connect.Client[v1.CompleteTotpEnrollmentRequest, v1.CompleteTotpEnrollmentResponse]
+	disableTotp                     *connect.Client[v1.DisableTotpRequest, v1.DisableTotpResponse]
+	regenerateAdminRecoveryCodes    *connect.Client[v1.RegenerateAdminRecoveryCodesRequest, v1.RegenerateAdminRecoveryCodesResponse]
+	confirmAdminSecretReceipt       *connect.Client[v1.ConfirmAdminSecretReceiptRequest, v1.ConfirmAdminSecretReceiptResponse]
+	elevateAdminSession             *connect.Client[v1.ElevateAdminSessionRequest, v1.ElevateAdminSessionResponse]
+	revokeCurrentAdminElevation     *connect.Client[v1.RevokeCurrentAdminElevationRequest, v1.RevokeCurrentAdminElevationResponse]
+	listAdminSessions               *connect.Client[v1.ListAdminSessionsRequest, v1.ListAdminSessionsResponse]
+	revokeAdminSession              *connect.Client[v1.RevokeAdminSessionRequest, v1.RevokeAdminSessionResponse]
+	previewRevokeOtherAdminSessions *connect.Client[v1.PreviewRevokeOtherAdminSessionsRequest, v1.PreviewRevokeOtherAdminSessionsResponse]
+	revokeOtherAdminSessions        *connect.Client[v1.RevokeOtherAdminSessionsRequest, v1.RevokeOtherAdminSessionsResponse]
+	logoutAdmin                     *connect.Client[v1.LogoutAdminRequest, v1.LogoutAdminResponse]
 }
 
 // GetSetupState calls platform.admin.v1.AdminAuthService.GetSetupState.
@@ -269,14 +313,24 @@ func (c *adminAuthServiceClient) LoginPassword(ctx context.Context, req *connect
 	return c.loginPassword.CallUnary(ctx, req)
 }
 
-// VerifyTotp calls platform.admin.v1.AdminAuthService.VerifyTotp.
-func (c *adminAuthServiceClient) VerifyTotp(ctx context.Context, req *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error) {
-	return c.verifyTotp.CallUnary(ctx, req)
+// VerifyAdminTotp calls platform.admin.v1.AdminAuthService.VerifyAdminTotp.
+func (c *adminAuthServiceClient) VerifyAdminTotp(ctx context.Context, req *connect.Request[v1.VerifyAdminTotpRequest]) (*connect.Response[v1.VerifyAdminTotpResponse], error) {
+	return c.verifyAdminTotp.CallUnary(ctx, req)
+}
+
+// VerifyAdminRecoveryCode calls platform.admin.v1.AdminAuthService.VerifyAdminRecoveryCode.
+func (c *adminAuthServiceClient) VerifyAdminRecoveryCode(ctx context.Context, req *connect.Request[v1.VerifyAdminRecoveryCodeRequest]) (*connect.Response[v1.VerifyAdminRecoveryCodeResponse], error) {
+	return c.verifyAdminRecoveryCode.CallUnary(ctx, req)
 }
 
 // ChangeInitialPassword calls platform.admin.v1.AdminAuthService.ChangeInitialPassword.
 func (c *adminAuthServiceClient) ChangeInitialPassword(ctx context.Context, req *connect.Request[v1.ChangeInitialPasswordRequest]) (*connect.Response[v1.ChangeInitialPasswordResponse], error) {
 	return c.changeInitialPassword.CallUnary(ctx, req)
+}
+
+// ChangeAdminPassword calls platform.admin.v1.AdminAuthService.ChangeAdminPassword.
+func (c *adminAuthServiceClient) ChangeAdminPassword(ctx context.Context, req *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error) {
+	return c.changeAdminPassword.CallUnary(ctx, req)
 }
 
 // BeginTotpEnrollment calls platform.admin.v1.AdminAuthService.BeginTotpEnrollment.
@@ -289,29 +343,9 @@ func (c *adminAuthServiceClient) CompleteTotpEnrollment(ctx context.Context, req
 	return c.completeTotpEnrollment.CallUnary(ctx, req)
 }
 
-// ConfirmAdminSecretReceipt calls platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt.
-func (c *adminAuthServiceClient) ConfirmAdminSecretReceipt(ctx context.Context, req *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error) {
-	return c.confirmAdminSecretReceipt.CallUnary(ctx, req)
-}
-
-// RecoverAdmin calls platform.admin.v1.AdminAuthService.RecoverAdmin.
-func (c *adminAuthServiceClient) RecoverAdmin(ctx context.Context, req *connect.Request[v1.RecoverAdminRequest]) (*connect.Response[v1.RecoverAdminResponse], error) {
-	return c.recoverAdmin.CallUnary(ctx, req)
-}
-
-// ChangeAdminPassword calls platform.admin.v1.AdminAuthService.ChangeAdminPassword.
-func (c *adminAuthServiceClient) ChangeAdminPassword(ctx context.Context, req *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error) {
-	return c.changeAdminPassword.CallUnary(ctx, req)
-}
-
-// BeginTotpRebind calls platform.admin.v1.AdminAuthService.BeginTotpRebind.
-func (c *adminAuthServiceClient) BeginTotpRebind(ctx context.Context, req *connect.Request[v1.BeginTotpRebindRequest]) (*connect.Response[v1.BeginTotpRebindResponse], error) {
-	return c.beginTotpRebind.CallUnary(ctx, req)
-}
-
-// CompleteTotpRebind calls platform.admin.v1.AdminAuthService.CompleteTotpRebind.
-func (c *adminAuthServiceClient) CompleteTotpRebind(ctx context.Context, req *connect.Request[v1.CompleteTotpRebindRequest]) (*connect.Response[v1.CompleteTotpRebindResponse], error) {
-	return c.completeTotpRebind.CallUnary(ctx, req)
+// DisableTotp calls platform.admin.v1.AdminAuthService.DisableTotp.
+func (c *adminAuthServiceClient) DisableTotp(ctx context.Context, req *connect.Request[v1.DisableTotpRequest]) (*connect.Response[v1.DisableTotpResponse], error) {
+	return c.disableTotp.CallUnary(ctx, req)
 }
 
 // RegenerateAdminRecoveryCodes calls
@@ -320,14 +354,45 @@ func (c *adminAuthServiceClient) RegenerateAdminRecoveryCodes(ctx context.Contex
 	return c.regenerateAdminRecoveryCodes.CallUnary(ctx, req)
 }
 
+// ConfirmAdminSecretReceipt calls platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt.
+func (c *adminAuthServiceClient) ConfirmAdminSecretReceipt(ctx context.Context, req *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error) {
+	return c.confirmAdminSecretReceipt.CallUnary(ctx, req)
+}
+
+// ElevateAdminSession calls platform.admin.v1.AdminAuthService.ElevateAdminSession.
+func (c *adminAuthServiceClient) ElevateAdminSession(ctx context.Context, req *connect.Request[v1.ElevateAdminSessionRequest]) (*connect.Response[v1.ElevateAdminSessionResponse], error) {
+	return c.elevateAdminSession.CallUnary(ctx, req)
+}
+
+// RevokeCurrentAdminElevation calls platform.admin.v1.AdminAuthService.RevokeCurrentAdminElevation.
+func (c *adminAuthServiceClient) RevokeCurrentAdminElevation(ctx context.Context, req *connect.Request[v1.RevokeCurrentAdminElevationRequest]) (*connect.Response[v1.RevokeCurrentAdminElevationResponse], error) {
+	return c.revokeCurrentAdminElevation.CallUnary(ctx, req)
+}
+
+// ListAdminSessions calls platform.admin.v1.AdminAuthService.ListAdminSessions.
+func (c *adminAuthServiceClient) ListAdminSessions(ctx context.Context, req *connect.Request[v1.ListAdminSessionsRequest]) (*connect.Response[v1.ListAdminSessionsResponse], error) {
+	return c.listAdminSessions.CallUnary(ctx, req)
+}
+
+// RevokeAdminSession calls platform.admin.v1.AdminAuthService.RevokeAdminSession.
+func (c *adminAuthServiceClient) RevokeAdminSession(ctx context.Context, req *connect.Request[v1.RevokeAdminSessionRequest]) (*connect.Response[v1.RevokeAdminSessionResponse], error) {
+	return c.revokeAdminSession.CallUnary(ctx, req)
+}
+
+// PreviewRevokeOtherAdminSessions calls
+// platform.admin.v1.AdminAuthService.PreviewRevokeOtherAdminSessions.
+func (c *adminAuthServiceClient) PreviewRevokeOtherAdminSessions(ctx context.Context, req *connect.Request[v1.PreviewRevokeOtherAdminSessionsRequest]) (*connect.Response[v1.PreviewRevokeOtherAdminSessionsResponse], error) {
+	return c.previewRevokeOtherAdminSessions.CallUnary(ctx, req)
+}
+
+// RevokeOtherAdminSessions calls platform.admin.v1.AdminAuthService.RevokeOtherAdminSessions.
+func (c *adminAuthServiceClient) RevokeOtherAdminSessions(ctx context.Context, req *connect.Request[v1.RevokeOtherAdminSessionsRequest]) (*connect.Response[v1.RevokeOtherAdminSessionsResponse], error) {
+	return c.revokeOtherAdminSessions.CallUnary(ctx, req)
+}
+
 // LogoutAdmin calls platform.admin.v1.AdminAuthService.LogoutAdmin.
 func (c *adminAuthServiceClient) LogoutAdmin(ctx context.Context, req *connect.Request[v1.LogoutAdminRequest]) (*connect.Response[v1.LogoutAdminResponse], error) {
 	return c.logoutAdmin.CallUnary(ctx, req)
-}
-
-// LogoutAllAdminSessions calls platform.admin.v1.AdminAuthService.LogoutAllAdminSessions.
-func (c *adminAuthServiceClient) LogoutAllAdminSessions(ctx context.Context, req *connect.Request[v1.LogoutAllAdminSessionsRequest]) (*connect.Response[v1.LogoutAllAdminSessionsResponse], error) {
-	return c.logoutAllAdminSessions.CallUnary(ctx, req)
 }
 
 // AdminAuthServiceHandler is an implementation of the platform.admin.v1.AdminAuthService service.
@@ -337,18 +402,22 @@ type AdminAuthServiceHandler interface {
 	GetRuntimeReadiness(context.Context, *connect.Request[v1.GetRuntimeReadinessRequest]) (*connect.Response[v1.GetRuntimeReadinessResponse], error)
 	BeginAdminLogin(context.Context, *connect.Request[v1.BeginAdminLoginRequest]) (*connect.Response[v1.BeginAdminLoginResponse], error)
 	LoginPassword(context.Context, *connect.Request[v1.LoginPasswordRequest]) (*connect.Response[v1.LoginPasswordResponse], error)
-	VerifyTotp(context.Context, *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error)
+	VerifyAdminTotp(context.Context, *connect.Request[v1.VerifyAdminTotpRequest]) (*connect.Response[v1.VerifyAdminTotpResponse], error)
+	VerifyAdminRecoveryCode(context.Context, *connect.Request[v1.VerifyAdminRecoveryCodeRequest]) (*connect.Response[v1.VerifyAdminRecoveryCodeResponse], error)
 	ChangeInitialPassword(context.Context, *connect.Request[v1.ChangeInitialPasswordRequest]) (*connect.Response[v1.ChangeInitialPasswordResponse], error)
+	ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error)
 	BeginTotpEnrollment(context.Context, *connect.Request[v1.BeginTotpEnrollmentRequest]) (*connect.Response[v1.BeginTotpEnrollmentResponse], error)
 	CompleteTotpEnrollment(context.Context, *connect.Request[v1.CompleteTotpEnrollmentRequest]) (*connect.Response[v1.CompleteTotpEnrollmentResponse], error)
-	ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error)
-	RecoverAdmin(context.Context, *connect.Request[v1.RecoverAdminRequest]) (*connect.Response[v1.RecoverAdminResponse], error)
-	ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error)
-	BeginTotpRebind(context.Context, *connect.Request[v1.BeginTotpRebindRequest]) (*connect.Response[v1.BeginTotpRebindResponse], error)
-	CompleteTotpRebind(context.Context, *connect.Request[v1.CompleteTotpRebindRequest]) (*connect.Response[v1.CompleteTotpRebindResponse], error)
+	DisableTotp(context.Context, *connect.Request[v1.DisableTotpRequest]) (*connect.Response[v1.DisableTotpResponse], error)
 	RegenerateAdminRecoveryCodes(context.Context, *connect.Request[v1.RegenerateAdminRecoveryCodesRequest]) (*connect.Response[v1.RegenerateAdminRecoveryCodesResponse], error)
+	ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error)
+	ElevateAdminSession(context.Context, *connect.Request[v1.ElevateAdminSessionRequest]) (*connect.Response[v1.ElevateAdminSessionResponse], error)
+	RevokeCurrentAdminElevation(context.Context, *connect.Request[v1.RevokeCurrentAdminElevationRequest]) (*connect.Response[v1.RevokeCurrentAdminElevationResponse], error)
+	ListAdminSessions(context.Context, *connect.Request[v1.ListAdminSessionsRequest]) (*connect.Response[v1.ListAdminSessionsResponse], error)
+	RevokeAdminSession(context.Context, *connect.Request[v1.RevokeAdminSessionRequest]) (*connect.Response[v1.RevokeAdminSessionResponse], error)
+	PreviewRevokeOtherAdminSessions(context.Context, *connect.Request[v1.PreviewRevokeOtherAdminSessionsRequest]) (*connect.Response[v1.PreviewRevokeOtherAdminSessionsResponse], error)
+	RevokeOtherAdminSessions(context.Context, *connect.Request[v1.RevokeOtherAdminSessionsRequest]) (*connect.Response[v1.RevokeOtherAdminSessionsResponse], error)
 	LogoutAdmin(context.Context, *connect.Request[v1.LogoutAdminRequest]) (*connect.Response[v1.LogoutAdminResponse], error)
-	LogoutAllAdminSessions(context.Context, *connect.Request[v1.LogoutAllAdminSessionsRequest]) (*connect.Response[v1.LogoutAllAdminSessionsResponse], error)
 }
 
 // NewAdminAuthServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -388,16 +457,28 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 		connect.WithSchema(adminAuthServiceMethods.ByName("LoginPassword")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminAuthServiceVerifyTotpHandler := connect.NewUnaryHandler(
-		AdminAuthServiceVerifyTotpProcedure,
-		svc.VerifyTotp,
-		connect.WithSchema(adminAuthServiceMethods.ByName("VerifyTotp")),
+	adminAuthServiceVerifyAdminTotpHandler := connect.NewUnaryHandler(
+		AdminAuthServiceVerifyAdminTotpProcedure,
+		svc.VerifyAdminTotp,
+		connect.WithSchema(adminAuthServiceMethods.ByName("VerifyAdminTotp")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceVerifyAdminRecoveryCodeHandler := connect.NewUnaryHandler(
+		AdminAuthServiceVerifyAdminRecoveryCodeProcedure,
+		svc.VerifyAdminRecoveryCode,
+		connect.WithSchema(adminAuthServiceMethods.ByName("VerifyAdminRecoveryCode")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminAuthServiceChangeInitialPasswordHandler := connect.NewUnaryHandler(
 		AdminAuthServiceChangeInitialPasswordProcedure,
 		svc.ChangeInitialPassword,
 		connect.WithSchema(adminAuthServiceMethods.ByName("ChangeInitialPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceChangeAdminPasswordHandler := connect.NewUnaryHandler(
+		AdminAuthServiceChangeAdminPasswordProcedure,
+		svc.ChangeAdminPassword,
+		connect.WithSchema(adminAuthServiceMethods.ByName("ChangeAdminPassword")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminAuthServiceBeginTotpEnrollmentHandler := connect.NewUnaryHandler(
@@ -412,34 +493,10 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 		connect.WithSchema(adminAuthServiceMethods.ByName("CompleteTotpEnrollment")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminAuthServiceConfirmAdminSecretReceiptHandler := connect.NewUnaryHandler(
-		AdminAuthServiceConfirmAdminSecretReceiptProcedure,
-		svc.ConfirmAdminSecretReceipt,
-		connect.WithSchema(adminAuthServiceMethods.ByName("ConfirmAdminSecretReceipt")),
-		connect.WithHandlerOptions(opts...),
-	)
-	adminAuthServiceRecoverAdminHandler := connect.NewUnaryHandler(
-		AdminAuthServiceRecoverAdminProcedure,
-		svc.RecoverAdmin,
-		connect.WithSchema(adminAuthServiceMethods.ByName("RecoverAdmin")),
-		connect.WithHandlerOptions(opts...),
-	)
-	adminAuthServiceChangeAdminPasswordHandler := connect.NewUnaryHandler(
-		AdminAuthServiceChangeAdminPasswordProcedure,
-		svc.ChangeAdminPassword,
-		connect.WithSchema(adminAuthServiceMethods.ByName("ChangeAdminPassword")),
-		connect.WithHandlerOptions(opts...),
-	)
-	adminAuthServiceBeginTotpRebindHandler := connect.NewUnaryHandler(
-		AdminAuthServiceBeginTotpRebindProcedure,
-		svc.BeginTotpRebind,
-		connect.WithSchema(adminAuthServiceMethods.ByName("BeginTotpRebind")),
-		connect.WithHandlerOptions(opts...),
-	)
-	adminAuthServiceCompleteTotpRebindHandler := connect.NewUnaryHandler(
-		AdminAuthServiceCompleteTotpRebindProcedure,
-		svc.CompleteTotpRebind,
-		connect.WithSchema(adminAuthServiceMethods.ByName("CompleteTotpRebind")),
+	adminAuthServiceDisableTotpHandler := connect.NewUnaryHandler(
+		AdminAuthServiceDisableTotpProcedure,
+		svc.DisableTotp,
+		connect.WithSchema(adminAuthServiceMethods.ByName("DisableTotp")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminAuthServiceRegenerateAdminRecoveryCodesHandler := connect.NewUnaryHandler(
@@ -448,16 +505,52 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 		connect.WithSchema(adminAuthServiceMethods.ByName("RegenerateAdminRecoveryCodes")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminAuthServiceConfirmAdminSecretReceiptHandler := connect.NewUnaryHandler(
+		AdminAuthServiceConfirmAdminSecretReceiptProcedure,
+		svc.ConfirmAdminSecretReceipt,
+		connect.WithSchema(adminAuthServiceMethods.ByName("ConfirmAdminSecretReceipt")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceElevateAdminSessionHandler := connect.NewUnaryHandler(
+		AdminAuthServiceElevateAdminSessionProcedure,
+		svc.ElevateAdminSession,
+		connect.WithSchema(adminAuthServiceMethods.ByName("ElevateAdminSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceRevokeCurrentAdminElevationHandler := connect.NewUnaryHandler(
+		AdminAuthServiceRevokeCurrentAdminElevationProcedure,
+		svc.RevokeCurrentAdminElevation,
+		connect.WithSchema(adminAuthServiceMethods.ByName("RevokeCurrentAdminElevation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceListAdminSessionsHandler := connect.NewUnaryHandler(
+		AdminAuthServiceListAdminSessionsProcedure,
+		svc.ListAdminSessions,
+		connect.WithSchema(adminAuthServiceMethods.ByName("ListAdminSessions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceRevokeAdminSessionHandler := connect.NewUnaryHandler(
+		AdminAuthServiceRevokeAdminSessionProcedure,
+		svc.RevokeAdminSession,
+		connect.WithSchema(adminAuthServiceMethods.ByName("RevokeAdminSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServicePreviewRevokeOtherAdminSessionsHandler := connect.NewUnaryHandler(
+		AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure,
+		svc.PreviewRevokeOtherAdminSessions,
+		connect.WithSchema(adminAuthServiceMethods.ByName("PreviewRevokeOtherAdminSessions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminAuthServiceRevokeOtherAdminSessionsHandler := connect.NewUnaryHandler(
+		AdminAuthServiceRevokeOtherAdminSessionsProcedure,
+		svc.RevokeOtherAdminSessions,
+		connect.WithSchema(adminAuthServiceMethods.ByName("RevokeOtherAdminSessions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminAuthServiceLogoutAdminHandler := connect.NewUnaryHandler(
 		AdminAuthServiceLogoutAdminProcedure,
 		svc.LogoutAdmin,
 		connect.WithSchema(adminAuthServiceMethods.ByName("LogoutAdmin")),
-		connect.WithHandlerOptions(opts...),
-	)
-	adminAuthServiceLogoutAllAdminSessionsHandler := connect.NewUnaryHandler(
-		AdminAuthServiceLogoutAllAdminSessionsProcedure,
-		svc.LogoutAllAdminSessions,
-		connect.WithSchema(adminAuthServiceMethods.ByName("LogoutAllAdminSessions")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/platform.admin.v1.AdminAuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -472,30 +565,38 @@ func NewAdminAuthServiceHandler(svc AdminAuthServiceHandler, opts ...connect.Han
 			adminAuthServiceBeginAdminLoginHandler.ServeHTTP(w, r)
 		case AdminAuthServiceLoginPasswordProcedure:
 			adminAuthServiceLoginPasswordHandler.ServeHTTP(w, r)
-		case AdminAuthServiceVerifyTotpProcedure:
-			adminAuthServiceVerifyTotpHandler.ServeHTTP(w, r)
+		case AdminAuthServiceVerifyAdminTotpProcedure:
+			adminAuthServiceVerifyAdminTotpHandler.ServeHTTP(w, r)
+		case AdminAuthServiceVerifyAdminRecoveryCodeProcedure:
+			adminAuthServiceVerifyAdminRecoveryCodeHandler.ServeHTTP(w, r)
 		case AdminAuthServiceChangeInitialPasswordProcedure:
 			adminAuthServiceChangeInitialPasswordHandler.ServeHTTP(w, r)
+		case AdminAuthServiceChangeAdminPasswordProcedure:
+			adminAuthServiceChangeAdminPasswordHandler.ServeHTTP(w, r)
 		case AdminAuthServiceBeginTotpEnrollmentProcedure:
 			adminAuthServiceBeginTotpEnrollmentHandler.ServeHTTP(w, r)
 		case AdminAuthServiceCompleteTotpEnrollmentProcedure:
 			adminAuthServiceCompleteTotpEnrollmentHandler.ServeHTTP(w, r)
-		case AdminAuthServiceConfirmAdminSecretReceiptProcedure:
-			adminAuthServiceConfirmAdminSecretReceiptHandler.ServeHTTP(w, r)
-		case AdminAuthServiceRecoverAdminProcedure:
-			adminAuthServiceRecoverAdminHandler.ServeHTTP(w, r)
-		case AdminAuthServiceChangeAdminPasswordProcedure:
-			adminAuthServiceChangeAdminPasswordHandler.ServeHTTP(w, r)
-		case AdminAuthServiceBeginTotpRebindProcedure:
-			adminAuthServiceBeginTotpRebindHandler.ServeHTTP(w, r)
-		case AdminAuthServiceCompleteTotpRebindProcedure:
-			adminAuthServiceCompleteTotpRebindHandler.ServeHTTP(w, r)
+		case AdminAuthServiceDisableTotpProcedure:
+			adminAuthServiceDisableTotpHandler.ServeHTTP(w, r)
 		case AdminAuthServiceRegenerateAdminRecoveryCodesProcedure:
 			adminAuthServiceRegenerateAdminRecoveryCodesHandler.ServeHTTP(w, r)
+		case AdminAuthServiceConfirmAdminSecretReceiptProcedure:
+			adminAuthServiceConfirmAdminSecretReceiptHandler.ServeHTTP(w, r)
+		case AdminAuthServiceElevateAdminSessionProcedure:
+			adminAuthServiceElevateAdminSessionHandler.ServeHTTP(w, r)
+		case AdminAuthServiceRevokeCurrentAdminElevationProcedure:
+			adminAuthServiceRevokeCurrentAdminElevationHandler.ServeHTTP(w, r)
+		case AdminAuthServiceListAdminSessionsProcedure:
+			adminAuthServiceListAdminSessionsHandler.ServeHTTP(w, r)
+		case AdminAuthServiceRevokeAdminSessionProcedure:
+			adminAuthServiceRevokeAdminSessionHandler.ServeHTTP(w, r)
+		case AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure:
+			adminAuthServicePreviewRevokeOtherAdminSessionsHandler.ServeHTTP(w, r)
+		case AdminAuthServiceRevokeOtherAdminSessionsProcedure:
+			adminAuthServiceRevokeOtherAdminSessionsHandler.ServeHTTP(w, r)
 		case AdminAuthServiceLogoutAdminProcedure:
 			adminAuthServiceLogoutAdminHandler.ServeHTTP(w, r)
-		case AdminAuthServiceLogoutAllAdminSessionsProcedure:
-			adminAuthServiceLogoutAllAdminSessionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -525,12 +626,20 @@ func (UnimplementedAdminAuthServiceHandler) LoginPassword(context.Context, *conn
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.LoginPassword is not implemented"))
 }
 
-func (UnimplementedAdminAuthServiceHandler) VerifyTotp(context.Context, *connect.Request[v1.VerifyTotpRequest]) (*connect.Response[v1.VerifyTotpResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.VerifyTotp is not implemented"))
+func (UnimplementedAdminAuthServiceHandler) VerifyAdminTotp(context.Context, *connect.Request[v1.VerifyAdminTotpRequest]) (*connect.Response[v1.VerifyAdminTotpResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.VerifyAdminTotp is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) VerifyAdminRecoveryCode(context.Context, *connect.Request[v1.VerifyAdminRecoveryCodeRequest]) (*connect.Response[v1.VerifyAdminRecoveryCodeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.VerifyAdminRecoveryCode is not implemented"))
 }
 
 func (UnimplementedAdminAuthServiceHandler) ChangeInitialPassword(context.Context, *connect.Request[v1.ChangeInitialPasswordRequest]) (*connect.Response[v1.ChangeInitialPasswordResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ChangeInitialPassword is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ChangeAdminPassword is not implemented"))
 }
 
 func (UnimplementedAdminAuthServiceHandler) BeginTotpEnrollment(context.Context, *connect.Request[v1.BeginTotpEnrollmentRequest]) (*connect.Response[v1.BeginTotpEnrollmentResponse], error) {
@@ -541,34 +650,42 @@ func (UnimplementedAdminAuthServiceHandler) CompleteTotpEnrollment(context.Conte
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.CompleteTotpEnrollment is not implemented"))
 }
 
-func (UnimplementedAdminAuthServiceHandler) ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt is not implemented"))
-}
-
-func (UnimplementedAdminAuthServiceHandler) RecoverAdmin(context.Context, *connect.Request[v1.RecoverAdminRequest]) (*connect.Response[v1.RecoverAdminResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.RecoverAdmin is not implemented"))
-}
-
-func (UnimplementedAdminAuthServiceHandler) ChangeAdminPassword(context.Context, *connect.Request[v1.ChangeAdminPasswordRequest]) (*connect.Response[v1.ChangeAdminPasswordResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ChangeAdminPassword is not implemented"))
-}
-
-func (UnimplementedAdminAuthServiceHandler) BeginTotpRebind(context.Context, *connect.Request[v1.BeginTotpRebindRequest]) (*connect.Response[v1.BeginTotpRebindResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.BeginTotpRebind is not implemented"))
-}
-
-func (UnimplementedAdminAuthServiceHandler) CompleteTotpRebind(context.Context, *connect.Request[v1.CompleteTotpRebindRequest]) (*connect.Response[v1.CompleteTotpRebindResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.CompleteTotpRebind is not implemented"))
+func (UnimplementedAdminAuthServiceHandler) DisableTotp(context.Context, *connect.Request[v1.DisableTotpRequest]) (*connect.Response[v1.DisableTotpResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.DisableTotp is not implemented"))
 }
 
 func (UnimplementedAdminAuthServiceHandler) RegenerateAdminRecoveryCodes(context.Context, *connect.Request[v1.RegenerateAdminRecoveryCodesRequest]) (*connect.Response[v1.RegenerateAdminRecoveryCodesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes is not implemented"))
 }
 
-func (UnimplementedAdminAuthServiceHandler) LogoutAdmin(context.Context, *connect.Request[v1.LogoutAdminRequest]) (*connect.Response[v1.LogoutAdminResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.LogoutAdmin is not implemented"))
+func (UnimplementedAdminAuthServiceHandler) ConfirmAdminSecretReceipt(context.Context, *connect.Request[v1.ConfirmAdminSecretReceiptRequest]) (*connect.Response[v1.ConfirmAdminSecretReceiptResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt is not implemented"))
 }
 
-func (UnimplementedAdminAuthServiceHandler) LogoutAllAdminSessions(context.Context, *connect.Request[v1.LogoutAllAdminSessionsRequest]) (*connect.Response[v1.LogoutAllAdminSessionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.LogoutAllAdminSessions is not implemented"))
+func (UnimplementedAdminAuthServiceHandler) ElevateAdminSession(context.Context, *connect.Request[v1.ElevateAdminSessionRequest]) (*connect.Response[v1.ElevateAdminSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ElevateAdminSession is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) RevokeCurrentAdminElevation(context.Context, *connect.Request[v1.RevokeCurrentAdminElevationRequest]) (*connect.Response[v1.RevokeCurrentAdminElevationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.RevokeCurrentAdminElevation is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) ListAdminSessions(context.Context, *connect.Request[v1.ListAdminSessionsRequest]) (*connect.Response[v1.ListAdminSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.ListAdminSessions is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) RevokeAdminSession(context.Context, *connect.Request[v1.RevokeAdminSessionRequest]) (*connect.Response[v1.RevokeAdminSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.RevokeAdminSession is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) PreviewRevokeOtherAdminSessions(context.Context, *connect.Request[v1.PreviewRevokeOtherAdminSessionsRequest]) (*connect.Response[v1.PreviewRevokeOtherAdminSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.PreviewRevokeOtherAdminSessions is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) RevokeOtherAdminSessions(context.Context, *connect.Request[v1.RevokeOtherAdminSessionsRequest]) (*connect.Response[v1.RevokeOtherAdminSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.RevokeOtherAdminSessions is not implemented"))
+}
+
+func (UnimplementedAdminAuthServiceHandler) LogoutAdmin(context.Context, *connect.Request[v1.LogoutAdminRequest]) (*connect.Response[v1.LogoutAdminResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.admin.v1.AdminAuthService.LogoutAdmin is not implemented"))
 }

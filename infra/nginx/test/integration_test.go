@@ -131,9 +131,6 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 	adminAuthResponse := requestNginx(t, client, endpoint, adminHost,
 		"/platform.admin.v1.AdminAuthService/GetStatus", false)
 	assertProxyResponse(t, adminAuthResponse, "admin", true)
-	adminIdentityResponse := requestNginx(t, client, endpoint, adminHost,
-		"/platform.admin.v1.AdminIdentityService/GetUser", false)
-	assertProxyResponse(t, adminIdentityResponse, "admin", true)
 	for _, request := range []struct {
 		host   string
 		method string
@@ -149,6 +146,7 @@ func TestNginxContainerEnforcesHostPathHeaderAndCacheBoundaries(t *testing.T) {
 		{host: adminHost, method: http.MethodGet, path: "/realtime/game"},
 		{host: userHost, method: http.MethodGet, path: "/realtime/game/other"},
 		{host: userHost, method: http.MethodGet, path: "/platform.identity.v1.UnknownService/Call"},
+		{host: adminHost, method: http.MethodPost, path: "/platform.admin.v1.AdminIdentityService/GetUser"},
 		{host: adminHost, method: http.MethodPost, path: "/"},
 		{host: "unexpected.game-night.test", method: http.MethodGet, path: "/"},
 	} {

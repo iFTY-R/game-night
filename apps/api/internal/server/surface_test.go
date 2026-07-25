@@ -31,7 +31,7 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 		t.Fatal(err)
 	}
 	adminSurface, err := NewAdminSurface(AdminSurfaceConfig{
-		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{},
+		Auth:         &testAdminAuthHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -59,13 +59,15 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	if _, err = adminAuthClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatalf("call admin auth surface: %v", err)
 	}
-	adminIdentityClient := adminv1connect.NewAdminIdentityServiceClient(adminServer.Client(), adminServer.URL)
-	if _, err = adminIdentityClient.GetUser(t.Context(), connect.NewRequest(&adminv1.GetUserRequest{})); err != nil {
-		t.Fatalf("call admin identity surface: %v", err)
+	if _, err = adminAuthClient.PreviewRevokeOtherAdminSessions(
+		t.Context(),
+		connect.NewRequest(&adminv1.PreviewRevokeOtherAdminSessionsRequest{}),
+	); err != nil {
+		t.Fatalf("call admin auth preview surface: %v", err)
 	}
 
 	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminAuthServiceGetSetupStateProcedure, http.StatusNotFound)
-	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminIdentityServiceGetUserProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, "/platform.admin.v1.AdminIdentityService/GetUser", http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, gamev1connect.GameServiceGetProjectionProcedure, http.StatusNotFound)
@@ -88,7 +90,7 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 		t.Fatal(err)
 	}
 	adminSurface, err := NewAdminSurface(AdminSurfaceConfig{
-		Auth: &testAdminAuthHandler{}, Identity: &testAdminIdentityHandler{},
+		Auth:         &testAdminAuthHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -120,12 +122,18 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	if _, err = adminClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{})); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = adminClient.PreviewRevokeOtherAdminSessions(
+		t.Context(),
+		connect.NewRequest(&adminv1.PreviewRevokeOtherAdminSessionsRequest{}),
+	); err != nil {
+		t.Fatal(err)
+	}
 	response, err := testServer.Client().Get(testServer.URL + MetricsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 3 || adminCalls.Load() != 1 {
+	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 3 || adminCalls.Load() != 2 {
 		t.Fatalf("combined routing: metrics=%d user=%d admin=%d", response.StatusCode, userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -188,10 +196,9 @@ func (*testAdminAuthHandler) GetSetupState(context.Context, *connect.Request[adm
 	return connect.NewResponse(&adminv1.GetSetupStateResponse{}), nil
 }
 
-type testAdminIdentityHandler struct {
-	adminv1connect.UnimplementedAdminIdentityServiceHandler
-}
-
-func (*testAdminIdentityHandler) GetUser(context.Context, *connect.Request[adminv1.GetUserRequest]) (*connect.Response[adminv1.GetUserResponse], error) {
-	return connect.NewResponse(&adminv1.GetUserResponse{}), nil
+func (*testAdminAuthHandler) PreviewRevokeOtherAdminSessions(
+	context.Context,
+	*connect.Request[adminv1.PreviewRevokeOtherAdminSessionsRequest],
+) (*connect.Response[adminv1.PreviewRevokeOtherAdminSessionsResponse], error) {
+	return connect.NewResponse(&adminv1.PreviewRevokeOtherAdminSessionsResponse{}), nil
 }

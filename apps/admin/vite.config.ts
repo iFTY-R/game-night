@@ -13,8 +13,7 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4174,
     proxy: {
-      "/platform.admin.v1.AdminAuthService": { ...adminEdgeProxy },
-      "/platform.admin.v1.AdminIdentityService": { ...adminEdgeProxy }
+      "/platform.admin.v1.AdminAuthService": { ...adminEdgeProxy }
     }
   },
   build: {

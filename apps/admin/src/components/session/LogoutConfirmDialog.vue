@@ -1,41 +1,21 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { NButton, NForm, NFormItem, NInput, NSpace } from "naive-ui";
-import type { FormInst, FormRules } from "naive-ui";
+import { NAlert, NButton } from "naive-ui";
 import AppDialog from "../AppDialog.vue";
 
-type LogoutDialogPayload = {
-  mode: "current" | "all";
-  summary: string;
-};
+defineProps<{ pending?: boolean }>();
 
 const emit = defineEmits<{
-  confirm: [payload: LogoutDialogPayload];
+  confirm: [];
 }>();
 
-const dialogRef = ref<{ toggleDialog: (open: boolean, payload?: LogoutDialogPayload) => void } | null>(null);
-const formRef = ref<FormInst | null>(null);
-const currentPayload = ref<LogoutDialogPayload | null>(null);
-const form = ref({ phrase: "" });
+const dialogRef = ref<{ toggleDialog: (open: boolean) => void } | null>(null);
 
-const rules: FormRules = {
-  phrase: [{ required: true, message: "请输入确认短语", trigger: ["input", "blur"] }]
+const toggleDialog = (open: boolean): void => {
+  dialogRef.value?.toggleDialog(open);
 };
 
-const toggleDialog = (open: boolean, payload?: LogoutDialogPayload): void => {
-  if (open) {
-    currentPayload.value = payload ?? null;
-    form.value.phrase = "";
-  }
-  dialogRef.value?.toggleDialog(open, payload);
-};
-
-const handleConfirm = async (): Promise<void> => {
-  await formRef.value?.validate();
-  if (!currentPayload.value) {
-    return;
-  }
-  emit("confirm", currentPayload.value);
+const handleCancel = (): void => {
   toggleDialog(false);
 };
 
@@ -45,18 +25,17 @@ defineExpose({
 </script>
 
 <template>
-  <AppDialog ref="dialogRef" title="确认退出" :width="520">
+  <AppDialog ref="dialogRef" title="退出管理后台" :width="480">
     <template #default>
-      <NForm ref="formRef" :model="form" :rules="rules">
-        <p class="admin-muted">{{ currentPayload?.summary }}</p>
-        <NFormItem label="确认短语" path="phrase">
-          <NInput v-model:value="form.phrase" placeholder="输入 yes 继续" />
-        </NFormItem>
-        <NSpace justify="end">
-          <NButton secondary @click="toggleDialog(false)">取消</NButton>
-          <NButton type="error" @click="handleConfirm">确认退出</NButton>
-        </NSpace>
-      </NForm>
+      <div class="admin-grid">
+        <NAlert type="warning" title="确认退出当前会话">
+          退出后需要重新验证管理员身份。其他设备上的会话不会受到影响。
+        </NAlert>
+        <div class="admin-dialog-footer">
+          <NButton :disabled="pending" @click="handleCancel">取消</NButton>
+          <NButton type="error" :loading="pending" @click="emit('confirm')">退出</NButton>
+        </div>
+      </div>
     </template>
   </AppDialog>
 </template>

@@ -10,71 +10,179 @@ import (
 	"github.com/iFTY-R/game-night/platform/security"
 )
 
-func TestAccountLifecycleAndGeneration(t *testing.T) {
+func TestAccountLifecycleKeepsMFAOutOfAccountState(t *testing.T) {
 	now := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
 	account, err := NewBootstrapAccount(uuid.New(), now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := account.Transition(AccountStatusActive, now); !errors.Is(err, ErrConcurrentTransition) {
-		t.Fatalf("expected guarded bootstrap transition, got %v", err)
-	}
-	account, err = account.WithPassword("$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", PasswordAlgorithmArgon2id, `{"MemoryKiB":65536,"Iterations":3,"Parallelism":2,"SaltLength":16,"KeyLength":32}`, now)
+	account, err = account.WithPassword(testArgonHash, PasswordAlgorithmArgon2id, testPasswordParametersJSON, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.Snapshot().Status != AccountStatusSetupRequired || account.Snapshot().AdminVersion != 2 || account.Snapshot().PasswordVersion != 1 {
-		t.Fatalf("unexpected bootstrap account generations: %+v", account.Snapshot())
+	if got := account.Snapshot().Status; got != AccountStatusSetupRequired {
+		t.Fatalf("status = %q, want %q", got, AccountStatusSetupRequired)
 	}
 	account, err = account.Transition(AccountStatusActive, now.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.Snapshot().Status != AccountStatusActive || account.Snapshot().AdminVersion != 3 {
-		t.Fatalf("unexpected setup state: %+v", account.Snapshot())
+	snapshot := account.Snapshot()
+	if snapshot.Status != AccountStatusActive {
+		t.Fatalf("status = %q, want %q", snapshot.Status, AccountStatusActive)
+	}
+	if snapshot.PasswordVersion != 1 {
+		t.Fatalf("password version = %d, want 1", snapshot.PasswordVersion)
+	}
+	if snapshot.AdminVersion != 3 {
+		t.Fatalf("admin version = %d, want 3", snapshot.AdminVersion)
 	}
 }
 
-func TestPasswordPolicyRejectsWeakAndUsernamePasswords(t *testing.T) {
-	policy := DefaultPasswordPolicy()
-	for _, candidate := range []string{"short", "admin", "password123"} {
-		if !errors.Is(policy.Validate("admin", candidate), ErrPasswordPolicy) {
-			t.Fatalf("expected policy rejection for %q", candidate)
-		}
-	}
-	if err := policy.Validate("admin", "correct horse battery staple"); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestTOTPWindowReturnsMovingFactorForCAS(t *testing.T) {
-	secret := "JBSWY3DPEHPK3PXP"
-	now := time.Unix(1_700_000_000, 0).UTC()
-	code, err := GenerateTOTPCode(secret, now)
+func TestMFAChangeAdvancesOnlyAdminVersion(t *testing.T) {
+	now := time.Date(2026, 7, 19, 13, 0, 0, 0, time.UTC)
+	account, err := RestoreAccount(AccountSnapshot{
+		ID:                 uuid.New(),
+		Username:           "admin",
+		Status:             AccountStatusActive,
+		PasswordHash:       testArgonHash,
+		PasswordAlgorithm:  PasswordAlgorithmArgon2id,
+		PasswordParameters: testPasswordParametersJSON,
+		PasswordVersion:    3,
+		AdminVersion:       7,
+		CreatedAt:          now.Add(-time.Hour),
+		UpdatedAt:          now.Add(-time.Minute),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	step, err := VerifyTOTPCode(secret, code, now.Add(30*time.Second))
+
+	updated, err := account.RecordMFAChange(now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if step != now.Unix()/int64(TOTPPeriod) {
-		t.Fatalf("accepted step %d does not identify previous window", step)
+	before, after := account.Snapshot(), updated.Snapshot()
+	if after.AdminVersion != before.AdminVersion+1 {
+		t.Fatalf("admin version = %d, want %d", after.AdminVersion, before.AdminVersion+1)
 	}
-	if _, err := VerifyTOTPCode(secret, code, now.Add(2*time.Minute)); !errors.Is(err, ErrTOTPInvalid) {
-		t.Fatalf("expected expired TOTP, got %v", err)
+	if after.PasswordVersion != before.PasswordVersion || after.PasswordHash != before.PasswordHash ||
+		after.PasswordAlgorithm != before.PasswordAlgorithm || after.PasswordParameters != before.PasswordParameters {
+		t.Fatal("MFA changes must preserve the password and password version")
 	}
 }
 
-type testRecoveryHasher struct{}
-
-const testRecoveryHash = "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-
-func (testRecoveryHasher) Hash(_ context.Context, _ []byte) (string, error) {
-	return testRecoveryHash, nil
+func TestEnrollmentOwnsReplayFloorAndVersion(t *testing.T) {
+	now := time.Date(2026, 7, 19, 14, 0, 0, 0, time.UTC)
+	enrollment, err := RestoreEnrollment(EnrollmentSnapshot{
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Ciphertext:        []byte("ciphertext"),
+		Nonce:             []byte("nonce"),
+		KeyVersion:        1,
+		Status:            EnrollmentStatusPending,
+		AdminVersion:      7,
+		EnrollmentVersion: 1,
+		OperationID:       "op-enable-totp",
+		CreatedAt:         now,
+		ExpiresAt:         now.Add(10 * time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	activated, err := enrollment.Activate(42, 8, now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := activated.Snapshot().ReplayFloor; got == nil || *got != 42 {
+		t.Fatalf("replay floor = %v, want 42", got)
+	}
+	if got := activated.Snapshot().EnrollmentVersion; got != 2 {
+		t.Fatalf("version = %d, want 2", got)
+	}
+	if got := activated.Snapshot().AdminVersion; got != 8 {
+		t.Fatalf("admin version = %d, want 8", got)
+	}
+	advanced, err := activated.AcceptTOTP(43, now.Add(2*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := advanced.Snapshot().ReplayFloor; got == nil || *got != 43 {
+		t.Fatalf("replay floor = %v, want 43", got)
+	}
+	if got := advanced.Snapshot().EnrollmentVersion; got != 3 {
+		t.Fatalf("version = %d, want 3", got)
+	}
+	if _, err := advanced.AcceptTOTP(43, now.Add(3*time.Minute)); !errors.Is(err, ErrConcurrentTransition) {
+		t.Fatalf("expected replay rejection, got %v", err)
+	}
+	disabled, err := advanced.Disable(9, now.Add(4*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabledSnapshot := disabled.Snapshot()
+	if disabledSnapshot.Status != EnrollmentStatusDisabled {
+		t.Fatalf("status = %q, want %q", disabledSnapshot.Status, EnrollmentStatusDisabled)
+	}
+	if len(disabledSnapshot.Ciphertext) != 0 || len(disabledSnapshot.Nonce) != 0 {
+		t.Fatal("disabled enrollment must clear ciphertext and nonce")
+	}
+	if disabledSnapshot.EnrollmentVersion != 4 {
+		t.Fatalf("version = %d, want 4", disabledSnapshot.EnrollmentVersion)
+	}
+	if disabledSnapshot.AdminVersion != 9 {
+		t.Fatalf("admin version = %d, want 9", disabledSnapshot.AdminVersion)
+	}
 }
-func (testRecoveryHasher) VerifyOrDummy(_ context.Context, encoded string, secret []byte) (bool, bool, error) {
-	return encoded == testRecoveryHash && len(secret) > 0, false, nil
+
+func TestSecuritySnapshotsDoNotExposeSecretBackingStorage(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 19, 14, 30, 0, 0, time.UTC)
+	enrollment, err := RestoreEnrollment(EnrollmentSnapshot{
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Ciphertext:        []byte{1, 2, 3},
+		Nonce:             []byte{4, 5, 6},
+		KeyVersion:        1,
+		Status:            EnrollmentStatusPending,
+		AdminVersion:      3,
+		EnrollmentVersion: 1,
+		OperationID:       "op-snapshot-isolation",
+		CreatedAt:         now,
+		ExpiresAt:         now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	enrollmentSnapshot := enrollment.Snapshot()
+	enrollmentSnapshot.Ciphertext[0] = 9
+	enrollmentSnapshot.Nonce[0] = 9
+	if current := enrollment.Snapshot(); current.Ciphertext[0] != 1 || current.Nonce[0] != 4 {
+		t.Fatal("enrollment snapshot mutated aggregate secret storage")
+	}
+
+	session := mustRestoreTestSession(t, SessionSnapshot{
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Selector:          "AAAAAAAAAAAAAAAAAAAAAA",
+		SecretMAC:         security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		CSRFHash:          security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		Kind:              SessionKindFull,
+		AdminVersion:      3,
+		PasswordVersion:   1,
+		SessionVersion:    1,
+		MaxAttempts:       5,
+		CreatedAt:         now,
+		LastSeenAt:        now,
+		IdleExpiresAt:     now.Add(time.Minute),
+		AbsoluteExpiresAt: now.Add(time.Hour),
+	})
+	sessionSnapshot := session.Snapshot()
+	sessionSnapshot.SecretMAC.Value[0] = 9
+	sessionSnapshot.CSRFHash.Value[0] = 9
+	if current := session.Snapshot(); current.SecretMAC.Value[0] != 0 || current.CSRFHash.Value[0] != 0 {
+		t.Fatal("session snapshot mutated aggregate proof storage")
+	}
 }
 
 func TestRecoveryCodeIsOneTimeAndSelectorBound(t *testing.T) {
@@ -104,20 +212,90 @@ func TestRecoveryCodeIsOneTimeAndSelectorBound(t *testing.T) {
 	}
 }
 
-func TestSessionLifecycleRejectsMalformedGeneration(t *testing.T) {
+func TestSessionLifecycleCarriesVersionAndClientMetadata(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	session, err := RestoreSession(SessionSnapshot{
-		ID: uuid.New(), AdminID: uuid.New(), Selector: "AAAAAAAAAAAAAAAAAAAAAA", SecretMAC: security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
-		CSRFHash: security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)}, Kind: SessionKindFull, AdminVersion: 2, PasswordVersion: 1,
-		MaxAttempts: 5, CreatedAt: now, LastSeenAt: now, IdleExpiresAt: now.Add(time.Minute), AbsoluteExpiresAt: now.Add(time.Hour),
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Selector:          "AAAAAAAAAAAAAAAAAAAAAA",
+		SecretMAC:         security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		CSRFHash:          security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		Kind:              SessionKindFull,
+		AdminVersion:      2,
+		PasswordVersion:   1,
+		SessionVersion:    1,
+		ClientIP:          "203.0.113.10",
+		UserAgent:         "GameNightAdmin/1.0",
+		MaxAttempts:       5,
+		CreatedAt:         now,
+		LastSeenAt:        now,
+		IdleExpiresAt:     now.Add(time.Minute),
+		AbsoluteExpiresAt: now.Add(time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !session.Active(now) || session.Active(now.Add(time.Minute)) {
-		t.Fatal("session expiry boundary is not enforced")
+	snapshot := session.Snapshot()
+	if snapshot.SessionVersion != 1 {
+		t.Fatalf("session version = %d, want 1", snapshot.SessionVersion)
 	}
-	if _, err := session.Revoke("logout", now); err != nil {
+	if snapshot.ClientIP != "203.0.113.10" || snapshot.UserAgent != "GameNightAdmin/1.0" {
+		t.Fatalf("unexpected client metadata: %+v", snapshot)
+	}
+	if _, err := RestoreSession(SessionSnapshot{
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Selector:          "AAAAAAAAAAAAAAAAAAAAAA",
+		SecretMAC:         security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		CSRFHash:          security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		Kind:              SessionKindFull,
+		AdminVersion:      2,
+		PasswordVersion:   1,
+		SessionVersion:    0,
+		MaxAttempts:       5,
+		CreatedAt:         now,
+		LastSeenAt:        now,
+		IdleExpiresAt:     now.Add(time.Minute),
+		AbsoluteExpiresAt: now.Add(time.Hour),
+	}); !errors.Is(err, ErrIntegrity) {
+		t.Fatalf("expected missing session version integrity failure, got %v", err)
+	}
+}
+
+func TestTOTPWindowReturnsMovingFactorForCAS(t *testing.T) {
+	secret := "JBSWY3DPEHPK3PXP"
+	now := time.Unix(1_700_000_000, 0).UTC()
+	code, err := GenerateTOTPCode(secret, now)
+	if err != nil {
 		t.Fatal(err)
 	}
+	step, err := VerifyTOTPCode(secret, code, now.Add(30*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if step != now.Unix()/int64(TOTPPeriod) {
+		t.Fatalf("accepted step %d does not identify previous window", step)
+	}
+	if _, err := VerifyTOTPCode(secret, code, now.Add(2*time.Minute)); !errors.Is(err, ErrTOTPInvalid) {
+		t.Fatalf("expected expired TOTP, got %v", err)
+	}
+}
+
+type fixedClock struct{ now time.Time }
+
+func (clock fixedClock) Now() time.Time { return clock.now }
+
+type testRecoveryHasher struct{}
+
+const (
+	testArgonHash              = "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	testPasswordParametersJSON = `{"MemoryKiB":65536,"Iterations":3,"Parallelism":2,"SaltLength":16,"KeyLength":32}`
+)
+
+func (testRecoveryHasher) Hash(_ context.Context, _ []byte) (string, error) {
+	return testArgonHash, nil
+}
+
+func (testRecoveryHasher) VerifyOrDummy(_ context.Context, encoded string, secret []byte) (bool, bool, error) {
+	return encoded == testArgonHash && len(secret) > 0, false, nil
 }

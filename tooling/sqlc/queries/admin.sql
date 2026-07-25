@@ -1,7 +1,6 @@
 -- name: GetSingletonAdminForUpdate :one
 SELECT singleton_id, admin_id, username, status, password_hash, password_algorithm,
-       password_parameters, password_version, admin_version, last_accepted_totp_step,
-       created_at, updated_at
+       password_parameters, password_version, admin_version, created_at, updated_at
 FROM admin_accounts
 WHERE singleton_id = 1
 FOR UPDATE;
@@ -47,16 +46,15 @@ WHERE singleton_id = 1
   AND admin_version = sqlc.arg(expected_admin_version)
 RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at;
 
--- name: AcceptAdminTotpStepCAS :one
+-- name: RecordAdminMFAChangeCAS :one
 UPDATE admin_accounts
-SET last_accepted_totp_step = sqlc.arg(totp_step),
-    updated_at = sqlc.arg(accepted_at)
+SET admin_version = admin_version + 1,
+    updated_at = sqlc.arg(changed_at)
 WHERE singleton_id = 1
   AND admin_id = sqlc.arg(admin_id)
-  AND status IN ('setup_required', 'recovery_pending', 'active')
+  AND status = 'active'
   AND admin_version = sqlc.arg(expected_admin_version)
-  AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < sqlc.arg(totp_step))
-RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at;
+RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at;
 
 -- name: CreateAdminChallenge :one
 INSERT INTO admin_challenges (
@@ -175,6 +173,7 @@ INSERT INTO admin_totp_enrollments (
     key_version,
     status,
     admin_version,
+    enrollment_version,
     operation_id,
     created_at,
     expires_at
@@ -186,17 +185,18 @@ INSERT INTO admin_totp_enrollments (
     sqlc.arg(key_version),
     'pending',
     sqlc.arg(admin_version),
+    1,
     sqlc.arg(operation_id),
     sqlc.arg(created_at),
     sqlc.arg(expires_at)
 )
 ON CONFLICT (admin_id) WHERE status = 'pending' DO NOTHING
 RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-          operation_id, created_at, expires_at, activated_at, disabled_at;
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at;
 
 -- name: GetPendingAdminTotpEnrollmentForUpdate :one
 SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-       operation_id, created_at, expires_at, activated_at, disabled_at
+       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 FROM admin_totp_enrollments
 WHERE admin_id = sqlc.arg(admin_id)
   AND status = 'pending'
@@ -204,15 +204,47 @@ FOR UPDATE;
 
 -- name: GetActiveAdminTotpEnrollmentForUpdate :one
 SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-       operation_id, created_at, expires_at, activated_at, disabled_at
+       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 FROM admin_totp_enrollments
 WHERE admin_id = sqlc.arg(admin_id)
   AND status = 'active'
 FOR UPDATE;
 
+-- name: ActivatePendingAdminTotpEnrollmentCAS :one
+UPDATE admin_totp_enrollments
+SET status = 'active',
+    admin_version = sqlc.arg(next_admin_version),
+    enrollment_version = enrollment_version + 1,
+    replay_floor = sqlc.arg(replay_floor),
+    expires_at = NULL,
+    activated_at = sqlc.arg(activated_at)
+WHERE admin_id = sqlc.arg(admin_id)
+  AND enrollment_id = sqlc.arg(enrollment_id)
+  AND status = 'pending'
+  AND admin_version = sqlc.arg(expected_admin_version)
+  AND enrollment_version = sqlc.arg(expected_enrollment_version)
+  AND expires_at > sqlc.arg(activated_at)
+RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at;
+
+-- name: AcceptAdminTotpReplayCAS :one
+UPDATE admin_totp_enrollments
+SET replay_floor = sqlc.arg(replay_floor),
+    enrollment_version = enrollment_version + 1
+WHERE admin_id = sqlc.arg(admin_id)
+  AND enrollment_id = sqlc.arg(enrollment_id)
+  AND status = 'active'
+  AND admin_version = sqlc.arg(expected_admin_version)
+  AND enrollment_version = sqlc.arg(expected_enrollment_version)
+  AND replay_floor < sqlc.arg(replay_floor)
+RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at;
+
 -- name: DisableActiveAdminTotpEnrollmentCAS :one
 UPDATE admin_totp_enrollments
 SET status = 'disabled',
+    admin_version = sqlc.arg(next_admin_version),
+    enrollment_version = enrollment_version + 1,
     ciphertext = NULL,
     nonce = NULL,
     disabled_at = sqlc.arg(disabled_at)
@@ -220,20 +252,9 @@ WHERE admin_id = sqlc.arg(admin_id)
   AND enrollment_id = sqlc.arg(enrollment_id)
   AND status = 'active'
   AND admin_version = sqlc.arg(expected_admin_version)
-RETURNING enrollment_id, admin_id, status, disabled_at;
-
--- name: ActivatePendingAdminTotpEnrollmentCAS :one
-UPDATE admin_totp_enrollments
-SET status = 'active',
-    expires_at = NULL,
-    activated_at = sqlc.arg(activated_at)
-WHERE admin_id = sqlc.arg(admin_id)
-  AND enrollment_id = sqlc.arg(enrollment_id)
-  AND status = 'pending'
-  AND admin_version = sqlc.arg(expected_admin_version)
-  AND expires_at > sqlc.arg(activated_at)
+  AND enrollment_version = sqlc.arg(expected_enrollment_version)
 RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-          operation_id, created_at, expires_at, activated_at, disabled_at;
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at;
 
 -- name: CreateAdminSession :one
 INSERT INTO admin_sessions (
@@ -246,6 +267,9 @@ INSERT INTO admin_sessions (
     kind,
     admin_version,
     password_version,
+    session_version,
+    client_ip,
+    user_agent,
     attempt_count,
     max_attempts,
     created_at,
@@ -262,6 +286,9 @@ INSERT INTO admin_sessions (
     sqlc.arg(kind),
     sqlc.arg(admin_version),
     sqlc.arg(password_version),
+    sqlc.arg(session_version),
+    sqlc.arg(client_ip),
+    sqlc.arg(user_agent),
     0,
     sqlc.arg(max_attempts),
     sqlc.arg(created_at),
@@ -270,16 +297,39 @@ INSERT INTO admin_sessions (
     sqlc.arg(absolute_expires_at)
 )
 RETURNING session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-          kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-          last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason;
+          kind, admin_version, password_version, session_version, client_ip, user_agent,
+          attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+          absolute_expires_at, revoked_at, revoke_reason;
 
 -- name: GetAdminSessionForUpdate :one
 SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-       kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-       last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
 FROM admin_sessions
 WHERE selector = sqlc.arg(selector)
 FOR UPDATE;
+
+-- name: GetAdminSessionByIDForUpdate :one
+SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
+FROM admin_sessions
+WHERE session_id = sqlc.arg(session_id)
+FOR UPDATE;
+
+-- name: ListActiveAdminSessions :many
+SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
+FROM admin_sessions
+WHERE admin_id = sqlc.arg(admin_id)
+  AND revoked_at IS NULL
+  AND idle_expires_at > sqlc.arg(active_at)
+  AND absolute_expires_at > sqlc.arg(active_at)
+ORDER BY created_at ASC, session_id ASC;
 
 -- name: GetAdminRecoveryCodeForUpdate :one
 SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
@@ -291,29 +341,163 @@ FOR UPDATE;
 -- name: TouchAdminSessionCAS :one
 UPDATE admin_sessions
 SET last_seen_at = sqlc.arg(seen_at),
-    idle_expires_at = LEAST(sqlc.arg(idle_expires_at)::timestamptz, absolute_expires_at)
+    idle_expires_at = LEAST(sqlc.arg(idle_expires_at)::timestamptz, absolute_expires_at),
+    session_version = session_version + 1
 WHERE session_id = sqlc.arg(session_id)
   AND admin_version = sqlc.arg(expected_admin_version)
   AND password_version = sqlc.arg(expected_password_version)
+  AND session_version = sqlc.arg(expected_session_version)
   AND revoked_at IS NULL
   AND idle_expires_at > sqlc.arg(seen_at)
   AND absolute_expires_at > sqlc.arg(seen_at)
-RETURNING session_id, kind, last_seen_at, idle_expires_at, absolute_expires_at;
+RETURNING session_id, kind, session_version, last_seen_at, idle_expires_at, absolute_expires_at;
 
 -- name: RevokeAdminSessionCAS :one
 UPDATE admin_sessions
 SET revoked_at = sqlc.arg(revoked_at),
-    revoke_reason = sqlc.arg(revoke_reason)
+    revoke_reason = sqlc.arg(revoke_reason),
+    session_version = session_version + 1
 WHERE session_id = sqlc.arg(session_id)
+  AND admin_id = sqlc.arg(admin_id)
+  AND session_version = sqlc.arg(expected_session_version)
   AND revoked_at IS NULL
-RETURNING session_id, revoked_at, revoke_reason;
+RETURNING session_id, session_version, revoked_at, revoke_reason;
 
--- name: RevokeAllAdminSessions :execrows
-UPDATE admin_sessions
+-- name: RevokeOtherActiveAdminSessionsCAS :many
+WITH preserved AS MATERIALIZED (
+    SELECT preserved_session.session_id
+    FROM admin_sessions AS preserved_session
+    WHERE preserved_session.session_id = sqlc.arg(preserved_session_id)
+      AND preserved_session.admin_id = sqlc.arg(admin_id)
+      AND preserved_session.admin_version = sqlc.arg(expected_admin_version)
+      AND preserved_session.session_version = sqlc.arg(expected_preserved_session_version)
+      AND preserved_session.revoked_at IS NULL
+      AND preserved_session.idle_expires_at > sqlc.arg(revoked_at)
+      AND preserved_session.absolute_expires_at > sqlc.arg(revoked_at)
+    FOR UPDATE OF preserved_session
+)
+UPDATE admin_sessions AS sessions
 SET revoked_at = sqlc.arg(revoked_at),
-    revoke_reason = sqlc.arg(revoke_reason)
+    revoke_reason = sqlc.arg(revoke_reason),
+    session_version = sessions.session_version + 1
+FROM preserved
+WHERE sessions.admin_id = sqlc.arg(admin_id)
+  AND sessions.session_id <> preserved.session_id
+  AND sessions.revoked_at IS NULL
+  AND sessions.idle_expires_at > sqlc.arg(revoked_at)
+  AND sessions.absolute_expires_at > sqlc.arg(revoked_at)
+RETURNING sessions.session_id, sessions.admin_id, sessions.selector, sessions.secret_hash,
+          sessions.secret_key_version, sessions.csrf_hash, sessions.kind, sessions.admin_version,
+          sessions.password_version, sessions.session_version, sessions.client_ip, sessions.user_agent,
+          sessions.attempt_count, sessions.max_attempts, sessions.created_at, sessions.last_seen_at,
+          sessions.idle_expires_at, sessions.absolute_expires_at, sessions.revoked_at, sessions.revoke_reason;
+
+-- name: UpsertAdminElevationGrant :one
+INSERT INTO admin_elevation_grants (
+    admin_id,
+    session_id,
+    scope,
+    admin_version,
+    password_version,
+    session_version,
+    enrollment_version,
+    granted_at,
+    expires_at,
+    revoked_at
+) VALUES (
+    sqlc.arg(admin_id),
+    sqlc.arg(session_id),
+    sqlc.arg(scope),
+    sqlc.arg(admin_version),
+    sqlc.arg(password_version),
+    sqlc.arg(session_version),
+    sqlc.arg(enrollment_version),
+    sqlc.arg(granted_at),
+    sqlc.arg(expires_at),
+    sqlc.narg(revoked_at)
+)
+ON CONFLICT (session_id, scope) DO UPDATE
+SET admin_id = EXCLUDED.admin_id,
+    admin_version = EXCLUDED.admin_version,
+    password_version = EXCLUDED.password_version,
+    session_version = EXCLUDED.session_version,
+    enrollment_version = EXCLUDED.enrollment_version,
+    granted_at = EXCLUDED.granted_at,
+    expires_at = EXCLUDED.expires_at,
+    revoked_at = EXCLUDED.revoked_at
+RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+          enrollment_version, granted_at, expires_at, revoked_at;
+
+-- name: GetAdminElevationGrantForSessionScope :one
+SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+       enrollment_version, granted_at, expires_at, revoked_at
+FROM admin_elevation_grants
+WHERE session_id = sqlc.arg(session_id)
+  AND scope = sqlc.arg(scope)
+FOR UPDATE;
+
+-- name: ListLiveAdminElevationGrantsForSessions :many
+SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+       enrollment_version, granted_at, expires_at, revoked_at
+FROM admin_elevation_grants
 WHERE admin_id = sqlc.arg(admin_id)
-  AND revoked_at IS NULL;
+  AND session_id = ANY(sqlc.arg(session_ids)::uuid[])
+  AND revoked_at IS NULL
+  AND expires_at > sqlc.arg(active_at)
+ORDER BY session_id, scope;
+
+-- name: RevokeAdminElevationGrantCAS :one
+UPDATE admin_elevation_grants
+SET revoked_at = sqlc.arg(revoked_at)
+WHERE session_id = sqlc.arg(session_id)
+  AND scope = sqlc.arg(scope)
+  AND admin_version = sqlc.arg(expected_admin_version)
+  AND password_version = sqlc.arg(expected_password_version)
+  AND session_version = sqlc.arg(expected_session_version)
+  AND enrollment_version = sqlc.arg(expected_enrollment_version)
+  AND revoked_at IS NULL
+RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+          enrollment_version, granted_at, expires_at, revoked_at;
+
+-- name: CreateAdminCommandReceipt :one
+INSERT INTO admin_command_receipts (
+    admin_id,
+    operation_id,
+    request_digest,
+    command,
+    target_type,
+    target_id,
+    result_admin_version,
+    result_password_version,
+    result_session_version,
+    result_enrollment_version,
+    audit_event_id,
+    created_at
+) VALUES (
+    sqlc.arg(admin_id),
+    sqlc.arg(operation_id),
+    sqlc.arg(request_digest),
+    sqlc.arg(command),
+    sqlc.arg(target_type),
+    sqlc.arg(target_id),
+    sqlc.arg(result_admin_version),
+    sqlc.arg(result_password_version),
+    sqlc.arg(result_session_version),
+    sqlc.arg(result_enrollment_version),
+    sqlc.arg(audit_event_id),
+    sqlc.arg(created_at)
+)
+RETURNING admin_id, operation_id, request_digest, command, target_type, target_id,
+          result_admin_version, result_password_version, result_session_version,
+          result_enrollment_version, audit_event_id, created_at;
+
+-- name: GetAdminCommandReceipt :one
+SELECT admin_id, operation_id, request_digest, command, target_type, target_id,
+       result_admin_version, result_password_version, result_session_version,
+       result_enrollment_version, audit_event_id, created_at
+FROM admin_command_receipts
+WHERE admin_id = sqlc.arg(admin_id)
+  AND operation_id = sqlc.arg(operation_id);
 
 -- name: CreateAdminRecoveryCode :one
 INSERT INTO admin_recovery_codes (
@@ -335,6 +519,20 @@ INSERT INTO admin_recovery_codes (
 )
 RETURNING recovery_code_id, admin_id, selector, secret_hash, set_version, status,
           created_at, consumed_at, revoked_at;
+
+-- name: GetAdminRecoveryCodeSetState :one
+WITH latest AS (
+    SELECT COALESCE(MAX(set_version), 0)::bigint AS set_version
+    FROM admin_recovery_codes
+    WHERE admin_id = sqlc.arg(admin_id)
+)
+SELECT latest.set_version,
+       COUNT(code.recovery_code_id) FILTER (WHERE code.status = 'active')::bigint AS remaining_active
+FROM latest
+LEFT JOIN admin_recovery_codes AS code
+  ON code.admin_id = sqlc.arg(admin_id)
+ AND code.set_version = latest.set_version
+GROUP BY latest.set_version;
 
 -- name: ConsumeAdminRecoveryCodeCAS :one
 UPDATE admin_recovery_codes

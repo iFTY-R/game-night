@@ -161,9 +161,7 @@ func (service *Service) processBatch(ctx context.Context, job Job) (processed ui
 	err = service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
 		switch job.Cursor.Scope {
 		case ScopeUserProfiles:
-			return service.processUserProfiles(ctx, transaction, job, &processed, &conflicts)
-		case ScopeProfileExportItems:
-			return service.processProfileExportItems(ctx, transaction, job, &processed, &conflicts, &completed)
+			return service.processUserProfiles(ctx, transaction, job, &processed, &conflicts, &completed)
 		case ScopeAdminTOTPEnrollments:
 			return service.processTOTPEnrollments(ctx, transaction, job, &processed, &conflicts, &completed)
 		default:
@@ -178,13 +176,14 @@ func (service *Service) processUserProfiles(
 	transaction Transaction,
 	job Job,
 	processed, conflicts *uint32,
+	completed *bool,
 ) error {
 	rows, err := transaction.ListUserProfiles(ctx, job.SourceVersion, job.Cursor.ID, service.config.BatchSize)
 	if err != nil {
 		return err
 	}
 	if len(rows) == 0 {
-		return service.advanceAndAudit(ctx, transaction, job, Cursor{Scope: ScopeProfileExportItems}, 0, 0)
+		return service.finishOrRestart(ctx, transaction, job, processed, conflicts, completed)
 	}
 	for _, row := range rows {
 		rotated, rotateErr := service.pii.Reencrypt(row.UserID, profile.FieldRealName, row.Encrypted)
@@ -202,42 +201,6 @@ func (service *Service) processUserProfiles(
 		}
 	}
 	next := Cursor{Scope: ScopeUserProfiles, ID: rows[len(rows)-1].UserID}
-	return service.advanceAndAudit(ctx, transaction, job, next, int64(*processed), int64(*conflicts))
-}
-
-func (service *Service) processProfileExportItems(
-	ctx context.Context,
-	transaction Transaction,
-	job Job,
-	processed, conflicts *uint32,
-	completed *bool,
-) error {
-	rows, err := transaction.ListProfileExportItems(
-		ctx, job.SourceVersion, job.Cursor.ID, job.Cursor.Ordinal, service.config.BatchSize,
-	)
-	if err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return service.finishOrRestart(ctx, transaction, job, processed, conflicts, completed)
-	}
-	for _, row := range rows {
-		rotated, rotateErr := service.pii.Reencrypt(row.UserID, profile.FieldRealName, row.Encrypted)
-		if rotateErr != nil || rotated.KeyVersion != job.TargetVersion {
-			return ErrIntegrity
-		}
-		updated, updateErr := transaction.RotateProfileExportItem(ctx, row, rotated, job.SourceVersion)
-		if updateErr != nil {
-			return updateErr
-		}
-		if updated {
-			(*processed)++
-		} else {
-			(*conflicts)++
-		}
-	}
-	last := rows[len(rows)-1]
-	next := Cursor{Scope: ScopeProfileExportItems, ID: last.ExportID, Ordinal: last.Ordinal}
 	return service.advanceAndAudit(ctx, transaction, job, next, int64(*processed), int64(*conflicts))
 }
 
@@ -398,9 +361,6 @@ func validJob(job Job) bool {
 	switch job.Cursor.Scope {
 	case ScopeUserProfiles:
 		return job.Purpose == PurposePII && job.Cursor.Ordinal == 0
-	case ScopeProfileExportItems:
-		return job.Purpose == PurposePII &&
-			((job.Cursor.ID == uuid.Nil && job.Cursor.Ordinal == 0) || (job.Cursor.ID != uuid.Nil && job.Cursor.Ordinal > 0))
 	case ScopeAdminTOTPEnrollments:
 		return job.Purpose == PurposeTOTP && job.Cursor.Ordinal == 0
 	default:

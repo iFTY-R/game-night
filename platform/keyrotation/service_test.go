@@ -21,7 +21,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/security"
 )
 
-func TestServiceResumesProfileRotationAndAppendsLifecycleAudit(t *testing.T) {
+func TestServiceCompletesUserProfileRotationWithoutLegacyExportStage(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0).UTC()
 	oldKeyring := testAESKeyring[security.PIIKeyPurpose](t, now, 1, []uint32{1, 2})
 	activeKeyring := testAESKeyring[security.PIIKeyPurpose](t, now, 2, []uint32{1, 2})
@@ -56,14 +56,11 @@ func TestServiceResumesProfileRotationAndAppendsLifecycleAudit(t *testing.T) {
 	if store.profile.Encrypted.KeyVersion != 2 || store.job.Cursor.Scope != ScopeUserProfiles {
 		t.Fatalf("first pass did not rotate and advance: %+v", store.job)
 	}
-	var second Result
-	for attempt := 0; attempt < 4 && !second.Completed; attempt++ {
-		second, err = service.RunOnce(context.Background())
-		if err != nil {
-			t.Fatal(err)
-		}
+	second, err := service.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !second.Completed || store.job.CompletedAt.IsZero() || auditRepository.head.Sequence() != 4 {
+	if !second.Completed || store.job.CompletedAt.IsZero() || auditRepository.head.Sequence() != 3 {
 		t.Fatalf("resume did not complete lifecycle: result=%+v job=%+v audit-sequence=%d", second, store.job, auditRepository.head.Sequence())
 	}
 	plaintext, err := activePII.DecryptRealName(userID, store.profile.Encrypted)
@@ -217,14 +214,6 @@ func (store *fakeRotationStore) RotateUserProfile(_ context.Context, row UserPro
 	}
 	store.profile.Encrypted = rotated
 	return true, nil
-}
-
-func (store *fakeRotationStore) ListProfileExportItems(context.Context, uint32, uuid.UUID, int64, uint32) ([]ProfileExportCiphertext, error) {
-	return nil, nil
-}
-
-func (store *fakeRotationStore) RotateProfileExportItem(context.Context, ProfileExportCiphertext, profile.EncryptedValue, uint32) (bool, error) {
-	return false, errors.New("unexpected export rotation")
 }
 
 func (store *fakeRotationStore) ListTOTPEnrollments(context.Context, uint32, uuid.UUID, uint32) ([]TOTPEnrollmentCiphertext, error) {

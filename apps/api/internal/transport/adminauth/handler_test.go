@@ -1,11 +1,11 @@
-package adminauth_test
+package adminauth
 
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	stderrors "errors"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -17,8 +17,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/apps/api/internal/server"
-	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminauth"
-	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminidentity"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	transporterrors "github.com/iFTY-R/game-night/apps/api/internal/transport/errors"
@@ -28,248 +26,207 @@ import (
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
-	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
-	"github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/outbox"
-	"github.com/iFTY-R/game-night/platform/profile"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/iFTY-R/game-night/platform/security"
 )
 
-func TestEveryAdminRPCIsImplementedWithStableErrorDetails(t *testing.T) {
-	authClient, identityClient := invalidRequestClients(t)
-	calls := map[string]func() error{
-		"GetSetupState": func() error {
-			_, err := authClient.GetSetupState(t.Context(), connect.NewRequest(&adminv1.GetSetupStateRequest{}))
-			return err
+func TestContextInterceptorRejectsUnknownProcedure(t *testing.T) {
+	interceptor := newInterceptor(t, &fakeSessionInspector{})
+	called := false
+	handler := connect.NewUnaryHandler(
+		"/platform.admin.v1.AdminAuthService/Unknown",
+		func(context.Context, *connect.Request[adminv1.GetSetupStateRequest]) (*connect.Response[adminv1.GetSetupStateResponse], error) {
+			called = true
+			return connect.NewResponse(&adminv1.GetSetupStateResponse{}), nil
 		},
-		"GetCurrentAdminSession": func() error {
-			_, err := authClient.GetCurrentAdminSession(t.Context(), connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{}))
-			return err
-		},
-		"GetRuntimeReadiness": func() error {
-			_, err := authClient.GetRuntimeReadiness(t.Context(), connect.NewRequest(&adminv1.GetRuntimeReadinessRequest{}))
-			return err
-		},
-		"BeginAdminLogin": func() error {
-			_, err := authClient.BeginAdminLogin(t.Context(), connect.NewRequest(&adminv1.BeginAdminLoginRequest{}))
-			return err
-		},
-		"LoginPassword": func() error {
-			_, err := authClient.LoginPassword(t.Context(), connect.NewRequest(&adminv1.LoginPasswordRequest{}))
-			return err
-		},
-		"VerifyTotp": func() error {
-			_, err := authClient.VerifyTotp(t.Context(), connect.NewRequest(&adminv1.VerifyTotpRequest{}))
-			return err
-		},
-		"ChangeInitialPassword": func() error {
-			_, err := authClient.ChangeInitialPassword(t.Context(), connect.NewRequest(&adminv1.ChangeInitialPasswordRequest{}))
-			return err
-		},
-		"BeginTotpEnrollment": func() error {
-			_, err := authClient.BeginTotpEnrollment(t.Context(), connect.NewRequest(&adminv1.BeginTotpEnrollmentRequest{}))
-			return err
-		},
-		"CompleteTotpEnrollment": func() error {
-			_, err := authClient.CompleteTotpEnrollment(t.Context(), connect.NewRequest(&adminv1.CompleteTotpEnrollmentRequest{}))
-			return err
-		},
-		"ConfirmAdminSecretReceipt": func() error {
-			_, err := authClient.ConfirmAdminSecretReceipt(t.Context(), connect.NewRequest(&adminv1.ConfirmAdminSecretReceiptRequest{}))
-			return err
-		},
-		"RecoverAdmin": func() error {
-			_, err := authClient.RecoverAdmin(t.Context(), connect.NewRequest(&adminv1.RecoverAdminRequest{}))
-			return err
-		},
-		"ChangeAdminPassword": func() error {
-			_, err := authClient.ChangeAdminPassword(t.Context(), connect.NewRequest(&adminv1.ChangeAdminPasswordRequest{}))
-			return err
-		},
-		"BeginTotpRebind": func() error {
-			_, err := authClient.BeginTotpRebind(t.Context(), connect.NewRequest(&adminv1.BeginTotpRebindRequest{}))
-			return err
-		},
-		"CompleteTotpRebind": func() error {
-			_, err := authClient.CompleteTotpRebind(t.Context(), connect.NewRequest(&adminv1.CompleteTotpRebindRequest{}))
-			return err
-		},
-		"RegenerateAdminRecoveryCodes": func() error {
-			_, err := authClient.RegenerateAdminRecoveryCodes(t.Context(), connect.NewRequest(&adminv1.RegenerateAdminRecoveryCodesRequest{}))
-			return err
-		},
-		"LogoutAdmin": func() error {
-			_, err := authClient.LogoutAdmin(t.Context(), connect.NewRequest(&adminv1.LogoutAdminRequest{}))
-			return err
-		},
-		"LogoutAllAdminSessions": func() error {
-			_, err := authClient.LogoutAllAdminSessions(t.Context(), connect.NewRequest(&adminv1.LogoutAllAdminSessionsRequest{}))
-			return err
-		},
-		"GetUser": func() error {
-			_, err := identityClient.GetUser(t.Context(), connect.NewRequest(&adminv1.GetUserRequest{}))
-			return err
-		},
-		"GetRealName": func() error {
-			_, err := identityClient.GetRealName(t.Context(), connect.NewRequest(&adminv1.GetRealNameRequest{}))
-			return err
-		},
-		"UpdateRealName": func() error {
-			_, err := identityClient.UpdateRealName(t.Context(), connect.NewRequest(&adminv1.UpdateRealNameRequest{}))
-			return err
-		},
-		"CreateUserProfileExport": func() error {
-			_, err := identityClient.CreateUserProfileExport(t.Context(), connect.NewRequest(&adminv1.CreateUserProfileExportRequest{}))
-			return err
-		},
-		"GetUserProfileExportPage": func() error {
-			_, err := identityClient.GetUserProfileExportPage(t.Context(), connect.NewRequest(&adminv1.GetUserProfileExportPageRequest{}))
-			return err
-		},
-		"CompleteUserProfileExport": func() error {
-			_, err := identityClient.CompleteUserProfileExport(t.Context(), connect.NewRequest(&adminv1.CompleteUserProfileExportRequest{}))
-			return err
-		},
-		"AbortUserProfileExport": func() error {
-			_, err := identityClient.AbortUserProfileExport(t.Context(), connect.NewRequest(&adminv1.AbortUserProfileExportRequest{}))
-			return err
-		},
-		"CreateAssistedRecoveryGrant": func() error {
-			_, err := identityClient.CreateAssistedRecoveryGrant(t.Context(), connect.NewRequest(&adminv1.CreateAssistedRecoveryGrantRequest{}))
-			return err
-		},
-		"ForceChangeUsername": func() error {
-			_, err := identityClient.ForceChangeUsername(t.Context(), connect.NewRequest(&adminv1.ForceChangeUsernameRequest{}))
-			return err
-		},
-		"SuspendUser": func() error {
-			_, err := identityClient.SuspendUser(t.Context(), connect.NewRequest(&adminv1.SuspendUserRequest{}))
-			return err
-		},
-		"UnsuspendUser": func() error {
-			_, err := identityClient.UnsuspendUser(t.Context(), connect.NewRequest(&adminv1.UnsuspendUserRequest{}))
-			return err
-		},
-		"DeleteUser": func() error {
-			_, err := identityClient.DeleteUser(t.Context(), connect.NewRequest(&adminv1.DeleteUserRequest{}))
-			return err
-		},
-		"RevokeUserDevice": func() error {
-			_, err := identityClient.RevokeUserDevice(t.Context(), connect.NewRequest(&adminv1.RevokeUserDeviceRequest{}))
-			return err
-		},
-		"ListAuditEvents": func() error {
-			_, err := identityClient.ListAuditEvents(t.Context(), connect.NewRequest(&adminv1.ListAuditEventsRequest{}))
-			return err
-		},
-	}
+		connect.WithInterceptors(interceptor),
+	)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	client := connect.NewClient[adminv1.GetSetupStateRequest, adminv1.GetSetupStateResponse](server.Client(), server.URL+"/platform.admin.v1.AdminAuthService/Unknown")
 
-	for name, call := range calls {
-		t.Run(name, func(t *testing.T) {
-			err := call()
-			if err == nil || connect.CodeOf(err) == connect.CodeUnimplemented {
-				t.Fatalf("RPC error = %v", err)
-			}
-			if detail := businessDetail(t, err); detail.GetMessageKey() == "" {
-				t.Fatalf("RPC returned empty business detail: %+v", detail)
-			}
-		})
-	}
-}
-
-func TestAdminContextRejectsUserCookieNamespace(t *testing.T) {
-	authClient, _ := invalidRequestClients(t)
-	userToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{1}, csrf.TokenBytes))
-	request := connect.NewRequest(&adminv1.VerifyTotpRequest{})
+	request := connect.NewRequest(&adminv1.GetSetupStateRequest{})
 	request.Header().Set("Origin", "https://admin.example.test")
-	request.Header().Set(csrf.HeaderName, userToken)
-	request.Header().Add("Cookie", cookies.UserDeviceCookieName+"=v1.user.secret; "+cookies.UserCSRFCookieName+"="+userToken)
-	_, err := authClient.VerifyTotp(t.Context(), request)
-	if connect.CodeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("cross-domain Cookie error = %v", err)
+	_, err := client.CallUnary(t.Context(), request)
+	if err == nil {
+		t.Fatal("unknown procedure unexpectedly succeeded")
 	}
-	if detail := businessDetail(t, err); detail.GetCode() != commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID {
-		t.Fatalf("cross-domain business detail = %+v", detail)
+	if called {
+		t.Fatal("unknown procedure reached downstream handler")
 	}
 }
 
-func TestGetCurrentAdminSessionSucceedsWithoutRequestIDAndDoesNotSetCookie(t *testing.T) {
-	authClient, issued := validCurrentSessionClient(t, admin.SessionKindFull)
+func TestContextInterceptorAllowsAnonymousBeginLoginWithoutSessionLookup(t *testing.T) {
+	inspector := &fakeSessionInspector{}
+	interceptor := newInterceptor(t, inspector)
+	called := false
+	handler := connect.NewUnaryHandler(
+		"/platform.admin.v1.AdminAuthService/BeginAdminLogin",
+		func(context.Context, *connect.Request[adminv1.BeginAdminLoginRequest]) (*connect.Response[adminv1.BeginAdminLoginResponse], error) {
+			called = true
+			return connect.NewResponse(&adminv1.BeginAdminLoginResponse{}), nil
+		},
+		connect.WithInterceptors(interceptor),
+	)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	client := connect.NewClient[adminv1.BeginAdminLoginRequest, adminv1.BeginAdminLoginResponse](server.Client(), server.URL+"/platform.admin.v1.AdminAuthService/BeginAdminLogin")
+
+	request := connect.NewRequest(&adminv1.BeginAdminLoginRequest{RequestFlowId: "flow-1"})
+	request.Header().Set("Origin", "https://admin.example.test")
+	_, err := client.CallUnary(t.Context(), request)
+	if err != nil {
+		t.Fatalf("BeginAdminLogin error = %v", err)
+	}
+	if !called {
+		t.Fatal("anonymous begin-login request did not reach downstream handler")
+	}
+	if inspector.resolveCalls != 0 || inspector.currentCalls != 0 {
+		t.Fatalf("anonymous request unexpectedly inspected a session: resolve=%d current=%d", inspector.resolveCalls, inspector.currentCalls)
+	}
+}
+
+func TestContextInterceptorSeparatesPreviewAndBulkRevokePolicies(t *testing.T) {
+	now := time.Date(2026, time.July, 25, 13, 0, 0, 0, time.UTC)
+	issued, view := newSessionView(t, now, admin.SessionKindFull, false)
+	inspector := &fakeSessionInspector{session: issued.Session, view: view}
+	interceptor := newInterceptor(t, inspector)
+
+	previewCalled := false
+	previewHandler := connect.NewUnaryHandler(
+		"/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions",
+		func(context.Context, *connect.Request[adminv1.PreviewRevokeOtherAdminSessionsRequest]) (*connect.Response[adminv1.PreviewRevokeOtherAdminSessionsResponse], error) {
+			previewCalled = true
+			return connect.NewResponse(&adminv1.PreviewRevokeOtherAdminSessionsResponse{}), nil
+		},
+		connect.WithInterceptors(interceptor),
+	)
+	previewServer := httptest.NewServer(previewHandler)
+	t.Cleanup(previewServer.Close)
+	previewClient := connect.NewClient[adminv1.PreviewRevokeOtherAdminSessionsRequest, adminv1.PreviewRevokeOtherAdminSessionsResponse](
+		previewServer.Client(),
+		previewServer.URL+"/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions",
+	)
+	previewRequest := connect.NewRequest(&adminv1.PreviewRevokeOtherAdminSessionsRequest{})
+	previewRequest.Header().Set("Origin", "https://admin.example.test")
+	previewRequest.Header().Set(csrf.HeaderName, issued.CSRFToken)
+	previewRequest.Header().Add("Cookie", cookies.AdminSessionCookieName+"="+issued.Token+"; "+cookies.AdminCSRFCookieName+"="+issued.CSRFToken)
+	if _, err := previewClient.CallUnary(t.Context(), previewRequest); err != nil {
+		t.Fatalf("preview revoke-other error = %v", err)
+	}
+	if !previewCalled {
+		t.Fatal("preview revoke-other did not reach downstream handler")
+	}
+
+	revokeCalled := false
+	revokeHandler := connect.NewUnaryHandler(
+		"/platform.admin.v1.AdminAuthService/RevokeOtherAdminSessions",
+		func(context.Context, *connect.Request[adminv1.RevokeOtherAdminSessionsRequest]) (*connect.Response[adminv1.RevokeOtherAdminSessionsResponse], error) {
+			revokeCalled = true
+			return connect.NewResponse(&adminv1.RevokeOtherAdminSessionsResponse{}), nil
+		},
+		connect.WithInterceptors(interceptor),
+	)
+	revokeServer := httptest.NewServer(revokeHandler)
+	t.Cleanup(revokeServer.Close)
+	revokeClient := connect.NewClient[adminv1.RevokeOtherAdminSessionsRequest, adminv1.RevokeOtherAdminSessionsResponse](
+		revokeServer.Client(),
+		revokeServer.URL+"/platform.admin.v1.AdminAuthService/RevokeOtherAdminSessions",
+	)
+	revokeRequest := connect.NewRequest(&adminv1.RevokeOtherAdminSessionsRequest{
+		OperationId:                   "admin-op-1",
+		PreviewVersion:                "preview-v1",
+		ExpectedAdminVersion:          1,
+		ExpectedCurrentSessionVersion: 1,
+	})
+	revokeRequest.Header().Set("Origin", "https://admin.example.test")
+	revokeRequest.Header().Set(csrf.HeaderName, issued.CSRFToken)
+	revokeRequest.Header().Set(RequestIDHeader, "request-1")
+	revokeRequest.Header().Add("Cookie", cookies.AdminSessionCookieName+"="+issued.Token+"; "+cookies.AdminCSRFCookieName+"="+issued.CSRFToken)
+	_, err := revokeClient.CallUnary(t.Context(), revokeRequest)
+	if err == nil {
+		t.Fatal("bulk revoke unexpectedly succeeded without elevation")
+	}
+	if revokeCalled {
+		t.Fatal("bulk revoke reached downstream handler without elevation")
+	}
+}
+
+func TestGetCurrentAdminSessionReturnsSummaryWithoutLegacyStepState(t *testing.T) {
+	now := time.Date(2026, time.July, 25, 15, 0, 0, 0, time.UTC)
+	manager, err := cookies.NewManager(clock.NewFake(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effects, err := NewCookieEffects(manager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, service := newHandlerService(t, now, admin.SessionKindFull)
+	registry, err := sensitive.New(sensitive.AllOperations()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	interceptor := newInterceptor(t, service)
+	options := []connect.HandlerOption{connect.WithInterceptors(registry.Interceptor(), transporterrors.Interceptor(), interceptor)}
+	path, handler, err := NewHandler(service, effects, testReadiness(t, true), options...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := adminv1connect.NewAdminAuthServiceClient(server.Client(), server.URL)
+
 	request := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
 	request.Header().Set("Origin", "https://admin.example.test")
 	request.Header().Set(csrf.HeaderName, issued.CSRFToken)
 	request.Header().Add("Cookie", cookies.AdminSessionCookieName+"="+issued.Token+"; "+cookies.AdminCSRFCookieName+"="+issued.CSRFToken)
-
-	response, err := authClient.GetCurrentAdminSession(t.Context(), request)
+	response, err := client.GetCurrentAdminSession(t.Context(), request)
 	if err != nil {
 		t.Fatalf("GetCurrentAdminSession error = %v", err)
 	}
-	if response.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("next step = %s", response.Msg.GetNextStep())
+	if response.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL {
+		t.Fatalf("session kind = %s", response.Msg.GetSession().GetKind())
 	}
-	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("Pragma") != "no-cache" {
-		t.Fatalf("cache headers = %v", response.Header())
+	if response.Msg.GetSession().GetSessionId() == "" || response.Msg.GetSession().GetAdminId() == "" {
+		t.Fatalf("session summary = %+v", response.Msg.GetSession())
+	}
+	if len(response.Msg.GetSession().GetPermissions()) == 0 {
+		t.Fatalf("session permissions = %+v", response.Msg.GetSession())
 	}
 	if values := response.Header().Values("Set-Cookie"); len(values) != 0 {
 		t.Fatalf("unexpected Set-Cookie = %v", values)
 	}
 }
 
-func TestGetRuntimeReadinessRequiresFullSessionAndReturnsBoundedComponents(t *testing.T) {
-	authClient, issued := validCurrentSessionClient(t, admin.SessionKindFull)
-	request := connect.NewRequest(&adminv1.GetRuntimeReadinessRequest{})
-	request.Header().Set("Origin", "https://admin.example.test")
-	request.Header().Set(csrf.HeaderName, issued.CSRFToken)
-	request.Header().Add("Cookie", cookies.AdminSessionCookieName+"="+issued.Token+"; "+cookies.AdminCSRFCookieName+"="+issued.CSRFToken)
-
-	response, err := authClient.GetRuntimeReadiness(t.Context(), request)
-	if err != nil {
-		t.Fatalf("GetRuntimeReadiness error = %v", err)
-	}
-	ordinary, sensitive := response.Msg.GetOrdinary(), response.Msg.GetSensitive()
-	if ordinary.GetMode() != "ordinary" || !ordinary.GetReady() {
-		t.Fatalf("ordinary readiness = %+v", ordinary)
-	}
-	if sensitive.GetMode() != "sensitive_write" || sensitive.GetReady() {
-		t.Fatalf("sensitive readiness = %+v", sensitive)
-	}
-	if ordinary.GetComponents()["redis"] != "unavailable" || sensitive.GetComponents()["postgresql"] != "ready" {
-		t.Fatalf("readiness components are not bounded wire states: ordinary=%v sensitive=%v", ordinary.GetComponents(), sensitive.GetComponents())
-	}
-	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("Pragma") != "no-cache" {
-		t.Fatalf("cache headers = %v", response.Header())
-	}
+type fakeSessionInspector struct {
+	session      admin.Session
+	view         admin.SessionView
+	resolveErr   error
+	currentErr   error
+	resolveCalls int
+	currentCalls int
 }
 
-func TestGetRuntimeReadinessRejectsPendingAdminSession(t *testing.T) {
-	authClient, issued := validCurrentSessionClient(t, admin.SessionKindMFAPending)
-	request := connect.NewRequest(&adminv1.GetRuntimeReadinessRequest{})
-	request.Header().Set("Origin", "https://admin.example.test")
-	request.Header().Set(csrf.HeaderName, issued.CSRFToken)
-	request.Header().Add("Cookie", cookies.AdminSessionCookieName+"="+issued.Token+"; "+cookies.AdminCSRFCookieName+"="+issued.CSRFToken)
-
-	_, err := authClient.GetRuntimeReadiness(t.Context(), request)
-	if connect.CodeOf(err) != connect.CodePermissionDenied {
-		t.Fatalf("pending session error = %v", err)
-	}
+func (inspector *fakeSessionInspector) ResolveSession(context.Context, string) (admin.Session, error) {
+	inspector.resolveCalls++
+	return inspector.session, inspector.resolveErr
 }
 
-func invalidRequestClients(t testing.TB) (adminv1connect.AdminAuthServiceClient, adminv1connect.AdminIdentityServiceClient) {
+func (inspector *fakeSessionInspector) GetCurrentAdminSession(context.Context, admin.CurrentSessionCommand) (admin.CurrentSessionResult, error) {
+	inspector.currentCalls++
+	return admin.CurrentSessionResult{View: inspector.view}, inspector.currentErr
+}
+
+func newInterceptor(t testing.TB, inspector sessionInspector) *ContextInterceptor {
 	t.Helper()
-	source := clock.NewFake(time.Date(2026, time.July, 19, 13, 0, 0, 0, time.UTC))
-	manager, err := cookies.NewManager(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	effects, err := adminauth.NewCookieEffects(manager)
-	if err != nil {
-		t.Fatal(err)
-	}
 	origins, err := origin.NewAdminValidator(sharedconfig.OriginAllowlist{"https://admin.example.test"})
 	if err != nil {
 		t.Fatal(err)
@@ -278,67 +235,85 @@ func invalidRequestClients(t testing.TB) (adminv1connect.AdminAuthServiceClient,
 	if err != nil {
 		t.Fatal(err)
 	}
-	contextInterceptor, err := adminauth.NewContextInterceptor(origins, csrf.NewAdminValidator(), clients)
+	interceptor, err := NewContextInterceptor(inspector, origins, csrf.NewAdminValidator(), clients)
 	if err != nil {
 		t.Fatal(err)
 	}
-	registry, err := sensitive.New(sensitive.AllOperations()...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	options := []connect.HandlerOption{connect.WithInterceptors(registry.Interceptor(), transporterrors.Interceptor(), contextInterceptor)}
-	authPath, authHandler, err := adminauth.NewHandler(&admin.Service{}, effects, testReadiness(t, true), options...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	identityPath, identityHandler, err := adminidentity.NewHandler(&admin.IdentityService{}, &admin.Service{}, options...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mux := http.NewServeMux()
-	mux.Handle(authPath, authHandler)
-	mux.Handle(identityPath, identityHandler)
-	server := httptest.NewServer(mux)
-	t.Cleanup(server.Close)
-	return adminv1connect.NewAdminAuthServiceClient(server.Client(), server.URL), adminv1connect.NewAdminIdentityServiceClient(server.Client(), server.URL)
+	return interceptor
 }
 
-func validCurrentSessionClient(t testing.TB, kind admin.SessionKind) (adminv1connect.AdminAuthServiceClient, admin.IssuedSession) {
+func newSessionView(t testing.TB, now time.Time, kind admin.SessionKind, includeRevokeElevation bool) (admin.IssuedSession, admin.SessionView) {
 	t.Helper()
+	keyring := loadAdminSessionHMACKeyring(t, now)
+	sessionService, err := admin.NewSessionService(keyring, clock.NewFake(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminID := uuid.Must(uuid.NewV7())
+	issued, err := sessionService.IssueWithClient(
+		adminID,
+		kind,
+		1,
+		1,
+		admin.SessionClientMetadata{ClientIP: "127.0.0.1", UserAgent: "policy-test"},
+		now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view := admin.SessionView{Session: issued.Session}
+	if kind == admin.SessionKindFull {
+		view.Permissions = admin.ActiveAdminPermissionSet()
+	}
+	if includeRevokeElevation {
+		enrollment := newActiveEnrollment(t, adminID, 1, 2, now)
+		elevation, err := admin.NewElevation(issued.Session, enrollment.Snapshot().EnrollmentVersion, admin.ElevationScopeSecurityRevokeSessions, now, now.Add(2*time.Minute))
+		if err != nil {
+			t.Fatal(err)
+		}
+		elevations, err := admin.NewElevationSet(elevation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view.Enrollment = &enrollment
+		view.Elevations = elevations
+		view.RecoveryCodes = admin.RecoveryCodeSetState{SetVersion: 1, RemainingActive: 8}
+	}
+	return issued, view
+}
 
-	now := time.Date(2026, time.July, 23, 15, 0, 0, 0, time.UTC)
-	manager, err := cookies.NewManager(clock.NewFake(now))
+func newActiveEnrollment(t testing.TB, adminID uuid.UUID, adminVersion int64, enrollmentVersion int64, now time.Time) admin.Enrollment {
+	t.Helper()
+	replayFloor := int64(1)
+	enrollment, err := admin.RestoreEnrollment(admin.EnrollmentSnapshot{
+		ID:                uuid.Must(uuid.NewV7()),
+		AdminID:           adminID,
+		Ciphertext:        []byte{1},
+		Nonce:             []byte{1},
+		KeyVersion:        1,
+		Status:            admin.EnrollmentStatusActive,
+		AdminVersion:      adminVersion,
+		EnrollmentVersion: enrollmentVersion,
+		ReplayFloor:       &replayFloor,
+		OperationID:       "op-1",
+		CreatedAt:         now.Add(-time.Hour),
+		ActivatedAt:       now.Add(-time.Minute),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	effects, err := adminauth.NewCookieEffects(manager)
-	if err != nil {
-		t.Fatal(err)
-	}
-	origins, err := origin.NewAdminValidator(sharedconfig.OriginAllowlist{"https://admin.example.test"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	clients, err := proxy.NewResolver([]netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	contextInterceptor, err := adminauth.NewContextInterceptor(origins, csrf.NewAdminValidator(), clients)
-	if err != nil {
-		t.Fatal(err)
-	}
-	registry, err := sensitive.New(sensitive.AllOperations()...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	return enrollment
+}
 
-	sessionKeyring := loadAdminSessionHMACKeyring(t, now)
-	sessionService, err := admin.NewSessionService(sessionKeyring, clock.NewFake(now))
+func newHandlerService(t testing.TB, now time.Time, kind admin.SessionKind) (admin.IssuedSession, *admin.Service) {
+	t.Helper()
+	keyring := loadAdminSessionHMACKeyring(t, now)
+	sessionService, err := admin.NewSessionService(keyring, clock.NewFake(now))
 	if err != nil {
 		t.Fatal(err)
 	}
 	account, err := admin.RestoreAccount(admin.AccountSnapshot{
-		ID:                 uuid.New(),
+		ID:                 uuid.Must(uuid.NewV7()),
 		Username:           "admin",
 		Status:             admin.AccountStatusActive,
 		PasswordHash:       "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -352,7 +327,14 @@ func validCurrentSessionClient(t testing.TB, kind admin.SessionKind) (adminv1con
 	if err != nil {
 		t.Fatal(err)
 	}
-	issued, err := sessionService.Issue(account.Snapshot().ID, kind, account.Snapshot().AdminVersion, account.Snapshot().PasswordVersion, now)
+	issued, err := sessionService.IssueWithClient(
+		account.Snapshot().ID,
+		kind,
+		account.Snapshot().AdminVersion,
+		account.Snapshot().PasswordVersion,
+		admin.SessionClientMetadata{ClientIP: "127.0.0.1", UserAgent: "handler-test"},
+		now,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,25 +347,16 @@ func validCurrentSessionClient(t testing.TB, kind admin.SessionKind) (adminv1con
 		RecoveryCodes:  &admin.RecoveryCodeService{},
 		Results:        &secretresult.Service{},
 		Clock:          clock.NewFake(now),
-		UnitOfWork: adminHandlerUnitOfWork{
-			accounts: adminHandlerAccountRepository{account: account},
-			sessions: adminHandlerSessionRepository{session: issued.Session},
+		UnitOfWork: handlerUnitOfWork{
+			accounts: handlerAccountRepository{account: account},
+			sessions: handlerSessionRepository{session: issued.Session},
 		},
 		Limiter: dummyRateLimiter{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := []connect.HandlerOption{connect.WithInterceptors(registry.Interceptor(), transporterrors.Interceptor(), contextInterceptor)}
-	path, handler, err := adminauth.NewHandler(service, effects, testReadiness(t, false), options...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mux := http.NewServeMux()
-	mux.Handle(path, handler)
-	server := httptest.NewServer(mux)
-	t.Cleanup(server.Close)
-	return adminv1connect.NewAdminAuthServiceClient(server.Client(), server.URL), issued
+	return issued, service
 }
 
 func testReadiness(t testing.TB, redisReady bool) *server.Readiness {
@@ -393,7 +366,7 @@ func testReadiness(t testing.TB, redisReady bool) *server.Readiness {
 		if redisReady {
 			return nil
 		}
-		return stderrors.New("redis unavailable")
+		return connect.NewError(connect.CodeUnavailable, errors.New("redis unavailable"))
 	})
 	readiness, err := server.NewReadiness(server.ReadinessChecks{
 		PostgreSQL: ready,
@@ -408,28 +381,12 @@ func testReadiness(t testing.TB, redisReady bool) *server.Readiness {
 	return readiness
 }
 
-func businessDetail(t testing.TB, err error) *commonv1.BusinessErrorDetail {
-	t.Helper()
-	var connectError *connect.Error
-	if !stderrors.As(err, &connectError) || len(connectError.Details()) != 1 {
-		t.Fatalf("Connect details missing: %v", err)
-	}
-	message, valueErr := connectError.Details()[0].Value()
-	if valueErr != nil {
-		t.Fatal(valueErr)
-	}
-	detail, ok := message.(*commonv1.BusinessErrorDetail)
-	if !ok {
-		t.Fatalf("detail type = %T", message)
-	}
-	return detail
-}
-
 type dummyPasswordHasher struct{}
 
 func (dummyPasswordHasher) Hash(context.Context, []byte) (string, error) {
 	return "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", nil
 }
+
 func (dummyPasswordHasher) VerifyOrDummy(context.Context, string, []byte) (bool, bool, error) {
 	return false, false, nil
 }
@@ -440,90 +397,88 @@ func (dummyRateLimiter) Consume(context.Context, ratelimit.ConsumptionRequest) (
 	return ratelimit.Allow(), nil
 }
 
-type adminHandlerUnitOfWork struct {
-	accounts adminHandlerAccountRepository
-	sessions adminHandlerSessionRepository
+type handlerUnitOfWork struct {
+	accounts handlerAccountRepository
+	sessions handlerSessionRepository
 }
 
-func (unitOfWork adminHandlerUnitOfWork) Run(ctx context.Context, work admin.TransactionWork) error {
-	return work(ctx, adminHandlerTransaction{accounts: unitOfWork.accounts, sessions: unitOfWork.sessions})
+func (unitOfWork handlerUnitOfWork) Run(ctx context.Context, work admin.TransactionWork) error {
+	return work(ctx, handlerTransaction{accounts: unitOfWork.accounts, sessions: unitOfWork.sessions})
 }
 
-type adminHandlerTransaction struct {
-	accounts adminHandlerAccountRepository
-	sessions adminHandlerSessionRepository
+type handlerTransaction struct {
+	accounts handlerAccountRepository
+	sessions handlerSessionRepository
 }
 
-func (transaction adminHandlerTransaction) Challenges() admin.ChallengeRepository  { return nil }
-func (transaction adminHandlerTransaction) SecretResults() secretresult.Repository { return nil }
-func (transaction adminHandlerTransaction) Accounts() admin.AccountRepository {
-	return transaction.accounts
-}
-func (transaction adminHandlerTransaction) Enrollments() admin.EnrollmentRepository { return nil }
-func (transaction adminHandlerTransaction) Sessions() admin.SessionRepository {
-	return transaction.sessions
-}
-func (transaction adminHandlerTransaction) RecoveryCodes() admin.RecoveryCodeRepository { return nil }
-func (transaction adminHandlerTransaction) IdentityUsers() admin.IdentityUserRepository { return nil }
-func (transaction adminHandlerTransaction) IdentityUsernameClaims() identity.UsernameClaimRepository {
-	return nil
-}
-func (transaction adminHandlerTransaction) IdentityDevices() identity.DeviceRepository { return nil }
-func (transaction adminHandlerTransaction) IdentityRecoveryCredentials() identity.RecoveryCredentialRepository {
-	return nil
-}
-func (transaction adminHandlerTransaction) Profiles() profile.Repository             { return nil }
-func (transaction adminHandlerTransaction) ProfileExports() profile.ExportRepository { return nil }
-func (transaction adminHandlerTransaction) AssistedRecoveryGrants() admin.AssistedRecoveryGrantRepository {
-	return nil
-}
-func (transaction adminHandlerTransaction) Audit() audit.Repository                      { return nil }
-func (transaction adminHandlerTransaction) AuditCheckpoints() audit.CheckpointRepository { return nil }
-func (transaction adminHandlerTransaction) OutboxEvents() outbox.EventRepository         { return nil }
+func (transaction handlerTransaction) Challenges() admin.ChallengeRepository           { return nil }
+func (transaction handlerTransaction) SecretResults() secretresult.Repository          { return nil }
+func (transaction handlerTransaction) Accounts() admin.AccountRepository               { return transaction.accounts }
+func (transaction handlerTransaction) Enrollments() admin.EnrollmentRepository         { return nil }
+func (transaction handlerTransaction) Sessions() admin.SessionRepository               { return transaction.sessions }
+func (transaction handlerTransaction) Elevations() admin.ElevationRepository           { return nil }
+func (transaction handlerTransaction) CommandReceipts() admin.CommandReceiptRepository { return nil }
+func (transaction handlerTransaction) RecoveryCodes() admin.RecoveryCodeRepository     { return nil }
+func (transaction handlerTransaction) Audit() audit.Repository                         { return nil }
+func (transaction handlerTransaction) AuditCheckpoints() audit.CheckpointRepository    { return nil }
+func (transaction handlerTransaction) OutboxEvents() outbox.EventRepository            { return nil }
 
-type adminHandlerAccountRepository struct {
+type handlerAccountRepository struct {
 	account admin.Account
 }
 
-func (repository adminHandlerAccountRepository) GetForUpdate(context.Context) (admin.Account, error) {
+func (repository handlerAccountRepository) GetForUpdate(context.Context) (admin.Account, error) {
 	return repository.account, nil
 }
-func (adminHandlerAccountRepository) BootstrapPasswordCAS(context.Context, admin.Account, string, string, string, time.Time) (admin.Account, error) {
-	return admin.Account{}, admin.ErrConcurrentTransition
-}
-func (adminHandlerAccountRepository) UpdatePasswordCAS(context.Context, admin.Account, string, string, string, time.Time) (admin.Account, error) {
-	return admin.Account{}, admin.ErrConcurrentTransition
-}
-func (adminHandlerAccountRepository) TransitionStatusCAS(context.Context, admin.Account, admin.AccountStatus, time.Time) (admin.Account, error) {
-	return admin.Account{}, admin.ErrConcurrentTransition
-}
-func (adminHandlerAccountRepository) AcceptTOTPStepCAS(context.Context, admin.Account, int64, time.Time) (admin.Account, error) {
+
+func (handlerAccountRepository) BootstrapPasswordCAS(context.Context, admin.Account, string, string, string, time.Time) (admin.Account, error) {
 	return admin.Account{}, admin.ErrConcurrentTransition
 }
 
-type adminHandlerSessionRepository struct {
+func (handlerAccountRepository) UpdatePasswordCAS(context.Context, admin.Account, string, string, string, time.Time) (admin.Account, error) {
+	return admin.Account{}, admin.ErrConcurrentTransition
+}
+
+func (handlerAccountRepository) TransitionStatusCAS(context.Context, admin.Account, admin.AccountStatus, time.Time) (admin.Account, error) {
+	return admin.Account{}, admin.ErrConcurrentTransition
+}
+
+func (handlerAccountRepository) RecordMFAChangeCAS(context.Context, admin.Account, time.Time) (admin.Account, error) {
+	return admin.Account{}, admin.ErrConcurrentTransition
+}
+
+type handlerSessionRepository struct {
 	session admin.Session
 }
 
-func (repository adminHandlerSessionRepository) Insert(context.Context, admin.Session) error {
-	return nil
-}
-func (repository adminHandlerSessionRepository) GetForUpdate(context.Context, string) (admin.Session, error) {
+func (handlerSessionRepository) Insert(context.Context, admin.Session) error { return nil }
+
+func (repository handlerSessionRepository) GetForUpdate(context.Context, string) (admin.Session, error) {
 	return repository.session, nil
 }
-func (adminHandlerSessionRepository) TouchCAS(context.Context, admin.Session, time.Time, time.Duration) (admin.Session, error) {
+
+func (repository handlerSessionRepository) GetByIDForUpdate(context.Context, uuid.UUID) (admin.Session, error) {
+	return repository.session, nil
+}
+
+func (repository handlerSessionRepository) ListActiveForAdmin(context.Context, uuid.UUID, time.Time) ([]admin.Session, error) {
+	return []admin.Session{repository.session}, nil
+}
+
+func (handlerSessionRepository) TouchCAS(context.Context, admin.Session, time.Time, time.Duration) (admin.Session, error) {
 	return admin.Session{}, admin.ErrConcurrentTransition
 }
-func (adminHandlerSessionRepository) RevokeCAS(context.Context, admin.Session, string, time.Time) (admin.Session, error) {
+
+func (handlerSessionRepository) RevokeCAS(context.Context, admin.Session, string, time.Time) (admin.Session, error) {
 	return admin.Session{}, admin.ErrConcurrentTransition
 }
-func (adminHandlerSessionRepository) RevokeAll(context.Context, uuid.UUID, string, time.Time) (int64, error) {
-	return 0, admin.ErrConcurrentTransition
+
+func (handlerSessionRepository) RevokeOtherActiveCAS(context.Context, uuid.UUID, uuid.UUID, int64, int64, string, time.Time) ([]admin.Session, error) {
+	return nil, admin.ErrConcurrentTransition
 }
 
 func loadAdminSessionHMACKeyring(t testing.TB, now time.Time) *security.HMACKeyring[security.AdminSessionKeyPurpose] {
 	t.Helper()
-
 	key := bytes.Repeat([]byte{7}, 32)
 	document := map[string]any{
 		"active_version": 1,
@@ -538,10 +493,10 @@ func loadAdminSessionHMACKeyring(t testing.TB, now time.Time) *security.HMACKeyr
 		t.Fatal(err)
 	}
 	path := filepath.Join(t.TempDir(), "admin-session-keyring.json")
-	if err := os.WriteFile(path, contents, 0o600); err != nil {
+	if err = os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(path, 0o400); err != nil {
+	if err = os.Chmod(path, 0o400); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })

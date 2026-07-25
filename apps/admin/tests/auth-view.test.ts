@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
+import { AdminAccountState } from "../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import AdminAuthView from "../src/views/auth/AdminAuthView.vue";
 import { routes } from "../src/router/routes";
 import { useAuthStore } from "../src/stores/auth";
@@ -20,7 +21,8 @@ describe("AdminAuthView", () => {
     await router.isReady();
 
     const store = useAuthStore();
-    store.currentStep = "bootstrap";
+    store.setupState = AdminAccountState.BOOTSTRAP_PENDING;
+    store.startLogin = async () => undefined;
 
     const wrapper = mount(AdminAuthView, {
       global: {

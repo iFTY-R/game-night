@@ -24,7 +24,6 @@ const (
 	maxHeaderBytesEnvironment        = "GAME_NIGHT_API_MAX_HEADER_BYTES"
 	argon2WorkersEnvironment         = "GAME_NIGHT_API_ARGON2_WORKERS"
 	argon2QueueEnvironment           = "GAME_NIGHT_API_ARGON2_QUEUE_CAPACITY"
-	adminMFARequiredEnvironment      = "GAME_NIGHT_API_ADMIN_MFA_REQUIRED"
 	realtimeBootstrapURLEnvironment  = "GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL"
 	realtimePeerURLsEnvironment      = "GAME_NIGHT_API_REALTIME_PEER_URLS"
 	realtimeInternalTokenEnvironment = "GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN"
@@ -83,8 +82,6 @@ type Config struct {
 	Listener          ListenerConfig
 	Argon2            Argon2Config
 	Realtime          RealtimeConfig
-	// AdminPasswordOnly remains false unless a deployment explicitly disables MFA, keeping the zero value secure.
-	AdminPasswordOnly bool
 }
 
 // Load validates shared configuration first, then parses bounded API listener settings without opening sockets.
@@ -106,15 +103,11 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	adminMFARequired, err := parseBoolean(reader, adminMFARequiredEnvironment, true)
-	if err != nil {
-		return Config{}, err
-	}
 	realtimeConfig, err := loadRealtime(reader, shared.Environment)
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config, Realtime: realtimeConfig, AdminPasswordOnly: !adminMFARequired}, nil
+	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config, Realtime: realtimeConfig}, nil
 }
 
 type environmentReader struct {
@@ -257,18 +250,6 @@ func parseInteger(reader environmentReader, name string, fallback, minimum, maxi
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed < minimum || parsed > maximum {
 		return 0, fieldError(name, "integer outside allowed range")
-	}
-	return parsed, nil
-}
-
-func parseBoolean(reader environmentReader, name string, fallback bool) (bool, error) {
-	value := reader.optional(name)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return false, fieldError(name, "invalid boolean")
 	}
 	return parsed, nil
 }

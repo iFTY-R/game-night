@@ -4,50 +4,61 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/proxy"
-	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/platform/admin"
 )
 
 const (
-	// RequestFlowIDHeader binds LoginPassword to the browser flow used by BeginAdminLogin.
+	// RequestFlowIDHeader binds LoginPassword to the browser flow that created the admin challenge.
 	RequestFlowIDHeader = "X-Request-Flow-ID"
-	// RequestIDHeader is the independent audit correlation ID required by AdminIdentityService.
+	// RequestIDHeader carries the stable audit correlation ID for reviewed admin mutations.
 	RequestIDHeader      = "X-Request-ID"
 	maximumMetadataBytes = 128
 )
 
-// ContextInterceptor owns only administrator Origin, CSRF, Cookie, proxy, and context namespaces.
+type sessionInspector interface {
+	ResolveSession(context.Context, string) (admin.Session, error)
+	GetCurrentAdminSession(context.Context, admin.CurrentSessionCommand) (admin.CurrentSessionResult, error)
+}
+
+// ContextInterceptor normalizes transport metadata, authenticates reviewed procedures, and attaches a read-only actor context.
 type ContextInterceptor struct {
-	origins *origin.AdminValidator
-	csrf    *csrf.AdminValidator
-	clients *proxy.Resolver
+	sessions sessionInspector
+	origins  *origin.AdminValidator
+	csrf     *csrf.AdminValidator
+	clients  *proxy.Resolver
 }
 
 // NewContextInterceptor validates isolated administrator transport dependencies.
-func NewContextInterceptor(origins *origin.AdminValidator, csrfValidator *csrf.AdminValidator, clients *proxy.Resolver) (*ContextInterceptor, error) {
-	if origins == nil || csrfValidator == nil || clients == nil {
+func NewContextInterceptor(
+	sessions sessionInspector,
+	origins *origin.AdminValidator,
+	csrfValidator *csrf.AdminValidator,
+	clients *proxy.Resolver,
+) (*ContextInterceptor, error) {
+	if sessions == nil || origins == nil || csrfValidator == nil || clients == nil {
 		return nil, admin.ErrInvalidInput
 	}
-	return &ContextInterceptor{origins: origins, csrf: csrfValidator, clients: clients}, nil
+	return &ContextInterceptor{sessions: sessions, origins: origins, csrf: csrfValidator, clients: clients}, nil
 }
 
-// WrapUnary injects the exact context shape required by the reviewed administrator procedure class.
+// WrapUnary injects the exact transport and actor context shape required by the rebuilt admin procedure set.
 func (interceptor *ContextInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, request connect.AnyRequest) (connect.AnyResponse, error) {
 		if interceptor == nil || request == nil || request.Spec().IsClient {
 			return nil, admin.ErrInvalidInput
 		}
-		operation := request.Spec().Procedure
-		if operation == adminv1connect.AdminAuthServiceGetSetupStateProcedure {
-			return next(ctx, request)
+		policy, ok := policyForProcedure(request.Spec().Procedure)
+		if !ok {
+			return nil, admin.ErrPermissionDenied
 		}
-		httpRequest := &http.Request{Header: request.Header(), RemoteAddr: request.Peer().Addr}
+		httpRequest := requestHTTP(request)
 		acceptedOrigin, err := interceptor.origins.Validate(httpRequest)
 		if err != nil {
 			return nil, err
@@ -56,41 +67,73 @@ func (interceptor *ContextInterceptor) WrapUnary(next connect.UnaryFunc) connect
 		if err != nil {
 			return nil, err
 		}
-		transport := admin.AdminTransportContext{Origin: acceptedOrigin.Canonical(), ClientIP: clientIP.String()}
-		switch {
-		case operation == adminv1connect.AdminAuthServiceBeginAdminLoginProcedure:
-			// Begin creates the only challenge Cookie and therefore has no credential input.
-		case operation == adminv1connect.AdminAuthServiceLoginPasswordProcedure:
-			challengeCredential, readErr := cookies.ReadAdminChallenge(httpRequest)
+		state := requestContext{
+			transport: transportContext{
+				origin:    acceptedOrigin.Canonical(),
+				clientIP:  clientIP.String(),
+				userAgent: normalizedUserAgent(request.Header()),
+			},
+		}
+		if policy.requiresRequestID {
+			state.transport.requestID, err = singleMetadata(request.Header(), RequestIDHeader)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if policy.requiresChallenge {
+			credentials, readErr := cookies.ReadAdminChallenge(httpRequest)
 			if readErr != nil {
 				return nil, admin.ErrAuthentication
 			}
-			flowID, readErr := singleMetadata(request.Header(), RequestFlowIDHeader)
-			if readErr != nil {
-				return nil, readErr
+			state.transport.cookieToken = credentials.CookieToken()
+		}
+		if policy.requiresRequestFlowID {
+			state.transport.requestFlowID, err = singleMetadata(request.Header(), RequestFlowIDHeader)
+			if err != nil {
+				return nil, err
 			}
-			transport.CookieToken, transport.RequestFlowID = challengeCredential.CookieToken(), flowID
-		case isAdminSessionOperation(operation):
+		}
+		if policy.session != sessionRequirementNone {
 			credentials, readErr := cookies.ReadAdminSession(httpRequest)
 			if readErr != nil {
 				return nil, admin.ErrAuthentication
 			}
-			csrfToken, validateErr := interceptor.csrf.Validate(httpRequest)
-			if validateErr != nil {
-				return nil, validateErr
-			}
-			transport.CookieToken, transport.CSRFToken = credentials.CookieToken(), csrfToken
-			if isAdminIdentityOperation(operation) {
-				requestID, metadataErr := singleMetadata(request.Header(), RequestIDHeader)
-				if metadataErr != nil {
-					return nil, metadataErr
+			state.transport.cookieToken = credentials.CookieToken()
+			if policy.requiresCSRF {
+				state.transport.csrfToken, err = interceptor.csrf.Validate(httpRequest)
+				if err != nil {
+					return nil, err
 				}
-				transport.RequestFlowID = requestID
 			}
-		default:
-			return nil, admin.ErrInvalidInput
+			session, resolveErr := interceptor.sessions.ResolveSession(ctx, state.transport.cookieToken)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+			current, currentErr := interceptor.sessions.GetCurrentAdminSession(ctx, admin.CurrentSessionCommand{
+				Session:      session,
+				SessionToken: state.transport.cookieToken,
+				CSRFToken:    state.transport.csrfToken,
+			})
+			if currentErr != nil {
+				return nil, currentErr
+			}
+			actor, actorErr := actorFromView(
+				current.View,
+				state.transport.requestID,
+				state.transport.origin,
+				state.transport.clientIP,
+				state.transport.userAgent,
+			)
+			if actorErr != nil {
+				return nil, actorErr
+			}
+			state.view = &current.View
+			state.actor = &actor
+			if err = enforceStaticPolicy(policy, actor); err != nil {
+				return nil, err
+			}
 		}
-		return next(admin.WithAdminTransportContext(ctx, transport), request)
+		return next(withRequestContext(ctx, state), request)
 	}
 }
 
@@ -104,33 +147,34 @@ func (interceptor *ContextInterceptor) WrapStreamingHandler(next connect.Streami
 	return next
 }
 
-func isAdminSessionOperation(operation string) bool {
-	if isAdminIdentityOperation(operation) {
-		return true
+func enforceStaticPolicy(policy procedurePolicy, actor admin.ActorContext) error {
+	switch policy.session {
+	case sessionRequirementAuthenticated:
+		// Any authenticated setup, MFA-pending, or full session may continue.
+	case sessionRequirementSetup:
+		if actor.Session().Snapshot().Kind != admin.SessionKindSetupPasswordPending {
+			return admin.ErrPermissionDenied
+		}
+	case sessionRequirementMFAPending:
+		if actor.Session().Snapshot().Kind != admin.SessionKindMFAPending {
+			return admin.ErrPermissionDenied
+		}
+	case sessionRequirementFull:
+		if actor.Session().Snapshot().Kind != admin.SessionKindFull {
+			return admin.ErrPermissionDenied
+		}
 	}
-	switch operation {
-	case adminv1connect.AdminAuthServiceVerifyTotpProcedure,
-		adminv1connect.AdminAuthServiceGetCurrentAdminSessionProcedure,
-		adminv1connect.AdminAuthServiceGetRuntimeReadinessProcedure,
-		adminv1connect.AdminAuthServiceChangeInitialPasswordProcedure,
-		adminv1connect.AdminAuthServiceBeginTotpEnrollmentProcedure,
-		adminv1connect.AdminAuthServiceCompleteTotpEnrollmentProcedure,
-		adminv1connect.AdminAuthServiceConfirmAdminSecretReceiptProcedure,
-		adminv1connect.AdminAuthServiceRecoverAdminProcedure,
-		adminv1connect.AdminAuthServiceChangeAdminPasswordProcedure,
-		adminv1connect.AdminAuthServiceBeginTotpRebindProcedure,
-		adminv1connect.AdminAuthServiceCompleteTotpRebindProcedure,
-		adminv1connect.AdminAuthServiceRegenerateAdminRecoveryCodesProcedure,
-		adminv1connect.AdminAuthServiceLogoutAdminProcedure,
-		adminv1connect.AdminAuthServiceLogoutAllAdminSessionsProcedure:
-		return true
-	default:
-		return false
+	if policy.permission != "" {
+		if err := actor.Require(policy.permission); err != nil {
+			return err
+		}
 	}
-}
-
-func isAdminIdentityOperation(operation string) bool {
-	return strings.HasPrefix(operation, "/platform.admin.v1.AdminIdentityService/")
+	if policy.elevation != "" {
+		if err := actor.RequireElevation(policy.elevation, time.Now().UTC()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func singleMetadata(header http.Header, name string) (string, error) {

@@ -3,6 +3,7 @@ syntax = "proto3";
 package platform.admin.v1;
 
 import "google/protobuf/timestamp.proto";
+import "platform/admin/v1/admin_common.proto";
 import "platform/common/v1/common.proto";
 
 option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1";
@@ -14,87 +15,47 @@ service AdminAuthService {
   rpc GetRuntimeReadiness(GetRuntimeReadinessRequest) returns (GetRuntimeReadinessResponse);
   rpc BeginAdminLogin(BeginAdminLoginRequest) returns (BeginAdminLoginResponse);
   rpc LoginPassword(LoginPasswordRequest) returns (LoginPasswordResponse);
-  rpc VerifyTotp(VerifyTotpRequest) returns (VerifyTotpResponse);
+  rpc VerifyAdminTotp(VerifyAdminTotpRequest) returns (VerifyAdminTotpResponse);
+  rpc VerifyAdminRecoveryCode(VerifyAdminRecoveryCodeRequest) returns (VerifyAdminRecoveryCodeResponse);
   rpc ChangeInitialPassword(ChangeInitialPasswordRequest) returns (ChangeInitialPasswordResponse);
+  rpc ChangeAdminPassword(ChangeAdminPasswordRequest) returns (ChangeAdminPasswordResponse);
   rpc BeginTotpEnrollment(BeginTotpEnrollmentRequest) returns (BeginTotpEnrollmentResponse);
   rpc CompleteTotpEnrollment(CompleteTotpEnrollmentRequest) returns (CompleteTotpEnrollmentResponse);
-  rpc ConfirmAdminSecretReceipt(ConfirmAdminSecretReceiptRequest) returns (ConfirmAdminSecretReceiptResponse);
-  rpc RecoverAdmin(RecoverAdminRequest) returns (RecoverAdminResponse);
-  rpc ChangeAdminPassword(ChangeAdminPasswordRequest) returns (ChangeAdminPasswordResponse);
-  rpc BeginTotpRebind(BeginTotpRebindRequest) returns (BeginTotpRebindResponse);
-  rpc CompleteTotpRebind(CompleteTotpRebindRequest) returns (CompleteTotpRebindResponse);
+  rpc DisableTotp(DisableTotpRequest) returns (DisableTotpResponse);
   rpc RegenerateAdminRecoveryCodes(RegenerateAdminRecoveryCodesRequest) returns (RegenerateAdminRecoveryCodesResponse);
+  rpc ConfirmAdminSecretReceipt(ConfirmAdminSecretReceiptRequest) returns (ConfirmAdminSecretReceiptResponse);
+  rpc ElevateAdminSession(ElevateAdminSessionRequest) returns (ElevateAdminSessionResponse);
+  rpc RevokeCurrentAdminElevation(RevokeCurrentAdminElevationRequest) returns (RevokeCurrentAdminElevationResponse);
+  rpc ListAdminSessions(ListAdminSessionsRequest) returns (ListAdminSessionsResponse);
+  rpc RevokeAdminSession(RevokeAdminSessionRequest) returns (RevokeAdminSessionResponse);
+  rpc PreviewRevokeOtherAdminSessions(PreviewRevokeOtherAdminSessionsRequest) returns (PreviewRevokeOtherAdminSessionsResponse);
+  rpc RevokeOtherAdminSessions(RevokeOtherAdminSessionsRequest) returns (RevokeOtherAdminSessionsResponse);
   rpc LogoutAdmin(LogoutAdminRequest) returns (LogoutAdminResponse);
-  rpc LogoutAllAdminSessions(LogoutAllAdminSessionsRequest) returns (LogoutAllAdminSessionsResponse);
-}
-
-enum AdminSetupState {
-  ADMIN_SETUP_STATE_UNSPECIFIED = 0;
-  ADMIN_SETUP_STATE_BOOTSTRAP_PENDING = 1;
-  ADMIN_SETUP_STATE_SETUP_REQUIRED = 2;
-  ADMIN_SETUP_STATE_ACTIVE = 3;
-}
-
-enum AdminNextStep {
-  ADMIN_NEXT_STEP_UNSPECIFIED = 0;
-  ADMIN_NEXT_STEP_CHANGE_PASSWORD = 1;
-  ADMIN_NEXT_STEP_ENROLL_TOTP = 2;
-  ADMIN_NEXT_STEP_VERIFY_MFA = 3;
-  ADMIN_NEXT_STEP_REBIND_TOTP = 4;
-  ADMIN_NEXT_STEP_AUTHENTICATED = 5;
-}
-
-enum AdminSessionKind {
-  ADMIN_SESSION_KIND_UNSPECIFIED = 0;
-  ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING = 1;
-  ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING = 2;
-  ADMIN_SESSION_KIND_MFA_PENDING = 3;
-  ADMIN_SESSION_KIND_RECOVERY_PENDING = 4;
-  ADMIN_SESSION_KIND_FULL = 5;
-}
-
-enum AdminPermission {
-  ADMIN_PERMISSION_UNSPECIFIED = 0;
-  ADMIN_PERMISSION_GET_USER = 1;
-  ADMIN_PERMISSION_GET_REAL_NAME = 2;
-  ADMIN_PERMISSION_UPDATE_REAL_NAME = 3;
-  ADMIN_PERMISSION_EXPORT_PROFILE = 4;
-  ADMIN_PERMISSION_MANAGE_RECOVERY = 5;
-  ADMIN_PERMISSION_FORCE_USERNAME = 6;
-  ADMIN_PERMISSION_SUSPEND_USER = 7;
-  ADMIN_PERMISSION_DELETE_USER = 8;
-  ADMIN_PERMISSION_REVOKE_DEVICE = 9;
-  ADMIN_PERMISSION_READ_AUDIT = 10;
 }
 
 enum AdminSecretOperation {
   ADMIN_SECRET_OPERATION_UNSPECIFIED = 0;
   ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT = 1;
   ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES = 2;
-  ADMIN_SECRET_OPERATION_TOTP_REBIND = 3;
-  ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES = 4;
-  ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT = 5;
+  ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES = 3;
 }
 
-message AdminSessionSummary {
-  string admin_id = 1;
-  AdminSessionKind kind = 2;
-  repeated AdminPermission permissions = 3;
-  google.protobuf.Timestamp idle_expires_at = 4;
-  google.protobuf.Timestamp absolute_expires_at = 5;
+enum AdminElevationSecondFactor {
+  ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED = 0;
+  ADMIN_ELEVATION_SECOND_FACTOR_TOTP = 1;
+  ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE = 2;
 }
 
 message GetSetupStateRequest {}
 
 message GetSetupStateResponse {
-  AdminSetupState state = 1;
+  AdminAccountState state = 1;
 }
 
 message GetCurrentAdminSessionRequest {}
 
 message GetCurrentAdminSessionResponse {
   AdminSessionSummary session = 1;
-  AdminNextStep next_step = 2;
 }
 
 message GetRuntimeReadinessRequest {}
@@ -123,16 +84,35 @@ message LoginPasswordRequest {
   string password = 2;
 }
 
-message LoginPasswordResponse {
-  AdminNextStep next_step = 1;
-  google.protobuf.Timestamp expires_at = 2;
+message LoginRequiresInitialPasswordChange {
+  AdminSessionSummary session = 1;
 }
 
-message VerifyTotpRequest {
+message LoginRequiresMfa {
+  AdminSessionSummary session = 1;
+}
+
+message LoginPasswordResponse {
+  oneof outcome {
+    LoginRequiresInitialPasswordChange requires_initial_password_change = 1;
+    LoginRequiresMfa requires_mfa = 2;
+    AdminSessionSummary session = 3;
+  }
+}
+
+message VerifyAdminTotpRequest {
   string totp_code = 1;
 }
 
-message VerifyTotpResponse {
+message VerifyAdminTotpResponse {
+  AdminSessionSummary session = 1;
+}
+
+message VerifyAdminRecoveryCodeRequest {
+  string recovery_code = 1;
+}
+
+message VerifyAdminRecoveryCodeResponse {
   AdminSessionSummary session = 1;
 }
 
@@ -141,17 +121,30 @@ message ChangeInitialPasswordRequest {
 }
 
 message ChangeInitialPasswordResponse {
-  AdminNextStep next_step = 1;
-  google.protobuf.Timestamp expires_at = 2;
+  AdminSessionSummary session = 1;
+}
+
+message ChangeAdminPasswordRequest {
+  string operation_id = 1;
+  string current_password = 2;
+  string new_password = 3;
+  uint64 expected_password_version = 4;
+}
+
+message ChangeAdminPasswordResponse {
+  string operation_id = 1;
+  AdminSessionSummary session = 2;
+  int32 revoked_sessions = 3;
 }
 
 message BeginTotpEnrollmentRequest {
   string operation_id = 1;
+  string current_password = 2;
 }
 
 message BeginTotpEnrollmentResponse {
   platform.common.v1.OperationResult result = 1;
-  string totp_secret = 2;
+  string manual_entry_key = 2;
   string otpauth_uri = 3;
 }
 
@@ -162,6 +155,31 @@ message CompleteTotpEnrollmentRequest {
 }
 
 message CompleteTotpEnrollmentResponse {
+  platform.common.v1.OperationResult result = 1;
+  repeated string recovery_codes = 2;
+  AdminSessionSummary session = 3;
+  int32 revoked_sessions = 4;
+}
+
+message DisableTotpRequest {
+  string operation_id = 1;
+  string reason = 2;
+  uint64 expected_enrollment_version = 3;
+}
+
+message DisableTotpResponse {
+  string operation_id = 1;
+  AdminSessionSummary session = 2;
+  int32 revoked_sessions = 3;
+  bool already_disabled = 4;
+}
+
+message RegenerateAdminRecoveryCodesRequest {
+  string operation_id = 1;
+  uint64 expected_recovery_codes_version = 2;
+}
+
+message RegenerateAdminRecoveryCodesResponse {
   platform.common.v1.OperationResult result = 1;
   repeated string recovery_codes = 2;
   AdminSessionSummary session = 3;
@@ -177,65 +195,75 @@ message ConfirmAdminSecretReceiptResponse {
   bool confirmed = 1;
 }
 
-message RecoverAdminRequest {
-  string recovery_code = 1;
-}
-
-message RecoverAdminResponse {
-  AdminNextStep next_step = 1;
-  AdminSessionSummary session = 2;
-}
-
-message ChangeAdminPasswordRequest {
-  string current_password = 1;
-  string new_password = 2;
-}
-
-message ChangeAdminPasswordResponse {
-  AdminNextStep next_step = 1;
-  AdminSessionSummary session = 2;
-}
-
-message BeginTotpRebindRequest {
+message ElevateAdminSessionRequest {
   string operation_id = 1;
+  AdminElevationScope scope = 2;
+  string current_password = 3;
+  oneof second_factor {
+    string totp_code = 4;
+    string recovery_code = 5;
+  }
 }
 
-message BeginTotpRebindResponse {
-  platform.common.v1.OperationResult result = 1;
-  string totp_secret = 2;
-  string otpauth_uri = 3;
-}
-
-message CompleteTotpRebindRequest {
-  string enrollment_operation_id = 1;
-  string recovery_codes_operation_id = 2;
-  string totp_code = 3;
-}
-
-message CompleteTotpRebindResponse {
-  platform.common.v1.OperationResult result = 1;
-  repeated string recovery_codes = 2;
+message ElevateAdminSessionResponse {
+  string operation_id = 1;
+  AdminElevationSummary elevation = 2;
   AdminSessionSummary session = 3;
+  AdminElevationSecondFactor second_factor = 4;
 }
 
-message RegenerateAdminRecoveryCodesRequest {
+message RevokeCurrentAdminElevationRequest {
+  AdminElevationScope scope = 1;
+}
+
+message RevokeCurrentAdminElevationResponse {
+  bool revoked = 1;
+  AdminSessionSummary session = 2;
+}
+
+message ListAdminSessionsRequest {}
+
+message ListAdminSessionsResponse {
+  repeated AdminSessionInfo sessions = 1;
+}
+
+message RevokeAdminSessionRequest {
   string operation_id = 1;
-  string totp_code = 2;
+  string session_id = 2;
+  uint64 expected_session_version = 3;
 }
 
-message RegenerateAdminRecoveryCodesResponse {
-  platform.common.v1.OperationResult result = 1;
-  repeated string recovery_codes = 2;
+message RevokeAdminSessionResponse {
+  string operation_id = 1;
+  string session_id = 2;
+  bool revoked = 3;
+}
+
+message PreviewRevokeOtherAdminSessionsRequest {}
+
+message PreviewRevokeOtherAdminSessionsResponse {
+  string preview_version = 1;
+  uint64 current_admin_version = 2;
+  uint64 current_session_version = 3;
+  int32 other_session_count = 4;
+  repeated AdminSessionInfo sessions = 5;
+}
+
+message RevokeOtherAdminSessionsRequest {
+  string operation_id = 1;
+  string preview_version = 2;
+  uint64 expected_admin_version = 3;
+  uint64 expected_current_session_version = 4;
+}
+
+message RevokeOtherAdminSessionsResponse {
+  string operation_id = 1;
+  int32 revoked_sessions = 2;
+  AdminSessionSummary session = 3;
 }
 
 message LogoutAdminRequest {}
 
 message LogoutAdminResponse {
   bool logged_out = 1;
-}
-
-message LogoutAllAdminSessionsRequest {}
-
-message LogoutAllAdminSessionsResponse {
-  int32 revoked_sessions = 1;
 }

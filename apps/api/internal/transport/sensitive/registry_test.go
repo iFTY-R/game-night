@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -24,7 +25,6 @@ func TestAllGeneratedProceduresAreExplicitlyRegistered(t *testing.T) {
 		roomv1.File_platform_room_v1_room_proto.Services().ByName("RoomService"),
 		gamev1.File_platform_game_v1_game_proto.Services().ByName("GameService"),
 		adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService"),
-		adminv1.File_platform_admin_v1_admin_identity_proto.Services().ByName("AdminIdentityService"),
 	}
 	seen := make(map[string]struct{})
 	for _, service := range services {
@@ -38,6 +38,26 @@ func TestAllGeneratedProceduresAreExplicitlyRegistered(t *testing.T) {
 	}
 	if len(seen) != len(AllOperations()) {
 		t.Fatalf("registry has %d operations for %d generated procedures", len(AllOperations()), len(seen))
+	}
+}
+
+func TestAdminAuthOperationsMatchGeneratedServiceExactly(t *testing.T) {
+	service := adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService")
+	expected := make([]string, 0, service.Methods().Len())
+	for index := range service.Methods().Len() {
+		expected = append(expected, "/"+string(service.FullName())+"/"+string(service.Methods().Get(index).Name()))
+	}
+	if !slices.Equal(AdminAuthOperations, expected) {
+		t.Fatalf("AdminAuthOperations mismatch\nexpected: %v\nactual:   %v", expected, AdminAuthOperations)
+	}
+}
+
+func TestAllOperationsExcludeDeletedAdminIdentityProcedures(t *testing.T) {
+	for _, operation := range AllOperations() {
+		if len(operation) >= len("/platform.admin.v1.AdminIdentityService/") &&
+			operation[:len("/platform.admin.v1.AdminIdentityService/")] == "/platform.admin.v1.AdminIdentityService/" {
+			t.Fatalf("deleted admin identity procedure still registered: %s", operation)
+		}
 	}
 }
 

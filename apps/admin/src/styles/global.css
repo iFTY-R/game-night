@@ -19,6 +19,7 @@
   --admin-shadow: 0 10px 30px rgba(24, 43, 39, 0.08);
   color: var(--admin-ink);
   background: var(--admin-bg);
+  color-scheme: light;
   font-family: "Avenir Next", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   line-height: 1.5;
@@ -44,6 +45,7 @@
   --admin-sider-ink: #f1f7f5;
   --admin-sider-muted: #a5bbb6;
   --admin-shadow: 0 12px 32px rgba(0, 0, 0, 0.26);
+  color-scheme: dark;
 }
 
 *,

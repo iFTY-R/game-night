@@ -24,8 +24,16 @@ var (
 	// ErrSessionExpired and ErrSessionRevoked distinguish terminal local metadata from bad proofs.
 	ErrSessionExpired = errors.New("administrator session expired")
 	ErrSessionRevoked = errors.New("administrator session revoked")
-	// ErrPermissionDenied is the default-deny authorizer result for every non-full session.
+	// ErrPermissionDenied is the default-deny authorizer result for every unknown capability or non-full session.
 	ErrPermissionDenied = errors.New("administrator permission denied")
+	// ErrElevationDenied is returned when a scope is missing, unknown, revoked, or bound to stale versions.
+	ErrElevationDenied = errors.New("administrator elevation denied")
+	// ErrElevationExpired distinguishes a once-valid step-up grant that has simply timed out.
+	ErrElevationExpired = errors.New("administrator elevation expired")
+	// ErrRecoveryCodeExhausted reports that the active recovery-code set has no unused codes left.
+	ErrRecoveryCodeExhausted = errors.New("administrator recovery codes exhausted")
+	// ErrMFAStateConflict reports that an MFA command does not match the account's current enrollment state.
+	ErrMFAStateConflict = errors.New("administrator MFA state conflict")
 	// ErrRecoveryInvalid does not reveal whether a selector or Argon2 secret was wrong.
 	ErrRecoveryInvalid = errors.New("administrator recovery code is invalid")
 	// ErrIdempotencyConflict prevents operation IDs from authorizing a different request body.

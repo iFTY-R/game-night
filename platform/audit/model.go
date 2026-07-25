@@ -238,6 +238,18 @@ const (
 	ActionKeyRotationStarted        Action = 25
 	ActionKeyRotationBatchCompleted Action = 26
 	ActionKeyRotationCompleted      Action = 27
+	// Administrator security-setting actions are append-only because their numeric values are part of signed history.
+	ActionAdminMFAEnabled               Action = 28
+	ActionAdminMFADisabled              Action = 29
+	ActionAdminRecoveryCodesRegenerated Action = 30
+	ActionAdminSessionElevated          Action = 31
+	ActionAdminElevationRevoked         Action = 32
+	ActionAdminLoginSucceeded           Action = 33
+	ActionAdminLoginFailed              Action = 34
+	ActionAdminSecretResultOpened       Action = 35
+	ActionAdminSecretResultConfirmed    Action = 36
+	ActionAdminElevationDenied          Action = 37
+	ActionAdminElevationExpired         Action = 38
 )
 
 // Valid prevents unspecified or future wire values from entering the current canonical schema.
@@ -250,7 +262,11 @@ func (action Action) Valid() bool {
 		ActionProfileExportAborted, ActionProfileExportExpired, ActionAdminSetupCompleted,
 		ActionAdminPasswordChanged, ActionAdminTOTPRebound, ActionAdminRecoveryUsed,
 		ActionAdminSessionsRevoked, ActionAdminOfflineReset, ActionAuditEventsRead,
-		ActionKeyRotationStarted, ActionKeyRotationBatchCompleted, ActionKeyRotationCompleted:
+		ActionKeyRotationStarted, ActionKeyRotationBatchCompleted, ActionKeyRotationCompleted,
+		ActionAdminMFAEnabled, ActionAdminMFADisabled, ActionAdminRecoveryCodesRegenerated,
+		ActionAdminSessionElevated, ActionAdminElevationRevoked, ActionAdminLoginSucceeded,
+		ActionAdminLoginFailed, ActionAdminSecretResultOpened, ActionAdminSecretResultConfirmed,
+		ActionAdminElevationDenied, ActionAdminElevationExpired:
 		return true
 	default:
 		return false

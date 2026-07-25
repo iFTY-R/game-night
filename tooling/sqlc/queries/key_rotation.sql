@@ -88,31 +88,6 @@ WHERE user_id = sqlc.arg(user_id)
   AND real_name_key_version = sqlc.arg(source_key_version)
 RETURNING user_id, real_name_key_version, profile_version;
 
--- name: ListProfileExportItemsForKeyRotation :many
-SELECT export_id, ordinal, user_id, profile_version, real_name_ciphertext,
-       real_name_nonce, real_name_key_version
-FROM profile_export_items
-WHERE real_name_key_version = sqlc.arg(source_key_version)
-  AND (
-      sqlc.narg(after_export_id)::uuid IS NULL
-      OR (export_id, ordinal) > (
-          sqlc.narg(after_export_id)::uuid,
-          sqlc.narg(after_ordinal)::bigint
-      )
-  )
-ORDER BY export_id, ordinal
-LIMIT sqlc.arg(batch_size);
-
--- name: RotateProfileExportItemCiphertextCAS :one
-UPDATE profile_export_items
-SET real_name_ciphertext = sqlc.arg(real_name_ciphertext),
-    real_name_nonce = sqlc.arg(real_name_nonce),
-    real_name_key_version = sqlc.arg(target_key_version)
-WHERE export_id = sqlc.arg(export_id)
-  AND ordinal = sqlc.arg(ordinal)
-  AND real_name_key_version = sqlc.arg(source_key_version)
-RETURNING export_id, ordinal, user_id, real_name_key_version;
-
 -- name: ListAdminTotpEnrollmentsForKeyRotation :many
 SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
        operation_id, created_at, expires_at, activated_at, disabled_at
@@ -189,11 +164,9 @@ WHERE job_id = sqlc.arg(job_id)
 RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, updated_at;
 
 -- name: CountPIIKeyReferences :one
-SELECT (
-    (SELECT count(*) FROM user_profiles AS profile WHERE profile.real_name_key_version = sqlc.arg(key_version))
-    +
-    (SELECT count(*) FROM profile_export_items AS item WHERE item.real_name_key_version = sqlc.arg(key_version))
-)::bigint AS reference_count;
+SELECT count(*)::bigint AS reference_count
+FROM user_profiles
+WHERE real_name_key_version = sqlc.arg(key_version);
 
 -- name: CountTotpKeyReferences :one
 SELECT count(*)::bigint AS reference_count
@@ -203,11 +176,7 @@ WHERE key_version = sqlc.arg(key_version)
 
 -- name: ListPIIKeyVersionsWithReferences :many
 SELECT DISTINCT real_name_key_version
-FROM (
-    SELECT real_name_key_version FROM user_profiles
-    UNION ALL
-    SELECT real_name_key_version FROM profile_export_items
-) AS key_refs
+FROM user_profiles
 WHERE real_name_key_version IS NOT NULL
 ORDER BY real_name_key_version;
 

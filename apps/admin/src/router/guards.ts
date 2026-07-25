@@ -1,33 +1,7 @@
 import type { NavigationGuardWithThis, RouteLocationNormalized } from "vue-router";
-import { AdminNextStep, AdminPermission, AdminSessionKind, AdminSetupState } from "../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
+import { AdminAccountState, AdminPermission, AdminSessionKind } from "../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import { routeName } from "../constants/navigation";
 import { useAuthStore } from "../stores/auth";
-
-const authStepRouteMap = {
-  login: routeName.authLogin,
-  bootstrap: routeName.authBootstrap,
-  changePassword: routeName.authChangePassword,
-  enrollTotp: routeName.authEnrollTotp,
-  verifyMfa: routeName.authVerifyMfa,
-  rebindTotp: routeName.authRebindTotp
-} as const;
-
-const nextStepToAuthStep = (nextStep: AdminNextStep, setupState: AdminSetupState) => {
-  switch (nextStep) {
-    case AdminNextStep.CHANGE_PASSWORD:
-      return "changePassword" as const;
-    case AdminNextStep.ENROLL_TOTP:
-      return "enrollTotp" as const;
-    case AdminNextStep.VERIFY_MFA:
-      return "verifyMfa" as const;
-    case AdminNextStep.REBIND_TOTP:
-      return "rebindTotp" as const;
-    case AdminNextStep.AUTHENTICATED:
-      return null;
-    default:
-      return setupState === AdminSetupState.BOOTSTRAP_PENDING ? "bootstrap" : "login";
-  }
-};
 
 const hasPermission = (permissions: AdminPermission[], required?: AdminPermission): boolean =>
   required == null || permissions.includes(required);
@@ -39,28 +13,53 @@ export const createAdminGuard = (): NavigationGuardWithThis<undefined> => {
       await auth.restore();
     }
 
-    const restrictedStep = nextStepToAuthStep(auth.nextStep, auth.setupState);
-    const isAuthenticated = auth.session?.kind === AdminSessionKind.FULL && auth.nextStep === AdminNextStep.AUTHENTICATED;
+    const isAuthenticated = auth.session?.kind === AdminSessionKind.FULL;
+    const sessionKind = auth.session?.kind;
 
+    // Handle auth layout routes
     if (to.meta.layout === "auth") {
+      // If fully authenticated, redirect to main app
       if (isAuthenticated && to.name !== routeName.notFound) {
-        return { name: routeName.overview };
+        return { name: routeName.security };
       }
-      if (restrictedStep && to.meta.authStep && to.meta.authStep !== restrictedStep) {
-        return { name: authStepRouteMap[restrictedStep] };
+
+      // Route based on current session kind
+      if (sessionKind === AdminSessionKind.SETUP_PASSWORD_PENDING && to.meta.authStep !== "changePassword") {
+        return { name: routeName.authChangePassword };
       }
+      if (sessionKind === AdminSessionKind.MFA_PENDING && to.meta.authStep !== "verifyMfa") {
+        return { name: routeName.authVerifyMfa };
+      }
+
+      // If no session, route based on setup state
+      if (!sessionKind) {
+        if (auth.setupState === AdminAccountState.BOOTSTRAP_PENDING && to.meta.authStep !== "bootstrap") {
+          return { name: routeName.authBootstrap };
+        }
+        if (auth.setupState !== AdminAccountState.BOOTSTRAP_PENDING && to.meta.authStep !== "login") {
+          return { name: routeName.authLogin };
+        }
+      }
+
       return true;
     }
 
+    // Handle protected routes - require FULL session
     if (!isAuthenticated) {
-      if (restrictedStep) {
-        return { name: authStepRouteMap[restrictedStep] };
+      // Route to appropriate auth step
+      if (sessionKind === AdminSessionKind.SETUP_PASSWORD_PENDING) {
+        return { name: routeName.authChangePassword };
       }
-      return {
-        name: auth.setupState === AdminSetupState.BOOTSTRAP_PENDING ? routeName.authBootstrap : routeName.authLogin
-      };
+      if (sessionKind === AdminSessionKind.MFA_PENDING) {
+        return { name: routeName.authVerifyMfa };
+      }
+      if (auth.setupState === AdminAccountState.BOOTSTRAP_PENDING) {
+        return { name: routeName.authBootstrap };
+      }
+      return { name: routeName.authLogin };
     }
 
+    // Check permission if required
     if (!hasPermission(auth.permissions, to.meta.permission)) {
       return { name: routeName.forbidden };
     }

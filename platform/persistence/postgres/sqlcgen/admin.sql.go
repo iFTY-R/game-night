@@ -11,102 +11,67 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acceptAdminTotpStepCAS = `-- name: AcceptAdminTotpStepCAS :one
-UPDATE admin_accounts
-SET last_accepted_totp_step = $1,
-    updated_at = $2
-WHERE singleton_id = 1
-  AND admin_id = $3
-  AND status IN ('setup_required', 'recovery_pending', 'active')
-  AND admin_version = $4
-  AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < $1)
-RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at
-`
-
-type AcceptAdminTotpStepCASParams struct {
-	TotpStep             pgtype.Int8        `json:"totp_step"`
-	AcceptedAt           pgtype.Timestamptz `json:"accepted_at"`
-	AdminID              pgtype.UUID        `json:"admin_id"`
-	ExpectedAdminVersion int64              `json:"expected_admin_version"`
-}
-
-type AcceptAdminTotpStepCASRow struct {
-	AdminID              pgtype.UUID        `json:"admin_id"`
-	AdminVersion         int64              `json:"admin_version"`
-	LastAcceptedTotpStep pgtype.Int8        `json:"last_accepted_totp_step"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-}
-
-// AcceptAdminTotpStepCAS
-//
-//	UPDATE admin_accounts
-//	SET last_accepted_totp_step = $1,
-//	    updated_at = $2
-//	WHERE singleton_id = 1
-//	  AND admin_id = $3
-//	  AND status IN ('setup_required', 'recovery_pending', 'active')
-//	  AND admin_version = $4
-//	  AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < $1)
-//	RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at
-func (q *Queries) AcceptAdminTotpStepCAS(ctx context.Context, arg AcceptAdminTotpStepCASParams) (AcceptAdminTotpStepCASRow, error) {
-	row := q.db.QueryRow(ctx, acceptAdminTotpStepCAS,
-		arg.TotpStep,
-		arg.AcceptedAt,
-		arg.AdminID,
-		arg.ExpectedAdminVersion,
-	)
-	var i AcceptAdminTotpStepCASRow
-	err := row.Scan(
-		&i.AdminID,
-		&i.AdminVersion,
-		&i.LastAcceptedTotpStep,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const activatePendingAdminTotpEnrollmentCAS = `-- name: ActivatePendingAdminTotpEnrollmentCAS :one
+const acceptAdminTotpReplayCAS = `-- name: AcceptAdminTotpReplayCAS :one
 UPDATE admin_totp_enrollments
-SET status = 'active',
-    expires_at = NULL,
-    activated_at = $1
+SET replay_floor = $1,
+    enrollment_version = enrollment_version + 1
 WHERE admin_id = $2
   AND enrollment_id = $3
-  AND status = 'pending'
+  AND status = 'active'
   AND admin_version = $4
-  AND expires_at > $1
+  AND enrollment_version = $5
+  AND replay_floor < $1
 RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-          operation_id, created_at, expires_at, activated_at, disabled_at
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 `
 
-type ActivatePendingAdminTotpEnrollmentCASParams struct {
-	ActivatedAt          pgtype.Timestamptz `json:"activated_at"`
-	AdminID              pgtype.UUID        `json:"admin_id"`
-	EnrollmentID         pgtype.UUID        `json:"enrollment_id"`
-	ExpectedAdminVersion int64              `json:"expected_admin_version"`
+type AcceptAdminTotpReplayCASParams struct {
+	ReplayFloor               pgtype.Int8 `json:"replay_floor"`
+	AdminID                   pgtype.UUID `json:"admin_id"`
+	EnrollmentID              pgtype.UUID `json:"enrollment_id"`
+	ExpectedAdminVersion      int64       `json:"expected_admin_version"`
+	ExpectedEnrollmentVersion int64       `json:"expected_enrollment_version"`
 }
 
-// ActivatePendingAdminTotpEnrollmentCAS
+type AcceptAdminTotpReplayCASRow struct {
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+}
+
+// AcceptAdminTotpReplayCAS
 //
 //	UPDATE admin_totp_enrollments
-//	SET status = 'active',
-//	    expires_at = NULL,
-//	    activated_at = $1
+//	SET replay_floor = $1,
+//	    enrollment_version = enrollment_version + 1
 //	WHERE admin_id = $2
 //	  AND enrollment_id = $3
-//	  AND status = 'pending'
+//	  AND status = 'active'
 //	  AND admin_version = $4
-//	  AND expires_at > $1
+//	  AND enrollment_version = $5
+//	  AND replay_floor < $1
 //	RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-//	          operation_id, created_at, expires_at, activated_at, disabled_at
-func (q *Queries) ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg ActivatePendingAdminTotpEnrollmentCASParams) (AdminTotpEnrollment, error) {
-	row := q.db.QueryRow(ctx, activatePendingAdminTotpEnrollmentCAS,
-		arg.ActivatedAt,
+//	          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+func (q *Queries) AcceptAdminTotpReplayCAS(ctx context.Context, arg AcceptAdminTotpReplayCASParams) (AcceptAdminTotpReplayCASRow, error) {
+	row := q.db.QueryRow(ctx, acceptAdminTotpReplayCAS,
+		arg.ReplayFloor,
 		arg.AdminID,
 		arg.EnrollmentID,
 		arg.ExpectedAdminVersion,
+		arg.ExpectedEnrollmentVersion,
 	)
-	var i AdminTotpEnrollment
+	var i AcceptAdminTotpReplayCASRow
 	err := row.Scan(
 		&i.EnrollmentID,
 		&i.AdminID,
@@ -115,6 +80,100 @@ func (q *Queries) ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg
 		&i.KeyVersion,
 		&i.Status,
 		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
+		&i.OperationID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ActivatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
+const activatePendingAdminTotpEnrollmentCAS = `-- name: ActivatePendingAdminTotpEnrollmentCAS :one
+UPDATE admin_totp_enrollments
+SET status = 'active',
+    admin_version = $1,
+    enrollment_version = enrollment_version + 1,
+    replay_floor = $2,
+    expires_at = NULL,
+    activated_at = $3
+WHERE admin_id = $4
+  AND enrollment_id = $5
+  AND status = 'pending'
+  AND admin_version = $6
+  AND enrollment_version = $7
+  AND expires_at > $3
+RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+`
+
+type ActivatePendingAdminTotpEnrollmentCASParams struct {
+	NextAdminVersion          int64              `json:"next_admin_version"`
+	ReplayFloor               pgtype.Int8        `json:"replay_floor"`
+	ActivatedAt               pgtype.Timestamptz `json:"activated_at"`
+	AdminID                   pgtype.UUID        `json:"admin_id"`
+	EnrollmentID              pgtype.UUID        `json:"enrollment_id"`
+	ExpectedAdminVersion      int64              `json:"expected_admin_version"`
+	ExpectedEnrollmentVersion int64              `json:"expected_enrollment_version"`
+}
+
+type ActivatePendingAdminTotpEnrollmentCASRow struct {
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+}
+
+// ActivatePendingAdminTotpEnrollmentCAS
+//
+//	UPDATE admin_totp_enrollments
+//	SET status = 'active',
+//	    admin_version = $1,
+//	    enrollment_version = enrollment_version + 1,
+//	    replay_floor = $2,
+//	    expires_at = NULL,
+//	    activated_at = $3
+//	WHERE admin_id = $4
+//	  AND enrollment_id = $5
+//	  AND status = 'pending'
+//	  AND admin_version = $6
+//	  AND enrollment_version = $7
+//	  AND expires_at > $3
+//	RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+//	          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+func (q *Queries) ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg ActivatePendingAdminTotpEnrollmentCASParams) (ActivatePendingAdminTotpEnrollmentCASRow, error) {
+	row := q.db.QueryRow(ctx, activatePendingAdminTotpEnrollmentCAS,
+		arg.NextAdminVersion,
+		arg.ReplayFloor,
+		arg.ActivatedAt,
+		arg.AdminID,
+		arg.EnrollmentID,
+		arg.ExpectedAdminVersion,
+		arg.ExpectedEnrollmentVersion,
+	)
+	var i ActivatePendingAdminTotpEnrollmentCASRow
+	err := row.Scan(
+		&i.EnrollmentID,
+		&i.AdminID,
+		&i.Ciphertext,
+		&i.Nonce,
+		&i.KeyVersion,
+		&i.Status,
+		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
 		&i.OperationID,
 		&i.CreatedAt,
 		&i.ExpiresAt,
@@ -671,6 +730,119 @@ func (q *Queries) CreateAdminChallenge(ctx context.Context, arg CreateAdminChall
 	return i, err
 }
 
+const createAdminCommandReceipt = `-- name: CreateAdminCommandReceipt :one
+INSERT INTO admin_command_receipts (
+    admin_id,
+    operation_id,
+    request_digest,
+    command,
+    target_type,
+    target_id,
+    result_admin_version,
+    result_password_version,
+    result_session_version,
+    result_enrollment_version,
+    audit_event_id,
+    created_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12
+)
+RETURNING admin_id, operation_id, request_digest, command, target_type, target_id,
+          result_admin_version, result_password_version, result_session_version,
+          result_enrollment_version, audit_event_id, created_at
+`
+
+type CreateAdminCommandReceiptParams struct {
+	AdminID                 pgtype.UUID        `json:"admin_id"`
+	OperationID             string             `json:"operation_id"`
+	RequestDigest           []byte             `json:"request_digest"`
+	Command                 string             `json:"command"`
+	TargetType              string             `json:"target_type"`
+	TargetID                string             `json:"target_id"`
+	ResultAdminVersion      int64              `json:"result_admin_version"`
+	ResultPasswordVersion   int64              `json:"result_password_version"`
+	ResultSessionVersion    int64              `json:"result_session_version"`
+	ResultEnrollmentVersion int64              `json:"result_enrollment_version"`
+	AuditEventID            pgtype.UUID        `json:"audit_event_id"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+}
+
+// CreateAdminCommandReceipt
+//
+//	INSERT INTO admin_command_receipts (
+//	    admin_id,
+//	    operation_id,
+//	    request_digest,
+//	    command,
+//	    target_type,
+//	    target_id,
+//	    result_admin_version,
+//	    result_password_version,
+//	    result_session_version,
+//	    result_enrollment_version,
+//	    audit_event_id,
+//	    created_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10,
+//	    $11,
+//	    $12
+//	)
+//	RETURNING admin_id, operation_id, request_digest, command, target_type, target_id,
+//	          result_admin_version, result_password_version, result_session_version,
+//	          result_enrollment_version, audit_event_id, created_at
+func (q *Queries) CreateAdminCommandReceipt(ctx context.Context, arg CreateAdminCommandReceiptParams) (AdminCommandReceipt, error) {
+	row := q.db.QueryRow(ctx, createAdminCommandReceipt,
+		arg.AdminID,
+		arg.OperationID,
+		arg.RequestDigest,
+		arg.Command,
+		arg.TargetType,
+		arg.TargetID,
+		arg.ResultAdminVersion,
+		arg.ResultPasswordVersion,
+		arg.ResultSessionVersion,
+		arg.ResultEnrollmentVersion,
+		arg.AuditEventID,
+		arg.CreatedAt,
+	)
+	var i AdminCommandReceipt
+	err := row.Scan(
+		&i.AdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.Command,
+		&i.TargetType,
+		&i.TargetID,
+		&i.ResultAdminVersion,
+		&i.ResultPasswordVersion,
+		&i.ResultSessionVersion,
+		&i.ResultEnrollmentVersion,
+		&i.AuditEventID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createAdminRecoveryCode = `-- name: CreateAdminRecoveryCode :one
 INSERT INTO admin_recovery_codes (
     recovery_code_id,
@@ -758,6 +930,9 @@ INSERT INTO admin_sessions (
     kind,
     admin_version,
     password_version,
+    session_version,
+    client_ip,
+    user_agent,
     attempt_count,
     max_attempts,
     created_at,
@@ -774,16 +949,20 @@ INSERT INTO admin_sessions (
     $7,
     $8,
     $9,
-    0,
     $10,
     $11,
-    $11,
     $12,
-    $13
+    0,
+    $13,
+    $14,
+    $14,
+    $15,
+    $16
 )
 RETURNING session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-          kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-          last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+          kind, admin_version, password_version, session_version, client_ip, user_agent,
+          attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+          absolute_expires_at, revoked_at, revoke_reason
 `
 
 type CreateAdminSessionParams struct {
@@ -796,10 +975,36 @@ type CreateAdminSessionParams struct {
 	Kind              string             `json:"kind"`
 	AdminVersion      int64              `json:"admin_version"`
 	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
 	MaxAttempts       int32              `json:"max_attempts"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
 	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+}
+
+type CreateAdminSessionRow struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Selector          string             `json:"selector"`
+	SecretHash        []byte             `json:"secret_hash"`
+	SecretKeyVersion  int32              `json:"secret_key_version"`
+	CsrfHash          []byte             `json:"csrf_hash"`
+	Kind              string             `json:"kind"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
+	AttemptCount      int32              `json:"attempt_count"`
+	MaxAttempts       int32              `json:"max_attempts"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
 }
 
 // CreateAdminSession
@@ -814,6 +1019,9 @@ type CreateAdminSessionParams struct {
 //	    kind,
 //	    admin_version,
 //	    password_version,
+//	    session_version,
+//	    client_ip,
+//	    user_agent,
 //	    attempt_count,
 //	    max_attempts,
 //	    created_at,
@@ -830,17 +1038,21 @@ type CreateAdminSessionParams struct {
 //	    $7,
 //	    $8,
 //	    $9,
-//	    0,
 //	    $10,
 //	    $11,
-//	    $11,
 //	    $12,
-//	    $13
+//	    0,
+//	    $13,
+//	    $14,
+//	    $14,
+//	    $15,
+//	    $16
 //	)
 //	RETURNING session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-//	          kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-//	          last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
-func (q *Queries) CreateAdminSession(ctx context.Context, arg CreateAdminSessionParams) (AdminSession, error) {
+//	          kind, admin_version, password_version, session_version, client_ip, user_agent,
+//	          attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+//	          absolute_expires_at, revoked_at, revoke_reason
+func (q *Queries) CreateAdminSession(ctx context.Context, arg CreateAdminSessionParams) (CreateAdminSessionRow, error) {
 	row := q.db.QueryRow(ctx, createAdminSession,
 		arg.SessionID,
 		arg.AdminID,
@@ -851,12 +1063,15 @@ func (q *Queries) CreateAdminSession(ctx context.Context, arg CreateAdminSession
 		arg.Kind,
 		arg.AdminVersion,
 		arg.PasswordVersion,
+		arg.SessionVersion,
+		arg.ClientIp,
+		arg.UserAgent,
 		arg.MaxAttempts,
 		arg.CreatedAt,
 		arg.IdleExpiresAt,
 		arg.AbsoluteExpiresAt,
 	)
-	var i AdminSession
+	var i CreateAdminSessionRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.AdminID,
@@ -867,6 +1082,9 @@ func (q *Queries) CreateAdminSession(ctx context.Context, arg CreateAdminSession
 		&i.Kind,
 		&i.AdminVersion,
 		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.ClientIp,
+		&i.UserAgent,
 		&i.AttemptCount,
 		&i.MaxAttempts,
 		&i.CreatedAt,
@@ -888,6 +1106,7 @@ INSERT INTO admin_totp_enrollments (
     key_version,
     status,
     admin_version,
+    enrollment_version,
     operation_id,
     created_at,
     expires_at
@@ -899,13 +1118,14 @@ INSERT INTO admin_totp_enrollments (
     $5,
     'pending',
     $6,
+    1,
     $7,
     $8,
     $9
 )
 ON CONFLICT (admin_id) WHERE status = 'pending' DO NOTHING
 RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-          operation_id, created_at, expires_at, activated_at, disabled_at
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 `
 
 type CreatePendingAdminTotpEnrollmentParams struct {
@@ -920,6 +1140,23 @@ type CreatePendingAdminTotpEnrollmentParams struct {
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 }
 
+type CreatePendingAdminTotpEnrollmentRow struct {
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+}
+
 // CreatePendingAdminTotpEnrollment
 //
 //	INSERT INTO admin_totp_enrollments (
@@ -930,6 +1167,7 @@ type CreatePendingAdminTotpEnrollmentParams struct {
 //	    key_version,
 //	    status,
 //	    admin_version,
+//	    enrollment_version,
 //	    operation_id,
 //	    created_at,
 //	    expires_at
@@ -941,14 +1179,15 @@ type CreatePendingAdminTotpEnrollmentParams struct {
 //	    $5,
 //	    'pending',
 //	    $6,
+//	    1,
 //	    $7,
 //	    $8,
 //	    $9
 //	)
 //	ON CONFLICT (admin_id) WHERE status = 'pending' DO NOTHING
 //	RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-//	          operation_id, created_at, expires_at, activated_at, disabled_at
-func (q *Queries) CreatePendingAdminTotpEnrollment(ctx context.Context, arg CreatePendingAdminTotpEnrollmentParams) (AdminTotpEnrollment, error) {
+//	          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+func (q *Queries) CreatePendingAdminTotpEnrollment(ctx context.Context, arg CreatePendingAdminTotpEnrollmentParams) (CreatePendingAdminTotpEnrollmentRow, error) {
 	row := q.db.QueryRow(ctx, createPendingAdminTotpEnrollment,
 		arg.EnrollmentID,
 		arg.AdminID,
@@ -960,7 +1199,7 @@ func (q *Queries) CreatePendingAdminTotpEnrollment(ctx context.Context, arg Crea
 		arg.CreatedAt,
 		arg.ExpiresAt,
 	)
-	var i AdminTotpEnrollment
+	var i CreatePendingAdminTotpEnrollmentRow
 	err := row.Scan(
 		&i.EnrollmentID,
 		&i.AdminID,
@@ -969,6 +1208,8 @@ func (q *Queries) CreatePendingAdminTotpEnrollment(ctx context.Context, arg Crea
 		&i.KeyVersion,
 		&i.Status,
 		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
 		&i.OperationID,
 		&i.CreatedAt,
 		&i.ExpiresAt,
@@ -981,54 +1222,86 @@ func (q *Queries) CreatePendingAdminTotpEnrollment(ctx context.Context, arg Crea
 const disableActiveAdminTotpEnrollmentCAS = `-- name: DisableActiveAdminTotpEnrollmentCAS :one
 UPDATE admin_totp_enrollments
 SET status = 'disabled',
+    admin_version = $1,
+    enrollment_version = enrollment_version + 1,
     ciphertext = NULL,
     nonce = NULL,
-    disabled_at = $1
-WHERE admin_id = $2
-  AND enrollment_id = $3
+    disabled_at = $2
+WHERE admin_id = $3
+  AND enrollment_id = $4
   AND status = 'active'
-  AND admin_version = $4
-RETURNING enrollment_id, admin_id, status, disabled_at
+  AND admin_version = $5
+  AND enrollment_version = $6
+RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 `
 
 type DisableActiveAdminTotpEnrollmentCASParams struct {
-	DisabledAt           pgtype.Timestamptz `json:"disabled_at"`
-	AdminID              pgtype.UUID        `json:"admin_id"`
-	EnrollmentID         pgtype.UUID        `json:"enrollment_id"`
-	ExpectedAdminVersion int64              `json:"expected_admin_version"`
+	NextAdminVersion          int64              `json:"next_admin_version"`
+	DisabledAt                pgtype.Timestamptz `json:"disabled_at"`
+	AdminID                   pgtype.UUID        `json:"admin_id"`
+	EnrollmentID              pgtype.UUID        `json:"enrollment_id"`
+	ExpectedAdminVersion      int64              `json:"expected_admin_version"`
+	ExpectedEnrollmentVersion int64              `json:"expected_enrollment_version"`
 }
 
 type DisableActiveAdminTotpEnrollmentCASRow struct {
-	EnrollmentID pgtype.UUID        `json:"enrollment_id"`
-	AdminID      pgtype.UUID        `json:"admin_id"`
-	Status       string             `json:"status"`
-	DisabledAt   pgtype.Timestamptz `json:"disabled_at"`
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
 }
 
 // DisableActiveAdminTotpEnrollmentCAS
 //
 //	UPDATE admin_totp_enrollments
 //	SET status = 'disabled',
+//	    admin_version = $1,
+//	    enrollment_version = enrollment_version + 1,
 //	    ciphertext = NULL,
 //	    nonce = NULL,
-//	    disabled_at = $1
-//	WHERE admin_id = $2
-//	  AND enrollment_id = $3
+//	    disabled_at = $2
+//	WHERE admin_id = $3
+//	  AND enrollment_id = $4
 //	  AND status = 'active'
-//	  AND admin_version = $4
-//	RETURNING enrollment_id, admin_id, status, disabled_at
+//	  AND admin_version = $5
+//	  AND enrollment_version = $6
+//	RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+//	          enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 func (q *Queries) DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg DisableActiveAdminTotpEnrollmentCASParams) (DisableActiveAdminTotpEnrollmentCASRow, error) {
 	row := q.db.QueryRow(ctx, disableActiveAdminTotpEnrollmentCAS,
+		arg.NextAdminVersion,
 		arg.DisabledAt,
 		arg.AdminID,
 		arg.EnrollmentID,
 		arg.ExpectedAdminVersion,
+		arg.ExpectedEnrollmentVersion,
 	)
 	var i DisableActiveAdminTotpEnrollmentCASRow
 	err := row.Scan(
 		&i.EnrollmentID,
 		&i.AdminID,
+		&i.Ciphertext,
+		&i.Nonce,
+		&i.KeyVersion,
 		&i.Status,
+		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
+		&i.OperationID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ActivatedAt,
 		&i.DisabledAt,
 	)
 	return i, err
@@ -1036,7 +1309,7 @@ func (q *Queries) DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg D
 
 const getActiveAdminTotpEnrollmentForUpdate = `-- name: GetActiveAdminTotpEnrollmentForUpdate :one
 SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-       operation_id, created_at, expires_at, activated_at, disabled_at
+       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 FROM admin_totp_enrollments
 WHERE admin_id = $1
   AND status = 'active'
@@ -1047,17 +1320,34 @@ type GetActiveAdminTotpEnrollmentForUpdateParams struct {
 	AdminID pgtype.UUID `json:"admin_id"`
 }
 
+type GetActiveAdminTotpEnrollmentForUpdateRow struct {
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+}
+
 // GetActiveAdminTotpEnrollmentForUpdate
 //
 //	SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-//	       operation_id, created_at, expires_at, activated_at, disabled_at
+//	       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 //	FROM admin_totp_enrollments
 //	WHERE admin_id = $1
 //	  AND status = 'active'
 //	FOR UPDATE
-func (q *Queries) GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error) {
+func (q *Queries) GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (GetActiveAdminTotpEnrollmentForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getActiveAdminTotpEnrollmentForUpdate, arg.AdminID)
-	var i AdminTotpEnrollment
+	var i GetActiveAdminTotpEnrollmentForUpdateRow
 	err := row.Scan(
 		&i.EnrollmentID,
 		&i.AdminID,
@@ -1066,6 +1356,8 @@ func (q *Queries) GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg
 		&i.KeyVersion,
 		&i.Status,
 		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
 		&i.OperationID,
 		&i.CreatedAt,
 		&i.ExpiresAt,
@@ -1255,6 +1547,88 @@ func (q *Queries) GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminCh
 	return i, err
 }
 
+const getAdminCommandReceipt = `-- name: GetAdminCommandReceipt :one
+SELECT admin_id, operation_id, request_digest, command, target_type, target_id,
+       result_admin_version, result_password_version, result_session_version,
+       result_enrollment_version, audit_event_id, created_at
+FROM admin_command_receipts
+WHERE admin_id = $1
+  AND operation_id = $2
+`
+
+type GetAdminCommandReceiptParams struct {
+	AdminID     pgtype.UUID `json:"admin_id"`
+	OperationID string      `json:"operation_id"`
+}
+
+// GetAdminCommandReceipt
+//
+//	SELECT admin_id, operation_id, request_digest, command, target_type, target_id,
+//	       result_admin_version, result_password_version, result_session_version,
+//	       result_enrollment_version, audit_event_id, created_at
+//	FROM admin_command_receipts
+//	WHERE admin_id = $1
+//	  AND operation_id = $2
+func (q *Queries) GetAdminCommandReceipt(ctx context.Context, arg GetAdminCommandReceiptParams) (AdminCommandReceipt, error) {
+	row := q.db.QueryRow(ctx, getAdminCommandReceipt, arg.AdminID, arg.OperationID)
+	var i AdminCommandReceipt
+	err := row.Scan(
+		&i.AdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.Command,
+		&i.TargetType,
+		&i.TargetID,
+		&i.ResultAdminVersion,
+		&i.ResultPasswordVersion,
+		&i.ResultSessionVersion,
+		&i.ResultEnrollmentVersion,
+		&i.AuditEventID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAdminElevationGrantForSessionScope = `-- name: GetAdminElevationGrantForSessionScope :one
+SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+       enrollment_version, granted_at, expires_at, revoked_at
+FROM admin_elevation_grants
+WHERE session_id = $1
+  AND scope = $2
+FOR UPDATE
+`
+
+type GetAdminElevationGrantForSessionScopeParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
+	Scope     string      `json:"scope"`
+}
+
+// GetAdminElevationGrantForSessionScope
+//
+//	SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+//	       enrollment_version, granted_at, expires_at, revoked_at
+//	FROM admin_elevation_grants
+//	WHERE session_id = $1
+//	  AND scope = $2
+//	FOR UPDATE
+func (q *Queries) GetAdminElevationGrantForSessionScope(ctx context.Context, arg GetAdminElevationGrantForSessionScopeParams) (AdminElevationGrant, error) {
+	row := q.db.QueryRow(ctx, getAdminElevationGrantForSessionScope, arg.SessionID, arg.Scope)
+	var i AdminElevationGrant
+	err := row.Scan(
+		&i.AdminID,
+		&i.SessionID,
+		&i.Scope,
+		&i.AdminVersion,
+		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.EnrollmentVersion,
+		&i.GrantedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
 const getAdminRecoveryCodeForUpdate = `-- name: GetAdminRecoveryCodeForUpdate :one
 SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
        created_at, consumed_at, revoked_at
@@ -1291,30 +1665,100 @@ func (q *Queries) GetAdminRecoveryCodeForUpdate(ctx context.Context, arg GetAdmi
 	return i, err
 }
 
-const getAdminSessionForUpdate = `-- name: GetAdminSessionForUpdate :one
+const getAdminRecoveryCodeSetState = `-- name: GetAdminRecoveryCodeSetState :one
+WITH latest AS (
+    SELECT COALESCE(MAX(set_version), 0)::bigint AS set_version
+    FROM admin_recovery_codes
+    WHERE admin_id = $1
+)
+SELECT latest.set_version,
+       COUNT(code.recovery_code_id) FILTER (WHERE code.status = 'active')::bigint AS remaining_active
+FROM latest
+LEFT JOIN admin_recovery_codes AS code
+  ON code.admin_id = $1
+ AND code.set_version = latest.set_version
+GROUP BY latest.set_version
+`
+
+type GetAdminRecoveryCodeSetStateParams struct {
+	AdminID pgtype.UUID `json:"admin_id"`
+}
+
+type GetAdminRecoveryCodeSetStateRow struct {
+	SetVersion      int64 `json:"set_version"`
+	RemainingActive int64 `json:"remaining_active"`
+}
+
+// GetAdminRecoveryCodeSetState
+//
+//	WITH latest AS (
+//	    SELECT COALESCE(MAX(set_version), 0)::bigint AS set_version
+//	    FROM admin_recovery_codes
+//	    WHERE admin_id = $1
+//	)
+//	SELECT latest.set_version,
+//	       COUNT(code.recovery_code_id) FILTER (WHERE code.status = 'active')::bigint AS remaining_active
+//	FROM latest
+//	LEFT JOIN admin_recovery_codes AS code
+//	  ON code.admin_id = $1
+//	 AND code.set_version = latest.set_version
+//	GROUP BY latest.set_version
+func (q *Queries) GetAdminRecoveryCodeSetState(ctx context.Context, arg GetAdminRecoveryCodeSetStateParams) (GetAdminRecoveryCodeSetStateRow, error) {
+	row := q.db.QueryRow(ctx, getAdminRecoveryCodeSetState, arg.AdminID)
+	var i GetAdminRecoveryCodeSetStateRow
+	err := row.Scan(&i.SetVersion, &i.RemainingActive)
+	return i, err
+}
+
+const getAdminSessionByIDForUpdate = `-- name: GetAdminSessionByIDForUpdate :one
 SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-       kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-       last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
 FROM admin_sessions
-WHERE selector = $1
+WHERE session_id = $1
 FOR UPDATE
 `
 
-type GetAdminSessionForUpdateParams struct {
-	Selector string `json:"selector"`
+type GetAdminSessionByIDForUpdateParams struct {
+	SessionID pgtype.UUID `json:"session_id"`
 }
 
-// GetAdminSessionForUpdate
+type GetAdminSessionByIDForUpdateRow struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Selector          string             `json:"selector"`
+	SecretHash        []byte             `json:"secret_hash"`
+	SecretKeyVersion  int32              `json:"secret_key_version"`
+	CsrfHash          []byte             `json:"csrf_hash"`
+	Kind              string             `json:"kind"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
+	AttemptCount      int32              `json:"attempt_count"`
+	MaxAttempts       int32              `json:"max_attempts"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+}
+
+// GetAdminSessionByIDForUpdate
 //
 //	SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-//	       kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-//	       last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+//	       kind, admin_version, password_version, session_version, client_ip, user_agent,
+//	       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+//	       absolute_expires_at, revoked_at, revoke_reason
 //	FROM admin_sessions
-//	WHERE selector = $1
+//	WHERE session_id = $1
 //	FOR UPDATE
-func (q *Queries) GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSessionForUpdateParams) (AdminSession, error) {
-	row := q.db.QueryRow(ctx, getAdminSessionForUpdate, arg.Selector)
-	var i AdminSession
+func (q *Queries) GetAdminSessionByIDForUpdate(ctx context.Context, arg GetAdminSessionByIDForUpdateParams) (GetAdminSessionByIDForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getAdminSessionByIDForUpdate, arg.SessionID)
+	var i GetAdminSessionByIDForUpdateRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.AdminID,
@@ -1325,6 +1769,83 @@ func (q *Queries) GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSess
 		&i.Kind,
 		&i.AdminVersion,
 		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.ClientIp,
+		&i.UserAgent,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.IdleExpiresAt,
+		&i.AbsoluteExpiresAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
+	return i, err
+}
+
+const getAdminSessionForUpdate = `-- name: GetAdminSessionForUpdate :one
+SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
+FROM admin_sessions
+WHERE selector = $1
+FOR UPDATE
+`
+
+type GetAdminSessionForUpdateParams struct {
+	Selector string `json:"selector"`
+}
+
+type GetAdminSessionForUpdateRow struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Selector          string             `json:"selector"`
+	SecretHash        []byte             `json:"secret_hash"`
+	SecretKeyVersion  int32              `json:"secret_key_version"`
+	CsrfHash          []byte             `json:"csrf_hash"`
+	Kind              string             `json:"kind"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
+	AttemptCount      int32              `json:"attempt_count"`
+	MaxAttempts       int32              `json:"max_attempts"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+}
+
+// GetAdminSessionForUpdate
+//
+//	SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+//	       kind, admin_version, password_version, session_version, client_ip, user_agent,
+//	       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+//	       absolute_expires_at, revoked_at, revoke_reason
+//	FROM admin_sessions
+//	WHERE selector = $1
+//	FOR UPDATE
+func (q *Queries) GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSessionForUpdateParams) (GetAdminSessionForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getAdminSessionForUpdate, arg.Selector)
+	var i GetAdminSessionForUpdateRow
+	err := row.Scan(
+		&i.SessionID,
+		&i.AdminID,
+		&i.Selector,
+		&i.SecretHash,
+		&i.SecretKeyVersion,
+		&i.CsrfHash,
+		&i.Kind,
+		&i.AdminVersion,
+		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.ClientIp,
+		&i.UserAgent,
 		&i.AttemptCount,
 		&i.MaxAttempts,
 		&i.CreatedAt,
@@ -1339,7 +1860,7 @@ func (q *Queries) GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSess
 
 const getPendingAdminTotpEnrollmentForUpdate = `-- name: GetPendingAdminTotpEnrollmentForUpdate :one
 SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-       operation_id, created_at, expires_at, activated_at, disabled_at
+       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 FROM admin_totp_enrollments
 WHERE admin_id = $1
   AND status = 'pending'
@@ -1350,17 +1871,34 @@ type GetPendingAdminTotpEnrollmentForUpdateParams struct {
 	AdminID pgtype.UUID `json:"admin_id"`
 }
 
+type GetPendingAdminTotpEnrollmentForUpdateRow struct {
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+}
+
 // GetPendingAdminTotpEnrollmentForUpdate
 //
 //	SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-//	       operation_id, created_at, expires_at, activated_at, disabled_at
+//	       enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 //	FROM admin_totp_enrollments
 //	WHERE admin_id = $1
 //	  AND status = 'pending'
 //	FOR UPDATE
-func (q *Queries) GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetPendingAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error) {
+func (q *Queries) GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetPendingAdminTotpEnrollmentForUpdateParams) (GetPendingAdminTotpEnrollmentForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getPendingAdminTotpEnrollmentForUpdate, arg.AdminID)
-	var i AdminTotpEnrollment
+	var i GetPendingAdminTotpEnrollmentForUpdateRow
 	err := row.Scan(
 		&i.EnrollmentID,
 		&i.AdminID,
@@ -1369,6 +1907,8 @@ func (q *Queries) GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, ar
 		&i.KeyVersion,
 		&i.Status,
 		&i.AdminVersion,
+		&i.EnrollmentVersion,
+		&i.ReplayFloor,
 		&i.OperationID,
 		&i.CreatedAt,
 		&i.ExpiresAt,
@@ -1380,8 +1920,7 @@ func (q *Queries) GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, ar
 
 const getSingletonAdminForUpdate = `-- name: GetSingletonAdminForUpdate :one
 SELECT singleton_id, admin_id, username, status, password_hash, password_algorithm,
-       password_parameters, password_version, admin_version, last_accepted_totp_step,
-       created_at, updated_at
+       password_parameters, password_version, admin_version, created_at, updated_at
 FROM admin_accounts
 WHERE singleton_id = 1
 FOR UPDATE
@@ -1390,8 +1929,7 @@ FOR UPDATE
 // GetSingletonAdminForUpdate
 //
 //	SELECT singleton_id, admin_id, username, status, password_hash, password_algorithm,
-//	       password_parameters, password_version, admin_version, last_accepted_totp_step,
-//	       created_at, updated_at
+//	       password_parameters, password_version, admin_version, created_at, updated_at
 //	FROM admin_accounts
 //	WHERE singleton_id = 1
 //	FOR UPDATE
@@ -1408,11 +1946,162 @@ func (q *Queries) GetSingletonAdminForUpdate(ctx context.Context) (AdminAccount,
 		&i.PasswordParameters,
 		&i.PasswordVersion,
 		&i.AdminVersion,
-		&i.LastAcceptedTotpStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listActiveAdminSessions = `-- name: ListActiveAdminSessions :many
+SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+       kind, admin_version, password_version, session_version, client_ip, user_agent,
+       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+       absolute_expires_at, revoked_at, revoke_reason
+FROM admin_sessions
+WHERE admin_id = $1
+  AND revoked_at IS NULL
+  AND idle_expires_at > $2
+  AND absolute_expires_at > $2
+ORDER BY created_at ASC, session_id ASC
+`
+
+type ListActiveAdminSessionsParams struct {
+	AdminID  pgtype.UUID        `json:"admin_id"`
+	ActiveAt pgtype.Timestamptz `json:"active_at"`
+}
+
+type ListActiveAdminSessionsRow struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Selector          string             `json:"selector"`
+	SecretHash        []byte             `json:"secret_hash"`
+	SecretKeyVersion  int32              `json:"secret_key_version"`
+	CsrfHash          []byte             `json:"csrf_hash"`
+	Kind              string             `json:"kind"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
+	AttemptCount      int32              `json:"attempt_count"`
+	MaxAttempts       int32              `json:"max_attempts"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+}
+
+// ListActiveAdminSessions
+//
+//	SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+//	       kind, admin_version, password_version, session_version, client_ip, user_agent,
+//	       attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+//	       absolute_expires_at, revoked_at, revoke_reason
+//	FROM admin_sessions
+//	WHERE admin_id = $1
+//	  AND revoked_at IS NULL
+//	  AND idle_expires_at > $2
+//	  AND absolute_expires_at > $2
+//	ORDER BY created_at ASC, session_id ASC
+func (q *Queries) ListActiveAdminSessions(ctx context.Context, arg ListActiveAdminSessionsParams) ([]ListActiveAdminSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveAdminSessions, arg.AdminID, arg.ActiveAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveAdminSessionsRow{}
+	for rows.Next() {
+		var i ListActiveAdminSessionsRow
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.AdminID,
+			&i.Selector,
+			&i.SecretHash,
+			&i.SecretKeyVersion,
+			&i.CsrfHash,
+			&i.Kind,
+			&i.AdminVersion,
+			&i.PasswordVersion,
+			&i.SessionVersion,
+			&i.ClientIp,
+			&i.UserAgent,
+			&i.AttemptCount,
+			&i.MaxAttempts,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.IdleExpiresAt,
+			&i.AbsoluteExpiresAt,
+			&i.RevokedAt,
+			&i.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLiveAdminElevationGrantsForSessions = `-- name: ListLiveAdminElevationGrantsForSessions :many
+SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+       enrollment_version, granted_at, expires_at, revoked_at
+FROM admin_elevation_grants
+WHERE admin_id = $1
+  AND session_id = ANY($2::uuid[])
+  AND revoked_at IS NULL
+  AND expires_at > $3
+ORDER BY session_id, scope
+`
+
+type ListLiveAdminElevationGrantsForSessionsParams struct {
+	AdminID    pgtype.UUID        `json:"admin_id"`
+	SessionIds []pgtype.UUID      `json:"session_ids"`
+	ActiveAt   pgtype.Timestamptz `json:"active_at"`
+}
+
+// ListLiveAdminElevationGrantsForSessions
+//
+//	SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+//	       enrollment_version, granted_at, expires_at, revoked_at
+//	FROM admin_elevation_grants
+//	WHERE admin_id = $1
+//	  AND session_id = ANY($2::uuid[])
+//	  AND revoked_at IS NULL
+//	  AND expires_at > $3
+//	ORDER BY session_id, scope
+func (q *Queries) ListLiveAdminElevationGrantsForSessions(ctx context.Context, arg ListLiveAdminElevationGrantsForSessionsParams) ([]AdminElevationGrant, error) {
+	rows, err := q.db.Query(ctx, listLiveAdminElevationGrantsForSessions, arg.AdminID, arg.SessionIds, arg.ActiveAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminElevationGrant{}
+	for rows.Next() {
+		var i AdminElevationGrant
+		if err := rows.Scan(
+			&i.AdminID,
+			&i.SessionID,
+			&i.Scope,
+			&i.AdminVersion,
+			&i.PasswordVersion,
+			&i.SessionVersion,
+			&i.EnrollmentVersion,
+			&i.GrantedAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const recordAdminAssistedRecoveryFailureCAS = `-- name: RecordAdminAssistedRecoveryFailureCAS :one
@@ -1517,6 +2206,56 @@ func (q *Queries) RecordAdminChallengeFailureCAS(ctx context.Context, arg Record
 	return i, err
 }
 
+const recordAdminMFAChangeCAS = `-- name: RecordAdminMFAChangeCAS :one
+UPDATE admin_accounts
+SET admin_version = admin_version + 1,
+    updated_at = $1
+WHERE singleton_id = 1
+  AND admin_id = $2
+  AND status = 'active'
+  AND admin_version = $3
+RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
+`
+
+type RecordAdminMFAChangeCASParams struct {
+	ChangedAt            pgtype.Timestamptz `json:"changed_at"`
+	AdminID              pgtype.UUID        `json:"admin_id"`
+	ExpectedAdminVersion int64              `json:"expected_admin_version"`
+}
+
+type RecordAdminMFAChangeCASRow struct {
+	SingletonID     int16              `json:"singleton_id"`
+	AdminID         pgtype.UUID        `json:"admin_id"`
+	Status          string             `json:"status"`
+	PasswordVersion int64              `json:"password_version"`
+	AdminVersion    int64              `json:"admin_version"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+// RecordAdminMFAChangeCAS
+//
+//	UPDATE admin_accounts
+//	SET admin_version = admin_version + 1,
+//	    updated_at = $1
+//	WHERE singleton_id = 1
+//	  AND admin_id = $2
+//	  AND status = 'active'
+//	  AND admin_version = $3
+//	RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
+func (q *Queries) RecordAdminMFAChangeCAS(ctx context.Context, arg RecordAdminMFAChangeCASParams) (RecordAdminMFAChangeCASRow, error) {
+	row := q.db.QueryRow(ctx, recordAdminMFAChangeCAS, arg.ChangedAt, arg.AdminID, arg.ExpectedAdminVersion)
+	var i RecordAdminMFAChangeCASRow
+	err := row.Scan(
+		&i.SingletonID,
+		&i.AdminID,
+		&i.Status,
+		&i.PasswordVersion,
+		&i.AdminVersion,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const revokeActiveAdminAssistedRecoveryGrantsForUser = `-- name: RevokeActiveAdminAssistedRecoveryGrantsForUser :many
 UPDATE admin_assisted_recovery_grants
 SET status = 'revoked',
@@ -1590,6 +2329,69 @@ func (q *Queries) RevokeAdminChallenges(ctx context.Context, arg RevokeAdminChal
 	return result.RowsAffected(), nil
 }
 
+const revokeAdminElevationGrantCAS = `-- name: RevokeAdminElevationGrantCAS :one
+UPDATE admin_elevation_grants
+SET revoked_at = $1
+WHERE session_id = $2
+  AND scope = $3
+  AND admin_version = $4
+  AND password_version = $5
+  AND session_version = $6
+  AND enrollment_version = $7
+  AND revoked_at IS NULL
+RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+          enrollment_version, granted_at, expires_at, revoked_at
+`
+
+type RevokeAdminElevationGrantCASParams struct {
+	RevokedAt                 pgtype.Timestamptz `json:"revoked_at"`
+	SessionID                 pgtype.UUID        `json:"session_id"`
+	Scope                     string             `json:"scope"`
+	ExpectedAdminVersion      int64              `json:"expected_admin_version"`
+	ExpectedPasswordVersion   int64              `json:"expected_password_version"`
+	ExpectedSessionVersion    int64              `json:"expected_session_version"`
+	ExpectedEnrollmentVersion int64              `json:"expected_enrollment_version"`
+}
+
+// RevokeAdminElevationGrantCAS
+//
+//	UPDATE admin_elevation_grants
+//	SET revoked_at = $1
+//	WHERE session_id = $2
+//	  AND scope = $3
+//	  AND admin_version = $4
+//	  AND password_version = $5
+//	  AND session_version = $6
+//	  AND enrollment_version = $7
+//	  AND revoked_at IS NULL
+//	RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+//	          enrollment_version, granted_at, expires_at, revoked_at
+func (q *Queries) RevokeAdminElevationGrantCAS(ctx context.Context, arg RevokeAdminElevationGrantCASParams) (AdminElevationGrant, error) {
+	row := q.db.QueryRow(ctx, revokeAdminElevationGrantCAS,
+		arg.RevokedAt,
+		arg.SessionID,
+		arg.Scope,
+		arg.ExpectedAdminVersion,
+		arg.ExpectedPasswordVersion,
+		arg.ExpectedSessionVersion,
+		arg.ExpectedEnrollmentVersion,
+	)
+	var i AdminElevationGrant
+	err := row.Scan(
+		&i.AdminID,
+		&i.SessionID,
+		&i.Scope,
+		&i.AdminVersion,
+		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.EnrollmentVersion,
+		&i.GrantedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
 const revokeAdminRecoveryCodeSet = `-- name: RevokeAdminRecoveryCodeSet :execrows
 UPDATE admin_recovery_codes
 SET status = 'revoked',
@@ -1624,36 +2426,56 @@ func (q *Queries) RevokeAdminRecoveryCodeSet(ctx context.Context, arg RevokeAdmi
 const revokeAdminSessionCAS = `-- name: RevokeAdminSessionCAS :one
 UPDATE admin_sessions
 SET revoked_at = $1,
-    revoke_reason = $2
+    revoke_reason = $2,
+    session_version = session_version + 1
 WHERE session_id = $3
+  AND admin_id = $4
+  AND session_version = $5
   AND revoked_at IS NULL
-RETURNING session_id, revoked_at, revoke_reason
+RETURNING session_id, session_version, revoked_at, revoke_reason
 `
 
 type RevokeAdminSessionCASParams struct {
-	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
-	RevokeReason pgtype.Text        `json:"revoke_reason"`
-	SessionID    pgtype.UUID        `json:"session_id"`
+	RevokedAt              pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason           pgtype.Text        `json:"revoke_reason"`
+	SessionID              pgtype.UUID        `json:"session_id"`
+	AdminID                pgtype.UUID        `json:"admin_id"`
+	ExpectedSessionVersion int64              `json:"expected_session_version"`
 }
 
 type RevokeAdminSessionCASRow struct {
-	SessionID    pgtype.UUID        `json:"session_id"`
-	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
-	RevokeReason pgtype.Text        `json:"revoke_reason"`
+	SessionID      pgtype.UUID        `json:"session_id"`
+	SessionVersion int64              `json:"session_version"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason   pgtype.Text        `json:"revoke_reason"`
 }
 
 // RevokeAdminSessionCAS
 //
 //	UPDATE admin_sessions
 //	SET revoked_at = $1,
-//	    revoke_reason = $2
+//	    revoke_reason = $2,
+//	    session_version = session_version + 1
 //	WHERE session_id = $3
+//	  AND admin_id = $4
+//	  AND session_version = $5
 //	  AND revoked_at IS NULL
-//	RETURNING session_id, revoked_at, revoke_reason
+//	RETURNING session_id, session_version, revoked_at, revoke_reason
 func (q *Queries) RevokeAdminSessionCAS(ctx context.Context, arg RevokeAdminSessionCASParams) (RevokeAdminSessionCASRow, error) {
-	row := q.db.QueryRow(ctx, revokeAdminSessionCAS, arg.RevokedAt, arg.RevokeReason, arg.SessionID)
+	row := q.db.QueryRow(ctx, revokeAdminSessionCAS,
+		arg.RevokedAt,
+		arg.RevokeReason,
+		arg.SessionID,
+		arg.AdminID,
+		arg.ExpectedSessionVersion,
+	)
 	var i RevokeAdminSessionCASRow
-	err := row.Scan(&i.SessionID, &i.RevokedAt, &i.RevokeReason)
+	err := row.Scan(
+		&i.SessionID,
+		&i.SessionVersion,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
 	return i, err
 }
 
@@ -1685,46 +2507,158 @@ func (q *Queries) RevokeAllAdminRecoveryCodeSets(ctx context.Context, arg Revoke
 	return result.RowsAffected(), nil
 }
 
-const revokeAllAdminSessions = `-- name: RevokeAllAdminSessions :execrows
-UPDATE admin_sessions
+const revokeOtherActiveAdminSessionsCAS = `-- name: RevokeOtherActiveAdminSessionsCAS :many
+WITH preserved AS MATERIALIZED (
+    SELECT preserved_session.session_id
+    FROM admin_sessions AS preserved_session
+    WHERE preserved_session.session_id = $4
+      AND preserved_session.admin_id = $3
+      AND preserved_session.admin_version = $5
+      AND preserved_session.session_version = $6
+      AND preserved_session.revoked_at IS NULL
+      AND preserved_session.idle_expires_at > $1
+      AND preserved_session.absolute_expires_at > $1
+    FOR UPDATE OF preserved_session
+)
+UPDATE admin_sessions AS sessions
 SET revoked_at = $1,
-    revoke_reason = $2
-WHERE admin_id = $3
-  AND revoked_at IS NULL
+    revoke_reason = $2,
+    session_version = sessions.session_version + 1
+FROM preserved
+WHERE sessions.admin_id = $3
+  AND sessions.session_id <> preserved.session_id
+  AND sessions.revoked_at IS NULL
+  AND sessions.idle_expires_at > $1
+  AND sessions.absolute_expires_at > $1
+RETURNING sessions.session_id, sessions.admin_id, sessions.selector, sessions.secret_hash,
+          sessions.secret_key_version, sessions.csrf_hash, sessions.kind, sessions.admin_version,
+          sessions.password_version, sessions.session_version, sessions.client_ip, sessions.user_agent,
+          sessions.attempt_count, sessions.max_attempts, sessions.created_at, sessions.last_seen_at,
+          sessions.idle_expires_at, sessions.absolute_expires_at, sessions.revoked_at, sessions.revoke_reason
 `
 
-type RevokeAllAdminSessionsParams struct {
-	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
-	RevokeReason pgtype.Text        `json:"revoke_reason"`
-	AdminID      pgtype.UUID        `json:"admin_id"`
+type RevokeOtherActiveAdminSessionsCASParams struct {
+	RevokedAt                       pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason                    pgtype.Text        `json:"revoke_reason"`
+	AdminID                         pgtype.UUID        `json:"admin_id"`
+	PreservedSessionID              pgtype.UUID        `json:"preserved_session_id"`
+	ExpectedAdminVersion            int64              `json:"expected_admin_version"`
+	ExpectedPreservedSessionVersion int64              `json:"expected_preserved_session_version"`
 }
 
-// RevokeAllAdminSessions
+type RevokeOtherActiveAdminSessionsCASRow struct {
+	SessionID         pgtype.UUID        `json:"session_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Selector          string             `json:"selector"`
+	SecretHash        []byte             `json:"secret_hash"`
+	SecretKeyVersion  int32              `json:"secret_key_version"`
+	CsrfHash          []byte             `json:"csrf_hash"`
+	Kind              string             `json:"kind"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
+	AttemptCount      int32              `json:"attempt_count"`
+	MaxAttempts       int32              `json:"max_attempts"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+}
+
+// RevokeOtherActiveAdminSessionsCAS
 //
-//	UPDATE admin_sessions
+//	WITH preserved AS MATERIALIZED (
+//	    SELECT preserved_session.session_id
+//	    FROM admin_sessions AS preserved_session
+//	    WHERE preserved_session.session_id = $4
+//	      AND preserved_session.admin_id = $3
+//	      AND preserved_session.admin_version = $5
+//	      AND preserved_session.session_version = $6
+//	      AND preserved_session.revoked_at IS NULL
+//	      AND preserved_session.idle_expires_at > $1
+//	      AND preserved_session.absolute_expires_at > $1
+//	    FOR UPDATE OF preserved_session
+//	)
+//	UPDATE admin_sessions AS sessions
 //	SET revoked_at = $1,
-//	    revoke_reason = $2
-//	WHERE admin_id = $3
-//	  AND revoked_at IS NULL
-func (q *Queries) RevokeAllAdminSessions(ctx context.Context, arg RevokeAllAdminSessionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAllAdminSessions, arg.RevokedAt, arg.RevokeReason, arg.AdminID)
+//	    revoke_reason = $2,
+//	    session_version = sessions.session_version + 1
+//	FROM preserved
+//	WHERE sessions.admin_id = $3
+//	  AND sessions.session_id <> preserved.session_id
+//	  AND sessions.revoked_at IS NULL
+//	  AND sessions.idle_expires_at > $1
+//	  AND sessions.absolute_expires_at > $1
+//	RETURNING sessions.session_id, sessions.admin_id, sessions.selector, sessions.secret_hash,
+//	          sessions.secret_key_version, sessions.csrf_hash, sessions.kind, sessions.admin_version,
+//	          sessions.password_version, sessions.session_version, sessions.client_ip, sessions.user_agent,
+//	          sessions.attempt_count, sessions.max_attempts, sessions.created_at, sessions.last_seen_at,
+//	          sessions.idle_expires_at, sessions.absolute_expires_at, sessions.revoked_at, sessions.revoke_reason
+func (q *Queries) RevokeOtherActiveAdminSessionsCAS(ctx context.Context, arg RevokeOtherActiveAdminSessionsCASParams) ([]RevokeOtherActiveAdminSessionsCASRow, error) {
+	rows, err := q.db.Query(ctx, revokeOtherActiveAdminSessionsCAS,
+		arg.RevokedAt,
+		arg.RevokeReason,
+		arg.AdminID,
+		arg.PreservedSessionID,
+		arg.ExpectedAdminVersion,
+		arg.ExpectedPreservedSessionVersion,
+	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []RevokeOtherActiveAdminSessionsCASRow{}
+	for rows.Next() {
+		var i RevokeOtherActiveAdminSessionsCASRow
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.AdminID,
+			&i.Selector,
+			&i.SecretHash,
+			&i.SecretKeyVersion,
+			&i.CsrfHash,
+			&i.Kind,
+			&i.AdminVersion,
+			&i.PasswordVersion,
+			&i.SessionVersion,
+			&i.ClientIp,
+			&i.UserAgent,
+			&i.AttemptCount,
+			&i.MaxAttempts,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.IdleExpiresAt,
+			&i.AbsoluteExpiresAt,
+			&i.RevokedAt,
+			&i.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const touchAdminSessionCAS = `-- name: TouchAdminSessionCAS :one
 UPDATE admin_sessions
 SET last_seen_at = $1,
-    idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
+    idle_expires_at = LEAST($2::timestamptz, absolute_expires_at),
+    session_version = session_version + 1
 WHERE session_id = $3
   AND admin_version = $4
   AND password_version = $5
+  AND session_version = $6
   AND revoked_at IS NULL
   AND idle_expires_at > $1
   AND absolute_expires_at > $1
-RETURNING session_id, kind, last_seen_at, idle_expires_at, absolute_expires_at
+RETURNING session_id, kind, session_version, last_seen_at, idle_expires_at, absolute_expires_at
 `
 
 type TouchAdminSessionCASParams struct {
@@ -1733,11 +2667,13 @@ type TouchAdminSessionCASParams struct {
 	SessionID               pgtype.UUID        `json:"session_id"`
 	ExpectedAdminVersion    int64              `json:"expected_admin_version"`
 	ExpectedPasswordVersion int64              `json:"expected_password_version"`
+	ExpectedSessionVersion  int64              `json:"expected_session_version"`
 }
 
 type TouchAdminSessionCASRow struct {
 	SessionID         pgtype.UUID        `json:"session_id"`
 	Kind              string             `json:"kind"`
+	SessionVersion    int64              `json:"session_version"`
 	LastSeenAt        pgtype.Timestamptz `json:"last_seen_at"`
 	IdleExpiresAt     pgtype.Timestamptz `json:"idle_expires_at"`
 	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
@@ -1747,14 +2683,16 @@ type TouchAdminSessionCASRow struct {
 //
 //	UPDATE admin_sessions
 //	SET last_seen_at = $1,
-//	    idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
+//	    idle_expires_at = LEAST($2::timestamptz, absolute_expires_at),
+//	    session_version = session_version + 1
 //	WHERE session_id = $3
 //	  AND admin_version = $4
 //	  AND password_version = $5
+//	  AND session_version = $6
 //	  AND revoked_at IS NULL
 //	  AND idle_expires_at > $1
 //	  AND absolute_expires_at > $1
-//	RETURNING session_id, kind, last_seen_at, idle_expires_at, absolute_expires_at
+//	RETURNING session_id, kind, session_version, last_seen_at, idle_expires_at, absolute_expires_at
 func (q *Queries) TouchAdminSessionCAS(ctx context.Context, arg TouchAdminSessionCASParams) (TouchAdminSessionCASRow, error) {
 	row := q.db.QueryRow(ctx, touchAdminSessionCAS,
 		arg.SeenAt,
@@ -1762,11 +2700,13 @@ func (q *Queries) TouchAdminSessionCAS(ctx context.Context, arg TouchAdminSessio
 		arg.SessionID,
 		arg.ExpectedAdminVersion,
 		arg.ExpectedPasswordVersion,
+		arg.ExpectedSessionVersion,
 	)
 	var i TouchAdminSessionCASRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.Kind,
+		&i.SessionVersion,
 		&i.LastSeenAt,
 		&i.IdleExpiresAt,
 		&i.AbsoluteExpiresAt,
@@ -1904,6 +2844,121 @@ func (q *Queries) UpdateAdminPasswordCAS(ctx context.Context, arg UpdateAdminPas
 		&i.PasswordVersion,
 		&i.AdminVersion,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertAdminElevationGrant = `-- name: UpsertAdminElevationGrant :one
+INSERT INTO admin_elevation_grants (
+    admin_id,
+    session_id,
+    scope,
+    admin_version,
+    password_version,
+    session_version,
+    enrollment_version,
+    granted_at,
+    expires_at,
+    revoked_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10
+)
+ON CONFLICT (session_id, scope) DO UPDATE
+SET admin_id = EXCLUDED.admin_id,
+    admin_version = EXCLUDED.admin_version,
+    password_version = EXCLUDED.password_version,
+    session_version = EXCLUDED.session_version,
+    enrollment_version = EXCLUDED.enrollment_version,
+    granted_at = EXCLUDED.granted_at,
+    expires_at = EXCLUDED.expires_at,
+    revoked_at = EXCLUDED.revoked_at
+RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+          enrollment_version, granted_at, expires_at, revoked_at
+`
+
+type UpsertAdminElevationGrantParams struct {
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	SessionID         pgtype.UUID        `json:"session_id"`
+	Scope             string             `json:"scope"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	GrantedAt         pgtype.Timestamptz `json:"granted_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+}
+
+// UpsertAdminElevationGrant
+//
+//	INSERT INTO admin_elevation_grants (
+//	    admin_id,
+//	    session_id,
+//	    scope,
+//	    admin_version,
+//	    password_version,
+//	    session_version,
+//	    enrollment_version,
+//	    granted_at,
+//	    expires_at,
+//	    revoked_at
+//	) VALUES (
+//	    $1,
+//	    $2,
+//	    $3,
+//	    $4,
+//	    $5,
+//	    $6,
+//	    $7,
+//	    $8,
+//	    $9,
+//	    $10
+//	)
+//	ON CONFLICT (session_id, scope) DO UPDATE
+//	SET admin_id = EXCLUDED.admin_id,
+//	    admin_version = EXCLUDED.admin_version,
+//	    password_version = EXCLUDED.password_version,
+//	    session_version = EXCLUDED.session_version,
+//	    enrollment_version = EXCLUDED.enrollment_version,
+//	    granted_at = EXCLUDED.granted_at,
+//	    expires_at = EXCLUDED.expires_at,
+//	    revoked_at = EXCLUDED.revoked_at
+//	RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+//	          enrollment_version, granted_at, expires_at, revoked_at
+func (q *Queries) UpsertAdminElevationGrant(ctx context.Context, arg UpsertAdminElevationGrantParams) (AdminElevationGrant, error) {
+	row := q.db.QueryRow(ctx, upsertAdminElevationGrant,
+		arg.AdminID,
+		arg.SessionID,
+		arg.Scope,
+		arg.AdminVersion,
+		arg.PasswordVersion,
+		arg.SessionVersion,
+		arg.EnrollmentVersion,
+		arg.GrantedAt,
+		arg.ExpiresAt,
+		arg.RevokedAt,
+	)
+	var i AdminElevationGrant
+	err := row.Scan(
+		&i.AdminID,
+		&i.SessionID,
+		&i.Scope,
+		&i.AdminVersion,
+		&i.PasswordVersion,
+		&i.SessionVersion,
+		&i.EnrollmentVersion,
+		&i.GrantedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
 	)
 	return i, err
 }

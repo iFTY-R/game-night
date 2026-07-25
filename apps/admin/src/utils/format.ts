@@ -1,4 +1,4 @@
-import { AdminSessionKind, type AdminPermission, type AdminSessionSummary } from "../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
+import { AdminPermission, AdminSessionKind, type AdminSessionSummary } from "../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 
 export const formatDateTime = (value?: { seconds?: bigint | number | string } | Date): string => {
   if (!value) {
@@ -18,12 +18,8 @@ export const formatSessionKind = (kind?: AdminSessionKind): string => {
   switch (kind) {
     case AdminSessionKind.SETUP_PASSWORD_PENDING:
       return "等待修改初始密码";
-    case AdminSessionKind.TOTP_ENROLLMENT_PENDING:
-      return "等待绑定验证器";
     case AdminSessionKind.MFA_PENDING:
       return "等待多因素验证";
-    case AdminSessionKind.RECOVERY_PENDING:
-      return "等待重绑验证器";
     case AdminSessionKind.FULL:
       return "完整会话";
     default:
@@ -33,16 +29,14 @@ export const formatSessionKind = (kind?: AdminSessionKind): string => {
 
 export const formatPermission = (permission: AdminPermission): string => {
   switch (permission) {
-    case 1:
-      return "精确用户查询";
-    case 2:
-      return "读取实名";
-    case 3:
-      return "修改实名";
-    case 7:
-      return "封禁用户";
-    case 10:
-      return "读取审计";
+    case AdminPermission.SECURITY_READ:
+      return "读取安全设置";
+    case AdminPermission.SECURITY_MANAGE_PASSWORD:
+      return "管理密码";
+    case AdminPermission.SECURITY_MANAGE_MFA:
+      return "管理多因素认证";
+    case AdminPermission.SECURITY_MANAGE_SESSIONS:
+      return "管理会话";
     default:
       return `权限 ${permission}`;
   }

@@ -50,9 +50,7 @@ const (
 	ScopeIdentityRecoveryCodeRotation Scope = "identity.recovery_code_rotation"
 	ScopeAdminTOTPEnrollment          Scope = "admin.totp_enrollment"
 	ScopeAdminInitialRecoveryCodes    Scope = "admin.initial_recovery_codes"
-	ScopeAdminTOTPRebind              Scope = "admin.totp_rebind"
 	ScopeAdminRegenerateRecoveryCodes Scope = "admin.regenerate_recovery_codes"
-	ScopeAdminAssistedRecoveryGrant   Scope = "admin.assisted_recovery_grant"
 )
 
 // Valid rejects free-form scopes so protocol and database values cannot silently drift.
@@ -60,8 +58,7 @@ func (scope Scope) Valid() bool {
 	switch scope {
 	case ScopeIdentityBootstrap, ScopeIdentityOnboarding, ScopeIdentityRecovery,
 		ScopeIdentityRecoveryCodeRotation, ScopeAdminTOTPEnrollment,
-		ScopeAdminInitialRecoveryCodes, ScopeAdminTOTPRebind,
-		ScopeAdminRegenerateRecoveryCodes, ScopeAdminAssistedRecoveryGrant:
+		ScopeAdminInitialRecoveryCodes, ScopeAdminRegenerateRecoveryCodes:
 		return true
 	default:
 		return false
@@ -81,8 +78,7 @@ func (scope Scope) IsIdentity() bool {
 // IsAdmin reports whether the operation belongs to an administrator security workflow.
 func (scope Scope) IsAdmin() bool {
 	switch scope {
-	case ScopeAdminTOTPEnrollment, ScopeAdminInitialRecoveryCodes, ScopeAdminTOTPRebind,
-		ScopeAdminRegenerateRecoveryCodes, ScopeAdminAssistedRecoveryGrant:
+	case ScopeAdminTOTPEnrollment, ScopeAdminInitialRecoveryCodes, ScopeAdminRegenerateRecoveryCodes:
 		return true
 	default:
 		return false
@@ -93,12 +89,11 @@ func (scope Scope) IsAdmin() bool {
 type ResultType string
 
 const (
-	ResultTypeIdentityDeviceCredential   ResultType = "identity.device_credential"
-	ResultTypeIdentityRecoveryCode       ResultType = "identity.recovery_code"
-	ResultTypeIdentityRecoveryBundle     ResultType = "identity.recovery_bundle"
-	ResultTypeAdminTOTPEnrollment        ResultType = "admin.totp_enrollment"
-	ResultTypeAdminRecoveryCodes         ResultType = "admin.recovery_codes"
-	ResultTypeAdminAssistedRecoveryGrant ResultType = "admin.assisted_recovery_grant"
+	ResultTypeIdentityDeviceCredential ResultType = "identity.device_credential"
+	ResultTypeIdentityRecoveryCode     ResultType = "identity.recovery_code"
+	ResultTypeIdentityRecoveryBundle   ResultType = "identity.recovery_bundle"
+	ResultTypeAdminTOTPEnrollment      ResultType = "admin.totp_enrollment"
+	ResultTypeAdminRecoveryCodes       ResultType = "admin.recovery_codes"
 )
 
 // Valid rejects result schemas that have not been explicitly versioned by the domain.
@@ -106,7 +101,7 @@ func (resultType ResultType) Valid() bool {
 	switch resultType {
 	case ResultTypeIdentityDeviceCredential, ResultTypeIdentityRecoveryCode,
 		ResultTypeIdentityRecoveryBundle, ResultTypeAdminTOTPEnrollment,
-		ResultTypeAdminRecoveryCodes, ResultTypeAdminAssistedRecoveryGrant:
+		ResultTypeAdminRecoveryCodes:
 		return true
 	default:
 		return false
@@ -190,10 +185,6 @@ func scopeAllowsResultType(scope Scope, resultType ResultType) bool {
 		return resultType == ResultTypeAdminTOTPEnrollment
 	case ScopeAdminInitialRecoveryCodes, ScopeAdminRegenerateRecoveryCodes:
 		return resultType == ResultTypeAdminRecoveryCodes
-	case ScopeAdminTOTPRebind:
-		return resultType == ResultTypeAdminTOTPEnrollment || resultType == ResultTypeAdminRecoveryCodes
-	case ScopeAdminAssistedRecoveryGrant:
-		return resultType == ResultTypeAdminAssistedRecoveryGrant
 	default:
 		return false
 	}

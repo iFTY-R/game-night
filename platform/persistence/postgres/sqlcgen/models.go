@@ -9,18 +9,17 @@ import (
 )
 
 type AdminAccount struct {
-	SingletonID          int16              `json:"singleton_id"`
-	AdminID              pgtype.UUID        `json:"admin_id"`
-	Username             string             `json:"username"`
-	Status               string             `json:"status"`
-	PasswordHash         pgtype.Text        `json:"password_hash"`
-	PasswordAlgorithm    pgtype.Text        `json:"password_algorithm"`
-	PasswordParameters   pgtype.Text        `json:"password_parameters"`
-	PasswordVersion      int64              `json:"password_version"`
-	AdminVersion         int64              `json:"admin_version"`
-	LastAcceptedTotpStep pgtype.Int8        `json:"last_accepted_totp_step"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	SingletonID        int16              `json:"singleton_id"`
+	AdminID            pgtype.UUID        `json:"admin_id"`
+	Username           string             `json:"username"`
+	Status             string             `json:"status"`
+	PasswordHash       pgtype.Text        `json:"password_hash"`
+	PasswordAlgorithm  pgtype.Text        `json:"password_algorithm"`
+	PasswordParameters pgtype.Text        `json:"password_parameters"`
+	PasswordVersion    int64              `json:"password_version"`
+	AdminVersion       int64              `json:"admin_version"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type AdminAssistedRecoveryGrant struct {
@@ -65,6 +64,34 @@ type AdminChallenge struct {
 	ResultID         pgtype.UUID        `json:"result_id"`
 }
 
+type AdminCommandReceipt struct {
+	AdminID                 pgtype.UUID        `json:"admin_id"`
+	OperationID             string             `json:"operation_id"`
+	RequestDigest           []byte             `json:"request_digest"`
+	Command                 string             `json:"command"`
+	TargetType              string             `json:"target_type"`
+	TargetID                string             `json:"target_id"`
+	ResultAdminVersion      int64              `json:"result_admin_version"`
+	ResultPasswordVersion   int64              `json:"result_password_version"`
+	ResultSessionVersion    int64              `json:"result_session_version"`
+	ResultEnrollmentVersion int64              `json:"result_enrollment_version"`
+	AuditEventID            pgtype.UUID        `json:"audit_event_id"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+}
+
+type AdminElevationGrant struct {
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	SessionID         pgtype.UUID        `json:"session_id"`
+	Scope             string             `json:"scope"`
+	AdminVersion      int64              `json:"admin_version"`
+	PasswordVersion   int64              `json:"password_version"`
+	SessionVersion    int64              `json:"session_version"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	GrantedAt         pgtype.Timestamptz `json:"granted_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
+}
+
 type AdminRecoveryCode struct {
 	RecoveryCodeID pgtype.UUID        `json:"recovery_code_id"`
 	AdminID        pgtype.UUID        `json:"admin_id"`
@@ -95,21 +122,26 @@ type AdminSession struct {
 	AbsoluteExpiresAt pgtype.Timestamptz `json:"absolute_expires_at"`
 	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
 	RevokeReason      pgtype.Text        `json:"revoke_reason"`
+	SessionVersion    int64              `json:"session_version"`
+	ClientIp          string             `json:"client_ip"`
+	UserAgent         string             `json:"user_agent"`
 }
 
 type AdminTotpEnrollment struct {
-	EnrollmentID pgtype.UUID        `json:"enrollment_id"`
-	AdminID      pgtype.UUID        `json:"admin_id"`
-	Ciphertext   []byte             `json:"ciphertext"`
-	Nonce        []byte             `json:"nonce"`
-	KeyVersion   int32              `json:"key_version"`
-	Status       string             `json:"status"`
-	AdminVersion int64              `json:"admin_version"`
-	OperationID  string             `json:"operation_id"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
-	ActivatedAt  pgtype.Timestamptz `json:"activated_at"`
-	DisabledAt   pgtype.Timestamptz `json:"disabled_at"`
+	EnrollmentID      pgtype.UUID        `json:"enrollment_id"`
+	AdminID           pgtype.UUID        `json:"admin_id"`
+	Ciphertext        []byte             `json:"ciphertext"`
+	Nonce             []byte             `json:"nonce"`
+	KeyVersion        int32              `json:"key_version"`
+	Status            string             `json:"status"`
+	AdminVersion      int64              `json:"admin_version"`
+	OperationID       string             `json:"operation_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt       pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
+	EnrollmentVersion int64              `json:"enrollment_version"`
+	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
 }
 
 type AnonymousChallenge struct {
@@ -426,33 +458,6 @@ type PartyRoom struct {
 	ActivePauseRequestedByUserID pgtype.UUID        `json:"active_pause_requested_by_user_id"`
 	ActivePausePausedByUserID    pgtype.UUID        `json:"active_pause_paused_by_user_id"`
 	ActivePausePausedAt          pgtype.Timestamptz `json:"active_pause_paused_at"`
-}
-
-type ProfileExportContext struct {
-	ExportID         pgtype.UUID        `json:"export_id"`
-	CreatedByAdminID pgtype.UUID        `json:"created_by_admin_id"`
-	FilterDigest     []byte             `json:"filter_digest"`
-	RequestedFields  []string           `json:"requested_fields"`
-	SchemaVersion    int32              `json:"schema_version"`
-	ItemCount        int64              `json:"item_count"`
-	Status           string             `json:"status"`
-	Reason           string             `json:"reason"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
-	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
-	AbortedAt        pgtype.Timestamptz `json:"aborted_at"`
-	ExpiredAt        pgtype.Timestamptz `json:"expired_at"`
-}
-
-type ProfileExportItem struct {
-	ExportID           pgtype.UUID `json:"export_id"`
-	Ordinal            int64       `json:"ordinal"`
-	UserID             pgtype.UUID `json:"user_id"`
-	Username           string      `json:"username"`
-	ProfileVersion     pgtype.Int8 `json:"profile_version"`
-	RealNameCiphertext []byte      `json:"real_name_ciphertext"`
-	RealNameNonce      []byte      `json:"real_name_nonce"`
-	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
 }
 
 type RoomActivityLease struct {

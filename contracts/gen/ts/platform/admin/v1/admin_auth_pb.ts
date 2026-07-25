@@ -4,8 +4,9 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { AdminAccountState, AdminElevationScope, AdminElevationSummary, AdminSessionInfo, AdminSessionSummary } from "./admin_common_pb";
+import { file_platform_admin_v1_admin_common } from "./admin_common_pb";
 import type { AnonymousChallenge, OperationResult } from "../../common/v1/common_pb";
 import { file_platform_common_v1_common } from "../../common/v1/common_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -14,44 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file platform/admin/v1/admin_auth.proto.
  */
 export const file_platform_admin_v1_admin_auth: GenFile = /*@__PURE__*/
-  fileDesc("CiJwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9hdXRoLnByb3RvEhFwbGF0Zm9ybS5hZG1pbi52MSKBAgoTQWRtaW5TZXNzaW9uU3VtbWFyeRIQCghhZG1pbl9pZBgBIAEoCRIxCgRraW5kGAIgASgOMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uS2luZBI3CgtwZXJtaXNzaW9ucxgDIAMoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluUGVybWlzc2lvbhIzCg9pZGxlX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjcKE2Fic29sdXRlX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhYKFEdldFNldHVwU3RhdGVSZXF1ZXN0IkoKFUdldFNldHVwU3RhdGVSZXNwb25zZRIxCgVzdGF0ZRgBIAEoDjIiLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2V0dXBTdGF0ZSIfCh1HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVxdWVzdCKOAQoeR2V0Q3VycmVudEFkbWluU2Vzc2lvblJlc3BvbnNlEjcKB3Nlc3Npb24YASABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5EjMKCW5leHRfc3RlcBgCIAEoDjIgLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluTmV4dFN0ZXAiHAoaR2V0UnVudGltZVJlYWRpbmVzc1JlcXVlc3QitQEKFVJ1bnRpbWVSZWFkaW5lc3NTdGF0ZRIMCgRtb2RlGAEgASgJEg0KBXJlYWR5GAIgASgIEkwKCmNvbXBvbmVudHMYAyADKAsyOC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUuQ29tcG9uZW50c0VudHJ5GjEKD0NvbXBvbmVudHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpYBChtHZXRSdW50aW1lUmVhZGluZXNzUmVzcG9uc2USOgoIb3JkaW5hcnkYASABKAsyKC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUSOwoJc2Vuc2l0aXZlGAIgASgLMigucGxhdGZvcm0uYWRtaW4udjEuUnVudGltZVJlYWRpbmVzc1N0YXRlIjEKFkJlZ2luQWRtaW5Mb2dpblJlcXVlc3QSFwoPcmVxdWVzdF9mbG93X2lkGAEgASgJIlQKF0JlZ2luQWRtaW5Mb2dpblJlc3BvbnNlEjkKCWNoYWxsZW5nZRgBIAEoCzImLnBsYXRmb3JtLmNvbW1vbi52MS5Bbm9ueW1vdXNDaGFsbGVuZ2UiQQoUTG9naW5QYXNzd29yZFJlcXVlc3QSFwoPY2hhbGxlbmdlX3Byb29mGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJInwKFUxvZ2luUGFzc3dvcmRSZXNwb25zZRIzCgluZXh0X3N0ZXAYASABKA4yIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk5leHRTdGVwEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKEVZlcmlmeVRvdHBSZXF1ZXN0EhEKCXRvdHBfY29kZRgBIAEoCSJNChJWZXJpZnlUb3RwUmVzcG9uc2USNwoHc2Vzc2lvbhgBIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiNAocQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVxdWVzdBIUCgxuZXdfcGFzc3dvcmQYASABKAkihAEKHUNoYW5nZUluaXRpYWxQYXNzd29yZFJlc3BvbnNlEjMKCW5leHRfc3RlcBgBIAEoDjIgLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluTmV4dFN0ZXASLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMgoaQmVnaW5Ub3RwRW5yb2xsbWVudFJlcXVlc3QSFAoMb3BlcmF0aW9uX2lkGAEgASgJInwKG0JlZ2luVG90cEVucm9sbG1lbnRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhMKC3RvdHBfc2VjcmV0GAIgASgJEhMKC290cGF1dGhfdXJpGAMgASgJIngKHUNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXF1ZXN0Eh8KF2Vucm9sbG1lbnRfb3BlcmF0aW9uX2lkGAEgASgJEiMKG3JlY292ZXJ5X2NvZGVzX29wZXJhdGlvbl9pZBgCIAEoCRIRCgl0b3RwX2NvZGUYAyABKAkipgEKHkNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhYKDnJlY292ZXJ5X2NvZGVzGAIgAygJEjcKB3Nlc3Npb24YAyABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IocBCiBDb25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVxdWVzdBI6CglvcGVyYXRpb24YASABKA4yJy5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlY3JldE9wZXJhdGlvbhIUCgxvcGVyYXRpb25faWQYAiABKAkSEQoJcmVzdWx0X2lkGAMgASgJIjYKIUNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHRSZXNwb25zZRIRCgljb25maXJtZWQYASABKAgiLAoTUmVjb3ZlckFkbWluUmVxdWVzdBIVCg1yZWNvdmVyeV9jb2RlGAEgASgJIoQBChRSZWNvdmVyQWRtaW5SZXNwb25zZRIzCgluZXh0X3N0ZXAYASABKA4yIC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbk5leHRTdGVwEjcKB3Nlc3Npb24YAiABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IkwKGkNoYW5nZUFkbWluUGFzc3dvcmRSZXF1ZXN0EhgKEGN1cnJlbnRfcGFzc3dvcmQYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJIosBChtDaGFuZ2VBZG1pblBhc3N3b3JkUmVzcG9uc2USMwoJbmV4dF9zdGVwGAEgASgOMiAucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5OZXh0U3RlcBI3CgdzZXNzaW9uGAIgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSIuChZCZWdpblRvdHBSZWJpbmRSZXF1ZXN0EhQKDG9wZXJhdGlvbl9pZBgBIAEoCSJ4ChdCZWdpblRvdHBSZWJpbmRSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhMKC3RvdHBfc2VjcmV0GAIgASgJEhMKC290cGF1dGhfdXJpGAMgASgJInQKGUNvbXBsZXRlVG90cFJlYmluZFJlcXVlc3QSHwoXZW5yb2xsbWVudF9vcGVyYXRpb25faWQYASABKAkSIwobcmVjb3ZlcnlfY29kZXNfb3BlcmF0aW9uX2lkGAIgASgJEhEKCXRvdHBfY29kZRgDIAEoCSKiAQoaQ29tcGxldGVUb3RwUmViaW5kUmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCRI3CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSJOCiNSZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSEQoJdG90cF9jb2RlGAIgASgJInMKJFJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXNwb25zZRIzCgZyZXN1bHQYASABKAsyIy5wbGF0Zm9ybS5jb21tb24udjEuT3BlcmF0aW9uUmVzdWx0EhYKDnJlY292ZXJ5X2NvZGVzGAIgAygJIhQKEkxvZ291dEFkbWluUmVxdWVzdCIpChNMb2dvdXRBZG1pblJlc3BvbnNlEhIKCmxvZ2dlZF9vdXQYASABKAgiHwodTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1JlcXVlc3QiOgoeTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1Jlc3BvbnNlEhgKEHJldm9rZWRfc2Vzc2lvbnMYASABKAUqoQEKD0FkbWluU2V0dXBTdGF0ZRIhCh1BRE1JTl9TRVRVUF9TVEFURV9VTlNQRUNJRklFRBAAEicKI0FETUlOX1NFVFVQX1NUQVRFX0JPT1RTVFJBUF9QRU5ESU5HEAESJAogQURNSU5fU0VUVVBfU1RBVEVfU0VUVVBfUkVRVUlSRUQQAhIcChhBRE1JTl9TRVRVUF9TVEFURV9BQ1RJVkUQAyraAQoNQWRtaW5OZXh0U3RlcBIfChtBRE1JTl9ORVhUX1NURVBfVU5TUEVDSUZJRUQQABIjCh9BRE1JTl9ORVhUX1NURVBfQ0hBTkdFX1BBU1NXT1JEEAESHwobQURNSU5fTkVYVF9TVEVQX0VOUk9MTF9UT1RQEAISHgoaQURNSU5fTkVYVF9TVEVQX1ZFUklGWV9NRkEQAxIfChtBRE1JTl9ORVhUX1NURVBfUkVCSU5EX1RPVFAQBBIhCh1BRE1JTl9ORVhUX1NURVBfQVVUSEVOVElDQVRFRBAFKv8BChBBZG1pblNlc3Npb25LaW5kEiIKHkFETUlOX1NFU1NJT05fS0lORF9VTlNQRUNJRklFRBAAEi0KKUFETUlOX1NFU1NJT05fS0lORF9TRVRVUF9QQVNTV09SRF9QRU5ESU5HEAESLgoqQURNSU5fU0VTU0lPTl9LSU5EX1RPVFBfRU5ST0xMTUVOVF9QRU5ESU5HEAISIgoeQURNSU5fU0VTU0lPTl9LSU5EX01GQV9QRU5ESU5HEAMSJwojQURNSU5fU0VTU0lPTl9LSU5EX1JFQ09WRVJZX1BFTkRJTkcQBBIbChdBRE1JTl9TRVNTSU9OX0tJTkRfRlVMTBAFKpcDCg9BZG1pblBlcm1pc3Npb24SIAocQURNSU5fUEVSTUlTU0lPTl9VTlNQRUNJRklFRBAAEh0KGUFETUlOX1BFUk1JU1NJT05fR0VUX1VTRVIQARIiCh5BRE1JTl9QRVJNSVNTSU9OX0dFVF9SRUFMX05BTUUQAhIlCiFBRE1JTl9QRVJNSVNTSU9OX1VQREFURV9SRUFMX05BTUUQAxIjCh9BRE1JTl9QRVJNSVNTSU9OX0VYUE9SVF9QUk9GSUxFEAQSJAogQURNSU5fUEVSTUlTU0lPTl9NQU5BR0VfUkVDT1ZFUlkQBRIjCh9BRE1JTl9QRVJNSVNTSU9OX0ZPUkNFX1VTRVJOQU1FEAYSIQodQURNSU5fUEVSTUlTU0lPTl9TVVNQRU5EX1VTRVIQBxIgChxBRE1JTl9QRVJNSVNTSU9OX0RFTEVURV9VU0VSEAgSIgoeQURNSU5fUEVSTUlTU0lPTl9SRVZPS0VfREVWSUNFEAkSHwobQURNSU5fUEVSTUlTU0lPTl9SRUFEX0FVRElUEAoqrwIKFEFkbWluU2VjcmV0T3BlcmF0aW9uEiYKIkFETUlOX1NFQ1JFVF9PUEVSQVRJT05fVU5TUEVDSUZJRUQQABIqCiZBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1RPVFBfRU5ST0xMTUVOVBABEjEKLUFETUlOX1NFQ1JFVF9PUEVSQVRJT05fSU5JVElBTF9SRUNPVkVSWV9DT0RFUxACEiYKIkFETUlOX1NFQ1JFVF9PUEVSQVRJT05fVE9UUF9SRUJJTkQQAxI0CjBBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1JFR0VORVJBVEVfUkVDT1ZFUllfQ09ERVMQBBIyCi5BRE1JTl9TRUNSRVRfT1BFUkFUSU9OX0FTU0lTVEVEX1JFQ09WRVJZX0dSQU5UEAUysQ8KEEFkbWluQXV0aFNlcnZpY2USYgoNR2V0U2V0dXBTdGF0ZRInLnBsYXRmb3JtLmFkbWluLnYxLkdldFNldHVwU3RhdGVSZXF1ZXN0GigucGxhdGZvcm0uYWRtaW4udjEuR2V0U2V0dXBTdGF0ZVJlc3BvbnNlEn0KFkdldEN1cnJlbnRBZG1pblNlc3Npb24SMC5wbGF0Zm9ybS5hZG1pbi52MS5HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVxdWVzdBoxLnBsYXRmb3JtLmFkbWluLnYxLkdldEN1cnJlbnRBZG1pblNlc3Npb25SZXNwb25zZRJ0ChNHZXRSdW50aW1lUmVhZGluZXNzEi0ucGxhdGZvcm0uYWRtaW4udjEuR2V0UnVudGltZVJlYWRpbmVzc1JlcXVlc3QaLi5wbGF0Zm9ybS5hZG1pbi52MS5HZXRSdW50aW1lUmVhZGluZXNzUmVzcG9uc2USaAoPQmVnaW5BZG1pbkxvZ2luEikucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5BZG1pbkxvZ2luUmVxdWVzdBoqLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luQWRtaW5Mb2dpblJlc3BvbnNlEmIKDUxvZ2luUGFzc3dvcmQSJy5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dpblBhc3N3b3JkUmVxdWVzdBooLnBsYXRmb3JtLmFkbWluLnYxLkxvZ2luUGFzc3dvcmRSZXNwb25zZRJZCgpWZXJpZnlUb3RwEiQucGxhdGZvcm0uYWRtaW4udjEuVmVyaWZ5VG90cFJlcXVlc3QaJS5wbGF0Zm9ybS5hZG1pbi52MS5WZXJpZnlUb3RwUmVzcG9uc2USegoVQ2hhbmdlSW5pdGlhbFBhc3N3b3JkEi8ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVxdWVzdBowLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUluaXRpYWxQYXNzd29yZFJlc3BvbnNlEnQKE0JlZ2luVG90cEVucm9sbG1lbnQSLS5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpblRvdHBFbnJvbGxtZW50UmVxdWVzdBouLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cEVucm9sbG1lbnRSZXNwb25zZRJ9ChZDb21wbGV0ZVRvdHBFbnJvbGxtZW50EjAucGxhdGZvcm0uYWRtaW4udjEuQ29tcGxldGVUb3RwRW5yb2xsbWVudFJlcXVlc3QaMS5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVzcG9uc2UShgEKGUNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHQSMy5wbGF0Zm9ybS5hZG1pbi52MS5Db25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVxdWVzdBo0LnBsYXRmb3JtLmFkbWluLnYxLkNvbmZpcm1BZG1pblNlY3JldFJlY2VpcHRSZXNwb25zZRJfCgxSZWNvdmVyQWRtaW4SJi5wbGF0Zm9ybS5hZG1pbi52MS5SZWNvdmVyQWRtaW5SZXF1ZXN0GicucGxhdGZvcm0uYWRtaW4udjEuUmVjb3ZlckFkbWluUmVzcG9uc2USdAoTQ2hhbmdlQWRtaW5QYXNzd29yZBItLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUFkbWluUGFzc3dvcmRSZXF1ZXN0Gi4ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlQWRtaW5QYXNzd29yZFJlc3BvbnNlEmgKD0JlZ2luVG90cFJlYmluZBIpLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luVG90cFJlYmluZFJlcXVlc3QaKi5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpblRvdHBSZWJpbmRSZXNwb25zZRJxChJDb21wbGV0ZVRvdHBSZWJpbmQSLC5wbGF0Zm9ybS5hZG1pbi52MS5Db21wbGV0ZVRvdHBSZWJpbmRSZXF1ZXN0Gi0ucGxhdGZvcm0uYWRtaW4udjEuQ29tcGxldGVUb3RwUmViaW5kUmVzcG9uc2USjwEKHFJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXMSNi5wbGF0Zm9ybS5hZG1pbi52MS5SZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVxdWVzdBo3LnBsYXRmb3JtLmFkbWluLnYxLlJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXNwb25zZRJcCgtMb2dvdXRBZG1pbhIlLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFkbWluUmVxdWVzdBomLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFkbWluUmVzcG9uc2USfQoWTG9nb3V0QWxsQWRtaW5TZXNzaW9ucxIwLnBsYXRmb3JtLmFkbWluLnYxLkxvZ291dEFsbEFkbWluU2Vzc2lvbnNSZXF1ZXN0GjEucGxhdGZvcm0uYWRtaW4udjEuTG9nb3V0QWxsQWRtaW5TZXNzaW9uc1Jlc3BvbnNlQklaR2dpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_google_protobuf_timestamp, file_platform_common_v1_common]);
-
-/**
- * @generated from message platform.admin.v1.AdminSessionSummary
- */
-export type AdminSessionSummary = Message<"platform.admin.v1.AdminSessionSummary"> & {
-  /**
-   * @generated from field: string admin_id = 1;
-   */
-  adminId: string;
-
-  /**
-   * @generated from field: platform.admin.v1.AdminSessionKind kind = 2;
-   */
-  kind: AdminSessionKind;
-
-  /**
-   * @generated from field: repeated platform.admin.v1.AdminPermission permissions = 3;
-   */
-  permissions: AdminPermission[];
-
-  /**
-   * @generated from field: google.protobuf.Timestamp idle_expires_at = 4;
-   */
-  idleExpiresAt?: Timestamp;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp absolute_expires_at = 5;
-   */
-  absoluteExpiresAt?: Timestamp;
-};
-
-/**
- * Describes the message platform.admin.v1.AdminSessionSummary.
- * Use `create(AdminSessionSummarySchema)` to create a new message.
- */
-export const AdminSessionSummarySchema: GenMessage<AdminSessionSummary> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 0);
+  fileDesc("CiJwbGF0Zm9ybS9hZG1pbi92MS9hZG1pbl9hdXRoLnByb3RvEhFwbGF0Zm9ybS5hZG1pbi52MSIWChRHZXRTZXR1cFN0YXRlUmVxdWVzdCJMChVHZXRTZXR1cFN0YXRlUmVzcG9uc2USMwoFc3RhdGUYASABKA4yJC5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkFjY291bnRTdGF0ZSIfCh1HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVxdWVzdCJZCh5HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVzcG9uc2USNwoHc2Vzc2lvbhgBIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiHAoaR2V0UnVudGltZVJlYWRpbmVzc1JlcXVlc3QitQEKFVJ1bnRpbWVSZWFkaW5lc3NTdGF0ZRIMCgRtb2RlGAEgASgJEg0KBXJlYWR5GAIgASgIEkwKCmNvbXBvbmVudHMYAyADKAsyOC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUuQ29tcG9uZW50c0VudHJ5GjEKD0NvbXBvbmVudHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpYBChtHZXRSdW50aW1lUmVhZGluZXNzUmVzcG9uc2USOgoIb3JkaW5hcnkYASABKAsyKC5wbGF0Zm9ybS5hZG1pbi52MS5SdW50aW1lUmVhZGluZXNzU3RhdGUSOwoJc2Vuc2l0aXZlGAIgASgLMigucGxhdGZvcm0uYWRtaW4udjEuUnVudGltZVJlYWRpbmVzc1N0YXRlIjEKFkJlZ2luQWRtaW5Mb2dpblJlcXVlc3QSFwoPcmVxdWVzdF9mbG93X2lkGAEgASgJIlQKF0JlZ2luQWRtaW5Mb2dpblJlc3BvbnNlEjkKCWNoYWxsZW5nZRgBIAEoCzImLnBsYXRmb3JtLmNvbW1vbi52MS5Bbm9ueW1vdXNDaGFsbGVuZ2UiQQoUTG9naW5QYXNzd29yZFJlcXVlc3QSFwoPY2hhbGxlbmdlX3Byb29mGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJIl0KIkxvZ2luUmVxdWlyZXNJbml0aWFsUGFzc3dvcmRDaGFuZ2USNwoHc2Vzc2lvbhgBIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiSwoQTG9naW5SZXF1aXJlc01mYRI3CgdzZXNzaW9uGAEgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSL9AQoVTG9naW5QYXNzd29yZFJlc3BvbnNlEmEKIHJlcXVpcmVzX2luaXRpYWxfcGFzc3dvcmRfY2hhbmdlGAEgASgLMjUucGxhdGZvcm0uYWRtaW4udjEuTG9naW5SZXF1aXJlc0luaXRpYWxQYXNzd29yZENoYW5nZUgAEjsKDHJlcXVpcmVzX21mYRgCIAEoCzIjLnBsYXRmb3JtLmFkbWluLnYxLkxvZ2luUmVxdWlyZXNNZmFIABI5CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeUgAQgkKB291dGNvbWUiKwoWVmVyaWZ5QWRtaW5Ub3RwUmVxdWVzdBIRCgl0b3RwX2NvZGUYASABKAkiUgoXVmVyaWZ5QWRtaW5Ub3RwUmVzcG9uc2USNwoHc2Vzc2lvbhgBIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkiNwoeVmVyaWZ5QWRtaW5SZWNvdmVyeUNvZGVSZXF1ZXN0EhUKDXJlY292ZXJ5X2NvZGUYASABKAkiWgofVmVyaWZ5QWRtaW5SZWNvdmVyeUNvZGVSZXNwb25zZRI3CgdzZXNzaW9uGAEgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSI0ChxDaGFuZ2VJbml0aWFsUGFzc3dvcmRSZXF1ZXN0EhQKDG5ld19wYXNzd29yZBgBIAEoCSJYCh1DaGFuZ2VJbml0aWFsUGFzc3dvcmRSZXNwb25zZRI3CgdzZXNzaW9uGAEgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSKFAQoaQ2hhbmdlQWRtaW5QYXNzd29yZFJlcXVlc3QSFAoMb3BlcmF0aW9uX2lkGAEgASgJEhgKEGN1cnJlbnRfcGFzc3dvcmQYAiABKAkSFAoMbmV3X3Bhc3N3b3JkGAMgASgJEiEKGWV4cGVjdGVkX3Bhc3N3b3JkX3ZlcnNpb24YBCABKAQihgEKG0NoYW5nZUFkbWluUGFzc3dvcmRSZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSNwoHc2Vzc2lvbhgCIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkSGAoQcmV2b2tlZF9zZXNzaW9ucxgDIAEoBSJMChpCZWdpblRvdHBFbnJvbGxtZW50UmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSGAoQY3VycmVudF9wYXNzd29yZBgCIAEoCSKBAQobQmVnaW5Ub3RwRW5yb2xsbWVudFJlc3BvbnNlEjMKBnJlc3VsdBgBIAEoCzIjLnBsYXRmb3JtLmNvbW1vbi52MS5PcGVyYXRpb25SZXN1bHQSGAoQbWFudWFsX2VudHJ5X2tleRgCIAEoCRITCgtvdHBhdXRoX3VyaRgDIAEoCSJ4Ch1Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVxdWVzdBIfChdlbnJvbGxtZW50X29wZXJhdGlvbl9pZBgBIAEoCRIjChtyZWNvdmVyeV9jb2Rlc19vcGVyYXRpb25faWQYAiABKAkSEQoJdG90cF9jb2RlGAMgASgJIsABCh5Db21wbGV0ZVRvdHBFbnJvbGxtZW50UmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCRI3CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeRIYChByZXZva2VkX3Nlc3Npb25zGAQgASgFIl8KEkRpc2FibGVUb3RwUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSDgoGcmVhc29uGAIgASgJEiMKG2V4cGVjdGVkX2Vucm9sbG1lbnRfdmVyc2lvbhgDIAEoBCKYAQoTRGlzYWJsZVRvdHBSZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSNwoHc2Vzc2lvbhgCIAEoCzImLnBsYXRmb3JtLmFkbWluLnYxLkFkbWluU2Vzc2lvblN1bW1hcnkSGAoQcmV2b2tlZF9zZXNzaW9ucxgDIAEoBRIYChBhbHJlYWR5X2Rpc2FibGVkGAQgASgIImQKI1JlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXF1ZXN0EhQKDG9wZXJhdGlvbl9pZBgBIAEoCRInCh9leHBlY3RlZF9yZWNvdmVyeV9jb2Rlc192ZXJzaW9uGAIgASgEIqwBCiRSZWdlbmVyYXRlQWRtaW5SZWNvdmVyeUNvZGVzUmVzcG9uc2USMwoGcmVzdWx0GAEgASgLMiMucGxhdGZvcm0uY29tbW9uLnYxLk9wZXJhdGlvblJlc3VsdBIWCg5yZWNvdmVyeV9jb2RlcxgCIAMoCRI3CgdzZXNzaW9uGAMgASgLMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uU3VtbWFyeSKHAQogQ29uZmlybUFkbWluU2VjcmV0UmVjZWlwdFJlcXVlc3QSOgoJb3BlcmF0aW9uGAEgASgOMicucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZWNyZXRPcGVyYXRpb24SFAoMb3BlcmF0aW9uX2lkGAIgASgJEhEKCXJlc3VsdF9pZBgDIAEoCSI2CiFDb25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVzcG9uc2USEQoJY29uZmlybWVkGAEgASgIIsIBChpFbGV2YXRlQWRtaW5TZXNzaW9uUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSNQoFc2NvcGUYAiABKA4yJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkVsZXZhdGlvblNjb3BlEhgKEGN1cnJlbnRfcGFzc3dvcmQYAyABKAkSEwoJdG90cF9jb2RlGAQgASgJSAASFwoNcmVjb3ZlcnlfY29kZRgFIAEoCUgAQg8KDXNlY29uZF9mYWN0b3Ii7wEKG0VsZXZhdGVBZG1pblNlc3Npb25SZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSOwoJZWxldmF0aW9uGAIgASgLMigucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5FbGV2YXRpb25TdW1tYXJ5EjcKB3Nlc3Npb24YAyABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5EkQKDXNlY29uZF9mYWN0b3IYBCABKA4yLS5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pbkVsZXZhdGlvblNlY29uZEZhY3RvciJbCiJSZXZva2VDdXJyZW50QWRtaW5FbGV2YXRpb25SZXF1ZXN0EjUKBXNjb3BlGAEgASgOMiYucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5FbGV2YXRpb25TY29wZSJvCiNSZXZva2VDdXJyZW50QWRtaW5FbGV2YXRpb25SZXNwb25zZRIPCgdyZXZva2VkGAEgASgIEjcKB3Nlc3Npb24YAiABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IhoKGExpc3RBZG1pblNlc3Npb25zUmVxdWVzdCJSChlMaXN0QWRtaW5TZXNzaW9uc1Jlc3BvbnNlEjUKCHNlc3Npb25zGAEgAygLMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uSW5mbyJnChlSZXZva2VBZG1pblNlc3Npb25SZXF1ZXN0EhQKDG9wZXJhdGlvbl9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEiAKGGV4cGVjdGVkX3Nlc3Npb25fdmVyc2lvbhgDIAEoBCJXChpSZXZva2VBZG1pblNlc3Npb25SZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIPCgdyZXZva2VkGAMgASgIIigKJlByZXZpZXdSZXZva2VPdGhlckFkbWluU2Vzc2lvbnNSZXF1ZXN0ItYBCidQcmV2aWV3UmV2b2tlT3RoZXJBZG1pblNlc3Npb25zUmVzcG9uc2USFwoPcHJldmlld192ZXJzaW9uGAEgASgJEh0KFWN1cnJlbnRfYWRtaW5fdmVyc2lvbhgCIAEoBBIfChdjdXJyZW50X3Nlc3Npb25fdmVyc2lvbhgDIAEoBBIbChNvdGhlcl9zZXNzaW9uX2NvdW50GAQgASgFEjUKCHNlc3Npb25zGAUgAygLMiMucGxhdGZvcm0uYWRtaW4udjEuQWRtaW5TZXNzaW9uSW5mbyKaAQofUmV2b2tlT3RoZXJBZG1pblNlc3Npb25zUmVxdWVzdBIUCgxvcGVyYXRpb25faWQYASABKAkSFwoPcHJldmlld192ZXJzaW9uGAIgASgJEh4KFmV4cGVjdGVkX2FkbWluX3ZlcnNpb24YAyABKAQSKAogZXhwZWN0ZWRfY3VycmVudF9zZXNzaW9uX3ZlcnNpb24YBCABKAQiiwEKIFJldm9rZU90aGVyQWRtaW5TZXNzaW9uc1Jlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRIYChByZXZva2VkX3Nlc3Npb25zGAIgASgFEjcKB3Nlc3Npb24YAyABKAsyJi5wbGF0Zm9ybS5hZG1pbi52MS5BZG1pblNlc3Npb25TdW1tYXJ5IhQKEkxvZ291dEFkbWluUmVxdWVzdCIpChNMb2dvdXRBZG1pblJlc3BvbnNlEhIKCmxvZ2dlZF9vdXQYASABKAgq1AEKFEFkbWluU2VjcmV0T3BlcmF0aW9uEiYKIkFETUlOX1NFQ1JFVF9PUEVSQVRJT05fVU5TUEVDSUZJRUQQABIqCiZBRE1JTl9TRUNSRVRfT1BFUkFUSU9OX1RPVFBfRU5ST0xMTUVOVBABEjEKLUFETUlOX1NFQ1JFVF9PUEVSQVRJT05fSU5JVElBTF9SRUNPVkVSWV9DT0RFUxACEjUKMUFETUlOX1NFQ1JFVF9PUEVSQVRJT05fUkVHRU5FUkFURURfUkVDT1ZFUllfQ09ERVMQAyqkAQoaQWRtaW5FbGV2YXRpb25TZWNvbmRGYWN0b3ISLQopQURNSU5fRUxFVkFUSU9OX1NFQ09ORF9GQUNUT1JfVU5TUEVDSUZJRUQQABImCiJBRE1JTl9FTEVWQVRJT05fU0VDT05EX0ZBQ1RPUl9UT1RQEAESLworQURNSU5fRUxFVkFUSU9OX1NFQ09ORF9GQUNUT1JfUkVDT1ZFUllfQ09ERRACMu0TChBBZG1pbkF1dGhTZXJ2aWNlEmIKDUdldFNldHVwU3RhdGUSJy5wbGF0Zm9ybS5hZG1pbi52MS5HZXRTZXR1cFN0YXRlUmVxdWVzdBooLnBsYXRmb3JtLmFkbWluLnYxLkdldFNldHVwU3RhdGVSZXNwb25zZRJ9ChZHZXRDdXJyZW50QWRtaW5TZXNzaW9uEjAucGxhdGZvcm0uYWRtaW4udjEuR2V0Q3VycmVudEFkbWluU2Vzc2lvblJlcXVlc3QaMS5wbGF0Zm9ybS5hZG1pbi52MS5HZXRDdXJyZW50QWRtaW5TZXNzaW9uUmVzcG9uc2USdAoTR2V0UnVudGltZVJlYWRpbmVzcxItLnBsYXRmb3JtLmFkbWluLnYxLkdldFJ1bnRpbWVSZWFkaW5lc3NSZXF1ZXN0Gi4ucGxhdGZvcm0uYWRtaW4udjEuR2V0UnVudGltZVJlYWRpbmVzc1Jlc3BvbnNlEmgKD0JlZ2luQWRtaW5Mb2dpbhIpLnBsYXRmb3JtLmFkbWluLnYxLkJlZ2luQWRtaW5Mb2dpblJlcXVlc3QaKi5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpbkFkbWluTG9naW5SZXNwb25zZRJiCg1Mb2dpblBhc3N3b3JkEicucGxhdGZvcm0uYWRtaW4udjEuTG9naW5QYXNzd29yZFJlcXVlc3QaKC5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dpblBhc3N3b3JkUmVzcG9uc2USaAoPVmVyaWZ5QWRtaW5Ub3RwEikucGxhdGZvcm0uYWRtaW4udjEuVmVyaWZ5QWRtaW5Ub3RwUmVxdWVzdBoqLnBsYXRmb3JtLmFkbWluLnYxLlZlcmlmeUFkbWluVG90cFJlc3BvbnNlEoABChdWZXJpZnlBZG1pblJlY292ZXJ5Q29kZRIxLnBsYXRmb3JtLmFkbWluLnYxLlZlcmlmeUFkbWluUmVjb3ZlcnlDb2RlUmVxdWVzdBoyLnBsYXRmb3JtLmFkbWluLnYxLlZlcmlmeUFkbWluUmVjb3ZlcnlDb2RlUmVzcG9uc2USegoVQ2hhbmdlSW5pdGlhbFBhc3N3b3JkEi8ucGxhdGZvcm0uYWRtaW4udjEuQ2hhbmdlSW5pdGlhbFBhc3N3b3JkUmVxdWVzdBowLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUluaXRpYWxQYXNzd29yZFJlc3BvbnNlEnQKE0NoYW5nZUFkbWluUGFzc3dvcmQSLS5wbGF0Zm9ybS5hZG1pbi52MS5DaGFuZ2VBZG1pblBhc3N3b3JkUmVxdWVzdBouLnBsYXRmb3JtLmFkbWluLnYxLkNoYW5nZUFkbWluUGFzc3dvcmRSZXNwb25zZRJ0ChNCZWdpblRvdHBFbnJvbGxtZW50Ei0ucGxhdGZvcm0uYWRtaW4udjEuQmVnaW5Ub3RwRW5yb2xsbWVudFJlcXVlc3QaLi5wbGF0Zm9ybS5hZG1pbi52MS5CZWdpblRvdHBFbnJvbGxtZW50UmVzcG9uc2USfQoWQ29tcGxldGVUb3RwRW5yb2xsbWVudBIwLnBsYXRmb3JtLmFkbWluLnYxLkNvbXBsZXRlVG90cEVucm9sbG1lbnRSZXF1ZXN0GjEucGxhdGZvcm0uYWRtaW4udjEuQ29tcGxldGVUb3RwRW5yb2xsbWVudFJlc3BvbnNlElwKC0Rpc2FibGVUb3RwEiUucGxhdGZvcm0uYWRtaW4udjEuRGlzYWJsZVRvdHBSZXF1ZXN0GiYucGxhdGZvcm0uYWRtaW4udjEuRGlzYWJsZVRvdHBSZXNwb25zZRKPAQocUmVnZW5lcmF0ZUFkbWluUmVjb3ZlcnlDb2RlcxI2LnBsYXRmb3JtLmFkbWluLnYxLlJlZ2VuZXJhdGVBZG1pblJlY292ZXJ5Q29kZXNSZXF1ZXN0GjcucGxhdGZvcm0uYWRtaW4udjEuUmVnZW5lcmF0ZUFkbWluUmVjb3ZlcnlDb2Rlc1Jlc3BvbnNlEoYBChlDb25maXJtQWRtaW5TZWNyZXRSZWNlaXB0EjMucGxhdGZvcm0uYWRtaW4udjEuQ29uZmlybUFkbWluU2VjcmV0UmVjZWlwdFJlcXVlc3QaNC5wbGF0Zm9ybS5hZG1pbi52MS5Db25maXJtQWRtaW5TZWNyZXRSZWNlaXB0UmVzcG9uc2USdAoTRWxldmF0ZUFkbWluU2Vzc2lvbhItLnBsYXRmb3JtLmFkbWluLnYxLkVsZXZhdGVBZG1pblNlc3Npb25SZXF1ZXN0Gi4ucGxhdGZvcm0uYWRtaW4udjEuRWxldmF0ZUFkbWluU2Vzc2lvblJlc3BvbnNlEowBChtSZXZva2VDdXJyZW50QWRtaW5FbGV2YXRpb24SNS5wbGF0Zm9ybS5hZG1pbi52MS5SZXZva2VDdXJyZW50QWRtaW5FbGV2YXRpb25SZXF1ZXN0GjYucGxhdGZvcm0uYWRtaW4udjEuUmV2b2tlQ3VycmVudEFkbWluRWxldmF0aW9uUmVzcG9uc2USbgoRTGlzdEFkbWluU2Vzc2lvbnMSKy5wbGF0Zm9ybS5hZG1pbi52MS5MaXN0QWRtaW5TZXNzaW9uc1JlcXVlc3QaLC5wbGF0Zm9ybS5hZG1pbi52MS5MaXN0QWRtaW5TZXNzaW9uc1Jlc3BvbnNlEnEKElJldm9rZUFkbWluU2Vzc2lvbhIsLnBsYXRmb3JtLmFkbWluLnYxLlJldm9rZUFkbWluU2Vzc2lvblJlcXVlc3QaLS5wbGF0Zm9ybS5hZG1pbi52MS5SZXZva2VBZG1pblNlc3Npb25SZXNwb25zZRKYAQofUHJldmlld1Jldm9rZU90aGVyQWRtaW5TZXNzaW9ucxI5LnBsYXRmb3JtLmFkbWluLnYxLlByZXZpZXdSZXZva2VPdGhlckFkbWluU2Vzc2lvbnNSZXF1ZXN0GjoucGxhdGZvcm0uYWRtaW4udjEuUHJldmlld1Jldm9rZU90aGVyQWRtaW5TZXNzaW9uc1Jlc3BvbnNlEoMBChhSZXZva2VPdGhlckFkbWluU2Vzc2lvbnMSMi5wbGF0Zm9ybS5hZG1pbi52MS5SZXZva2VPdGhlckFkbWluU2Vzc2lvbnNSZXF1ZXN0GjMucGxhdGZvcm0uYWRtaW4udjEuUmV2b2tlT3RoZXJBZG1pblNlc3Npb25zUmVzcG9uc2USXAoLTG9nb3V0QWRtaW4SJS5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dvdXRBZG1pblJlcXVlc3QaJi5wbGF0Zm9ybS5hZG1pbi52MS5Mb2dvdXRBZG1pblJlc3BvbnNlQklaR2dpdGh1Yi5jb20vaUZUWS1SL2dhbWUtbmlnaHQvY29udHJhY3RzL2dlbi9nby9wbGF0Zm9ybS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_google_protobuf_timestamp, file_platform_admin_v1_admin_common, file_platform_common_v1_common]);
 
 /**
  * @generated from message platform.admin.v1.GetSetupStateRequest
@@ -64,16 +28,16 @@ export type GetSetupStateRequest = Message<"platform.admin.v1.GetSetupStateReque
  * Use `create(GetSetupStateRequestSchema)` to create a new message.
  */
 export const GetSetupStateRequestSchema: GenMessage<GetSetupStateRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 1);
+  messageDesc(file_platform_admin_v1_admin_auth, 0);
 
 /**
  * @generated from message platform.admin.v1.GetSetupStateResponse
  */
 export type GetSetupStateResponse = Message<"platform.admin.v1.GetSetupStateResponse"> & {
   /**
-   * @generated from field: platform.admin.v1.AdminSetupState state = 1;
+   * @generated from field: platform.admin.v1.AdminAccountState state = 1;
    */
-  state: AdminSetupState;
+  state: AdminAccountState;
 };
 
 /**
@@ -81,7 +45,7 @@ export type GetSetupStateResponse = Message<"platform.admin.v1.GetSetupStateResp
  * Use `create(GetSetupStateResponseSchema)` to create a new message.
  */
 export const GetSetupStateResponseSchema: GenMessage<GetSetupStateResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 2);
+  messageDesc(file_platform_admin_v1_admin_auth, 1);
 
 /**
  * @generated from message platform.admin.v1.GetCurrentAdminSessionRequest
@@ -94,7 +58,7 @@ export type GetCurrentAdminSessionRequest = Message<"platform.admin.v1.GetCurren
  * Use `create(GetCurrentAdminSessionRequestSchema)` to create a new message.
  */
 export const GetCurrentAdminSessionRequestSchema: GenMessage<GetCurrentAdminSessionRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 3);
+  messageDesc(file_platform_admin_v1_admin_auth, 2);
 
 /**
  * @generated from message platform.admin.v1.GetCurrentAdminSessionResponse
@@ -104,11 +68,6 @@ export type GetCurrentAdminSessionResponse = Message<"platform.admin.v1.GetCurre
    * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
    */
   session?: AdminSessionSummary;
-
-  /**
-   * @generated from field: platform.admin.v1.AdminNextStep next_step = 2;
-   */
-  nextStep: AdminNextStep;
 };
 
 /**
@@ -116,7 +75,7 @@ export type GetCurrentAdminSessionResponse = Message<"platform.admin.v1.GetCurre
  * Use `create(GetCurrentAdminSessionResponseSchema)` to create a new message.
  */
 export const GetCurrentAdminSessionResponseSchema: GenMessage<GetCurrentAdminSessionResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 4);
+  messageDesc(file_platform_admin_v1_admin_auth, 3);
 
 /**
  * @generated from message platform.admin.v1.GetRuntimeReadinessRequest
@@ -129,7 +88,7 @@ export type GetRuntimeReadinessRequest = Message<"platform.admin.v1.GetRuntimeRe
  * Use `create(GetRuntimeReadinessRequestSchema)` to create a new message.
  */
 export const GetRuntimeReadinessRequestSchema: GenMessage<GetRuntimeReadinessRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 5);
+  messageDesc(file_platform_admin_v1_admin_auth, 4);
 
 /**
  * @generated from message platform.admin.v1.RuntimeReadinessState
@@ -156,7 +115,7 @@ export type RuntimeReadinessState = Message<"platform.admin.v1.RuntimeReadinessS
  * Use `create(RuntimeReadinessStateSchema)` to create a new message.
  */
 export const RuntimeReadinessStateSchema: GenMessage<RuntimeReadinessState> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 6);
+  messageDesc(file_platform_admin_v1_admin_auth, 5);
 
 /**
  * @generated from message platform.admin.v1.GetRuntimeReadinessResponse
@@ -178,7 +137,7 @@ export type GetRuntimeReadinessResponse = Message<"platform.admin.v1.GetRuntimeR
  * Use `create(GetRuntimeReadinessResponseSchema)` to create a new message.
  */
 export const GetRuntimeReadinessResponseSchema: GenMessage<GetRuntimeReadinessResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 7);
+  messageDesc(file_platform_admin_v1_admin_auth, 6);
 
 /**
  * @generated from message platform.admin.v1.BeginAdminLoginRequest
@@ -195,7 +154,7 @@ export type BeginAdminLoginRequest = Message<"platform.admin.v1.BeginAdminLoginR
  * Use `create(BeginAdminLoginRequestSchema)` to create a new message.
  */
 export const BeginAdminLoginRequestSchema: GenMessage<BeginAdminLoginRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 8);
+  messageDesc(file_platform_admin_v1_admin_auth, 7);
 
 /**
  * @generated from message platform.admin.v1.BeginAdminLoginResponse
@@ -212,7 +171,7 @@ export type BeginAdminLoginResponse = Message<"platform.admin.v1.BeginAdminLogin
  * Use `create(BeginAdminLoginResponseSchema)` to create a new message.
  */
 export const BeginAdminLoginResponseSchema: GenMessage<BeginAdminLoginResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 9);
+  messageDesc(file_platform_admin_v1_admin_auth, 8);
 
 /**
  * @generated from message platform.admin.v1.LoginPasswordRequest
@@ -234,51 +193,12 @@ export type LoginPasswordRequest = Message<"platform.admin.v1.LoginPasswordReque
  * Use `create(LoginPasswordRequestSchema)` to create a new message.
  */
 export const LoginPasswordRequestSchema: GenMessage<LoginPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 10);
+  messageDesc(file_platform_admin_v1_admin_auth, 9);
 
 /**
- * @generated from message platform.admin.v1.LoginPasswordResponse
+ * @generated from message platform.admin.v1.LoginRequiresInitialPasswordChange
  */
-export type LoginPasswordResponse = Message<"platform.admin.v1.LoginPasswordResponse"> & {
-  /**
-   * @generated from field: platform.admin.v1.AdminNextStep next_step = 1;
-   */
-  nextStep: AdminNextStep;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 2;
-   */
-  expiresAt?: Timestamp;
-};
-
-/**
- * Describes the message platform.admin.v1.LoginPasswordResponse.
- * Use `create(LoginPasswordResponseSchema)` to create a new message.
- */
-export const LoginPasswordResponseSchema: GenMessage<LoginPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 11);
-
-/**
- * @generated from message platform.admin.v1.VerifyTotpRequest
- */
-export type VerifyTotpRequest = Message<"platform.admin.v1.VerifyTotpRequest"> & {
-  /**
-   * @generated from field: string totp_code = 1;
-   */
-  totpCode: string;
-};
-
-/**
- * Describes the message platform.admin.v1.VerifyTotpRequest.
- * Use `create(VerifyTotpRequestSchema)` to create a new message.
- */
-export const VerifyTotpRequestSchema: GenMessage<VerifyTotpRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 12);
-
-/**
- * @generated from message platform.admin.v1.VerifyTotpResponse
- */
-export type VerifyTotpResponse = Message<"platform.admin.v1.VerifyTotpResponse"> & {
+export type LoginRequiresInitialPasswordChange = Message<"platform.admin.v1.LoginRequiresInitialPasswordChange"> & {
   /**
    * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
    */
@@ -286,11 +206,131 @@ export type VerifyTotpResponse = Message<"platform.admin.v1.VerifyTotpResponse">
 };
 
 /**
- * Describes the message platform.admin.v1.VerifyTotpResponse.
- * Use `create(VerifyTotpResponseSchema)` to create a new message.
+ * Describes the message platform.admin.v1.LoginRequiresInitialPasswordChange.
+ * Use `create(LoginRequiresInitialPasswordChangeSchema)` to create a new message.
  */
-export const VerifyTotpResponseSchema: GenMessage<VerifyTotpResponse> = /*@__PURE__*/
+export const LoginRequiresInitialPasswordChangeSchema: GenMessage<LoginRequiresInitialPasswordChange> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 10);
+
+/**
+ * @generated from message platform.admin.v1.LoginRequiresMfa
+ */
+export type LoginRequiresMfa = Message<"platform.admin.v1.LoginRequiresMfa"> & {
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
+   */
+  session?: AdminSessionSummary;
+};
+
+/**
+ * Describes the message platform.admin.v1.LoginRequiresMfa.
+ * Use `create(LoginRequiresMfaSchema)` to create a new message.
+ */
+export const LoginRequiresMfaSchema: GenMessage<LoginRequiresMfa> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 11);
+
+/**
+ * @generated from message platform.admin.v1.LoginPasswordResponse
+ */
+export type LoginPasswordResponse = Message<"platform.admin.v1.LoginPasswordResponse"> & {
+  /**
+   * @generated from oneof platform.admin.v1.LoginPasswordResponse.outcome
+   */
+  outcome: {
+    /**
+     * @generated from field: platform.admin.v1.LoginRequiresInitialPasswordChange requires_initial_password_change = 1;
+     */
+    value: LoginRequiresInitialPasswordChange;
+    case: "requiresInitialPasswordChange";
+  } | {
+    /**
+     * @generated from field: platform.admin.v1.LoginRequiresMfa requires_mfa = 2;
+     */
+    value: LoginRequiresMfa;
+    case: "requiresMfa";
+  } | {
+    /**
+     * @generated from field: platform.admin.v1.AdminSessionSummary session = 3;
+     */
+    value: AdminSessionSummary;
+    case: "session";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message platform.admin.v1.LoginPasswordResponse.
+ * Use `create(LoginPasswordResponseSchema)` to create a new message.
+ */
+export const LoginPasswordResponseSchema: GenMessage<LoginPasswordResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 12);
+
+/**
+ * @generated from message platform.admin.v1.VerifyAdminTotpRequest
+ */
+export type VerifyAdminTotpRequest = Message<"platform.admin.v1.VerifyAdminTotpRequest"> & {
+  /**
+   * @generated from field: string totp_code = 1;
+   */
+  totpCode: string;
+};
+
+/**
+ * Describes the message platform.admin.v1.VerifyAdminTotpRequest.
+ * Use `create(VerifyAdminTotpRequestSchema)` to create a new message.
+ */
+export const VerifyAdminTotpRequestSchema: GenMessage<VerifyAdminTotpRequest> = /*@__PURE__*/
   messageDesc(file_platform_admin_v1_admin_auth, 13);
+
+/**
+ * @generated from message platform.admin.v1.VerifyAdminTotpResponse
+ */
+export type VerifyAdminTotpResponse = Message<"platform.admin.v1.VerifyAdminTotpResponse"> & {
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
+   */
+  session?: AdminSessionSummary;
+};
+
+/**
+ * Describes the message platform.admin.v1.VerifyAdminTotpResponse.
+ * Use `create(VerifyAdminTotpResponseSchema)` to create a new message.
+ */
+export const VerifyAdminTotpResponseSchema: GenMessage<VerifyAdminTotpResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 14);
+
+/**
+ * @generated from message platform.admin.v1.VerifyAdminRecoveryCodeRequest
+ */
+export type VerifyAdminRecoveryCodeRequest = Message<"platform.admin.v1.VerifyAdminRecoveryCodeRequest"> & {
+  /**
+   * @generated from field: string recovery_code = 1;
+   */
+  recoveryCode: string;
+};
+
+/**
+ * Describes the message platform.admin.v1.VerifyAdminRecoveryCodeRequest.
+ * Use `create(VerifyAdminRecoveryCodeRequestSchema)` to create a new message.
+ */
+export const VerifyAdminRecoveryCodeRequestSchema: GenMessage<VerifyAdminRecoveryCodeRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 15);
+
+/**
+ * @generated from message platform.admin.v1.VerifyAdminRecoveryCodeResponse
+ */
+export type VerifyAdminRecoveryCodeResponse = Message<"platform.admin.v1.VerifyAdminRecoveryCodeResponse"> & {
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
+   */
+  session?: AdminSessionSummary;
+};
+
+/**
+ * Describes the message platform.admin.v1.VerifyAdminRecoveryCodeResponse.
+ * Use `create(VerifyAdminRecoveryCodeResponseSchema)` to create a new message.
+ */
+export const VerifyAdminRecoveryCodeResponseSchema: GenMessage<VerifyAdminRecoveryCodeResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 16);
 
 /**
  * @generated from message platform.admin.v1.ChangeInitialPasswordRequest
@@ -307,21 +347,16 @@ export type ChangeInitialPasswordRequest = Message<"platform.admin.v1.ChangeInit
  * Use `create(ChangeInitialPasswordRequestSchema)` to create a new message.
  */
 export const ChangeInitialPasswordRequestSchema: GenMessage<ChangeInitialPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 14);
+  messageDesc(file_platform_admin_v1_admin_auth, 17);
 
 /**
  * @generated from message platform.admin.v1.ChangeInitialPasswordResponse
  */
 export type ChangeInitialPasswordResponse = Message<"platform.admin.v1.ChangeInitialPasswordResponse"> & {
   /**
-   * @generated from field: platform.admin.v1.AdminNextStep next_step = 1;
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 1;
    */
-  nextStep: AdminNextStep;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 2;
-   */
-  expiresAt?: Timestamp;
+  session?: AdminSessionSummary;
 };
 
 /**
@@ -329,7 +364,66 @@ export type ChangeInitialPasswordResponse = Message<"platform.admin.v1.ChangeIni
  * Use `create(ChangeInitialPasswordResponseSchema)` to create a new message.
  */
 export const ChangeInitialPasswordResponseSchema: GenMessage<ChangeInitialPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 15);
+  messageDesc(file_platform_admin_v1_admin_auth, 18);
+
+/**
+ * @generated from message platform.admin.v1.ChangeAdminPasswordRequest
+ */
+export type ChangeAdminPasswordRequest = Message<"platform.admin.v1.ChangeAdminPasswordRequest"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string current_password = 2;
+   */
+  currentPassword: string;
+
+  /**
+   * @generated from field: string new_password = 3;
+   */
+  newPassword: string;
+
+  /**
+   * @generated from field: uint64 expected_password_version = 4;
+   */
+  expectedPasswordVersion: bigint;
+};
+
+/**
+ * Describes the message platform.admin.v1.ChangeAdminPasswordRequest.
+ * Use `create(ChangeAdminPasswordRequestSchema)` to create a new message.
+ */
+export const ChangeAdminPasswordRequestSchema: GenMessage<ChangeAdminPasswordRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 19);
+
+/**
+ * @generated from message platform.admin.v1.ChangeAdminPasswordResponse
+ */
+export type ChangeAdminPasswordResponse = Message<"platform.admin.v1.ChangeAdminPasswordResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 2;
+   */
+  session?: AdminSessionSummary;
+
+  /**
+   * @generated from field: int32 revoked_sessions = 3;
+   */
+  revokedSessions: number;
+};
+
+/**
+ * Describes the message platform.admin.v1.ChangeAdminPasswordResponse.
+ * Use `create(ChangeAdminPasswordResponseSchema)` to create a new message.
+ */
+export const ChangeAdminPasswordResponseSchema: GenMessage<ChangeAdminPasswordResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 20);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpEnrollmentRequest
@@ -339,6 +433,11 @@ export type BeginTotpEnrollmentRequest = Message<"platform.admin.v1.BeginTotpEnr
    * @generated from field: string operation_id = 1;
    */
   operationId: string;
+
+  /**
+   * @generated from field: string current_password = 2;
+   */
+  currentPassword: string;
 };
 
 /**
@@ -346,7 +445,7 @@ export type BeginTotpEnrollmentRequest = Message<"platform.admin.v1.BeginTotpEnr
  * Use `create(BeginTotpEnrollmentRequestSchema)` to create a new message.
  */
 export const BeginTotpEnrollmentRequestSchema: GenMessage<BeginTotpEnrollmentRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 16);
+  messageDesc(file_platform_admin_v1_admin_auth, 21);
 
 /**
  * @generated from message platform.admin.v1.BeginTotpEnrollmentResponse
@@ -358,9 +457,9 @@ export type BeginTotpEnrollmentResponse = Message<"platform.admin.v1.BeginTotpEn
   result?: OperationResult;
 
   /**
-   * @generated from field: string totp_secret = 2;
+   * @generated from field: string manual_entry_key = 2;
    */
-  totpSecret: string;
+  manualEntryKey: string;
 
   /**
    * @generated from field: string otpauth_uri = 3;
@@ -373,7 +472,7 @@ export type BeginTotpEnrollmentResponse = Message<"platform.admin.v1.BeginTotpEn
  * Use `create(BeginTotpEnrollmentResponseSchema)` to create a new message.
  */
 export const BeginTotpEnrollmentResponseSchema: GenMessage<BeginTotpEnrollmentResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 17);
+  messageDesc(file_platform_admin_v1_admin_auth, 22);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpEnrollmentRequest
@@ -400,7 +499,7 @@ export type CompleteTotpEnrollmentRequest = Message<"platform.admin.v1.CompleteT
  * Use `create(CompleteTotpEnrollmentRequestSchema)` to create a new message.
  */
 export const CompleteTotpEnrollmentRequestSchema: GenMessage<CompleteTotpEnrollmentRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 18);
+  messageDesc(file_platform_admin_v1_admin_auth, 23);
 
 /**
  * @generated from message platform.admin.v1.CompleteTotpEnrollmentResponse
@@ -420,6 +519,11 @@ export type CompleteTotpEnrollmentResponse = Message<"platform.admin.v1.Complete
    * @generated from field: platform.admin.v1.AdminSessionSummary session = 3;
    */
   session?: AdminSessionSummary;
+
+  /**
+   * @generated from field: int32 revoked_sessions = 4;
+   */
+  revokedSessions: number;
 };
 
 /**
@@ -427,7 +531,115 @@ export type CompleteTotpEnrollmentResponse = Message<"platform.admin.v1.Complete
  * Use `create(CompleteTotpEnrollmentResponseSchema)` to create a new message.
  */
 export const CompleteTotpEnrollmentResponseSchema: GenMessage<CompleteTotpEnrollmentResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 19);
+  messageDesc(file_platform_admin_v1_admin_auth, 24);
+
+/**
+ * @generated from message platform.admin.v1.DisableTotpRequest
+ */
+export type DisableTotpRequest = Message<"platform.admin.v1.DisableTotpRequest"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: uint64 expected_enrollment_version = 3;
+   */
+  expectedEnrollmentVersion: bigint;
+};
+
+/**
+ * Describes the message platform.admin.v1.DisableTotpRequest.
+ * Use `create(DisableTotpRequestSchema)` to create a new message.
+ */
+export const DisableTotpRequestSchema: GenMessage<DisableTotpRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 25);
+
+/**
+ * @generated from message platform.admin.v1.DisableTotpResponse
+ */
+export type DisableTotpResponse = Message<"platform.admin.v1.DisableTotpResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 2;
+   */
+  session?: AdminSessionSummary;
+
+  /**
+   * @generated from field: int32 revoked_sessions = 3;
+   */
+  revokedSessions: number;
+
+  /**
+   * @generated from field: bool already_disabled = 4;
+   */
+  alreadyDisabled: boolean;
+};
+
+/**
+ * Describes the message platform.admin.v1.DisableTotpResponse.
+ * Use `create(DisableTotpResponseSchema)` to create a new message.
+ */
+export const DisableTotpResponseSchema: GenMessage<DisableTotpResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 26);
+
+/**
+ * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesRequest
+ */
+export type RegenerateAdminRecoveryCodesRequest = Message<"platform.admin.v1.RegenerateAdminRecoveryCodesRequest"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: uint64 expected_recovery_codes_version = 2;
+   */
+  expectedRecoveryCodesVersion: bigint;
+};
+
+/**
+ * Describes the message platform.admin.v1.RegenerateAdminRecoveryCodesRequest.
+ * Use `create(RegenerateAdminRecoveryCodesRequestSchema)` to create a new message.
+ */
+export const RegenerateAdminRecoveryCodesRequestSchema: GenMessage<RegenerateAdminRecoveryCodesRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 27);
+
+/**
+ * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesResponse
+ */
+export type RegenerateAdminRecoveryCodesResponse = Message<"platform.admin.v1.RegenerateAdminRecoveryCodesResponse"> & {
+  /**
+   * @generated from field: platform.common.v1.OperationResult result = 1;
+   */
+  result?: OperationResult;
+
+  /**
+   * @generated from field: repeated string recovery_codes = 2;
+   */
+  recoveryCodes: string[];
+
+  /**
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 3;
+   */
+  session?: AdminSessionSummary;
+};
+
+/**
+ * Describes the message platform.admin.v1.RegenerateAdminRecoveryCodesResponse.
+ * Use `create(RegenerateAdminRecoveryCodesResponseSchema)` to create a new message.
+ */
+export const RegenerateAdminRecoveryCodesResponseSchema: GenMessage<RegenerateAdminRecoveryCodesResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 28);
 
 /**
  * @generated from message platform.admin.v1.ConfirmAdminSecretReceiptRequest
@@ -454,7 +666,7 @@ export type ConfirmAdminSecretReceiptRequest = Message<"platform.admin.v1.Confir
  * Use `create(ConfirmAdminSecretReceiptRequestSchema)` to create a new message.
  */
 export const ConfirmAdminSecretReceiptRequestSchema: GenMessage<ConfirmAdminSecretReceiptRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 20);
+  messageDesc(file_platform_admin_v1_admin_auth, 29);
 
 /**
  * @generated from message platform.admin.v1.ConfirmAdminSecretReceiptResponse
@@ -471,175 +683,302 @@ export type ConfirmAdminSecretReceiptResponse = Message<"platform.admin.v1.Confi
  * Use `create(ConfirmAdminSecretReceiptResponseSchema)` to create a new message.
  */
 export const ConfirmAdminSecretReceiptResponseSchema: GenMessage<ConfirmAdminSecretReceiptResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 21);
+  messageDesc(file_platform_admin_v1_admin_auth, 30);
 
 /**
- * @generated from message platform.admin.v1.RecoverAdminRequest
+ * @generated from message platform.admin.v1.ElevateAdminSessionRequest
  */
-export type RecoverAdminRequest = Message<"platform.admin.v1.RecoverAdminRequest"> & {
-  /**
-   * @generated from field: string recovery_code = 1;
-   */
-  recoveryCode: string;
-};
-
-/**
- * Describes the message platform.admin.v1.RecoverAdminRequest.
- * Use `create(RecoverAdminRequestSchema)` to create a new message.
- */
-export const RecoverAdminRequestSchema: GenMessage<RecoverAdminRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 22);
-
-/**
- * @generated from message platform.admin.v1.RecoverAdminResponse
- */
-export type RecoverAdminResponse = Message<"platform.admin.v1.RecoverAdminResponse"> & {
-  /**
-   * @generated from field: platform.admin.v1.AdminNextStep next_step = 1;
-   */
-  nextStep: AdminNextStep;
-
-  /**
-   * @generated from field: platform.admin.v1.AdminSessionSummary session = 2;
-   */
-  session?: AdminSessionSummary;
-};
-
-/**
- * Describes the message platform.admin.v1.RecoverAdminResponse.
- * Use `create(RecoverAdminResponseSchema)` to create a new message.
- */
-export const RecoverAdminResponseSchema: GenMessage<RecoverAdminResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 23);
-
-/**
- * @generated from message platform.admin.v1.ChangeAdminPasswordRequest
- */
-export type ChangeAdminPasswordRequest = Message<"platform.admin.v1.ChangeAdminPasswordRequest"> & {
-  /**
-   * @generated from field: string current_password = 1;
-   */
-  currentPassword: string;
-
-  /**
-   * @generated from field: string new_password = 2;
-   */
-  newPassword: string;
-};
-
-/**
- * Describes the message platform.admin.v1.ChangeAdminPasswordRequest.
- * Use `create(ChangeAdminPasswordRequestSchema)` to create a new message.
- */
-export const ChangeAdminPasswordRequestSchema: GenMessage<ChangeAdminPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 24);
-
-/**
- * @generated from message platform.admin.v1.ChangeAdminPasswordResponse
- */
-export type ChangeAdminPasswordResponse = Message<"platform.admin.v1.ChangeAdminPasswordResponse"> & {
-  /**
-   * @generated from field: platform.admin.v1.AdminNextStep next_step = 1;
-   */
-  nextStep: AdminNextStep;
-
-  /**
-   * @generated from field: platform.admin.v1.AdminSessionSummary session = 2;
-   */
-  session?: AdminSessionSummary;
-};
-
-/**
- * Describes the message platform.admin.v1.ChangeAdminPasswordResponse.
- * Use `create(ChangeAdminPasswordResponseSchema)` to create a new message.
- */
-export const ChangeAdminPasswordResponseSchema: GenMessage<ChangeAdminPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 25);
-
-/**
- * @generated from message platform.admin.v1.BeginTotpRebindRequest
- */
-export type BeginTotpRebindRequest = Message<"platform.admin.v1.BeginTotpRebindRequest"> & {
+export type ElevateAdminSessionRequest = Message<"platform.admin.v1.ElevateAdminSessionRequest"> & {
   /**
    * @generated from field: string operation_id = 1;
    */
   operationId: string;
+
+  /**
+   * @generated from field: platform.admin.v1.AdminElevationScope scope = 2;
+   */
+  scope: AdminElevationScope;
+
+  /**
+   * @generated from field: string current_password = 3;
+   */
+  currentPassword: string;
+
+  /**
+   * @generated from oneof platform.admin.v1.ElevateAdminSessionRequest.second_factor
+   */
+  secondFactor: {
+    /**
+     * @generated from field: string totp_code = 4;
+     */
+    value: string;
+    case: "totpCode";
+  } | {
+    /**
+     * @generated from field: string recovery_code = 5;
+     */
+    value: string;
+    case: "recoveryCode";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
- * Describes the message platform.admin.v1.BeginTotpRebindRequest.
- * Use `create(BeginTotpRebindRequestSchema)` to create a new message.
+ * Describes the message platform.admin.v1.ElevateAdminSessionRequest.
+ * Use `create(ElevateAdminSessionRequestSchema)` to create a new message.
  */
-export const BeginTotpRebindRequestSchema: GenMessage<BeginTotpRebindRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 26);
+export const ElevateAdminSessionRequestSchema: GenMessage<ElevateAdminSessionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 31);
 
 /**
- * @generated from message platform.admin.v1.BeginTotpRebindResponse
+ * @generated from message platform.admin.v1.ElevateAdminSessionResponse
  */
-export type BeginTotpRebindResponse = Message<"platform.admin.v1.BeginTotpRebindResponse"> & {
+export type ElevateAdminSessionResponse = Message<"platform.admin.v1.ElevateAdminSessionResponse"> & {
   /**
-   * @generated from field: platform.common.v1.OperationResult result = 1;
+   * @generated from field: string operation_id = 1;
    */
-  result?: OperationResult;
+  operationId: string;
 
   /**
-   * @generated from field: string totp_secret = 2;
+   * @generated from field: platform.admin.v1.AdminElevationSummary elevation = 2;
    */
-  totpSecret: string;
+  elevation?: AdminElevationSummary;
 
   /**
-   * @generated from field: string otpauth_uri = 3;
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 3;
    */
-  otpauthUri: string;
+  session?: AdminSessionSummary;
+
+  /**
+   * @generated from field: platform.admin.v1.AdminElevationSecondFactor second_factor = 4;
+   */
+  secondFactor: AdminElevationSecondFactor;
 };
 
 /**
- * Describes the message platform.admin.v1.BeginTotpRebindResponse.
- * Use `create(BeginTotpRebindResponseSchema)` to create a new message.
+ * Describes the message platform.admin.v1.ElevateAdminSessionResponse.
+ * Use `create(ElevateAdminSessionResponseSchema)` to create a new message.
  */
-export const BeginTotpRebindResponseSchema: GenMessage<BeginTotpRebindResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 27);
+export const ElevateAdminSessionResponseSchema: GenMessage<ElevateAdminSessionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 32);
 
 /**
- * @generated from message platform.admin.v1.CompleteTotpRebindRequest
+ * @generated from message platform.admin.v1.RevokeCurrentAdminElevationRequest
  */
-export type CompleteTotpRebindRequest = Message<"platform.admin.v1.CompleteTotpRebindRequest"> & {
+export type RevokeCurrentAdminElevationRequest = Message<"platform.admin.v1.RevokeCurrentAdminElevationRequest"> & {
   /**
-   * @generated from field: string enrollment_operation_id = 1;
+   * @generated from field: platform.admin.v1.AdminElevationScope scope = 1;
    */
-  enrollmentOperationId: string;
-
-  /**
-   * @generated from field: string recovery_codes_operation_id = 2;
-   */
-  recoveryCodesOperationId: string;
-
-  /**
-   * @generated from field: string totp_code = 3;
-   */
-  totpCode: string;
+  scope: AdminElevationScope;
 };
 
 /**
- * Describes the message platform.admin.v1.CompleteTotpRebindRequest.
- * Use `create(CompleteTotpRebindRequestSchema)` to create a new message.
+ * Describes the message platform.admin.v1.RevokeCurrentAdminElevationRequest.
+ * Use `create(RevokeCurrentAdminElevationRequestSchema)` to create a new message.
  */
-export const CompleteTotpRebindRequestSchema: GenMessage<CompleteTotpRebindRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 28);
+export const RevokeCurrentAdminElevationRequestSchema: GenMessage<RevokeCurrentAdminElevationRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 33);
 
 /**
- * @generated from message platform.admin.v1.CompleteTotpRebindResponse
+ * @generated from message platform.admin.v1.RevokeCurrentAdminElevationResponse
  */
-export type CompleteTotpRebindResponse = Message<"platform.admin.v1.CompleteTotpRebindResponse"> & {
+export type RevokeCurrentAdminElevationResponse = Message<"platform.admin.v1.RevokeCurrentAdminElevationResponse"> & {
   /**
-   * @generated from field: platform.common.v1.OperationResult result = 1;
+   * @generated from field: bool revoked = 1;
    */
-  result?: OperationResult;
+  revoked: boolean;
 
   /**
-   * @generated from field: repeated string recovery_codes = 2;
+   * @generated from field: platform.admin.v1.AdminSessionSummary session = 2;
    */
-  recoveryCodes: string[];
+  session?: AdminSessionSummary;
+};
+
+/**
+ * Describes the message platform.admin.v1.RevokeCurrentAdminElevationResponse.
+ * Use `create(RevokeCurrentAdminElevationResponseSchema)` to create a new message.
+ */
+export const RevokeCurrentAdminElevationResponseSchema: GenMessage<RevokeCurrentAdminElevationResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 34);
+
+/**
+ * @generated from message platform.admin.v1.ListAdminSessionsRequest
+ */
+export type ListAdminSessionsRequest = Message<"platform.admin.v1.ListAdminSessionsRequest"> & {
+};
+
+/**
+ * Describes the message platform.admin.v1.ListAdminSessionsRequest.
+ * Use `create(ListAdminSessionsRequestSchema)` to create a new message.
+ */
+export const ListAdminSessionsRequestSchema: GenMessage<ListAdminSessionsRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 35);
+
+/**
+ * @generated from message platform.admin.v1.ListAdminSessionsResponse
+ */
+export type ListAdminSessionsResponse = Message<"platform.admin.v1.ListAdminSessionsResponse"> & {
+  /**
+   * @generated from field: repeated platform.admin.v1.AdminSessionInfo sessions = 1;
+   */
+  sessions: AdminSessionInfo[];
+};
+
+/**
+ * Describes the message platform.admin.v1.ListAdminSessionsResponse.
+ * Use `create(ListAdminSessionsResponseSchema)` to create a new message.
+ */
+export const ListAdminSessionsResponseSchema: GenMessage<ListAdminSessionsResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 36);
+
+/**
+ * @generated from message platform.admin.v1.RevokeAdminSessionRequest
+ */
+export type RevokeAdminSessionRequest = Message<"platform.admin.v1.RevokeAdminSessionRequest"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: uint64 expected_session_version = 3;
+   */
+  expectedSessionVersion: bigint;
+};
+
+/**
+ * Describes the message platform.admin.v1.RevokeAdminSessionRequest.
+ * Use `create(RevokeAdminSessionRequestSchema)` to create a new message.
+ */
+export const RevokeAdminSessionRequestSchema: GenMessage<RevokeAdminSessionRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 37);
+
+/**
+ * @generated from message platform.admin.v1.RevokeAdminSessionResponse
+ */
+export type RevokeAdminSessionResponse = Message<"platform.admin.v1.RevokeAdminSessionResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: bool revoked = 3;
+   */
+  revoked: boolean;
+};
+
+/**
+ * Describes the message platform.admin.v1.RevokeAdminSessionResponse.
+ * Use `create(RevokeAdminSessionResponseSchema)` to create a new message.
+ */
+export const RevokeAdminSessionResponseSchema: GenMessage<RevokeAdminSessionResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 38);
+
+/**
+ * @generated from message platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest
+ */
+export type PreviewRevokeOtherAdminSessionsRequest = Message<"platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest"> & {
+};
+
+/**
+ * Describes the message platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest.
+ * Use `create(PreviewRevokeOtherAdminSessionsRequestSchema)` to create a new message.
+ */
+export const PreviewRevokeOtherAdminSessionsRequestSchema: GenMessage<PreviewRevokeOtherAdminSessionsRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 39);
+
+/**
+ * @generated from message platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse
+ */
+export type PreviewRevokeOtherAdminSessionsResponse = Message<"platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse"> & {
+  /**
+   * @generated from field: string preview_version = 1;
+   */
+  previewVersion: string;
+
+  /**
+   * @generated from field: uint64 current_admin_version = 2;
+   */
+  currentAdminVersion: bigint;
+
+  /**
+   * @generated from field: uint64 current_session_version = 3;
+   */
+  currentSessionVersion: bigint;
+
+  /**
+   * @generated from field: int32 other_session_count = 4;
+   */
+  otherSessionCount: number;
+
+  /**
+   * @generated from field: repeated platform.admin.v1.AdminSessionInfo sessions = 5;
+   */
+  sessions: AdminSessionInfo[];
+};
+
+/**
+ * Describes the message platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse.
+ * Use `create(PreviewRevokeOtherAdminSessionsResponseSchema)` to create a new message.
+ */
+export const PreviewRevokeOtherAdminSessionsResponseSchema: GenMessage<PreviewRevokeOtherAdminSessionsResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 40);
+
+/**
+ * @generated from message platform.admin.v1.RevokeOtherAdminSessionsRequest
+ */
+export type RevokeOtherAdminSessionsRequest = Message<"platform.admin.v1.RevokeOtherAdminSessionsRequest"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string preview_version = 2;
+   */
+  previewVersion: string;
+
+  /**
+   * @generated from field: uint64 expected_admin_version = 3;
+   */
+  expectedAdminVersion: bigint;
+
+  /**
+   * @generated from field: uint64 expected_current_session_version = 4;
+   */
+  expectedCurrentSessionVersion: bigint;
+};
+
+/**
+ * Describes the message platform.admin.v1.RevokeOtherAdminSessionsRequest.
+ * Use `create(RevokeOtherAdminSessionsRequestSchema)` to create a new message.
+ */
+export const RevokeOtherAdminSessionsRequestSchema: GenMessage<RevokeOtherAdminSessionsRequest> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 41);
+
+/**
+ * @generated from message platform.admin.v1.RevokeOtherAdminSessionsResponse
+ */
+export type RevokeOtherAdminSessionsResponse = Message<"platform.admin.v1.RevokeOtherAdminSessionsResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: int32 revoked_sessions = 2;
+   */
+  revokedSessions: number;
 
   /**
    * @generated from field: platform.admin.v1.AdminSessionSummary session = 3;
@@ -648,55 +987,11 @@ export type CompleteTotpRebindResponse = Message<"platform.admin.v1.CompleteTotp
 };
 
 /**
- * Describes the message platform.admin.v1.CompleteTotpRebindResponse.
- * Use `create(CompleteTotpRebindResponseSchema)` to create a new message.
+ * Describes the message platform.admin.v1.RevokeOtherAdminSessionsResponse.
+ * Use `create(RevokeOtherAdminSessionsResponseSchema)` to create a new message.
  */
-export const CompleteTotpRebindResponseSchema: GenMessage<CompleteTotpRebindResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 29);
-
-/**
- * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesRequest
- */
-export type RegenerateAdminRecoveryCodesRequest = Message<"platform.admin.v1.RegenerateAdminRecoveryCodesRequest"> & {
-  /**
-   * @generated from field: string operation_id = 1;
-   */
-  operationId: string;
-
-  /**
-   * @generated from field: string totp_code = 2;
-   */
-  totpCode: string;
-};
-
-/**
- * Describes the message platform.admin.v1.RegenerateAdminRecoveryCodesRequest.
- * Use `create(RegenerateAdminRecoveryCodesRequestSchema)` to create a new message.
- */
-export const RegenerateAdminRecoveryCodesRequestSchema: GenMessage<RegenerateAdminRecoveryCodesRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 30);
-
-/**
- * @generated from message platform.admin.v1.RegenerateAdminRecoveryCodesResponse
- */
-export type RegenerateAdminRecoveryCodesResponse = Message<"platform.admin.v1.RegenerateAdminRecoveryCodesResponse"> & {
-  /**
-   * @generated from field: platform.common.v1.OperationResult result = 1;
-   */
-  result?: OperationResult;
-
-  /**
-   * @generated from field: repeated string recovery_codes = 2;
-   */
-  recoveryCodes: string[];
-};
-
-/**
- * Describes the message platform.admin.v1.RegenerateAdminRecoveryCodesResponse.
- * Use `create(RegenerateAdminRecoveryCodesResponseSchema)` to create a new message.
- */
-export const RegenerateAdminRecoveryCodesResponseSchema: GenMessage<RegenerateAdminRecoveryCodesResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 31);
+export const RevokeOtherAdminSessionsResponseSchema: GenMessage<RevokeOtherAdminSessionsResponse> = /*@__PURE__*/
+  messageDesc(file_platform_admin_v1_admin_auth, 42);
 
 /**
  * @generated from message platform.admin.v1.LogoutAdminRequest
@@ -709,7 +1004,7 @@ export type LogoutAdminRequest = Message<"platform.admin.v1.LogoutAdminRequest">
  * Use `create(LogoutAdminRequestSchema)` to create a new message.
  */
 export const LogoutAdminRequestSchema: GenMessage<LogoutAdminRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 32);
+  messageDesc(file_platform_admin_v1_admin_auth, 43);
 
 /**
  * @generated from message platform.admin.v1.LogoutAdminResponse
@@ -726,216 +1021,7 @@ export type LogoutAdminResponse = Message<"platform.admin.v1.LogoutAdminResponse
  * Use `create(LogoutAdminResponseSchema)` to create a new message.
  */
 export const LogoutAdminResponseSchema: GenMessage<LogoutAdminResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 33);
-
-/**
- * @generated from message platform.admin.v1.LogoutAllAdminSessionsRequest
- */
-export type LogoutAllAdminSessionsRequest = Message<"platform.admin.v1.LogoutAllAdminSessionsRequest"> & {
-};
-
-/**
- * Describes the message platform.admin.v1.LogoutAllAdminSessionsRequest.
- * Use `create(LogoutAllAdminSessionsRequestSchema)` to create a new message.
- */
-export const LogoutAllAdminSessionsRequestSchema: GenMessage<LogoutAllAdminSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 34);
-
-/**
- * @generated from message platform.admin.v1.LogoutAllAdminSessionsResponse
- */
-export type LogoutAllAdminSessionsResponse = Message<"platform.admin.v1.LogoutAllAdminSessionsResponse"> & {
-  /**
-   * @generated from field: int32 revoked_sessions = 1;
-   */
-  revokedSessions: number;
-};
-
-/**
- * Describes the message platform.admin.v1.LogoutAllAdminSessionsResponse.
- * Use `create(LogoutAllAdminSessionsResponseSchema)` to create a new message.
- */
-export const LogoutAllAdminSessionsResponseSchema: GenMessage<LogoutAllAdminSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_platform_admin_v1_admin_auth, 35);
-
-/**
- * @generated from enum platform.admin.v1.AdminSetupState
- */
-export enum AdminSetupState {
-  /**
-   * @generated from enum value: ADMIN_SETUP_STATE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: ADMIN_SETUP_STATE_BOOTSTRAP_PENDING = 1;
-   */
-  BOOTSTRAP_PENDING = 1,
-
-  /**
-   * @generated from enum value: ADMIN_SETUP_STATE_SETUP_REQUIRED = 2;
-   */
-  SETUP_REQUIRED = 2,
-
-  /**
-   * @generated from enum value: ADMIN_SETUP_STATE_ACTIVE = 3;
-   */
-  ACTIVE = 3,
-}
-
-/**
- * Describes the enum platform.admin.v1.AdminSetupState.
- */
-export const AdminSetupStateSchema: GenEnum<AdminSetupState> = /*@__PURE__*/
-  enumDesc(file_platform_admin_v1_admin_auth, 0);
-
-/**
- * @generated from enum platform.admin.v1.AdminNextStep
- */
-export enum AdminNextStep {
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_CHANGE_PASSWORD = 1;
-   */
-  CHANGE_PASSWORD = 1,
-
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_ENROLL_TOTP = 2;
-   */
-  ENROLL_TOTP = 2,
-
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_VERIFY_MFA = 3;
-   */
-  VERIFY_MFA = 3,
-
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_REBIND_TOTP = 4;
-   */
-  REBIND_TOTP = 4,
-
-  /**
-   * @generated from enum value: ADMIN_NEXT_STEP_AUTHENTICATED = 5;
-   */
-  AUTHENTICATED = 5,
-}
-
-/**
- * Describes the enum platform.admin.v1.AdminNextStep.
- */
-export const AdminNextStepSchema: GenEnum<AdminNextStep> = /*@__PURE__*/
-  enumDesc(file_platform_admin_v1_admin_auth, 1);
-
-/**
- * @generated from enum platform.admin.v1.AdminSessionKind
- */
-export enum AdminSessionKind {
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING = 1;
-   */
-  SETUP_PASSWORD_PENDING = 1,
-
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING = 2;
-   */
-  TOTP_ENROLLMENT_PENDING = 2,
-
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_MFA_PENDING = 3;
-   */
-  MFA_PENDING = 3,
-
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_RECOVERY_PENDING = 4;
-   */
-  RECOVERY_PENDING = 4,
-
-  /**
-   * @generated from enum value: ADMIN_SESSION_KIND_FULL = 5;
-   */
-  FULL = 5,
-}
-
-/**
- * Describes the enum platform.admin.v1.AdminSessionKind.
- */
-export const AdminSessionKindSchema: GenEnum<AdminSessionKind> = /*@__PURE__*/
-  enumDesc(file_platform_admin_v1_admin_auth, 2);
-
-/**
- * @generated from enum platform.admin.v1.AdminPermission
- */
-export enum AdminPermission {
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_GET_USER = 1;
-   */
-  GET_USER = 1,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_GET_REAL_NAME = 2;
-   */
-  GET_REAL_NAME = 2,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_UPDATE_REAL_NAME = 3;
-   */
-  UPDATE_REAL_NAME = 3,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_EXPORT_PROFILE = 4;
-   */
-  EXPORT_PROFILE = 4,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_MANAGE_RECOVERY = 5;
-   */
-  MANAGE_RECOVERY = 5,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_FORCE_USERNAME = 6;
-   */
-  FORCE_USERNAME = 6,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_SUSPEND_USER = 7;
-   */
-  SUSPEND_USER = 7,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_DELETE_USER = 8;
-   */
-  DELETE_USER = 8,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_REVOKE_DEVICE = 9;
-   */
-  REVOKE_DEVICE = 9,
-
-  /**
-   * @generated from enum value: ADMIN_PERMISSION_READ_AUDIT = 10;
-   */
-  READ_AUDIT = 10,
-}
-
-/**
- * Describes the enum platform.admin.v1.AdminPermission.
- */
-export const AdminPermissionSchema: GenEnum<AdminPermission> = /*@__PURE__*/
-  enumDesc(file_platform_admin_v1_admin_auth, 3);
+  messageDesc(file_platform_admin_v1_admin_auth, 44);
 
 /**
  * @generated from enum platform.admin.v1.AdminSecretOperation
@@ -957,26 +1043,42 @@ export enum AdminSecretOperation {
   INITIAL_RECOVERY_CODES = 2,
 
   /**
-   * @generated from enum value: ADMIN_SECRET_OPERATION_TOTP_REBIND = 3;
+   * @generated from enum value: ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES = 3;
    */
-  TOTP_REBIND = 3,
-
-  /**
-   * @generated from enum value: ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES = 4;
-   */
-  REGENERATE_RECOVERY_CODES = 4,
-
-  /**
-   * @generated from enum value: ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT = 5;
-   */
-  ASSISTED_RECOVERY_GRANT = 5,
+  REGENERATED_RECOVERY_CODES = 3,
 }
 
 /**
  * Describes the enum platform.admin.v1.AdminSecretOperation.
  */
 export const AdminSecretOperationSchema: GenEnum<AdminSecretOperation> = /*@__PURE__*/
-  enumDesc(file_platform_admin_v1_admin_auth, 4);
+  enumDesc(file_platform_admin_v1_admin_auth, 0);
+
+/**
+ * @generated from enum platform.admin.v1.AdminElevationSecondFactor
+ */
+export enum AdminElevationSecondFactor {
+  /**
+   * @generated from enum value: ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ADMIN_ELEVATION_SECOND_FACTOR_TOTP = 1;
+   */
+  TOTP = 1,
+
+  /**
+   * @generated from enum value: ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE = 2;
+   */
+  RECOVERY_CODE = 2,
+}
+
+/**
+ * Describes the enum platform.admin.v1.AdminElevationSecondFactor.
+ */
+export const AdminElevationSecondFactorSchema: GenEnum<AdminElevationSecondFactor> = /*@__PURE__*/
+  enumDesc(file_platform_admin_v1_admin_auth, 1);
 
 /**
  * AdminAuthService owns the isolated administrator authentication state machine.
@@ -1025,12 +1127,20 @@ export const AdminAuthService: GenService<{
     output: typeof LoginPasswordResponseSchema;
   },
   /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.VerifyTotp
+   * @generated from rpc platform.admin.v1.AdminAuthService.VerifyAdminTotp
    */
-  verifyTotp: {
+  verifyAdminTotp: {
     methodKind: "unary";
-    input: typeof VerifyTotpRequestSchema;
-    output: typeof VerifyTotpResponseSchema;
+    input: typeof VerifyAdminTotpRequestSchema;
+    output: typeof VerifyAdminTotpResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.VerifyAdminRecoveryCode
+   */
+  verifyAdminRecoveryCode: {
+    methodKind: "unary";
+    input: typeof VerifyAdminRecoveryCodeRequestSchema;
+    output: typeof VerifyAdminRecoveryCodeResponseSchema;
   },
   /**
    * @generated from rpc platform.admin.v1.AdminAuthService.ChangeInitialPassword
@@ -1039,6 +1149,14 @@ export const AdminAuthService: GenService<{
     methodKind: "unary";
     input: typeof ChangeInitialPasswordRequestSchema;
     output: typeof ChangeInitialPasswordResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.ChangeAdminPassword
+   */
+  changeAdminPassword: {
+    methodKind: "unary";
+    input: typeof ChangeAdminPasswordRequestSchema;
+    output: typeof ChangeAdminPasswordResponseSchema;
   },
   /**
    * @generated from rpc platform.admin.v1.AdminAuthService.BeginTotpEnrollment
@@ -1057,44 +1175,12 @@ export const AdminAuthService: GenService<{
     output: typeof CompleteTotpEnrollmentResponseSchema;
   },
   /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt
+   * @generated from rpc platform.admin.v1.AdminAuthService.DisableTotp
    */
-  confirmAdminSecretReceipt: {
+  disableTotp: {
     methodKind: "unary";
-    input: typeof ConfirmAdminSecretReceiptRequestSchema;
-    output: typeof ConfirmAdminSecretReceiptResponseSchema;
-  },
-  /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.RecoverAdmin
-   */
-  recoverAdmin: {
-    methodKind: "unary";
-    input: typeof RecoverAdminRequestSchema;
-    output: typeof RecoverAdminResponseSchema;
-  },
-  /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.ChangeAdminPassword
-   */
-  changeAdminPassword: {
-    methodKind: "unary";
-    input: typeof ChangeAdminPasswordRequestSchema;
-    output: typeof ChangeAdminPasswordResponseSchema;
-  },
-  /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.BeginTotpRebind
-   */
-  beginTotpRebind: {
-    methodKind: "unary";
-    input: typeof BeginTotpRebindRequestSchema;
-    output: typeof BeginTotpRebindResponseSchema;
-  },
-  /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.CompleteTotpRebind
-   */
-  completeTotpRebind: {
-    methodKind: "unary";
-    input: typeof CompleteTotpRebindRequestSchema;
-    output: typeof CompleteTotpRebindResponseSchema;
+    input: typeof DisableTotpRequestSchema;
+    output: typeof DisableTotpResponseSchema;
   },
   /**
    * @generated from rpc platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes
@@ -1105,20 +1191,68 @@ export const AdminAuthService: GenService<{
     output: typeof RegenerateAdminRecoveryCodesResponseSchema;
   },
   /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt
+   */
+  confirmAdminSecretReceipt: {
+    methodKind: "unary";
+    input: typeof ConfirmAdminSecretReceiptRequestSchema;
+    output: typeof ConfirmAdminSecretReceiptResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.ElevateAdminSession
+   */
+  elevateAdminSession: {
+    methodKind: "unary";
+    input: typeof ElevateAdminSessionRequestSchema;
+    output: typeof ElevateAdminSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.RevokeCurrentAdminElevation
+   */
+  revokeCurrentAdminElevation: {
+    methodKind: "unary";
+    input: typeof RevokeCurrentAdminElevationRequestSchema;
+    output: typeof RevokeCurrentAdminElevationResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.ListAdminSessions
+   */
+  listAdminSessions: {
+    methodKind: "unary";
+    input: typeof ListAdminSessionsRequestSchema;
+    output: typeof ListAdminSessionsResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.RevokeAdminSession
+   */
+  revokeAdminSession: {
+    methodKind: "unary";
+    input: typeof RevokeAdminSessionRequestSchema;
+    output: typeof RevokeAdminSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.PreviewRevokeOtherAdminSessions
+   */
+  previewRevokeOtherAdminSessions: {
+    methodKind: "unary";
+    input: typeof PreviewRevokeOtherAdminSessionsRequestSchema;
+    output: typeof PreviewRevokeOtherAdminSessionsResponseSchema;
+  },
+  /**
+   * @generated from rpc platform.admin.v1.AdminAuthService.RevokeOtherAdminSessions
+   */
+  revokeOtherAdminSessions: {
+    methodKind: "unary";
+    input: typeof RevokeOtherAdminSessionsRequestSchema;
+    output: typeof RevokeOtherAdminSessionsResponseSchema;
+  },
+  /**
    * @generated from rpc platform.admin.v1.AdminAuthService.LogoutAdmin
    */
   logoutAdmin: {
     methodKind: "unary";
     input: typeof LogoutAdminRequestSchema;
     output: typeof LogoutAdminResponseSchema;
-  },
-  /**
-   * @generated from rpc platform.admin.v1.AdminAuthService.LogoutAllAdminSessions
-   */
-  logoutAllAdminSessions: {
-    methodKind: "unary";
-    input: typeof LogoutAllAdminSessionsRequestSchema;
-    output: typeof LogoutAllAdminSessionsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_platform_admin_v1_admin_auth, 0);

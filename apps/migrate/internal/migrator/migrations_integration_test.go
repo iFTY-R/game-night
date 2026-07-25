@@ -1012,14 +1012,12 @@ func TestMigrationPrivileges(t *testing.T) {
 	assertQuerySucceeds(t, ctx, workerPool, "SELECT event_hash FROM read_audit_anchor('admin', 1)")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE outbox_consumers SET updated_at = updated_at WHERE consumer_id = 'audit.checkpoint'")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE user_profiles SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
-	assertQuerySucceeds(t, ctx, workerPool, "UPDATE profile_export_items SET real_name_ciphertext = real_name_ciphertext, real_name_nonce = real_name_nonce, real_name_key_version = real_name_key_version WHERE false")
 	assertQuerySucceeds(t, ctx, workerPool, "UPDATE admin_totp_enrollments SET ciphertext = ciphertext, nonce = nonce, key_version = key_version WHERE false")
 	assertQueryFails(t, ctx, workerPool, "UPDATE outbox_events SET payload = payload", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM admin_accounts", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM users", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "DELETE FROM anonymous_challenges", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "UPDATE admin_totp_enrollments SET status = status", "permission denied")
-	assertQueryFails(t, ctx, workerPool, "UPDATE profile_export_items SET username = username", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM audit_events", "permission denied")
 	assertResetDenied(t, ctx, workerPool)
 }
@@ -1198,6 +1196,8 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"admin_accounts",
 		"admin_assisted_recovery_grants",
 		"admin_challenges",
+		"admin_command_receipts",
+		"admin_elevation_grants",
 		"admin_recovery_codes",
 		"admin_sessions",
 		"admin_totp_enrollments",
@@ -1222,8 +1222,6 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"outbox_consumers",
 		"outbox_events",
 		"party_rooms",
-		"profile_export_contexts",
-		"profile_export_items",
 		"room_activity_leases",
 		"room_game_config_drafts",
 		"room_members",

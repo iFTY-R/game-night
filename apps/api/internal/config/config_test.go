@@ -20,8 +20,6 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	environment[maxHeaderBytesEnvironment] = "524288"
 	environment[argon2WorkersEnvironment] = "4"
 	environment[argon2QueueEnvironment] = "128"
-	environment[adminMFARequiredEnvironment] = "false"
-
 	loaded, err := Load(mapLookup(environment))
 	if err != nil {
 		t.Fatal(err)
@@ -38,9 +36,6 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	}
 	if loaded.Argon2 != (Argon2Config{Workers: 4, QueueCapacity: 128}) {
 		t.Fatalf("unexpected Argon2 config: %+v", loaded.Argon2)
-	}
-	if !loaded.AdminPasswordOnly {
-		t.Fatal("password-only admin login should be enabled by the explicit API setting")
 	}
 	if loaded.Realtime.BootstrapURL != defaultRealtimeBootstrapURL || len(loaded.Realtime.PeerURLs) != 1 ||
 		loaded.Realtime.PeerURLs[0] != defaultRealtimeBootstrapURL {
@@ -71,9 +66,6 @@ func TestLoadUsesBoundedAPIListenerDefaults(t *testing.T) {
 	}
 	if loaded.Argon2 != (Argon2Config{Workers: 2, QueueCapacity: 64}) {
 		t.Fatalf("unexpected Argon2 defaults: %+v", loaded.Argon2)
-	}
-	if loaded.AdminPasswordOnly {
-		t.Fatal("password-only admin login must remain disabled when the setting is omitted")
 	}
 }
 
@@ -110,7 +102,6 @@ func TestLoadRejectsInvalidAPIOptionsWithoutLeakingValues(t *testing.T) {
 		{name: "max header bytes", environment: maxHeaderBytesEnvironment, value: "secret-header-size"},
 		{name: "Argon2 workers", environment: argon2WorkersEnvironment, value: "secret-workers"},
 		{name: "Argon2 queue", environment: argon2QueueEnvironment, value: "secret-queue"},
-		{name: "admin MFA requirement", environment: adminMFARequiredEnvironment, value: "secret-boolean"},
 	}
 
 	for _, test := range tests {

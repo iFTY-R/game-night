@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package platform.admin.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1";
+
+// AdminAccountState models the only durable administrator account states supported by the rebuilt console.
+enum AdminAccountState {
+  ADMIN_ACCOUNT_STATE_UNSPECIFIED = 0;
+  ADMIN_ACCOUNT_STATE_BOOTSTRAP_PENDING = 1;
+  ADMIN_ACCOUNT_STATE_SETUP_REQUIRED = 2;
+  ADMIN_ACCOUNT_STATE_ACTIVE = 3;
+}
+
+// AdminSessionKind models only the temporary setup session, MFA challenge session, and full authenticated session.
+enum AdminSessionKind {
+  ADMIN_SESSION_KIND_UNSPECIFIED = 0;
+  ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING = 1;
+  ADMIN_SESSION_KIND_MFA_PENDING = 2;
+  ADMIN_SESSION_KIND_FULL = 3;
+}
+
+// AdminPermission is the stable generated permission enum shared by transport, backend authorization, and UI gating.
+enum AdminPermission {
+  ADMIN_PERMISSION_UNSPECIFIED = 0;
+  ADMIN_PERMISSION_OVERVIEW_READ = 1;
+  ADMIN_PERMISSION_USERS_READ = 2;
+  ADMIN_PERMISSION_USERS_READ_PII = 3;
+  ADMIN_PERMISSION_USERS_ANNOTATE = 4;
+  ADMIN_PERMISSION_USERS_GOVERN = 5;
+  ADMIN_PERMISSION_USERS_EXPORT = 6;
+  ADMIN_PERMISSION_ROOMS_READ = 7;
+  ADMIN_PERMISSION_ROOMS_CONTROL = 8;
+  ADMIN_PERMISSION_GAMES_READ = 9;
+  ADMIN_PERMISSION_GAMES_CONTROL = 10;
+  ADMIN_PERMISSION_GAMES_REPAIR = 11;
+  ADMIN_PERMISSION_SECURITY_READ = 12;
+  ADMIN_PERMISSION_SECURITY_MANAGE_PASSWORD = 13;
+  ADMIN_PERMISSION_SECURITY_MANAGE_MFA = 14;
+  ADMIN_PERMISSION_SECURITY_MANAGE_SESSIONS = 15;
+  ADMIN_PERMISSION_AUDIT_READ = 16;
+  ADMIN_PERMISSION_AUDIT_EXPORT = 17;
+  ADMIN_PERMISSION_OPERATIONS_READ = 18;
+  ADMIN_PERMISSION_OPERATIONS_MAINTAIN = 19;
+}
+
+// AdminElevationScope enumerates every approved high-risk command family that requires a short-lived step-up grant.
+enum AdminElevationScope {
+  ADMIN_ELEVATION_SCOPE_UNSPECIFIED = 0;
+  ADMIN_ELEVATION_SCOPE_USERS_BULK_GOVERNANCE = 1;
+  ADMIN_ELEVATION_SCOPE_USERS_REVOKE_DEVICES = 2;
+  ADMIN_ELEVATION_SCOPE_USERS_DELETE = 3;
+  ADMIN_ELEVATION_SCOPE_ROOMS_FORCE_CLOSE = 4;
+  ADMIN_ELEVATION_SCOPE_GAMES_FORCE_TERMINATE = 5;
+  ADMIN_ELEVATION_SCOPE_GAMES_EMERGENCY_REPAIR = 6;
+  ADMIN_ELEVATION_SCOPE_OPERATIONS_MAINTENANCE = 7;
+  ADMIN_ELEVATION_SCOPE_SECURITY_DISABLE_MFA = 8;
+  ADMIN_ELEVATION_SCOPE_SECURITY_REGENERATE_RECOVERY_CODES = 9;
+  ADMIN_ELEVATION_SCOPE_SECURITY_REVOKE_SESSIONS = 10;
+  ADMIN_ELEVATION_SCOPE_AUDIT_EXPORT_SENSITIVE = 11;
+}
+
+// AdminElevationSummary exposes only the current grant scope and lifetime to the browser.
+message AdminElevationSummary {
+  AdminElevationScope scope = 1;
+  google.protobuf.Timestamp granted_at = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+// AdminMfaState describes whether MFA is enabled and the current versions that guard security mutations.
+message AdminMfaState {
+  bool enabled = 1;
+  int32 recovery_codes_remaining = 2;
+  uint64 enrollment_version = 3;
+  uint64 recovery_codes_version = 4;
+}
+
+// AdminSessionSummary is the canonical introspection shape used by auth, security, and future admin modules.
+message AdminSessionSummary {
+  string admin_id = 1;
+  string session_id = 2;
+  AdminSessionKind kind = 3;
+  repeated AdminPermission permissions = 4;
+  AdminMfaState mfa = 5;
+  repeated AdminElevationSummary elevations = 6;
+  uint64 admin_version = 7;
+  uint64 password_version = 8;
+  uint64 session_version = 9;
+  google.protobuf.Timestamp idle_expires_at = 10;
+  google.protobuf.Timestamp absolute_expires_at = 11;
+}
+
+// AdminSessionInfo lists one concrete browser session for session management flows.
+message AdminSessionInfo {
+  string session_id = 1;
+  AdminSessionKind kind = 2;
+  bool current = 3;
+  uint64 session_version = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp last_activity_at = 6;
+  google.protobuf.Timestamp idle_expires_at = 7;
+  google.protobuf.Timestamp absolute_expires_at = 8;
+  string client_ip = 9;
+  string user_agent = 10;
+  repeated AdminElevationScope active_elevation_scopes = 11;
+}

@@ -1,62 +1,157 @@
 <script setup lang="ts">
-import { NAlert, NButton, NTag } from "naive-ui";
-import { ref } from "vue";
-import LogoutConfirmDialog from "../../components/session/LogoutConfirmDialog.vue";
-import SessionSummary from "../../components/session/SessionSummary.vue";
+import { computed, ref } from "vue";
+import { NAlert, NButton, NCard, NDescriptions, NDescriptionsItem, NDivider, NSpin, NTag } from "naive-ui";
+import { KeyRound, Shield, Smartphone, UserRoundX } from "lucide-vue-next";
+import { AdminPermission } from "../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
+import PermissionGate from "../../components/PermissionGate.vue";
 import { useAuthStore } from "../../stores/auth";
+import ChangePasswordDialog from "./components/ChangePasswordDialog.vue";
+import TotpSetupDialog from "./components/TotpSetupDialog.vue";
+import DisableTotpDialog from "./components/DisableTotpDialog.vue";
+import RecoveryCodesDialog from "./components/RecoveryCodesDialog.vue";
+import AdminSessionsTable from "./components/AdminSessionsTable.vue";
+import RevokeOtherSessionsDialog from "./components/RevokeOtherSessionsDialog.vue";
 
 const auth = useAuthStore();
-const dialogRef = ref<InstanceType<typeof LogoutConfirmDialog> | null>(null);
-const pending = ref(false);
-const resultMessage = ref("");
 
-const handleConfirm = async (payload: { mode: "current" | "all"; summary: string }): Promise<void> => {
-  pending.value = true;
-  resultMessage.value = "";
-  try {
-    if (payload.mode === "current") {
-      await auth.logoutCurrentSession();
-      resultMessage.value = "当前会话已退出。";
-      return;
-    }
-    const revoked = await auth.logoutEverySession();
-    resultMessage.value = `已撤销 ${revoked} 个管理员会话。`;
-  } finally {
-    pending.value = false;
-  }
+// Dialog refs
+const changePasswordDialogRef = ref<InstanceType<typeof ChangePasswordDialog> | null>(null);
+const totpSetupDialogRef = ref<InstanceType<typeof TotpSetupDialog> | null>(null);
+const disableTotpDialogRef = ref<InstanceType<typeof DisableTotpDialog> | null>(null);
+const recoveryCodesDialogRef = ref<InstanceType<typeof RecoveryCodesDialog> | null>(null);
+const revokeOtherSessionsDialogRef = ref<InstanceType<typeof RevokeOtherSessionsDialog> | null>(null);
+const sessionsTableRef = ref<InstanceType<typeof AdminSessionsTable> | null>(null);
+
+// Computed session info
+const mfaEnabled = computed(() => auth.session?.mfa?.enabled ?? false);
+const recoveryCodesRemaining = computed(() => auth.session?.mfa?.recoveryCodesRemaining ?? 0);
+
+// Action handlers
+const handleChangePassword = (): void => {
+  changePasswordDialogRef.value?.toggleDialog(true);
+};
+
+const handleSetupTotp = (): void => {
+  totpSetupDialogRef.value?.toggleDialog(true);
+};
+
+const handleDisableTotp = (): void => {
+  disableTotpDialogRef.value?.toggleDialog(true);
+};
+
+const handleRegenerateRecoveryCodes = (): void => {
+  recoveryCodesDialogRef.value?.toggleDialog(true);
+};
+
+const handleRevokeOtherSessions = (): void => {
+  revokeOtherSessionsDialogRef.value?.toggleDialog(true);
+};
+
+// Security mutations may revoke sessions or advance their versions, so the list must be re-read.
+const handleSecurityStateChanged = (): void => {
+  void sessionsTableRef.value?.refresh();
 };
 </script>
 
 <template>
-  <div class="admin-pane__section">
-    <div class="admin-page-title">
-      <div class="admin-eyebrow">Session Security</div>
-      <h2>会话安全</h2>
-    </div>
+  <div class="admin-view">
+    <header class="admin-view__header">
+      <h1 class="admin-view__title">安全设置</h1>
+      <p class="admin-view__subtitle">管理密码、多因素认证和会话</p>
+    </header>
 
-    <div class="admin-grid admin-grid--two">
-      <SessionSummary :session="auth.session" />
-      <div class="admin-card-shell admin-section-card admin-grid">
-        <div class="admin-list">
-          <div class="admin-list__row"><span class="admin-muted">当前 next step</span><NTag>{{ auth.nextStep }}</NTag></div>
-          <div class="admin-list__row"><span class="admin-muted">持久化范围</span><span>仅主题 / 侧栏 / 静态标签</span></div>
-          <div class="admin-list__row"><span class="admin-muted">敏感数据</span><span>仅在内存中短暂存在</span></div>
-        </div>
-        <NAlert type="warning" title="危险操作">
-          退出全部会话会使其他后台标签页在下一次请求时统一回到登录流程。
-        </NAlert>
-        <div class="admin-toolbar__cluster">
-          <NButton type="warning" :loading="pending" @click="dialogRef?.toggleDialog(true, { mode: 'current', summary: '仅撤销当前浏览器会话。' })">
-            退出当前会话
-          </NButton>
-          <NButton type="error" :loading="pending" @click="dialogRef?.toggleDialog(true, { mode: 'all', summary: '撤销当前管理员的全部会话，包括其他标签页与浏览器。' })">
-            退出全部会话
-          </NButton>
-        </div>
-        <p v-if="resultMessage" class="admin-muted">{{ resultMessage }}</p>
+    <NSpin :show="false">
+      <div class="admin-view__content">
+        <!-- Password Section -->
+        <NCard title="密码" :bordered="false" size="small">
+          <template #header-extra>
+            <PermissionGate :permission="AdminPermission.SECURITY_MANAGE_PASSWORD">
+              <NButton size="small" @click="handleChangePassword">
+                <template #icon>
+                  <KeyRound :size="16" />
+                </template>
+                修改密码
+              </NButton>
+            </PermissionGate>
+          </template>
+          <NDescriptions :column="1" label-placement="left" :label-style="{ width: '120px' }">
+            <NDescriptionsItem label="密码版本">
+              {{ auth.session?.passwordVersion ?? "-" }}
+            </NDescriptionsItem>
+          </NDescriptions>
+        </NCard>
+
+        <NDivider />
+
+        <!-- MFA Section -->
+        <NCard title="多因素认证" :bordered="false" size="small">
+          <template #header-extra>
+            <PermissionGate :permission="AdminPermission.SECURITY_MANAGE_MFA">
+              <NButton v-if="!mfaEnabled" size="small" type="primary" @click="handleSetupTotp">
+                <template #icon>
+                  <Smartphone :size="16" />
+                </template>
+                启用 MFA
+              </NButton>
+              <NButton v-else size="small" type="error" @click="handleDisableTotp">
+                <template #icon>
+                  <Shield :size="16" />
+                </template>
+                停用 MFA
+              </NButton>
+            </PermissionGate>
+          </template>
+          <NDescriptions :column="1" label-placement="left" :label-style="{ width: '120px' }">
+            <NDescriptionsItem label="状态">
+              <NTag v-if="mfaEnabled" type="success">已启用</NTag>
+              <NTag v-else type="default">未启用</NTag>
+            </NDescriptionsItem>
+            <NDescriptionsItem v-if="mfaEnabled" label="恢复码剩余">
+              <span>{{ recoveryCodesRemaining }} / 10</span>
+              <PermissionGate :permission="AdminPermission.SECURITY_MANAGE_MFA">
+                <NButton
+                  size="tiny"
+                  :type="recoveryCodesRemaining < 3 ? 'warning' : 'default'"
+                  style="margin-left: 8px"
+                  @click="handleRegenerateRecoveryCodes"
+                >
+                  重新生成
+                </NButton>
+              </PermissionGate>
+            </NDescriptionsItem>
+            <NDescriptionsItem v-if="mfaEnabled" label="绑定版本">
+              {{ auth.session?.mfa?.enrollmentVersion ?? "-" }}
+            </NDescriptionsItem>
+          </NDescriptions>
+          <NAlert v-if="!mfaEnabled" type="warning" style="margin-top: 16px">
+            启用多因素认证可以显著提升账户安全性。建议立即启用。
+          </NAlert>
+        </NCard>
+
+        <NDivider />
+
+        <!-- Sessions Section -->
+        <NCard title="活动会话" :bordered="false" size="small">
+          <template #header-extra>
+            <PermissionGate :permission="AdminPermission.SECURITY_MANAGE_SESSIONS">
+              <NButton size="small" type="error" @click="handleRevokeOtherSessions">
+                <template #icon>
+                  <UserRoundX :size="16" />
+                </template>
+                撤销其他会话
+              </NButton>
+            </PermissionGate>
+          </template>
+          <AdminSessionsTable ref="sessionsTableRef" />
+        </NCard>
       </div>
-    </div>
+    </NSpin>
 
-    <LogoutConfirmDialog ref="dialogRef" @confirm="handleConfirm" />
+    <!-- Dialogs -->
+    <ChangePasswordDialog ref="changePasswordDialogRef" @updated="handleSecurityStateChanged" />
+    <TotpSetupDialog ref="totpSetupDialogRef" @updated="handleSecurityStateChanged" />
+    <DisableTotpDialog ref="disableTotpDialogRef" @updated="handleSecurityStateChanged" />
+    <RecoveryCodesDialog ref="recoveryCodesDialogRef" />
+    <RevokeOtherSessionsDialog ref="revokeOtherSessionsDialogRef" @revoked="handleSecurityStateChanged" />
   </div>
 </template>

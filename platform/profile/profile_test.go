@@ -109,54 +109,6 @@ func TestUserProfileVersionedUpdateAndClone(t *testing.T) {
 	}
 }
 
-func TestProfileExportStateCursorAndDigest(t *testing.T) {
-	now := time.Date(2026, 7, 19, 2, 0, 0, 0, time.UTC)
-	exportID, adminID := uuid.New(), uuid.New()
-	filterDigest := bytes.Repeat([]byte{7}, 32)
-	context, err := NewProfileExportContext(exportID, adminID, filterDigest, []Field{FieldRealName}, ProfileSchemaVersion, 2, "support request", now, now.Add(time.Minute))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !context.IsReadableAt(now.Add(time.Second)) || context.IsReadableAt(now.Add(time.Minute)) {
-		t.Fatal("unexpected export readability boundary")
-	}
-	completed, err := context.Complete(now.Add(30 * time.Second))
-	if err != nil || completed.Status() != ExportStatusCompleted {
-		t.Fatalf("complete status = %s, err = %v", completed.Status(), err)
-	}
-	if _, err := completed.Complete(now.Add(40 * time.Second)); err != nil {
-		t.Fatalf("idempotent complete failed: %v", err)
-	}
-	if _, err := context.Complete(now.Add(time.Minute)); !errors.Is(err, ErrProfileExportExpired) {
-		t.Fatalf("expiry boundary completion error = %v", err)
-	}
-	cursorText, err := EncodeCursor(exportID, 12)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cursor, err := DecodeExportCursor(cursorText)
-	if err != nil || cursor.ExportID != exportID || cursor.Ordinal != 12 {
-		t.Fatalf("cursor = %+v, err = %v", cursor, err)
-	}
-	if _, err := DecodeExportCursor(cursorText + "A"); !errors.Is(err, ErrProfileExportCursor) {
-		t.Fatalf("tampered cursor error = %v", err)
-	}
-	first, err := TargetUserDigest([]uuid.UUID{adminID, exportID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := TargetUserDigest([]uuid.UUID{exportID, adminID})
-	if err != nil || !bytes.Equal(first, second) {
-		t.Fatalf("target digest was not order stable")
-	}
-	if _, err := TargetUserDigest([]uuid.UUID{adminID, adminID}); !errors.Is(err, ErrInvalidProfileInput) {
-		t.Fatalf("duplicate target IDs were accepted: %v", err)
-	}
-	if _, err := (ProfileExportSource{UserID: uuid.New()}).Materialize(exportID, 1); err != nil {
-		t.Fatalf("deleted identity without username was rejected: %v", err)
-	}
-}
-
 func mustAAD(t *testing.T, userID uuid.UUID, field Field, schemaVersion uint32) []byte {
 	t.Helper()
 	value, err := PIIAssociatedData(userID, field, schemaVersion)

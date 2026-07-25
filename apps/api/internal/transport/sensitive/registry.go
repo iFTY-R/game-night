@@ -68,43 +68,29 @@ var GameOperations = []string{
 	gamev1connect.GameServiceOpenSubscriptionProcedure,
 }
 
-// AdminAuthOperations contains every reviewed administrator authentication procedure.
+// AdminAuthOperations contains every reviewed administrator authentication and session-security procedure.
 var AdminAuthOperations = []string{
 	adminv1connect.AdminAuthServiceGetSetupStateProcedure,
 	adminv1connect.AdminAuthServiceGetCurrentAdminSessionProcedure,
 	adminv1connect.AdminAuthServiceGetRuntimeReadinessProcedure,
 	adminv1connect.AdminAuthServiceBeginAdminLoginProcedure,
 	adminv1connect.AdminAuthServiceLoginPasswordProcedure,
-	adminv1connect.AdminAuthServiceVerifyTotpProcedure,
+	adminv1connect.AdminAuthServiceVerifyAdminTotpProcedure,
+	adminv1connect.AdminAuthServiceVerifyAdminRecoveryCodeProcedure,
 	adminv1connect.AdminAuthServiceChangeInitialPasswordProcedure,
+	adminv1connect.AdminAuthServiceChangeAdminPasswordProcedure,
 	adminv1connect.AdminAuthServiceBeginTotpEnrollmentProcedure,
 	adminv1connect.AdminAuthServiceCompleteTotpEnrollmentProcedure,
-	adminv1connect.AdminAuthServiceConfirmAdminSecretReceiptProcedure,
-	adminv1connect.AdminAuthServiceRecoverAdminProcedure,
-	adminv1connect.AdminAuthServiceChangeAdminPasswordProcedure,
-	adminv1connect.AdminAuthServiceBeginTotpRebindProcedure,
-	adminv1connect.AdminAuthServiceCompleteTotpRebindProcedure,
+	adminv1connect.AdminAuthServiceDisableTotpProcedure,
 	adminv1connect.AdminAuthServiceRegenerateAdminRecoveryCodesProcedure,
+	adminv1connect.AdminAuthServiceConfirmAdminSecretReceiptProcedure,
+	adminv1connect.AdminAuthServiceElevateAdminSessionProcedure,
+	adminv1connect.AdminAuthServiceRevokeCurrentAdminElevationProcedure,
+	adminv1connect.AdminAuthServiceListAdminSessionsProcedure,
+	adminv1connect.AdminAuthServiceRevokeAdminSessionProcedure,
+	adminv1connect.AdminAuthServicePreviewRevokeOtherAdminSessionsProcedure,
+	adminv1connect.AdminAuthServiceRevokeOtherAdminSessionsProcedure,
 	adminv1connect.AdminAuthServiceLogoutAdminProcedure,
-	adminv1connect.AdminAuthServiceLogoutAllAdminSessionsProcedure,
-}
-
-// AdminIdentityOperations contains every reviewed privileged profile, governance, and audit procedure.
-var AdminIdentityOperations = []string{
-	adminv1connect.AdminIdentityServiceGetUserProcedure,
-	adminv1connect.AdminIdentityServiceGetRealNameProcedure,
-	adminv1connect.AdminIdentityServiceUpdateRealNameProcedure,
-	adminv1connect.AdminIdentityServiceCreateUserProfileExportProcedure,
-	adminv1connect.AdminIdentityServiceGetUserProfileExportPageProcedure,
-	adminv1connect.AdminIdentityServiceCompleteUserProfileExportProcedure,
-	adminv1connect.AdminIdentityServiceAbortUserProfileExportProcedure,
-	adminv1connect.AdminIdentityServiceCreateAssistedRecoveryGrantProcedure,
-	adminv1connect.AdminIdentityServiceForceChangeUsernameProcedure,
-	adminv1connect.AdminIdentityServiceSuspendUserProcedure,
-	adminv1connect.AdminIdentityServiceUnsuspendUserProcedure,
-	adminv1connect.AdminIdentityServiceDeleteUserProcedure,
-	adminv1connect.AdminIdentityServiceRevokeUserDeviceProcedure,
-	adminv1connect.AdminIdentityServiceListAuditEventsProcedure,
 }
 
 // Registry is immutable after construction so concurrent interceptors cannot change observation policy.
@@ -130,12 +116,11 @@ func New(operations ...string) (*Registry, error) {
 
 // AllOperations returns an independent list suitable for metrics and the process-wide cache policy registry.
 func AllOperations() []string {
-	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminIdentityOperations))
+	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations))
 	operations = append(operations, IdentityOperations...)
 	operations = append(operations, RoomOperations...)
 	operations = append(operations, GameOperations...)
 	operations = append(operations, AdminAuthOperations...)
-	operations = append(operations, AdminIdentityOperations...)
 	return operations
 }
 

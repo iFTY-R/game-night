@@ -7,28 +7,19 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/challenge"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/ratelimit"
 	"github.com/iFTY-R/game-night/platform/secretresult"
-	"github.com/iFTY-R/game-night/platform/security"
-)
-
-// NextStep is the transport-neutral state machine result consumed by Connect adapters.
-type NextStep string
-
-const (
-	NextStepChangePassword NextStep = "change_password"
-	NextStepEnrollTOTP     NextStep = "enroll_totp"
-	NextStepVerifyMFA      NextStep = "verify_mfa"
-	NextStepRebindTOTP     NextStep = "rebind_totp"
-	NextStepAuthenticated  NextStep = "authenticated"
 )
 
 type SetupState string
@@ -52,35 +43,45 @@ type OperationResult struct {
 	Replayed        bool
 }
 
+// SessionView keeps auth-session introspection transport-neutral while preserving the domain aggregates.
+type SessionView struct {
+	Session       Session
+	Permissions   PermissionSet
+	Enrollment    *Enrollment
+	Elevations    ElevationSet
+	RecoveryCodes RecoveryCodeSetState
+}
+
 // ServiceDependencies makes security wiring explicit and prevents accidental use of process globals.
 type ServiceDependencies struct {
-	Challenge      *ChallengeService
-	Passwords      PasswordHasher
-	PasswordPolicy PasswordPolicy
-	TOTP           *TOTPService
-	Sessions       *SessionService
-	RecoveryCodes  *RecoveryCodeService
-	Results        *secretresult.Service
-	Clock          clock.Clock
-	UnitOfWork     UnitOfWork
-	Limiter        ratelimit.RateLimiter
-	// AllowPasswordOnly is an explicit security downgrade used by controlled deployments that temporarily disable MFA.
-	AllowPasswordOnly bool
+	Challenge        *ChallengeService
+	Passwords        PasswordHasher
+	PasswordPolicy   PasswordPolicy
+	TOTP             *TOTPService
+	Sessions         *SessionService
+	RecoveryCodes    *RecoveryCodeService
+	Results          *secretresult.Service
+	Clock            clock.Clock
+	UnitOfWork       UnitOfWork
+	Limiter          ratelimit.RateLimiter
+	Audit            *audit.Service
+	CheckpointHealth *audit.CheckpointHealthPolicy
 }
 
 // Service coordinates administrator authentication workflows while repositories own durable CAS.
 type Service struct {
-	challenge         *ChallengeService
-	passwords         PasswordHasher
-	passwordPolicy    PasswordPolicy
-	totp              *TOTPService
-	sessions          *SessionService
-	recoveryCodes     *RecoveryCodeService
-	results           *secretresult.Service
-	clock             clock.Clock
-	unitOfWork        UnitOfWork
-	limiter           ratelimit.RateLimiter
-	allowPasswordOnly bool
+	challenge        *ChallengeService
+	passwords        PasswordHasher
+	passwordPolicy   PasswordPolicy
+	totp             *TOTPService
+	sessions         *SessionService
+	recoveryCodes    *RecoveryCodeService
+	results          *secretresult.Service
+	clock            clock.Clock
+	unitOfWork       UnitOfWork
+	limiter          ratelimit.RateLimiter
+	audit            *audit.Service
+	checkpointHealth *audit.CheckpointHealthPolicy
 }
 
 func NewService(deps ServiceDependencies) (*Service, error) {
@@ -93,9 +94,19 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 	}
 	return &Service{
 		challenge: deps.Challenge, passwords: deps.Passwords, passwordPolicy: deps.PasswordPolicy, totp: deps.TOTP,
-		sessions: deps.Sessions, recoveryCodes: deps.RecoveryCodes, results: deps.Results, clock: deps.Clock, unitOfWork: deps.UnitOfWork, limiter: deps.Limiter,
-		allowPasswordOnly: deps.AllowPasswordOnly,
+		sessions: deps.Sessions, recoveryCodes: deps.RecoveryCodes, results: deps.Results, clock: deps.Clock,
+		unitOfWork: deps.UnitOfWork, limiter: deps.Limiter, audit: deps.Audit, checkpointHealth: deps.CheckpointHealth,
 	}, nil
+}
+
+type CurrentSessionCommand struct {
+	Session      Session
+	SessionToken string
+	CSRFToken    string
+}
+
+type CurrentSessionResult struct {
+	View SessionView
 }
 
 // GetSetupState reads the singleton without exposing password or generation metadata.
@@ -114,7 +125,7 @@ func (service *Service) GetSetupState(ctx context.Context) (SetupState, error) {
 			state = SetupStateBootstrapPending
 		case AccountStatusSetupRequired:
 			state = SetupStateSetupRequired
-		case AccountStatusActive, AccountStatusRecoveryPending:
+		case AccountStatusActive:
 			state = SetupStateActive
 		default:
 			return ErrIntegrity
@@ -124,883 +135,40 @@ func (service *Service) GetSetupState(ctx context.Context) (SetupState, error) {
 	return state, mapAdminUoWError(err)
 }
 
-type CurrentSessionCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-}
-
-type CurrentSessionResult struct {
-	Session  Session
-	NextStep NextStep
-}
-
-// GetCurrentAdminSession revalidates the live restricted/full session without mutating expiry, cookies, or audit state.
-func (service *Service) GetCurrentAdminSession(ctx context.Context, command CurrentSessionCommand) (CurrentSessionResult, error) {
-	if service == nil || ctx == nil || service.sessions == nil || service.unitOfWork == nil || service.clock == nil {
-		return CurrentSessionResult{}, ErrRepositoryUnavailable
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return CurrentSessionResult{}, err
-	}
-	var result CurrentSessionResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return ErrAuthentication
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		nextStep, err := nextStepFromSessionKind(command.Session.Snapshot().Kind)
-		if err != nil {
-			return err
-		}
-		result = CurrentSessionResult{Session: command.Session, NextStep: nextStep}
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-// BootstrapPassword performs the one-winner bootstrap CAS. A losing instance verifies that its mounted
-// secret matches the committed bootstrap password; later active states reject a still-mounted secret.
-func (service *Service) BootstrapPassword(ctx context.Context, bootstrapSecret string) error {
-	if service == nil || ctx == nil || service.unitOfWork == nil || service.passwords == nil || service.clock == nil ||
-		strings.TrimSpace(bootstrapSecret) == "" {
-		return ErrBootstrapSecretMismatch
-	}
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		snapshot := account.Snapshot()
-		if snapshot.Status == AccountStatusSetupRequired {
-			matched, _, verifyErr := VerifyPassword(ctx, service.passwords, PasswordRecord{
-				Hash: snapshot.PasswordHash, Algorithm: snapshot.PasswordAlgorithm, Parameters: snapshot.PasswordParameters,
-			}, bootstrapSecret)
-			if verifyErr != nil || !matched {
-				return ErrBootstrapSecretMismatch
-			}
-			return nil
-		}
-		if !account.IsBootstrapPending() {
-			return ErrBootstrapSecretMismatch
-		}
-		record, err := HashPassword(ctx, service.passwords, service.passwordPolicy, account.Snapshot().Username, bootstrapSecret)
-		if err != nil {
-			return ErrBootstrapSecretMismatch
-		}
-		_, err = transaction.Accounts().BootstrapPasswordCAS(ctx, account, record.Hash, record.Algorithm, record.Parameters, service.clock.Now())
-		return err
-	})
-	return mapAdminUoWError(err)
-}
-
-// BootstrapReadyWithoutSecret confirms that startup no longer depends on the one-time secret mount.
-func (service *Service) BootstrapReadyWithoutSecret(ctx context.Context) error {
-	state, err := service.GetSetupState(ctx)
-	if err != nil {
-		return err
-	}
-	if state == SetupStateBootstrapPending {
-		return ErrBootstrapSecretMismatch
-	}
-	return nil
-}
-
-// BeginAdminLogin issues a generation-bound challenge and persists only its HMAC digest.
-func (service *Service) BeginAdminLogin(ctx context.Context, request AdminChallengeRequest) (IssuedChallenge, error) {
-	if request.MaxAttempts == 0 {
-		request.MaxAttempts = challenge.DefaultMaxAttempts
-	}
-	var issued IssuedChallenge
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		snapshot := account.Snapshot()
-		if _, _, stateErr := passwordLoginSessionState(snapshot.Status, service.allowPasswordOnly); stateErr != nil {
-			return ErrUnavailable
-		}
-		issued, err = service.challenge.Issue(ChallengePurposeLogin, snapshot.ID, snapshot.AdminVersion, snapshot.PasswordVersion, request.CanonicalOrigin, request.RequestFlowID, request.MaxAttempts)
-		if err != nil {
-			return err
-		}
-		return transaction.Challenges().Insert(ctx, issued.Challenge)
-	})
-	if err != nil {
-		return IssuedChallenge{}, mapAdminUoWError(err)
-	}
-	return issued, nil
-}
-
-type LoginPasswordCommand struct {
-	Credentials     challenge.Credentials
-	Password        string
-	OperationID     idempotency.OperationID
-	RequestDigest   idempotency.Digest
-	CanonicalOrigin string
-	RequestFlowID   challenge.RequestFlowID
-	ClientIP        string
-}
-
-type LoginPasswordResult struct {
-	NextStep  NextStep
-	Session   IssuedSession
-	ExpiresAt time.Time
-}
-
-// LoginPassword verifies the password and issues the session kind required by the configured MFA policy.
-func (service *Service) LoginPassword(ctx context.Context, command LoginPasswordCommand) (LoginPasswordResult, error) {
-	if !command.OperationID.Valid() || command.ClientIP == "" {
-		return LoginPasswordResult{}, ErrInvalidInput
-	}
-	account, err := service.readAccount(ctx)
-	if err != nil {
-		return LoginPasswordResult{}, err
-	}
-	if err := service.consumePasswordLimit(ctx, command.ClientIP, account.Snapshot().ID.String()); err != nil {
-		return LoginPasswordResult{}, err
-	}
-	// Verify the expensive first factor before entering the challenge transaction. A mismatch is
-	// deliberately re-submitted as an invalid proof below so the challenge attempt CAS commits.
-	matched, needsUpgrade, verifyErr := VerifyPassword(ctx, service.passwords, PasswordRecord{Hash: account.Snapshot().PasswordHash, Algorithm: account.Snapshot().PasswordAlgorithm, Parameters: account.Snapshot().PasswordParameters}, command.Password)
-	if verifyErr != nil {
-		return LoginPasswordResult{}, verifyErr
-	}
-	var result LoginPasswordResult
-	challengeUOW := adminChallengeUnitOfWork{parent: service.unitOfWork}
-	credentials := command.Credentials
-	if !matched {
-		credentials.BodyProof = ""
-	}
-	_, err = service.challenge.AuthorizePersistent(ctx, challengeUOW, ChallengePurposeLogin, account.Snapshot().ID, account.Snapshot().AdminVersion, account.Snapshot().PasswordVersion, command.CanonicalOrigin, command.RequestFlowID, credentials, command.OperationID, command.RequestDigest,
-		func(ctx context.Context, transaction ChallengeTransaction, _ Challenge, _ challenge.Authorization) (AuthorizedChallengeCompletion, error) {
-			adminTransaction, ok := transaction.(Transaction)
-			if !ok {
-				return AuthorizedChallengeCompletion{}, ErrRepositoryUnavailable
-			}
-			if !matched {
-				return AuthorizedChallengeCompletion{}, ErrAuthentication
-			}
-			currentAccount := account
-			if needsUpgrade {
-				upgraded, hashErr := HashPassword(ctx, service.passwords, service.passwordPolicy, account.Snapshot().Username, command.Password)
-				if hashErr != nil {
-					return AuthorizedChallengeCompletion{}, hashErr
-				}
-				currentAccount, hashErr = adminTransaction.Accounts().UpdatePasswordCAS(ctx, currentAccount, upgraded.Hash, upgraded.Algorithm, upgraded.Parameters, service.clock.Now())
-				if hashErr != nil {
-					return AuthorizedChallengeCompletion{}, hashErr
-				}
-			}
-			// A recovery-pending account can resume normal password login when MFA is intentionally disabled.
-			if service.allowPasswordOnly && currentAccount.Snapshot().Status == AccountStatusRecoveryPending {
-				var transitionErr error
-				currentAccount, transitionErr = adminTransaction.Accounts().TransitionStatusCAS(ctx, currentAccount, AccountStatusActive, service.clock.Now())
-				if transitionErr != nil {
-					return AuthorizedChallengeCompletion{}, transitionErr
-				}
-			}
-			kind, nextStep, stateErr := passwordLoginSessionState(currentAccount.Snapshot().Status, service.allowPasswordOnly)
-			if stateErr != nil {
-				return AuthorizedChallengeCompletion{}, stateErr
-			}
-			result.NextStep = nextStep
-			issued, issueErr := service.sessions.Issue(currentAccount.Snapshot().ID, kind, currentAccount.Snapshot().AdminVersion, currentAccount.Snapshot().PasswordVersion, service.clock.Now())
-			if issueErr != nil {
-				return AuthorizedChallengeCompletion{}, issueErr
-			}
-			if insertErr := adminTransaction.Sessions().Insert(ctx, issued.Session); insertErr != nil {
-				return AuthorizedChallengeCompletion{}, insertErr
-			}
-			result.Session, result.ExpiresAt = issued, issued.Session.Snapshot().AbsoluteExpiresAt
-			currentSnapshot := currentAccount.Snapshot()
-			return NoReplayCompletionAtGeneration(challenge.SubjectBinding{
-				ID: currentSnapshot.ID, Version: currentSnapshot.AdminVersion, CredentialVersion: currentSnapshot.PasswordVersion,
-			})
-		})
-	if err != nil {
-		return LoginPasswordResult{}, normalizeAuthError(err)
-	}
-	return result, nil
-}
-
-type VerifyTOTPCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-	Code         string
-	ClientIP     string
-}
-
-type SessionResult struct {
-	Session  IssuedSession
-	NextStep NextStep
-}
-
-// VerifyTotp atomically consumes the accepted moving-factor step and replaces MFA-pending with full access.
-func (service *Service) VerifyTotp(ctx context.Context, command VerifyTOTPCommand) (SessionResult, error) {
-	if command.ClientIP == "" || command.Session.Snapshot().Kind != SessionKindMFAPending {
-		return SessionResult{}, ErrAuthentication
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return SessionResult{}, err
-	}
-	if err := service.consumeSecondFactorLimit(ctx, command.ClientIP, command.Session.Snapshot().AdminID.String(), "totp"); err != nil {
-		return SessionResult{}, err
-	}
-	var result SessionResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		enrollment, err := transaction.Enrollments().GetActiveForUpdate(ctx, account.Snapshot().ID)
-		if err != nil {
-			return err
-		}
-		es := enrollment.Snapshot()
-		secret, err := service.totp.DecryptSeed(uuidToArray(account.Snapshot().ID), uuidToArray(es.ID), security.Encrypted[security.TOTPKeyPurpose]{KeyVersion: es.KeyVersion, Nonce: es.Nonce, Ciphertext: es.Ciphertext})
-		if err != nil {
-			return ErrTOTPInvalid
-		}
-		step, err := VerifyTOTPCode(secret, command.Code, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if _, err = transaction.Accounts().AcceptTOTPStepCAS(ctx, account, step, service.clock.Now()); err != nil {
-			return err
-		}
-		issued, err := service.sessions.Issue(account.Snapshot().ID, SessionKindFull, account.Snapshot().AdminVersion, account.Snapshot().PasswordVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if err = transaction.Sessions().Insert(ctx, issued.Session); err != nil {
-			return err
-		}
-		if _, err = transaction.Sessions().RevokeCAS(ctx, command.Session, "mfa_completed", service.clock.Now()); err != nil {
-			return err
-		}
-		result = SessionResult{Session: issued, NextStep: NextStepAuthenticated}
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-type ChangePasswordCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-	Current      string
-	New          string
-	ClientIP     string
-}
-
-// ChangeInitialPassword replaces the bootstrap password and follows the configured MFA policy.
-func (service *Service) ChangeInitialPassword(ctx context.Context, command ChangePasswordCommand) (SessionResult, error) {
-	return service.changePassword(ctx, command, true)
-}
-
-// ChangeAdminPassword is available in full and recovery-pending sessions, with recovery remaining restricted.
-func (service *Service) ChangeAdminPassword(ctx context.Context, command ChangePasswordCommand) (SessionResult, error) {
-	return service.changePassword(ctx, command, false)
-}
-
-func (service *Service) changePassword(ctx context.Context, command ChangePasswordCommand, initial bool) (SessionResult, error) {
-	kind := command.Session.Snapshot().Kind
-	if initial && kind != SessionKindSetupPasswordPending || !initial && kind != SessionKindRecoveryPending && kind != SessionKindFull {
-		return SessionResult{}, ErrPermissionDenied
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return SessionResult{}, err
-	}
-	if command.ClientIP == "" {
-		return SessionResult{}, ErrInvalidInput
-	}
-	if err := service.consumePasswordLimit(ctx, command.ClientIP, command.Session.Snapshot().AdminID.String()); err != nil {
-		return SessionResult{}, err
-	}
-	var result SessionResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		if command.Current != "" {
-			matched, _, verifyErr := VerifyPassword(ctx, service.passwords, PasswordRecord{Hash: account.Snapshot().PasswordHash, Algorithm: account.Snapshot().PasswordAlgorithm, Parameters: account.Snapshot().PasswordParameters}, command.Current)
-			if verifyErr != nil || !matched {
-				return ErrAuthentication
-			}
-		}
-		record, err := HashPassword(ctx, service.passwords, service.passwordPolicy, account.Snapshot().Username, command.New)
-		if err != nil {
-			return err
-		}
-		updated, err := transaction.Accounts().UpdatePasswordCAS(ctx, account, record.Hash, record.Algorithm, record.Parameters, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		// TOTP completion normally activates setup/recovery accounts; password-only mode must finalize that lifecycle here.
-		if service.allowPasswordOnly && updated.Snapshot().Status != AccountStatusActive {
-			status := updated.Snapshot().Status
-			if status != AccountStatusSetupRequired && status != AccountStatusRecoveryPending {
-				return ErrIntegrity
-			}
-			updated, err = transaction.Accounts().TransitionStatusCAS(ctx, updated, AccountStatusActive, service.clock.Now())
-			if err != nil {
-				return err
-			}
-		}
-		nextKind, nextStep := passwordChangeSessionState(initial, service.allowPasswordOnly)
-		issued, err := service.sessions.Issue(updated.Snapshot().ID, nextKind, updated.Snapshot().AdminVersion, updated.Snapshot().PasswordVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if err = transaction.Sessions().Insert(ctx, issued.Session); err != nil {
-			return err
-		}
-		_, err = transaction.Sessions().RevokeCAS(ctx, command.Session, "password_changed", service.clock.Now())
-		result = SessionResult{Session: issued, NextStep: nextStep}
-		return err
-	})
-	return result, mapAdminUoWError(err)
-}
-
-type BeginEnrollmentCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-	OperationID  idempotency.OperationID
-}
-
-type EnrollmentResult struct {
-	Enrollment Enrollment
-	Operation  OperationResult
-	Secret     string
-	URI        string
-}
-
-// BeginTotpEnrollment creates the one pending encrypted seed per account.
-func (service *Service) BeginTotpEnrollment(ctx context.Context, command BeginEnrollmentCommand) (EnrollmentResult, error) {
-	if !command.OperationID.Valid() || command.Session.Snapshot().Kind != SessionKindTOTPEnrollmentPending && command.Session.Snapshot().Kind != SessionKindRecoveryPending && command.Session.Snapshot().Kind != SessionKindFull {
-		return EnrollmentResult{}, ErrPermissionDenied
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return EnrollmentResult{}, err
-	}
-	var result EnrollmentResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		scope := secretresult.ScopeAdminTOTPRebind
-		if command.Session.Snapshot().Kind == SessionKindTOTPEnrollmentPending {
-			scope = secretresult.ScopeAdminTOTPEnrollment
-		}
-		digest := digestAdminRequest("admin.totp_enrollment", string(command.Session.Snapshot().Kind))
-		binding := adminResultBinding(scope, account.Snapshot().ID, command.OperationID, digest, secretresult.ResultTypeAdminTOTPEnrollment)
-		existing, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
-		if getErr == nil {
-			replayed, replayErr := service.replayEnrollmentResult(command.Session, command.OperationID, binding, existing)
-			if replayErr != nil {
-				return replayErr
-			}
-			result = replayed
-			return nil
-		}
-		if !errors.Is(getErr, secretresult.ErrNotFound) {
-			return getErr
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		pending, pendingErr := transaction.Enrollments().GetPendingForUpdate(ctx, account.Snapshot().ID)
-		if pendingErr == nil {
-			ps := pending.Snapshot()
-			if ps.AdminVersion != account.Snapshot().AdminVersion || !service.clock.Now().Before(ps.ExpiresAt) {
-				return ErrAuthentication
-			}
-			pendingOperationID, parseErr := idempotency.ParseOperationID(ps.OperationID)
-			if parseErr != nil {
-				return ErrIntegrity
-			}
-			pendingBinding := adminResultBinding(scope, account.Snapshot().ID, pendingOperationID, digest, secretresult.ResultTypeAdminTOTPEnrollment)
-			pendingResult, resultErr := transaction.SecretResults().GetByOperationForUpdate(ctx, pendingBinding.Key)
-			if errors.Is(resultErr, secretresult.ErrNotFound) {
-				return secretresult.ErrSecretNoLongerAvailable
-			}
-			if resultErr != nil {
-				return resultErr
-			}
-			replayed, replayErr := service.replayEnrollmentResult(command.Session, pendingOperationID, pendingBinding, pendingResult)
-			if replayErr != nil {
-				return replayErr
-			}
-			replayed.Enrollment = pending
-			result = replayed
-			return nil
-		}
-		if !errors.Is(pendingErr, ErrNotFound) {
-			return pendingErr
-		}
-		enrollmentID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		secret, uri, encrypted, err := service.totp.NewEnrollmentSecret(uuidToArray(account.Snapshot().ID), uuidToArray(enrollmentID), "Game Night", account.Snapshot().Username)
-		if err != nil {
-			return err
-		}
-		enrollment, err := RestoreEnrollment(EnrollmentSnapshot{ID: enrollmentID, AdminID: account.Snapshot().ID, Ciphertext: encrypted.Ciphertext, Nonce: encrypted.Nonce, KeyVersion: encrypted.KeyVersion, Status: EnrollmentStatusPending, AdminVersion: account.Snapshot().AdminVersion, OperationID: command.OperationID.Value(), CreatedAt: service.clock.Now(), ExpiresAt: service.clock.Now().Add(AdminSetupSessionTTL)})
-		if err != nil {
-			return err
-		}
-		stored, err := transaction.Enrollments().CreatePending(ctx, enrollment)
-		if err != nil {
-			return err
-		}
-		plaintext, err := json.Marshal(totpEnrollmentEnvelope{Secret: secret, URI: uri})
-		if err != nil {
-			return ErrIntegrity
-		}
-		defer clear(plaintext)
-		resultID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		prepared, err := service.results.PrepareAvailable(resultID, binding, plaintext, adminSecretResultTTL)
-		if err != nil {
-			return err
-		}
-		storedResult, err := transaction.SecretResults().InsertAvailable(ctx, prepared)
-		if err != nil {
-			return err
-		}
-		result = EnrollmentResult{Enrollment: stored, Operation: adminOperationResult(command.OperationID, storedResult, false), Secret: secret, URI: uri}
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-type CompleteEnrollmentCommand struct {
-	Session                  Session
-	SessionToken             string
-	CSRFToken                string
-	EnrollmentOperationID    string
-	RecoveryCodesOperationID idempotency.OperationID
-	TOTPPasscode             string
-}
-
-type CompleteEnrollmentResult struct {
-	Operation     OperationResult
-	Session       IssuedSession
-	RecoveryCodes []string
-}
-
-// CompleteTotpEnrollment verifies the first code, atomically activates the seed, and rotates recovery codes.
-func (service *Service) CompleteTotpEnrollment(ctx context.Context, command CompleteEnrollmentCommand) (CompleteEnrollmentResult, error) {
-	if command.EnrollmentOperationID == "" || !command.RecoveryCodesOperationID.Valid() || command.Session.Snapshot().Kind != SessionKindTOTPEnrollmentPending && command.Session.Snapshot().Kind != SessionKindRecoveryPending && command.Session.Snapshot().Kind != SessionKindFull {
-		return CompleteEnrollmentResult{}, ErrPermissionDenied
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return CompleteEnrollmentResult{}, err
-	}
-	var result CompleteEnrollmentResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		scope := secretresult.ScopeAdminTOTPRebind
-		if command.Session.Snapshot().Kind == SessionKindTOTPEnrollmentPending {
-			scope = secretresult.ScopeAdminInitialRecoveryCodes
-		}
-		binding := adminResultBinding(scope, account.Snapshot().ID, command.RecoveryCodesOperationID, digestAdminRequest("admin.recovery_codes", command.EnrollmentOperationID, string(command.Session.Snapshot().Kind)), secretresult.ResultTypeAdminRecoveryCodes)
-		existing, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
-		if getErr == nil {
-			if _, resolveErr := existing.Resolve(binding, service.clock.Now()); resolveErr != nil {
-				return resolveErr
-			}
-			grant, grantErr := service.sessions.ResultGrant(command.Session, existing.Snapshot().ID, service.clock.Now())
-			if grantErr != nil {
-				return grantErr
-			}
-			plaintext, openErr := service.results.OpenAdminAuthorizedResult(existing, binding, grant)
-			if openErr != nil {
-				return openErr
-			}
-			defer clear(plaintext)
-			envelope, decodeErr := decodeAdminRecoveryBundle(plaintext)
-			if decodeErr != nil {
-				return decodeErr
-			}
-			selector, secret, parseErr := parseSessionToken(envelope.SessionToken)
-			clear(secret)
-			if parseErr != nil {
-				return ErrIntegrity
-			}
-			storedSession, sessionErr := transaction.Sessions().GetForUpdate(ctx, selector)
-			if sessionErr != nil {
-				return sessionErr
-			}
-			result = CompleteEnrollmentResult{Operation: adminOperationResult(command.RecoveryCodesOperationID, existing, true), Session: IssuedSession{Session: storedSession, Token: envelope.SessionToken, CSRFToken: envelope.CSRFToken}, RecoveryCodes: envelope.RecoveryCodes}
-			return nil
-		}
-		if !errors.Is(getErr, secretresult.ErrNotFound) {
-			return getErr
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		enrollment, err := transaction.Enrollments().GetPendingForUpdate(ctx, account.Snapshot().ID)
-		if err != nil || enrollment.Snapshot().OperationID != command.EnrollmentOperationID {
-			return ErrTOTPInvalid
-		}
-		es := enrollment.Snapshot()
-		secret, err := service.totp.DecryptSeed(uuidToArray(account.Snapshot().ID), uuidToArray(es.ID), security.Encrypted[security.TOTPKeyPurpose]{KeyVersion: es.KeyVersion, Nonce: es.Nonce, Ciphertext: es.Ciphertext})
-		if err != nil {
-			return err
-		}
-		// Rebinding from a full session must retire the old seed before the partial unique index can activate the new one.
-		if command.Session.Snapshot().Kind == SessionKindFull {
-			if active, activeErr := transaction.Enrollments().GetActiveForUpdate(ctx, account.Snapshot().ID); activeErr == nil {
-				if _, activeErr = transaction.Enrollments().DisableCAS(ctx, active, service.clock.Now()); activeErr != nil {
-					return activeErr
-				}
-			}
-		}
-		step, err := VerifyTOTPCode(secret, command.TOTPPasscode, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if _, err = transaction.Accounts().AcceptTOTPStepCAS(ctx, account, step, service.clock.Now()); err != nil {
-			return err
-		}
-		if _, err = transaction.Enrollments().ActivateCAS(ctx, enrollment, service.clock.Now()); err != nil {
-			return err
-		}
-		setVersion := account.Snapshot().PasswordVersion
-		if _, err = transaction.RecoveryCodes().RevokeAllSets(ctx, account.Snapshot().ID, service.clock.Now()); err != nil {
-			return err
-		}
-		issuedCodes, err := service.recoveryCodes.IssueSet(ctx, account.Snapshot().ID, setVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		codes := make([]string, 0, len(issuedCodes))
-		for _, issued := range issuedCodes {
-			if err = transaction.RecoveryCodes().Insert(ctx, issued.Code); err != nil {
-				return err
-			}
-			codes = append(codes, issued.Secret)
-		}
-		updated, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if updated.Snapshot().Status != AccountStatusActive {
-			updated, err = updated.Transition(AccountStatusActive, service.clock.Now())
-			if err != nil {
-				return err
-			}
-			updated, err = transaction.Accounts().TransitionStatusCAS(ctx, account, AccountStatusActive, service.clock.Now())
-			if err != nil {
-				return err
-			}
-		}
-		issued, err := service.sessions.Issue(updated.Snapshot().ID, SessionKindFull, updated.Snapshot().AdminVersion, updated.Snapshot().PasswordVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if err = transaction.Sessions().Insert(ctx, issued.Session); err != nil {
-			return err
-		}
-		plaintext, err := json.Marshal(adminRecoveryBundle{RecoveryCodes: codes, SessionToken: issued.Token, CSRFToken: issued.CSRFToken})
-		if err != nil {
-			return ErrIntegrity
-		}
-		defer clear(plaintext)
-		resultID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		prepared, err := service.results.PrepareAvailable(resultID, binding, plaintext, adminSecretResultTTL)
-		if err != nil {
-			return err
-		}
-		storedResult, err := transaction.SecretResults().InsertAvailable(ctx, prepared)
-		if err != nil {
-			return err
-		}
-		result.Operation, result.Session, result.RecoveryCodes = adminOperationResult(command.RecoveryCodesOperationID, storedResult, false), issued, codes
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-type RecoverCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-	Code         string
-	ClientIP     string
-}
-
-// RecoverAdmin consumes a recovery code only inside a password-authenticated MFA-pending session.
-func (service *Service) RecoverAdmin(ctx context.Context, command RecoverCommand) (SessionResult, error) {
-	if command.Session.Snapshot().Kind != SessionKindMFAPending || command.ClientIP == "" {
-		return SessionResult{}, ErrAuthentication
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return SessionResult{}, err
-	}
-	if err := service.consumeSecondFactorLimit(ctx, command.ClientIP, command.Session.Snapshot().AdminID.String(), "recovery"); err != nil {
-		return SessionResult{}, err
-	}
-	var result SessionResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		selector, parsedSecret, parseErr := parseRecoveryCode(command.Code)
-		clear(parsedSecret)
-		if parseErr != nil {
-			return ErrRecoveryInvalid
-		}
-		code, err := transaction.RecoveryCodes().FindActiveBySelector(ctx, selector)
-		if err != nil {
-			return ErrRecoveryInvalid
-		}
-		if err = service.recoveryCodes.Verify(ctx, code, command.Code); err != nil {
-			return err
-		}
-		if _, err = transaction.RecoveryCodes().ConsumeCAS(ctx, code, service.clock.Now()); err != nil {
-			return err
-		}
-		if active, activeErr := transaction.Enrollments().GetActiveForUpdate(ctx, account.Snapshot().ID); activeErr == nil {
-			if _, activeErr = transaction.Enrollments().DisableCAS(ctx, active, service.clock.Now()); activeErr != nil {
-				return activeErr
-			}
-		}
-		updated, err := transaction.Accounts().TransitionStatusCAS(ctx, account, AccountStatusRecoveryPending, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if _, err = transaction.Sessions().RevokeAll(ctx, account.Snapshot().ID, "admin_recovery", service.clock.Now()); err != nil {
-			return err
-		}
-		issued, err := service.sessions.Issue(updated.Snapshot().ID, SessionKindRecoveryPending, updated.Snapshot().AdminVersion, updated.Snapshot().PasswordVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if err = transaction.Sessions().Insert(ctx, issued.Session); err != nil {
-			return err
-		}
-		result = SessionResult{Session: issued, NextStep: NextStepRebindTOTP}
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-type RegenerateRecoveryCodesCommand struct {
-	Session      Session
-	SessionToken string
-	CSRFToken    string
-	OperationID  idempotency.OperationID
-	TOTPPasscode string
-	ClientIP     string
-}
-
-type RegenerateRecoveryCodesResult struct {
-	Operation     OperationResult
-	RecoveryCodes []string
-}
-
-// RegenerateAdminRecoveryCodes requires a fresh monotonic TOTP step and atomically revokes all previous sets.
-func (service *Service) RegenerateAdminRecoveryCodes(ctx context.Context, command RegenerateRecoveryCodesCommand) (RegenerateRecoveryCodesResult, error) {
-	if command.Session.Snapshot().Kind != SessionKindFull || !command.OperationID.Valid() || command.ClientIP == "" {
-		return RegenerateRecoveryCodesResult{}, ErrPermissionDenied
-	}
-	if err := service.sessions.Authenticate(command.Session, command.SessionToken, command.CSRFToken, service.clock.Now()); err != nil {
-		return RegenerateRecoveryCodesResult{}, err
-	}
-	if err := service.consumeSecondFactorLimit(ctx, command.ClientIP, command.Session.Snapshot().AdminID.String(), "regenerate_recovery_codes"); err != nil {
-		return RegenerateRecoveryCodesResult{}, err
-	}
-	var result RegenerateRecoveryCodesResult
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if !sessionMatchesAccount(command.Session, account) {
-			return ErrAuthentication
-		}
-		binding := adminResultBinding(secretresult.ScopeAdminRegenerateRecoveryCodes, account.Snapshot().ID, command.OperationID, digestAdminRequest("admin.regenerate_recovery_codes", command.TOTPPasscode), secretresult.ResultTypeAdminRecoveryCodes)
-		existing, getErr := transaction.SecretResults().GetByOperationForUpdate(ctx, binding.Key)
-		if getErr == nil {
-			if _, resolveErr := existing.Resolve(binding, service.clock.Now()); resolveErr != nil {
-				return resolveErr
-			}
-			grant, grantErr := service.sessions.ResultGrant(command.Session, existing.Snapshot().ID, service.clock.Now())
-			if grantErr != nil {
-				return grantErr
-			}
-			plaintext, openErr := service.results.OpenAdminAuthorizedResult(existing, binding, grant)
-			if openErr != nil {
-				return openErr
-			}
-			defer clear(plaintext)
-			envelope, decodeErr := decodeAdminRecoveryCodesEnvelope(plaintext)
-			if decodeErr != nil {
-				return decodeErr
-			}
-			result = RegenerateRecoveryCodesResult{Operation: adminOperationResult(command.OperationID, existing, true), RecoveryCodes: envelope.RecoveryCodes}
-			return nil
-		}
-		if !errors.Is(getErr, secretresult.ErrNotFound) {
-			return getErr
-		}
-		enrollment, err := transaction.Enrollments().GetActiveForUpdate(ctx, account.Snapshot().ID)
-		if err != nil {
-			return err
-		}
-		es := enrollment.Snapshot()
-		seed, err := service.totp.DecryptSeed(uuidToArray(account.Snapshot().ID), uuidToArray(es.ID), security.Encrypted[security.TOTPKeyPurpose]{KeyVersion: es.KeyVersion, Nonce: es.Nonce, Ciphertext: es.Ciphertext})
-		if err != nil {
-			return err
-		}
-		step, err := VerifyTOTPCode(seed, command.TOTPPasscode, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		if _, err = transaction.Accounts().AcceptTOTPStepCAS(ctx, account, step, service.clock.Now()); err != nil {
-			return err
-		}
-		if _, err = transaction.RecoveryCodes().RevokeAllSets(ctx, account.Snapshot().ID, service.clock.Now()); err != nil {
-			return err
-		}
-		issuedCodes, err := service.recoveryCodes.IssueSet(ctx, account.Snapshot().ID, account.Snapshot().PasswordVersion, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		codes := make([]string, 0, len(issuedCodes))
-		for _, issued := range issuedCodes {
-			if err = transaction.RecoveryCodes().Insert(ctx, issued.Code); err != nil {
-				return err
-			}
-			codes = append(codes, issued.Secret)
-		}
-		plaintext, err := json.Marshal(adminRecoveryCodesEnvelope{RecoveryCodes: codes})
-		if err != nil {
-			return ErrIntegrity
-		}
-		defer clear(plaintext)
-		resultID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		prepared, err := service.results.PrepareAvailable(resultID, binding, plaintext, adminSecretResultTTL)
-		if err != nil {
-			return err
-		}
-		stored, err := transaction.SecretResults().InsertAvailable(ctx, prepared)
-		if err != nil {
-			return err
-		}
-		result = RegenerateRecoveryCodesResult{Operation: adminOperationResult(command.OperationID, stored, false), RecoveryCodes: codes}
-		return nil
-	})
-	return result, mapAdminUoWError(err)
-}
-
-// ConfirmAdminSecretReceipt erases a result only after the exact operation and live session are revalidated.
-func (service *Service) ConfirmAdminSecretReceipt(ctx context.Context, session Session, token, csrfToken string, scope secretresult.Scope, operationID idempotency.OperationID, resultID uuid.UUID) (bool, error) {
-	if !scope.IsAdmin() || !operationID.Valid() || resultID == uuid.Nil {
-		return false, ErrInvalidInput
-	}
-	if err := service.sessions.Authenticate(session, token, csrfToken, service.clock.Now()); err != nil {
-		return false, err
-	}
-	confirmed := false
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		account, err := transaction.Accounts().GetForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		if !sessionMatchesAccount(session, account) {
-			return ErrAuthentication
-		}
-		stored, err := transaction.SecretResults().GetByIDForUpdate(ctx, resultID)
-		if err != nil {
-			return err
-		}
-		snapshot := stored.Snapshot()
-		if snapshot.Binding.Key.Scope != scope || snapshot.Binding.Key.ActorID != account.Snapshot().ID || snapshot.Binding.Key.OperationID != operationID || snapshot.ID != resultID {
-			return secretresult.ErrReplayUnauthorized
-		}
-		grant, err := service.sessions.ResultGrant(session, resultID, service.clock.Now())
-		if err != nil {
-			return err
-		}
-		updated, err := service.results.ConfirmAdminAuthorizedResult(ctx, transaction.SecretResults(), stored, snapshot.Binding, grant)
-		if err != nil {
-			return err
-		}
-		confirmed = updated.Snapshot().Status == secretresult.StatusConfirmed
-		return nil
-	})
-	return confirmed, mapAdminUoWError(err)
-}
-
-// LogoutAdmin revokes exactly one authenticated session.
-func (service *Service) LogoutAdmin(ctx context.Context, session Session, token, csrfToken string) error {
-	if err := service.sessions.Authenticate(session, token, csrfToken, service.clock.Now()); err != nil {
-		return err
-	}
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		_, err := transaction.Sessions().RevokeCAS(ctx, session, "logout", service.clock.Now())
-		return err
-	})
-	return mapAdminUoWError(err)
-}
-
-// LogoutAllAdminSessions revokes every session after authenticating the caller.
-func (service *Service) LogoutAllAdminSessions(ctx context.Context, session Session, token, csrfToken string) (int64, error) {
-	if err := service.sessions.Authenticate(session, token, csrfToken, service.clock.Now()); err != nil {
-		return 0, err
-	}
-	var count int64
-	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		var err error
-		count, err = transaction.Sessions().RevokeAll(ctx, session.Snapshot().AdminID, "logout_all", service.clock.Now())
-		return err
-	})
-	return count, mapAdminUoWError(err)
-}
-
 func (service *Service) readAccount(ctx context.Context) (Account, error) {
 	var account Account
 	err := service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
-		var err error
-		account, err = transaction.Accounts().GetForUpdate(ctx)
-		return err
+		var runErr error
+		account, runErr = transaction.Accounts().GetForUpdate(ctx)
+		return runErr
 	})
 	return account, mapAdminUoWError(err)
+}
+
+// ResolveSession loads one persisted session from the transport bearer without exposing token parsing internals.
+func (service *Service) ResolveSession(ctx context.Context, token string) (Session, error) {
+	if service == nil || ctx == nil || service.unitOfWork == nil {
+		return Session{}, ErrRepositoryUnavailable
+	}
+	selector, secret, err := parseSessionToken(token)
+	clearSessionBytes(secret)
+	if err != nil {
+		return Session{}, ErrAuthentication
+	}
+	var session Session
+	err = service.unitOfWork.Run(ctx, func(ctx context.Context, transaction Transaction) error {
+		repository := transaction.Sessions()
+		if repository == nil {
+			return ErrRepositoryUnavailable
+		}
+		var runErr error
+		session, runErr = repository.GetForUpdate(ctx, selector)
+		return runErr
+	})
+	if errors.Is(err, ErrNotFound) {
+		return Session{}, ErrAuthentication
+	}
+	return session, mapAdminUoWError(err)
 }
 
 func (service *Service) consumePasswordLimit(ctx context.Context, clientIP, adminID string) error {
@@ -1048,7 +216,13 @@ func mapAdminUoWError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrAuthentication) || errors.Is(err, ErrPasswordPolicy) || errors.Is(err, ErrTOTPInvalid) || errors.Is(err, ErrRecoveryInvalid) || errors.Is(err, ErrPermissionDenied) {
+	if errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrAuthentication) || errors.Is(err, ErrPasswordPolicy) ||
+		errors.Is(err, ErrTOTPInvalid) || errors.Is(err, ErrRecoveryInvalid) || errors.Is(err, ErrPermissionDenied) ||
+		errors.Is(err, ErrElevationDenied) || errors.Is(err, ErrElevationExpired) || errors.Is(err, ErrIdempotencyConflict) ||
+		errors.Is(err, ErrRecoveryCodeExhausted) || errors.Is(err, ErrMFAStateConflict) ||
+		errors.Is(err, ErrUnavailable) || errors.Is(err, ErrConcurrentTransition) || errors.Is(err, audit.ErrSensitiveWriteBlocked) ||
+		errors.Is(err, secretresult.ErrSecretNoLongerAvailable) || errors.Is(err, secretresult.ErrReplayUnauthorized) ||
+		errors.Is(err, secretresult.ErrIdempotencyConflict) {
 		return err
 	}
 	return err
@@ -1061,93 +235,41 @@ func normalizeAuthError(err error) error {
 	return err
 }
 
-func nextStepFromSessionKind(kind SessionKind) (NextStep, error) {
-	switch kind {
-	case SessionKindSetupPasswordPending:
-		return NextStepChangePassword, nil
-	case SessionKindTOTPEnrollmentPending:
-		return NextStepEnrollTOTP, nil
-	case SessionKindMFAPending:
-		return NextStepVerifyMFA, nil
-	case SessionKindRecoveryPending:
-		return NextStepRebindTOTP, nil
-	case SessionKindFull:
-		return NextStepAuthenticated, nil
-	default:
-		return "", ErrAuthentication
+func normalizeSecurityReason(reason string) (string, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "", ErrInvalidInput
 	}
-}
-
-// passwordLoginSessionState keeps the security default MFA-required while allowing an explicit password-only policy.
-func passwordLoginSessionState(status AccountStatus, allowPasswordOnly bool) (SessionKind, NextStep, error) {
-	switch status {
-	case AccountStatusSetupRequired:
-		return SessionKindSetupPasswordPending, NextStepChangePassword, nil
-	case AccountStatusActive:
-		if allowPasswordOnly {
-			return SessionKindFull, NextStepAuthenticated, nil
-		}
-		return SessionKindMFAPending, NextStepVerifyMFA, nil
-	case AccountStatusRecoveryPending:
-		if allowPasswordOnly {
-			return SessionKindFull, NextStepAuthenticated, nil
-		}
+	if strings.ContainsAny(reason, "\r\n\t") {
+		return "", ErrInvalidInput
 	}
-	return "", "", ErrUnavailable
-}
-
-// passwordChangeSessionState identifies the replacement session after a successful password rotation.
-func passwordChangeSessionState(initial, allowPasswordOnly bool) (SessionKind, NextStep) {
-	if allowPasswordOnly {
-		return SessionKindFull, NextStepAuthenticated
-	}
-	if initial {
-		return SessionKindTOTPEnrollmentPending, NextStepEnrollTOTP
-	}
-	return SessionKindRecoveryPending, NextStepRebindTOTP
+	return reason, nil
 }
 
 func sessionMatchesAccount(session Session, account Account) bool {
 	sessionSnapshot, accountSnapshot := session.Snapshot(), account.Snapshot()
-	return sessionSnapshot.AdminID == accountSnapshot.ID && sessionSnapshot.AdminVersion == accountSnapshot.AdminVersion && sessionSnapshot.PasswordVersion == accountSnapshot.PasswordVersion
+	return sessionSnapshot.AdminID == accountSnapshot.ID &&
+		sessionSnapshot.AdminVersion == accountSnapshot.AdminVersion &&
+		sessionSnapshot.PasswordVersion == accountSnapshot.PasswordVersion
 }
 
 func adminResultBinding(scope secretresult.Scope, actorID uuid.UUID, operationID idempotency.OperationID, digest idempotency.Digest, resultType secretresult.ResultType) secretresult.Binding {
-	return secretresult.Binding{Key: secretresult.Key{Scope: scope, ActorID: actorID, OperationID: operationID}, RequestDigest: digest, ResultType: resultType, ResultVersion: adminSecretResultVersion}
+	return secretresult.Binding{
+		Key:           secretresult.Key{Scope: scope, ActorID: actorID, OperationID: operationID},
+		RequestDigest: digest,
+		ResultType:    resultType,
+		ResultVersion: adminSecretResultVersion,
+	}
 }
 
 func adminOperationResult(operationID idempotency.OperationID, result secretresult.Result, replayed bool) OperationResult {
 	snapshot := result.Snapshot()
-	return OperationResult{OperationID: operationID, ResultID: snapshot.ID, SecretExpiresAt: snapshot.SecretExpiresAt, Replayed: replayed}
-}
-
-func (service *Service) replayEnrollmentResult(
-	session Session,
-	operationID idempotency.OperationID,
-	binding secretresult.Binding,
-	result secretresult.Result,
-) (EnrollmentResult, error) {
-	if _, err := result.Resolve(binding, service.clock.Now()); err != nil {
-		return EnrollmentResult{}, err
+	return OperationResult{
+		OperationID:     operationID,
+		ResultID:        snapshot.ID,
+		SecretExpiresAt: snapshot.SecretExpiresAt,
+		Replayed:        replayed,
 	}
-	grant, err := service.sessions.ResultGrant(session, result.Snapshot().ID, service.clock.Now())
-	if err != nil {
-		return EnrollmentResult{}, err
-	}
-	plaintext, err := service.results.OpenAdminAuthorizedResult(result, binding, grant)
-	if err != nil {
-		return EnrollmentResult{}, err
-	}
-	defer clear(plaintext)
-	envelope, err := decodeTOTPEnrollmentEnvelope(plaintext)
-	if err != nil {
-		return EnrollmentResult{}, err
-	}
-	return EnrollmentResult{
-		Operation: adminOperationResult(operationID, result, true),
-		Secret:    envelope.Secret,
-		URI:       envelope.URI,
-	}, nil
 }
 
 func digestAdminRequest(domain string, fields ...string) idempotency.Digest {
@@ -1195,7 +317,8 @@ func decodeTOTPEnrollmentEnvelope(plaintext []byte) (totpEnrollmentEnvelope, err
 
 func decodeAdminRecoveryBundle(plaintext []byte) (adminRecoveryBundle, error) {
 	var envelope adminRecoveryBundle
-	if err := decodeAdminEnvelope(plaintext, &envelope); err != nil || len(envelope.RecoveryCodes) != AdminRecoveryCodeCount || envelope.SessionToken == "" || envelope.CSRFToken == "" {
+	if err := decodeAdminEnvelope(plaintext, &envelope); err != nil ||
+		len(envelope.RecoveryCodes) != AdminRecoveryCodeCount || envelope.SessionToken == "" || envelope.CSRFToken == "" {
 		return adminRecoveryBundle{}, ErrIntegrity
 	}
 	return envelope, nil
@@ -1222,6 +345,54 @@ func decodeAdminEnvelope(plaintext []byte, target any) error {
 }
 
 func uuidToArray(value uuid.UUID) [16]byte { return [16]byte(value) }
+
+func encodeReceiptTarget(parts ...string) string {
+	return strings.Join(parts, "|")
+}
+
+func decodeReceiptTarget(value string, expectedParts int) ([]string, error) {
+	parts := strings.Split(value, "|")
+	if len(parts) != expectedParts {
+		return nil, ErrIntegrity
+	}
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			return nil, ErrIntegrity
+		}
+	}
+	return parts, nil
+}
+
+func parseReceiptUUID(value string) (uuid.UUID, error) {
+	parsed, err := uuid.Parse(strings.TrimSpace(value))
+	if err != nil || parsed == uuid.Nil {
+		return uuid.UUID{}, ErrIntegrity
+	}
+	return parsed, nil
+}
+
+func parseReceiptInt64(value string) (int64, error) {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, ErrIntegrity
+	}
+	return parsed, nil
+}
+
+func parseReceiptBool(value string) (bool, error) {
+	switch strings.TrimSpace(value) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, ErrIntegrity
+	}
+}
+
+func formatSessionViewResult(view SessionView) string {
+	return fmt.Sprintf("%s/%d/%d", view.Session.Snapshot().ID, view.Session.Snapshot().AdminVersion, view.Session.Snapshot().SessionVersion)
+}
 
 type adminChallengeUnitOfWork struct{ parent UnitOfWork }
 

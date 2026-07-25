@@ -1,99 +1,64 @@
-import { computed, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
-import { AdminNextStep, AdminSecretOperation, AdminSessionKind, AdminSetupState, type AdminPermission, type AdminSessionSummary } from "../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
-import type { AnonymousChallenge, OperationResult } from "../../../../contracts/gen/ts/platform/common/v1/common_pb";
+import { AdminAccountState, AdminSessionKind, type AdminPermission, type AdminSessionSummary } from "../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
+import type { AnonymousChallenge } from "../../../../contracts/gen/ts/platform/common/v1/common_pb";
 import {
   beginAdminLogin,
-  beginTotpEnrollment,
-  beginTotpRebind,
   changeInitialPassword,
-  completeTotpEnrollment,
-  completeTotpRebind,
-  confirmAdminSecretReceipt,
   getCurrentAdminSession,
   getSetupState,
   loginPassword,
   logoutAdmin,
-  logoutAllAdminSessions,
-  recoverAdmin,
-  verifyTotp
+  verifyAdminRecoveryCode,
+  verifyAdminTotp
 } from "../api/admin-auth";
 import { createRequestId, installSessionInvalidHandler } from "../api/connect";
 import { AdminApiError } from "../api/errors";
 
-type AuthStep = "login" | "bootstrap" | "changePassword" | "enrollTotp" | "verifyMfa" | "rebindTotp" | "authenticated";
-
-type SecretEnvelope = {
-  operation: AdminSecretOperation;
-  result: OperationResult | null;
-  totpSecret?: string;
-  otpauthUri?: string;
-  recoveryCodes: string[];
-};
-
-const nextStepFromKind = (kind: AdminSessionKind): AdminNextStep => {
-  switch (kind) {
-    case AdminSessionKind.SETUP_PASSWORD_PENDING:
-      return AdminNextStep.CHANGE_PASSWORD;
-    case AdminSessionKind.TOTP_ENROLLMENT_PENDING:
-      return AdminNextStep.ENROLL_TOTP;
-    case AdminSessionKind.MFA_PENDING:
-      return AdminNextStep.VERIFY_MFA;
-    case AdminSessionKind.RECOVERY_PENDING:
-      return AdminNextStep.REBIND_TOTP;
-    case AdminSessionKind.FULL:
-      return AdminNextStep.AUTHENTICATED;
-    default:
-      return AdminNextStep.UNSPECIFIED;
-  }
-};
-
-const nextStepToUi = (nextStep: AdminNextStep, setupState: AdminSetupState): AuthStep => {
-  switch (nextStep) {
-    case AdminNextStep.CHANGE_PASSWORD:
-      return "changePassword";
-    case AdminNextStep.ENROLL_TOTP:
-      return "enrollTotp";
-    case AdminNextStep.VERIFY_MFA:
-      return "verifyMfa";
-    case AdminNextStep.REBIND_TOTP:
-      return "rebindTotp";
-    case AdminNextStep.AUTHENTICATED:
-      return "authenticated";
-    default:
-      return setupState === AdminSetupState.BOOTSTRAP_PENDING ? "bootstrap" : "login";
-  }
-};
-
 export const useAuthStore = defineStore("admin-auth", () => {
+  // Restoration state
   const restored = ref(false);
   const restoring = ref(false);
+
+  // Session state - only session summary from backend
   const session = ref<AdminSessionSummary | null>(null);
-  const setupState = ref<AdminSetupState>(AdminSetupState.ACTIVE);
-  const nextStep = ref<AdminNextStep>(AdminNextStep.UNSPECIFIED);
-  const currentStep = ref<AuthStep>("login");
+  const setupState = ref<AdminAccountState>(AdminAccountState.ACTIVE);
+
+  // Login flow state
   const challenge = ref<AnonymousChallenge | null>(null);
   const requestFlowId = ref("");
-  const secretEnvelope = ref<SecretEnvelope | null>(null);
+
+  // UI state
   const errorMessage = ref("");
+
+  // Generation token for latest-response-wins guard
   const generation = ref(0);
-  const activeController = ref<AbortController | null>(null);
+  const activeController = shallowRef<AbortController | null>(null);
 
+  // Computed properties
   const permissions = computed<AdminPermission[]>(() => session.value?.permissions ?? []);
-  const isRestricted = computed(() => session.value != null && session.value.kind !== AdminSessionKind.FULL);
+  const isAuthenticated = computed(() => session.value?.kind === AdminSessionKind.FULL);
 
+  /**
+   * Clears sensitive data from memory.
+   * Must be called on logout, route change, or abort.
+   */
   const clearSensitive = (): void => {
     challenge.value = null;
     requestFlowId.value = "";
-    secretEnvelope.value = null;
   };
 
-  const applySession = (current: AdminSessionSummary | null, currentNextStep: AdminNextStep): void => {
+  /**
+   * Updates session state from backend response.
+   */
+  const applySession = (current: AdminSessionSummary | null): void => {
     session.value = current;
-    nextStep.value = currentNextStep;
-    currentStep.value = nextStepToUi(currentNextStep, setupState.value);
   };
 
+  /**
+   * Starts a new request generation and returns token + signal.
+   * Aborts any previous in-flight request.
+   */
   const beginRequest = (): { token: number; signal: AbortSignal } => {
     generation.value += 1;
     activeController.value?.abort();
@@ -102,6 +67,10 @@ export const useAuthStore = defineStore("admin-auth", () => {
     return { token: generation.value, signal: controller.signal };
   };
 
+  /**
+   * Guards against stale responses by checking generation token.
+   * Only commits if the token matches the current generation.
+   */
   const guardCommit = (token: number, commit: () => void): void => {
     if (token !== generation.value) {
       return;
@@ -109,50 +78,53 @@ export const useAuthStore = defineStore("admin-auth", () => {
     commit();
   };
 
-  const syncAuthenticatedSession = async (token: number, signal: AbortSignal): Promise<void> => {
-    // Some auth mutations only confirm the next step and require a follow-up self introspection
-    // to hydrate the full admin session before the UI enters the unrestricted backend.
-    const current = await getCurrentAdminSession();
-    if (signal.aborted) {
-      return;
-    }
-    guardCommit(token, () => {
-      applySession(current.session ?? null, AdminNextStep.AUTHENTICATED);
-      clearSensitive();
-      errorMessage.value = "";
-    });
-  };
-
+  /**
+   * Clears all state and shows error message.
+   * Used when restore or critical operations fail.
+   */
   const failClosed = (message: string): void => {
     clearSensitive();
     session.value = null;
-    nextStep.value = AdminNextStep.UNSPECIFIED;
-    currentStep.value = nextStepToUi(AdminNextStep.UNSPECIFIED, setupState.value);
     errorMessage.value = message;
   };
 
+  /**
+   * Handles session invalidation from backend (401 with admin.auth.invalid).
+   * Clears session state but preserves setup state.
+   */
   const handleSessionLoss = (): void => {
     clearSensitive();
     session.value = null;
-    nextStep.value = AdminNextStep.UNSPECIFIED;
-    currentStep.value = nextStepToUi(AdminNextStep.UNSPECIFIED, setupState.value);
   };
 
+  // Install session invalid handler for connect layer
   installSessionInvalidHandler(handleSessionLoss);
 
+  /**
+   * Restores session state on page load.
+   * Attempts GetCurrentAdminSession first, falls back to GetSetupState on auth error.
+   */
   const restore = async (): Promise<void> => {
     const { token, signal } = beginRequest();
     restoring.value = true;
     errorMessage.value = "";
+
     try {
-      const current = await getCurrentAdminSession();
+      const current = await getCurrentAdminSession({ signal });
+      if (signal.aborted) {
+        return;
+      }
       guardCommit(token, () => {
-        applySession(current.session ?? null, current.nextStep);
+        applySession(current.session ?? null);
         restored.value = true;
         restoring.value = false;
       });
       return;
     } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      // Only fall back to setup state if the error is explicit session invalid
       if (!(error instanceof AdminApiError) || error.businessKey !== "admin.auth.invalid") {
         guardCommit(token, () => {
           failClosed("会话恢复失败，请稍后重试。");
@@ -162,207 +134,227 @@ export const useAuthStore = defineStore("admin-auth", () => {
         return;
       }
     }
+
+    // Session invalid, check setup state
     try {
-      const state = await getSetupState();
+      const state = await getSetupState({ signal });
       if (signal.aborted) {
         return;
       }
       guardCommit(token, () => {
         setupState.value = state.state;
-        currentStep.value = nextStepToUi(AdminNextStep.UNSPECIFIED, state.state);
         session.value = null;
-        nextStep.value = AdminNextStep.UNSPECIFIED;
         restored.value = true;
+        restoring.value = false;
       });
-    } finally {
+    } catch {
+      if (signal.aborted) {
+        return;
+      }
       guardCommit(token, () => {
+        failClosed("无法获取初始化状态，请稍后重试。");
+        restored.value = true;
         restoring.value = false;
       });
     }
   };
 
+  /**
+   * Starts login flow by requesting anonymous challenge.
+   */
   const startLogin = async (): Promise<void> => {
     const { token, signal } = beginRequest();
     const flowId = createRequestId();
-    const response = await beginAdminLogin(flowId);
-    if (signal.aborted) {
-      return;
+    try {
+      const response = await beginAdminLogin(flowId, { signal });
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        requestFlowId.value = flowId;
+        challenge.value = response.challenge ?? null;
+        errorMessage.value = "";
+      });
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        errorMessage.value = error instanceof AdminApiError ? error.message : "登录失败，请稍后重试。";
+      });
     }
-    guardCommit(token, () => {
-      requestFlowId.value = flowId;
-      challenge.value = response.challenge ?? null;
-      currentStep.value = "login";
-      errorMessage.value = "";
-    });
   };
 
+  /**
+   * Submits password for login.
+   * Handles three explicit outcomes: full session, requires_initial_password_change, requires_mfa.
+   */
   const submitPassword = async (password: string): Promise<void> => {
     if (!challenge.value?.challengeProof || !requestFlowId.value) {
       await startLogin();
     }
     const { token, signal } = beginRequest();
-    const response = await loginPassword({
-      challengeProof: challenge.value?.challengeProof ?? "",
-      password,
-      requestFlowId: requestFlowId.value
-    });
-    if (signal.aborted) {
-      return;
+    try {
+      const response = await loginPassword({
+        challengeProof: challenge.value?.challengeProof ?? "",
+        password,
+        requestFlowId: requestFlowId.value,
+        signal
+      });
+      if (signal.aborted) {
+        return;
+      }
+
+      guardCommit(token, () => {
+        switch (response.outcome.case) {
+          case "session":
+            // Full session - user authenticated without additional steps
+            applySession(response.outcome.value);
+            clearSensitive();
+            errorMessage.value = "";
+            break;
+          case "requiresInitialPasswordChange":
+            // User must change initial password
+            applySession(response.outcome.value.session ?? null);
+            clearSensitive();
+            errorMessage.value = "";
+            break;
+          case "requiresMfa":
+            // User must complete MFA challenge
+            applySession(response.outcome.value.session ?? null);
+            clearSensitive();
+            errorMessage.value = "";
+            break;
+          default:
+            errorMessage.value = "登录响应格式错误。";
+        }
+      });
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        errorMessage.value = error instanceof AdminApiError ? error.message : "登录失败，请稍后重试。";
+      });
     }
-    if (response.nextStep === AdminNextStep.AUTHENTICATED) {
-      await syncAuthenticatedSession(token, signal);
-      return;
-    }
-    guardCommit(token, () => {
-      nextStep.value = response.nextStep;
-      currentStep.value = nextStepToUi(response.nextStep, setupState.value);
-      errorMessage.value = "";
-    });
   };
 
+  /**
+   * Submits new password for initial password change.
+   * Transitions from SETUP_PASSWORD_PENDING to FULL session.
+   */
   const submitInitialPassword = async (newPassword: string): Promise<void> => {
     const { token, signal } = beginRequest();
-    const response = await changeInitialPassword(newPassword);
-    if (signal.aborted) {
-      return;
+    try {
+      const response = await changeInitialPassword({ newPassword, signal });
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        applySession(response.session ?? null);
+        clearSensitive();
+        errorMessage.value = "";
+      });
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        errorMessage.value = error instanceof AdminApiError ? error.message : "密码修改失败，请稍后重试。";
+      });
     }
-    if (response.nextStep === AdminNextStep.AUTHENTICATED) {
-      await syncAuthenticatedSession(token, signal);
-      return;
-    }
-    guardCommit(token, () => {
-      nextStep.value = response.nextStep;
-      currentStep.value = nextStepToUi(response.nextStep, setupState.value);
-      clearSensitive();
-    });
   };
 
-  const openTotpEnrollment = async (): Promise<void> => {
-    const response = await beginTotpEnrollment(createRequestId());
-    secretEnvelope.value = {
-      operation: AdminSecretOperation.TOTP_ENROLLMENT,
-      result: response.result ?? null,
-      totpSecret: response.totpSecret,
-      otpauthUri: response.otpauthUri,
-      recoveryCodes: []
-    };
-    currentStep.value = "enrollTotp";
-  };
-
-  const finishTotpEnrollment = async (totpCode: string): Promise<void> => {
-    const current = secretEnvelope.value;
-    if (!current?.result?.operationId) {
-      throw new Error("missing_enrollment_operation");
-    }
-    const response = await completeTotpEnrollment({
-      enrollmentOperationId: current.result.operationId,
-      recoveryCodesOperationId: createRequestId(),
-      totpCode
-    });
-    session.value = response.session ?? null;
-    nextStep.value = response.session?.kind ? nextStepFromKind(response.session.kind) : AdminNextStep.AUTHENTICATED;
-    secretEnvelope.value = {
-      operation: AdminSecretOperation.INITIAL_RECOVERY_CODES,
-      result: response.result ?? null,
-      recoveryCodes: [...response.recoveryCodes]
-    };
-  };
-
+  /**
+   * Submits TOTP code for MFA verification.
+   * Transitions from MFA_PENDING to FULL session.
+   */
   const submitTotp = async (totpCode: string): Promise<void> => {
-    const response = await verifyTotp(totpCode);
-    const current = response.session ?? null;
-    applySession(current, current?.kind ? nextStepFromKind(current.kind) : AdminNextStep.AUTHENTICATED);
-    clearSensitive();
+    const { token, signal } = beginRequest();
+    try {
+      const response = await verifyAdminTotp({ totpCode, signal });
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        applySession(response.session ?? null);
+        clearSensitive();
+        errorMessage.value = "";
+      });
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        errorMessage.value = error instanceof AdminApiError ? error.message : "验证码错误，请重试。";
+      });
+    }
   };
 
+  /**
+   * Submits recovery code for MFA verification.
+   * Transitions from MFA_PENDING to FULL session.
+   */
   const submitRecoveryCode = async (recoveryCode: string): Promise<void> => {
-    const response = await recoverAdmin(recoveryCode);
-    applySession(response.session ?? null, response.nextStep);
-    clearSensitive();
-  };
-
-  const openTotpRebind = async (): Promise<void> => {
-    const response = await beginTotpRebind(createRequestId());
-    secretEnvelope.value = {
-      operation: AdminSecretOperation.TOTP_REBIND,
-      result: response.result ?? null,
-      totpSecret: response.totpSecret,
-      otpauthUri: response.otpauthUri,
-      recoveryCodes: []
-    };
-    currentStep.value = "rebindTotp";
-  };
-
-  const finishTotpRebind = async (totpCode: string): Promise<void> => {
-    const current = secretEnvelope.value;
-    if (!current?.result?.operationId) {
-      throw new Error("missing_rebind_operation");
+    const { token, signal } = beginRequest();
+    try {
+      const response = await verifyAdminRecoveryCode({ recoveryCode, signal });
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        applySession(response.session ?? null);
+        clearSensitive();
+        errorMessage.value = "";
+      });
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      guardCommit(token, () => {
+        errorMessage.value = error instanceof AdminApiError ? error.message : "恢复码错误，请重试。";
+      });
     }
-    const response = await completeTotpRebind({
-      enrollmentOperationId: current.result.operationId,
-      recoveryCodesOperationId: createRequestId(),
-      totpCode
-    });
-    session.value = response.session ?? null;
-    nextStep.value = response.session?.kind ? nextStepFromKind(response.session.kind) : AdminNextStep.AUTHENTICATED;
-    secretEnvelope.value = {
-      operation: AdminSecretOperation.REGENERATE_RECOVERY_CODES,
-      result: response.result ?? null,
-      recoveryCodes: [...response.recoveryCodes]
-    };
   };
 
-  const acknowledgeSecretReceipt = async (): Promise<void> => {
-    const current = secretEnvelope.value;
-    if (!current?.result?.operationId || !current.result.resultId) {
-      return;
-    }
-    await confirmAdminSecretReceipt({
-      operation: current.operation,
-      operationId: current.result.operationId,
-      resultId: current.result.resultId
-    });
-    clearSensitive();
-    currentStep.value = nextStepToUi(nextStep.value, setupState.value);
-  };
-
+  /**
+   * Logs out current session.
+   * Clears all state and sensitive data.
+   */
   const logoutCurrentSession = async (): Promise<void> => {
-    await logoutAdmin();
-    handleSessionLoss();
-  };
-
-  const logoutEverySession = async (): Promise<number> => {
-    const revoked = await logoutAllAdminSessions();
-    handleSessionLoss();
-    return revoked;
+    const { signal } = beginRequest();
+    try {
+      await logoutAdmin({ signal });
+    } finally {
+      handleSessionLoss();
+    }
   };
 
   return {
-    acknowledgeSecretReceipt,
-    challenge,
-    clearSensitive,
-    currentStep,
-    errorMessage,
-    finishTotpEnrollment,
-    finishTotpRebind,
-    isRestricted,
-    logoutCurrentSession,
-    logoutEverySession,
-    nextStep,
-    openTotpEnrollment,
-    openTotpRebind,
-    permissions,
-    requestFlowId,
-    restore,
+    // State
     restored,
     restoring,
-    secretEnvelope,
     session,
     setupState,
+    challenge,
+    requestFlowId,
+    errorMessage,
+    generation,
+    activeController,
+
+    // Computed
+    permissions,
+    isAuthenticated,
+
+    // Actions
+    restore,
     startLogin,
-    submitInitialPassword,
     submitPassword,
+    submitInitialPassword,
+    submitTotp,
     submitRecoveryCode,
-    submitTotp
+    logoutCurrentSession,
+    clearSensitive,
+    applySession
   };
 });

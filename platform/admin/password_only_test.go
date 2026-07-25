@@ -3,61 +3,99 @@ package admin
 import (
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/security"
 )
 
-func TestPasswordLoginSessionStateKeepsMFASecureByDefault(t *testing.T) {
+func TestPasswordLoginSessionKindDependsOnActiveEnrollment(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		status            AccountStatus
-		allowPasswordOnly bool
-		wantKind          SessionKind
-		wantStep          NextStep
-		wantErr           error
+		name                string
+		status              AccountStatus
+		hasActiveEnrollment bool
+		wantKind            SessionKind
+		wantErr             error
 	}{
-		{name: "setup still changes password", status: AccountStatusSetupRequired, allowPasswordOnly: true, wantKind: SessionKindSetupPasswordPending, wantStep: NextStepChangePassword},
-		{name: "active requires MFA by default", status: AccountStatusActive, wantKind: SessionKindMFAPending, wantStep: NextStepVerifyMFA},
-		{name: "active allows password only explicitly", status: AccountStatusActive, allowPasswordOnly: true, wantKind: SessionKindFull, wantStep: NextStepAuthenticated},
-		{name: "recovery can resume with password only", status: AccountStatusRecoveryPending, allowPasswordOnly: true, wantKind: SessionKindFull, wantStep: NextStepAuthenticated},
-		{name: "recovery remains unavailable with MFA", status: AccountStatusRecoveryPending, wantErr: ErrUnavailable},
-		{name: "bootstrap cannot log in", status: AccountStatusBootstrapPending, allowPasswordOnly: true, wantErr: ErrUnavailable},
+		{name: "setup requires initial password change", status: AccountStatusSetupRequired, wantKind: SessionKindSetupPasswordPending},
+		{name: "active without enrollment becomes full", status: AccountStatusActive, wantKind: SessionKindFull},
+		{name: "active with enrollment requires mfa", status: AccountStatusActive, hasActiveEnrollment: true, wantKind: SessionKindMFAPending},
+		{name: "bootstrap cannot log in", status: AccountStatusBootstrapPending, wantErr: ErrUnavailable},
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			kind, step, err := passwordLoginSessionState(test.status, test.allowPasswordOnly)
-			if !errors.Is(err, test.wantErr) || kind != test.wantKind || step != test.wantStep {
-				t.Fatalf("state = (%q, %q, %v), want (%q, %q, %v)", kind, step, err, test.wantKind, test.wantStep, test.wantErr)
+
+			kind, err := PasswordLoginSessionKind(test.status, test.hasActiveEnrollment)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("error = %v, want %v", err, test.wantErr)
+			}
+			if kind != test.wantKind {
+				t.Fatalf("kind = %q, want %q", kind, test.wantKind)
 			}
 		})
 	}
 }
 
-func TestPasswordChangeSessionStateFollowsMFAPolicy(t *testing.T) {
+func TestSetupAndMFAPendingSessionsHaveNoBusinessPermissions(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name              string
-		initial           bool
-		allowPasswordOnly bool
-		wantKind          SessionKind
-		wantStep          NextStep
-	}{
-		{name: "initial requires enrollment by default", initial: true, wantKind: SessionKindTOTPEnrollmentPending, wantStep: NextStepEnrollTOTP},
-		{name: "rotation requires rebind by default", wantKind: SessionKindRecoveryPending, wantStep: NextStepRebindTOTP},
-		{name: "initial password only", initial: true, allowPasswordOnly: true, wantKind: SessionKindFull, wantStep: NextStepAuthenticated},
-		{name: "rotation password only", allowPasswordOnly: true, wantKind: SessionKindFull, wantStep: NextStepAuthenticated},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			kind, step := passwordChangeSessionState(test.initial, test.allowPasswordOnly)
-			if kind != test.wantKind || step != test.wantStep {
-				t.Fatalf("state = (%q, %q), want (%q, %q)", kind, step, test.wantKind, test.wantStep)
-			}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	authorizer := NewAdminAuthorizer()
+	for _, kind := range []SessionKind{SessionKindSetupPasswordPending, SessionKindMFAPending} {
+		session, err := RestoreSession(SessionSnapshot{
+			ID:                uuid.New(),
+			AdminID:           uuid.New(),
+			Selector:          "AAAAAAAAAAAAAAAAAAAAAA",
+			SecretMAC:         security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+			CSRFHash:          security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+			Kind:              kind,
+			AdminVersion:      2,
+			PasswordVersion:   1,
+			SessionVersion:    1,
+			MaxAttempts:       5,
+			CreatedAt:         now,
+			LastSeenAt:        now,
+			IdleExpiresAt:     now.Add(time.Minute),
+			AbsoluteExpiresAt: now.Add(time.Hour),
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := authorizer.Authorize(session, PermissionSecurityRead, fixedClock{now: now}); !errors.Is(err, ErrPermissionDenied) {
+			t.Fatalf("kind %q should not authorize business permissions, got %v", kind, err)
+		}
+	}
+}
+
+func TestAdminAuthorizerFailsClosedForUnknownPermissions(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	session, err := RestoreSession(SessionSnapshot{
+		ID:                uuid.New(),
+		AdminID:           uuid.New(),
+		Selector:          "AAAAAAAAAAAAAAAAAAAAAA",
+		SecretMAC:         security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		CSRFHash:          security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: 1, Value: make([]byte, 32)},
+		Kind:              SessionKindFull,
+		AdminVersion:      2,
+		PasswordVersion:   1,
+		SessionVersion:    4,
+		MaxAttempts:       5,
+		CreatedAt:         now,
+		LastSeenAt:        now,
+		IdleExpiresAt:     now.Add(time.Minute),
+		AbsoluteExpiresAt: now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewAdminAuthorizer().Authorize(session, Permission("legacy.permission"), fixedClock{now: now}); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("expected fail-closed denial, got %v", err)
 	}
 }

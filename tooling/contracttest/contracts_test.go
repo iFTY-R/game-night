@@ -36,34 +36,22 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"GetRuntimeReadiness",
 		"BeginAdminLogin",
 		"LoginPassword",
-		"VerifyTotp",
+		"VerifyAdminTotp",
+		"VerifyAdminRecoveryCode",
 		"ChangeInitialPassword",
+		"ChangeAdminPassword",
 		"BeginTotpEnrollment",
 		"CompleteTotpEnrollment",
-		"ConfirmAdminSecretReceipt",
-		"RecoverAdmin",
-		"ChangeAdminPassword",
-		"BeginTotpRebind",
-		"CompleteTotpRebind",
+		"DisableTotp",
 		"RegenerateAdminRecoveryCodes",
+		"ConfirmAdminSecretReceipt",
+		"ElevateAdminSession",
+		"RevokeCurrentAdminElevation",
+		"ListAdminSessions",
+		"RevokeAdminSession",
+		"PreviewRevokeOtherAdminSessions",
+		"RevokeOtherAdminSessions",
 		"LogoutAdmin",
-		"LogoutAllAdminSessions",
-	})
-	assertServiceMethods(t, adminv1.File_platform_admin_v1_admin_identity_proto, "AdminIdentityService", []string{
-		"GetUser",
-		"GetRealName",
-		"UpdateRealName",
-		"CreateUserProfileExport",
-		"GetUserProfileExportPage",
-		"CompleteUserProfileExport",
-		"AbortUserProfileExport",
-		"CreateAssistedRecoveryGrant",
-		"ForceChangeUsername",
-		"SuspendUser",
-		"UnsuspendUser",
-		"DeleteUser",
-		"RevokeUserDevice",
-		"ListAuditEvents",
 	})
 	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
 		"CreateRoom",
@@ -142,6 +130,11 @@ func TestBusinessErrorCodesMatchApprovedContract(t *testing.T) {
 		"BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE",
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT",
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE",
+		"BUSINESS_ERROR_CODE_ELEVATION_REQUIRED",
+		"BUSINESS_ERROR_CODE_ELEVATION_EXPIRED",
+		"BUSINESS_ERROR_CODE_VERSION_CONFLICT",
+		"BUSINESS_ERROR_CODE_RECOVERY_CODE_EXHAUSTED",
+		"BUSINESS_ERROR_CODE_MFA_STATE_CONFLICT",
 		"BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_EXISTS",
 		"BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_NOT_FOUND",
 		"BUSINESS_ERROR_CODE_ROOM_GAME_ALREADY_PAUSED",
@@ -230,6 +223,52 @@ func assertPauseFieldName(t *testing.T, field protoreflect.FieldDescriptor, want
 	}
 }
 
+func TestAuditActionContractShape(t *testing.T) {
+	t.Parallel()
+
+	assertEnumValues(t, auditv1.File_platform_audit_v1_audit_proto.Enums().ByName("AuditAction"), []string{
+		"AUDIT_ACTION_UNSPECIFIED",
+		"AUDIT_ACTION_IDENTITY_ONBOARDED",
+		"AUDIT_ACTION_IDENTITY_RECOVERED",
+		"AUDIT_ACTION_RECOVERY_CODE_ROTATED",
+		"AUDIT_ACTION_DEVICE_REVOKED",
+		"AUDIT_ACTION_USERNAME_CHANGED",
+		"AUDIT_ACTION_USERNAME_FORCE_CHANGED",
+		"AUDIT_ACTION_USER_SUSPENDED",
+		"AUDIT_ACTION_USER_UNSUSPENDED",
+		"AUDIT_ACTION_USER_DELETED",
+		"AUDIT_ACTION_ASSISTED_RECOVERY_CREATED",
+		"AUDIT_ACTION_REAL_NAME_READ",
+		"AUDIT_ACTION_REAL_NAME_UPDATED",
+		"AUDIT_ACTION_PROFILE_EXPORT_CREATED",
+		"AUDIT_ACTION_PROFILE_EXPORT_PAGE_READ",
+		"AUDIT_ACTION_PROFILE_EXPORT_COMPLETED",
+		"AUDIT_ACTION_PROFILE_EXPORT_ABORTED",
+		"AUDIT_ACTION_PROFILE_EXPORT_EXPIRED",
+		"AUDIT_ACTION_ADMIN_SETUP_COMPLETED",
+		"AUDIT_ACTION_ADMIN_PASSWORD_CHANGED",
+		"AUDIT_ACTION_ADMIN_TOTP_REBOUND",
+		"AUDIT_ACTION_ADMIN_RECOVERY_USED",
+		"AUDIT_ACTION_ADMIN_SESSIONS_REVOKED",
+		"AUDIT_ACTION_ADMIN_OFFLINE_RESET",
+		"AUDIT_ACTION_AUDIT_EVENTS_READ",
+		"AUDIT_ACTION_KEY_ROTATION_STARTED",
+		"AUDIT_ACTION_KEY_ROTATION_BATCH_COMPLETED",
+		"AUDIT_ACTION_KEY_ROTATION_COMPLETED",
+		"AUDIT_ACTION_ADMIN_MFA_ENABLED",
+		"AUDIT_ACTION_ADMIN_MFA_DISABLED",
+		"AUDIT_ACTION_ADMIN_RECOVERY_CODES_REGENERATED",
+		"AUDIT_ACTION_ADMIN_SESSION_ELEVATED",
+		"AUDIT_ACTION_ADMIN_ELEVATION_REVOKED",
+		"AUDIT_ACTION_ADMIN_LOGIN_SUCCEEDED",
+		"AUDIT_ACTION_ADMIN_LOGIN_FAILED",
+		"AUDIT_ACTION_ADMIN_SECRET_RESULT_OPENED",
+		"AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED",
+		"AUDIT_ACTION_ADMIN_ELEVATION_DENIED",
+		"AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED",
+	})
+}
+
 func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 	t.Parallel()
 
@@ -237,8 +276,8 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		commonv1.File_platform_common_v1_common_proto,
 		commonv1.File_platform_common_v1_error_proto,
 		identityv1.File_platform_identity_v1_identity_proto,
+		adminv1.File_platform_admin_v1_admin_common_proto,
 		adminv1.File_platform_admin_v1_admin_auth_proto,
-		adminv1.File_platform_admin_v1_admin_identity_proto,
 		auditv1.File_platform_audit_v1_audit_proto,
 		roomv1.File_platform_room_v1_room_proto,
 	}
@@ -246,6 +285,98 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		assertEnumsHaveUnspecifiedZero(t, file.Enums(), file.Path())
 		assertMessagesUsePortableFields(t, file.Messages(), file.Path())
 	}
+}
+
+func TestAdminCommonContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_common_proto
+	assertEnumValues(t, file.Enums().ByName("AdminAccountState"), []string{
+		"ADMIN_ACCOUNT_STATE_UNSPECIFIED",
+		"ADMIN_ACCOUNT_STATE_BOOTSTRAP_PENDING",
+		"ADMIN_ACCOUNT_STATE_SETUP_REQUIRED",
+		"ADMIN_ACCOUNT_STATE_ACTIVE",
+	})
+	assertEnumValues(t, file.Enums().ByName("AdminSessionKind"), []string{
+		"ADMIN_SESSION_KIND_UNSPECIFIED",
+		"ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING",
+		"ADMIN_SESSION_KIND_MFA_PENDING",
+		"ADMIN_SESSION_KIND_FULL",
+	})
+	assertEnumValues(t, file.Enums().ByName("AdminPermission"), []string{
+		"ADMIN_PERMISSION_UNSPECIFIED",
+		"ADMIN_PERMISSION_OVERVIEW_READ",
+		"ADMIN_PERMISSION_USERS_READ",
+		"ADMIN_PERMISSION_USERS_READ_PII",
+		"ADMIN_PERMISSION_USERS_ANNOTATE",
+		"ADMIN_PERMISSION_USERS_GOVERN",
+		"ADMIN_PERMISSION_USERS_EXPORT",
+		"ADMIN_PERMISSION_ROOMS_READ",
+		"ADMIN_PERMISSION_ROOMS_CONTROL",
+		"ADMIN_PERMISSION_GAMES_READ",
+		"ADMIN_PERMISSION_GAMES_CONTROL",
+		"ADMIN_PERMISSION_GAMES_REPAIR",
+		"ADMIN_PERMISSION_SECURITY_READ",
+		"ADMIN_PERMISSION_SECURITY_MANAGE_PASSWORD",
+		"ADMIN_PERMISSION_SECURITY_MANAGE_MFA",
+		"ADMIN_PERMISSION_SECURITY_MANAGE_SESSIONS",
+		"ADMIN_PERMISSION_AUDIT_READ",
+		"ADMIN_PERMISSION_AUDIT_EXPORT",
+		"ADMIN_PERMISSION_OPERATIONS_READ",
+		"ADMIN_PERMISSION_OPERATIONS_MAINTAIN",
+	})
+	assertEnumValues(t, file.Enums().ByName("AdminElevationScope"), []string{
+		"ADMIN_ELEVATION_SCOPE_UNSPECIFIED",
+		"ADMIN_ELEVATION_SCOPE_USERS_BULK_GOVERNANCE",
+		"ADMIN_ELEVATION_SCOPE_USERS_REVOKE_DEVICES",
+		"ADMIN_ELEVATION_SCOPE_USERS_DELETE",
+		"ADMIN_ELEVATION_SCOPE_ROOMS_FORCE_CLOSE",
+		"ADMIN_ELEVATION_SCOPE_GAMES_FORCE_TERMINATE",
+		"ADMIN_ELEVATION_SCOPE_GAMES_EMERGENCY_REPAIR",
+		"ADMIN_ELEVATION_SCOPE_OPERATIONS_MAINTENANCE",
+		"ADMIN_ELEVATION_SCOPE_SECURITY_DISABLE_MFA",
+		"ADMIN_ELEVATION_SCOPE_SECURITY_REGENERATE_RECOVERY_CODES",
+		"ADMIN_ELEVATION_SCOPE_SECURITY_REVOKE_SESSIONS",
+		"ADMIN_ELEVATION_SCOPE_AUDIT_EXPORT_SENSITIVE",
+	})
+
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminElevationSummary"), []fieldShape{
+		{name: "scope", kind: protoreflect.EnumKind, typeName: "platform.admin.v1.AdminElevationScope"},
+		{name: "granted_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "expires_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminMfaState"), []fieldShape{
+		{name: "enabled", kind: protoreflect.BoolKind},
+		{name: "recovery_codes_remaining", kind: protoreflect.Int32Kind},
+		{name: "enrollment_version", kind: protoreflect.Uint64Kind},
+		{name: "recovery_codes_version", kind: protoreflect.Uint64Kind},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminSessionSummary"), []fieldShape{
+		{name: "admin_id", kind: protoreflect.StringKind},
+		{name: "session_id", kind: protoreflect.StringKind},
+		{name: "kind", kind: protoreflect.EnumKind, typeName: "platform.admin.v1.AdminSessionKind"},
+		{name: "permissions", kind: protoreflect.EnumKind, list: true, typeName: "platform.admin.v1.AdminPermission"},
+		{name: "mfa", kind: protoreflect.MessageKind, typeName: "platform.admin.v1.AdminMfaState"},
+		{name: "elevations", kind: protoreflect.MessageKind, list: true, typeName: "platform.admin.v1.AdminElevationSummary"},
+		{name: "admin_version", kind: protoreflect.Uint64Kind},
+		{name: "password_version", kind: protoreflect.Uint64Kind},
+		{name: "session_version", kind: protoreflect.Uint64Kind},
+		{name: "idle_expires_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "absolute_expires_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminSessionInfo"), []fieldShape{
+		{name: "session_id", kind: protoreflect.StringKind},
+		{name: "kind", kind: protoreflect.EnumKind, typeName: "platform.admin.v1.AdminSessionKind"},
+		{name: "current", kind: protoreflect.BoolKind},
+		{name: "session_version", kind: protoreflect.Uint64Kind},
+		{name: "created_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "last_activity_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "idle_expires_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "absolute_expires_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "client_ip", kind: protoreflect.StringKind},
+		{name: "user_agent", kind: protoreflect.StringKind},
+		{name: "active_elevation_scopes", kind: protoreflect.EnumKind, list: true, typeName: "platform.admin.v1.AdminElevationScope"},
+	})
 }
 
 func TestAdminCurrentSessionContractShape(t *testing.T) {
@@ -261,15 +392,53 @@ func TestAdminCurrentSessionContractShape(t *testing.T) {
 	if response == nil {
 		t.Fatal("GetCurrentAdminSessionResponse is missing")
 	}
-	if response.Fields().Len() != 2 {
+	if response.Fields().Len() != 1 {
 		t.Fatalf("GetCurrentAdminSessionResponse field count = %d", response.Fields().Len())
 	}
 	if field := response.Fields().ByNumber(1); field == nil || string(field.Name()) != "session" {
 		t.Fatalf("field 1 = %v", field)
 	}
-	if field := response.Fields().ByNumber(2); field == nil || string(field.Name()) != "next_step" {
-		t.Fatalf("field 2 = %v", field)
+	if field := response.Fields().ByName("next_step"); field != nil {
+		t.Fatalf("GetCurrentAdminSessionResponse must not expose next_step: %v", field)
 	}
+}
+
+func TestAdminLoginPasswordOutcomeContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_auth_proto
+	response := file.Messages().ByName("LoginPasswordResponse")
+	if response == nil {
+		t.Fatal("LoginPasswordResponse is missing")
+	}
+	if response.Oneofs().Len() != 1 {
+		t.Fatalf("LoginPasswordResponse oneof count = %d", response.Oneofs().Len())
+	}
+	outcome := response.Oneofs().ByName("outcome")
+	if outcome == nil || outcome.Fields().Len() != 3 {
+		t.Fatalf("LoginPasswordResponse outcome = %v", outcome)
+	}
+	assertFieldName(t, outcome.Fields().ByNumber(1), "requires_initial_password_change")
+	assertFieldName(t, outcome.Fields().ByNumber(2), "requires_mfa")
+	assertFieldName(t, outcome.Fields().ByNumber(3), "session")
+}
+
+func TestAdminSessionRevocationCommandShapes(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_auth_proto
+	assertMessageFields(t, file.Messages().ByName("RevokeAdminSessionRequest"),
+		"operation_id",
+		"session_id",
+		"expected_session_version",
+	)
+	assertMessageFields(t, file.Messages().ByName("PreviewRevokeOtherAdminSessionsRequest"))
+	assertMessageFields(t, file.Messages().ByName("RevokeOtherAdminSessionsRequest"),
+		"operation_id",
+		"preview_version",
+		"expected_admin_version",
+		"expected_current_session_version",
+	)
 }
 
 func TestAdminRuntimeReadinessContractShape(t *testing.T) {
@@ -361,6 +530,82 @@ func assertMessagesUsePortableFields(t *testing.T, messages protoreflect.Message
 					t.Errorf("%s: time field %s must use google.protobuf.Timestamp", owner, field.FullName())
 				}
 			}
+		}
+	}
+}
+
+func assertMessageFields(t *testing.T, message protoreflect.MessageDescriptor, want ...string) {
+	t.Helper()
+
+	if message == nil {
+		t.Fatal("message descriptor is missing")
+	}
+	if message.Fields().Len() != len(want) {
+		t.Fatalf("%s: expected %d fields, got %d", message.FullName(), len(want), message.Fields().Len())
+	}
+	for index, name := range want {
+		assertFieldName(t, message.Fields().ByNumber(protoreflect.FieldNumber(index+1)), name)
+	}
+}
+
+func assertFieldName(t *testing.T, field protoreflect.FieldDescriptor, want string) {
+	t.Helper()
+
+	if field == nil || string(field.Name()) != want {
+		t.Fatalf("expected field %q, got %v", want, field)
+	}
+}
+
+type fieldShape struct {
+	name     string
+	kind     protoreflect.Kind
+	list     bool
+	typeName protoreflect.FullName
+}
+
+func assertEnumValues(t *testing.T, enum protoreflect.EnumDescriptor, want []string) {
+	t.Helper()
+
+	if enum == nil {
+		t.Fatal("enum descriptor is missing")
+	}
+	if enum.Values().Len() != len(want) {
+		t.Fatalf("%s: expected %d values, got %d", enum.FullName(), len(want), enum.Values().Len())
+	}
+	for index, name := range want {
+		value := enum.Values().Get(index)
+		if got := string(value.Name()); got != name || value.Number() != protoreflect.EnumNumber(index) {
+			t.Fatalf("%s value %d: expected %q = %d, got %q = %d", enum.FullName(), index, name, index, value.Name(), value.Number())
+		}
+	}
+}
+
+func assertMessageFieldShapes(t *testing.T, message protoreflect.MessageDescriptor, want []fieldShape) {
+	t.Helper()
+
+	if message == nil {
+		t.Fatal("message descriptor is missing")
+	}
+	if message.Fields().Len() != len(want) {
+		t.Fatalf("%s: expected %d fields, got %d", message.FullName(), len(want), message.Fields().Len())
+	}
+	for index, expected := range want {
+		field := message.Fields().ByNumber(protoreflect.FieldNumber(index + 1))
+		if field == nil || string(field.Name()) != expected.name || field.Kind() != expected.kind || field.IsList() != expected.list {
+			t.Fatalf("%s field %d: expected %+v, got %v", message.FullName(), index+1, expected, field)
+		}
+		if expected.typeName == "" {
+			continue
+		}
+		var got protoreflect.FullName
+		switch field.Kind() {
+		case protoreflect.EnumKind:
+			got = field.Enum().FullName()
+		case protoreflect.MessageKind:
+			got = field.Message().FullName()
+		}
+		if got != expected.typeName {
+			t.Fatalf("%s field %d: expected type %s, got %s", message.FullName(), index+1, expected.typeName, got)
 		}
 	}
 }

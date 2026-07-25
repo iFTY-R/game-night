@@ -30,7 +30,6 @@ var supportedOperations = [...]ratelimit.Operation{
 	ratelimit.OperationAdminSecondFactor,
 	ratelimit.OperationRealNameRead,
 	ratelimit.OperationRealNameUpdate,
-	ratelimit.OperationProfileExport,
 }
 
 // StandardRules returns conservative security defaults; callers receive an independent map for tests or reviewed tuning.
@@ -72,10 +71,6 @@ func StandardRules() Rules {
 		ratelimit.OperationRealNameUpdate: {
 			ratelimit.DimensionAdminSession: standardRule(20, 3*time.Second),
 			ratelimit.DimensionTargetUser:   standardRule(10, 6*time.Second),
-		},
-		ratelimit.OperationProfileExport: {
-			ratelimit.DimensionAdminSession: standardRule(10, time.Minute),
-			ratelimit.DimensionTargetUser:   standardRule(5, 2*time.Minute),
 		},
 	}
 }

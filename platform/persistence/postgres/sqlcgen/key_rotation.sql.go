@@ -262,11 +262,9 @@ func (q *Queries) CompleteKeyRotationJobCAS(ctx context.Context, arg CompleteKey
 }
 
 const countPIIKeyReferences = `-- name: CountPIIKeyReferences :one
-SELECT (
-    (SELECT count(*) FROM user_profiles AS profile WHERE profile.real_name_key_version = $1)
-    +
-    (SELECT count(*) FROM profile_export_items AS item WHERE item.real_name_key_version = $1)
-)::bigint AS reference_count
+SELECT count(*)::bigint AS reference_count
+FROM user_profiles
+WHERE real_name_key_version = $1
 `
 
 type CountPIIKeyReferencesParams struct {
@@ -275,11 +273,9 @@ type CountPIIKeyReferencesParams struct {
 
 // CountPIIKeyReferences
 //
-//	SELECT (
-//	    (SELECT count(*) FROM user_profiles AS profile WHERE profile.real_name_key_version = $1)
-//	    +
-//	    (SELECT count(*) FROM profile_export_items AS item WHERE item.real_name_key_version = $1)
-//	)::bigint AS reference_count
+//	SELECT count(*)::bigint AS reference_count
+//	FROM user_profiles
+//	WHERE real_name_key_version = $1
 func (q *Queries) CountPIIKeyReferences(ctx context.Context, arg CountPIIKeyReferencesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countPIIKeyReferences, arg.KeyVersion)
 	var reference_count int64
@@ -532,6 +528,21 @@ type ListAdminTotpEnrollmentsForKeyRotationParams struct {
 	BatchSize         int32       `json:"batch_size"`
 }
 
+type ListAdminTotpEnrollmentsForKeyRotationRow struct {
+	EnrollmentID pgtype.UUID        `json:"enrollment_id"`
+	AdminID      pgtype.UUID        `json:"admin_id"`
+	Ciphertext   []byte             `json:"ciphertext"`
+	Nonce        []byte             `json:"nonce"`
+	KeyVersion   int32              `json:"key_version"`
+	Status       string             `json:"status"`
+	AdminVersion int64              `json:"admin_version"`
+	OperationID  string             `json:"operation_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	ActivatedAt  pgtype.Timestamptz `json:"activated_at"`
+	DisabledAt   pgtype.Timestamptz `json:"disabled_at"`
+}
+
 // ListAdminTotpEnrollmentsForKeyRotation
 //
 //	SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
@@ -542,15 +553,15 @@ type ListAdminTotpEnrollmentsForKeyRotationParams struct {
 //	  AND ($2::uuid IS NULL OR enrollment_id > $2::uuid)
 //	ORDER BY enrollment_id
 //	LIMIT $3
-func (q *Queries) ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, arg ListAdminTotpEnrollmentsForKeyRotationParams) ([]AdminTotpEnrollment, error) {
+func (q *Queries) ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, arg ListAdminTotpEnrollmentsForKeyRotationParams) ([]ListAdminTotpEnrollmentsForKeyRotationRow, error) {
 	rows, err := q.db.Query(ctx, listAdminTotpEnrollmentsForKeyRotation, arg.SourceKeyVersion, arg.AfterEnrollmentID, arg.BatchSize)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AdminTotpEnrollment{}
+	items := []ListAdminTotpEnrollmentsForKeyRotationRow{}
 	for rows.Next() {
-		var i AdminTotpEnrollment
+		var i ListAdminTotpEnrollmentsForKeyRotationRow
 		if err := rows.Scan(
 			&i.EnrollmentID,
 			&i.AdminID,
@@ -577,11 +588,7 @@ func (q *Queries) ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, ar
 
 const listPIIKeyVersionsWithReferences = `-- name: ListPIIKeyVersionsWithReferences :many
 SELECT DISTINCT real_name_key_version
-FROM (
-    SELECT real_name_key_version FROM user_profiles
-    UNION ALL
-    SELECT real_name_key_version FROM profile_export_items
-) AS key_refs
+FROM user_profiles
 WHERE real_name_key_version IS NOT NULL
 ORDER BY real_name_key_version
 `
@@ -589,11 +596,7 @@ ORDER BY real_name_key_version
 // ListPIIKeyVersionsWithReferences
 //
 //	SELECT DISTINCT real_name_key_version
-//	FROM (
-//	    SELECT real_name_key_version FROM user_profiles
-//	    UNION ALL
-//	    SELECT real_name_key_version FROM profile_export_items
-//	) AS key_refs
+//	FROM user_profiles
 //	WHERE real_name_key_version IS NOT NULL
 //	ORDER BY real_name_key_version
 func (q *Queries) ListPIIKeyVersionsWithReferences(ctx context.Context) ([]int32, error) {
@@ -609,87 +612,6 @@ func (q *Queries) ListPIIKeyVersionsWithReferences(ctx context.Context) ([]int32
 			return nil, err
 		}
 		items = append(items, real_name_key_version)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listProfileExportItemsForKeyRotation = `-- name: ListProfileExportItemsForKeyRotation :many
-SELECT export_id, ordinal, user_id, profile_version, real_name_ciphertext,
-       real_name_nonce, real_name_key_version
-FROM profile_export_items
-WHERE real_name_key_version = $1
-  AND (
-      $2::uuid IS NULL
-      OR (export_id, ordinal) > (
-          $2::uuid,
-          $3::bigint
-      )
-  )
-ORDER BY export_id, ordinal
-LIMIT $4
-`
-
-type ListProfileExportItemsForKeyRotationParams struct {
-	SourceKeyVersion pgtype.Int4 `json:"source_key_version"`
-	AfterExportID    pgtype.UUID `json:"after_export_id"`
-	AfterOrdinal     pgtype.Int8 `json:"after_ordinal"`
-	BatchSize        int32       `json:"batch_size"`
-}
-
-type ListProfileExportItemsForKeyRotationRow struct {
-	ExportID           pgtype.UUID `json:"export_id"`
-	Ordinal            int64       `json:"ordinal"`
-	UserID             pgtype.UUID `json:"user_id"`
-	ProfileVersion     pgtype.Int8 `json:"profile_version"`
-	RealNameCiphertext []byte      `json:"real_name_ciphertext"`
-	RealNameNonce      []byte      `json:"real_name_nonce"`
-	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
-}
-
-// ListProfileExportItemsForKeyRotation
-//
-//	SELECT export_id, ordinal, user_id, profile_version, real_name_ciphertext,
-//	       real_name_nonce, real_name_key_version
-//	FROM profile_export_items
-//	WHERE real_name_key_version = $1
-//	  AND (
-//	      $2::uuid IS NULL
-//	      OR (export_id, ordinal) > (
-//	          $2::uuid,
-//	          $3::bigint
-//	      )
-//	  )
-//	ORDER BY export_id, ordinal
-//	LIMIT $4
-func (q *Queries) ListProfileExportItemsForKeyRotation(ctx context.Context, arg ListProfileExportItemsForKeyRotationParams) ([]ListProfileExportItemsForKeyRotationRow, error) {
-	rows, err := q.db.Query(ctx, listProfileExportItemsForKeyRotation,
-		arg.SourceKeyVersion,
-		arg.AfterExportID,
-		arg.AfterOrdinal,
-		arg.BatchSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListProfileExportItemsForKeyRotationRow{}
-	for rows.Next() {
-		var i ListProfileExportItemsForKeyRotationRow
-		if err := rows.Scan(
-			&i.ExportID,
-			&i.Ordinal,
-			&i.UserID,
-			&i.ProfileVersion,
-			&i.RealNameCiphertext,
-			&i.RealNameNonce,
-			&i.RealNameKeyVersion,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -955,62 +877,6 @@ func (q *Queries) RotateAdminTotpEnrollmentCiphertextCAS(ctx context.Context, ar
 		&i.KeyVersion,
 		&i.Status,
 		&i.AdminVersion,
-	)
-	return i, err
-}
-
-const rotateProfileExportItemCiphertextCAS = `-- name: RotateProfileExportItemCiphertextCAS :one
-UPDATE profile_export_items
-SET real_name_ciphertext = $1,
-    real_name_nonce = $2,
-    real_name_key_version = $3
-WHERE export_id = $4
-  AND ordinal = $5
-  AND real_name_key_version = $6
-RETURNING export_id, ordinal, user_id, real_name_key_version
-`
-
-type RotateProfileExportItemCiphertextCASParams struct {
-	RealNameCiphertext []byte      `json:"real_name_ciphertext"`
-	RealNameNonce      []byte      `json:"real_name_nonce"`
-	TargetKeyVersion   pgtype.Int4 `json:"target_key_version"`
-	ExportID           pgtype.UUID `json:"export_id"`
-	Ordinal            int64       `json:"ordinal"`
-	SourceKeyVersion   pgtype.Int4 `json:"source_key_version"`
-}
-
-type RotateProfileExportItemCiphertextCASRow struct {
-	ExportID           pgtype.UUID `json:"export_id"`
-	Ordinal            int64       `json:"ordinal"`
-	UserID             pgtype.UUID `json:"user_id"`
-	RealNameKeyVersion pgtype.Int4 `json:"real_name_key_version"`
-}
-
-// RotateProfileExportItemCiphertextCAS
-//
-//	UPDATE profile_export_items
-//	SET real_name_ciphertext = $1,
-//	    real_name_nonce = $2,
-//	    real_name_key_version = $3
-//	WHERE export_id = $4
-//	  AND ordinal = $5
-//	  AND real_name_key_version = $6
-//	RETURNING export_id, ordinal, user_id, real_name_key_version
-func (q *Queries) RotateProfileExportItemCiphertextCAS(ctx context.Context, arg RotateProfileExportItemCiphertextCASParams) (RotateProfileExportItemCiphertextCASRow, error) {
-	row := q.db.QueryRow(ctx, rotateProfileExportItemCiphertextCAS,
-		arg.RealNameCiphertext,
-		arg.RealNameNonce,
-		arg.TargetKeyVersion,
-		arg.ExportID,
-		arg.Ordinal,
-		arg.SourceKeyVersion,
-	)
-	var i RotateProfileExportItemCiphertextCASRow
-	err := row.Scan(
-		&i.ExportID,
-		&i.Ordinal,
-		&i.UserID,
-		&i.RealNameKeyVersion,
 	)
 	return i, err
 }

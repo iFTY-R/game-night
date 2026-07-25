@@ -12,30 +12,54 @@ import (
 )
 
 const (
-	adminSessionTokenVersion    = "v1"
-	adminSessionSelectorBytes   = 16
-	adminSessionSecretBytes     = 32
-	adminSessionCSRFBytes       = 32
-	AdminSetupSessionTTL        = 10 * time.Minute
-	AdminMFASessionTTL          = 5 * time.Minute
-	AdminRecoverySessionTTL     = 10 * time.Minute
-	AdminFullSessionIdleTTL     = 30 * time.Minute
+	adminSessionTokenVersion  = "v1"
+	adminSessionSelectorBytes = 16
+	adminSessionSecretBytes   = 32
+	adminSessionCSRFBytes     = 32
+	// AdminSetupSessionTTL caps the initial-password-change window so stale bootstrap credentials cannot linger.
+	AdminSetupSessionTTL = 10 * time.Minute
+	// AdminMFASessionTTL caps the second-factor verification window to a short-lived challenge session.
+	AdminMFASessionTTL = 5 * time.Minute
+	// AdminFullSessionIdleTTL is the rolling inactivity limit for a fully authenticated admin browser session.
+	AdminFullSessionIdleTTL = 30 * time.Minute
+	// AdminFullSessionAbsoluteTTL is the hard maximum age for a full admin browser session.
 	AdminFullSessionAbsoluteTTL = 12 * time.Hour
 )
 
-// SessionPolicy keeps short-lived elevation tokens distinct from the long-lived full session.
+// SessionClientMetadata keeps the normalized client hints later persistence needs for session management UX.
+type SessionClientMetadata struct {
+	ClientIP  string
+	UserAgent string
+}
+
+// SessionPolicy keeps short-lived setup and MFA sessions distinct from the long-lived full session.
 func SessionPolicy(kind SessionKind) (idleTTL, absoluteTTL time.Duration, err error) {
 	switch kind {
-	case SessionKindSetupPasswordPending, SessionKindTOTPEnrollmentPending:
+	case SessionKindSetupPasswordPending:
 		return AdminSetupSessionTTL, AdminSetupSessionTTL, nil
 	case SessionKindMFAPending:
 		return AdminMFASessionTTL, AdminMFASessionTTL, nil
-	case SessionKindRecoveryPending:
-		return AdminRecoverySessionTTL, AdminRecoverySessionTTL, nil
 	case SessionKindFull:
 		return AdminFullSessionIdleTTL, AdminFullSessionAbsoluteTTL, nil
 	default:
 		return 0, 0, ErrInvalidInput
+	}
+}
+
+// PasswordLoginSessionKind derives the post-password session kind from durable account state and active enrollment.
+func PasswordLoginSessionKind(status AccountStatus, hasActiveEnrollment bool) (SessionKind, error) {
+	switch status {
+	case AccountStatusSetupRequired:
+		return SessionKindSetupPasswordPending, nil
+	case AccountStatusActive:
+		if hasActiveEnrollment {
+			return SessionKindMFAPending, nil
+		}
+		return SessionKindFull, nil
+	case AccountStatusBootstrapPending:
+		return "", ErrUnavailable
+	default:
+		return "", ErrInvalidInput
 	}
 }
 
@@ -52,6 +76,7 @@ type SessionService struct {
 	clock   interface{ Now() time.Time }
 }
 
+// NewSessionService creates the bearer-token helper used by the admin auth flows.
 func NewSessionService(keyring *security.HMACKeyring[security.AdminSessionKeyPurpose], source interface{ Now() time.Time }) (*SessionService, error) {
 	if keyring == nil || source == nil {
 		return nil, ErrInvalidInput
@@ -59,8 +84,13 @@ func NewSessionService(keyring *security.HMACKeyring[security.AdminSessionKeyPur
 	return &SessionService{keyring: keyring, clock: source}, nil
 }
 
-// Issue creates a session bound to current account generations and never stores the raw bearer values.
+// Issue keeps backward compatibility for legacy callers while new persistence starts storing client metadata.
 func (service *SessionService) Issue(adminID uuid.UUID, kind SessionKind, adminVersion, passwordVersion int64, at time.Time) (IssuedSession, error) {
+	return service.IssueWithClient(adminID, kind, adminVersion, passwordVersion, SessionClientMetadata{}, at)
+}
+
+// IssueWithClient creates a session bound to current account generations and normalized client metadata.
+func (service *SessionService) IssueWithClient(adminID uuid.UUID, kind SessionKind, adminVersion, passwordVersion int64, metadata SessionClientMetadata, at time.Time) (IssuedSession, error) {
 	if service == nil || service.keyring == nil || adminID == uuid.Nil || !kind.Valid() || adminVersion <= 0 || passwordVersion < 0 {
 		return IssuedSession{}, ErrInvalidInput
 	}
@@ -99,11 +129,25 @@ func (service *SessionService) Issue(adminID uuid.UUID, kind SessionKind, adminV
 	if err != nil {
 		return IssuedSession{}, err
 	}
-	at = at.Round(0).UTC()
+	metadata = normalizeSessionClientMetadata(metadata)
+	at = canonicalAdminTime(at)
 	session, err := RestoreSession(SessionSnapshot{
-		ID: id, AdminID: adminID, Selector: selector.Value(), SecretMAC: secretMAC, CSRFHash: csrfMAC,
-		Kind: kind, AdminVersion: adminVersion, PasswordVersion: passwordVersion, MaxAttempts: 5,
-		CreatedAt: at, LastSeenAt: at, IdleExpiresAt: at.Add(idleTTL), AbsoluteExpiresAt: at.Add(absoluteTTL),
+		ID:                id,
+		AdminID:           adminID,
+		Selector:          selector.Value(),
+		SecretMAC:         secretMAC,
+		CSRFHash:          csrfMAC,
+		Kind:              kind,
+		AdminVersion:      adminVersion,
+		PasswordVersion:   passwordVersion,
+		SessionVersion:    1,
+		ClientIP:          metadata.ClientIP,
+		UserAgent:         metadata.UserAgent,
+		MaxAttempts:       5,
+		CreatedAt:         at,
+		LastSeenAt:        at,
+		IdleExpiresAt:     at.Add(idleTTL),
+		AbsoluteExpiresAt: at.Add(absoluteTTL),
 	})
 	if err != nil {
 		return IssuedSession{}, err
@@ -165,6 +209,12 @@ func (service *SessionService) ResultGrant(session Session, resultID uuid.UUID, 
 		validUntil = snapshot.AbsoluteExpiresAt
 	}
 	return secretaccess.MintAdminGrant(service.keyring, snapshot.ID, snapshot.AdminID, resultID, validUntil)
+}
+
+func normalizeSessionClientMetadata(metadata SessionClientMetadata) SessionClientMetadata {
+	metadata.ClientIP = strings.TrimSpace(metadata.ClientIP)
+	metadata.UserAgent = strings.TrimSpace(metadata.UserAgent)
+	return metadata
 }
 
 func parseSessionToken(encoded string) (string, []byte, error) {

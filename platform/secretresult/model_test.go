@@ -94,10 +94,7 @@ func TestBindingAllowsOnlyReviewedScopeAndResultTypePairs(t *testing.T) {
 		{ScopeIdentityRecoveryCodeRotation, ResultTypeIdentityRecoveryCode},
 		{ScopeAdminTOTPEnrollment, ResultTypeAdminTOTPEnrollment},
 		{ScopeAdminInitialRecoveryCodes, ResultTypeAdminRecoveryCodes},
-		{ScopeAdminTOTPRebind, ResultTypeAdminTOTPEnrollment},
-		{ScopeAdminTOTPRebind, ResultTypeAdminRecoveryCodes},
 		{ScopeAdminRegenerateRecoveryCodes, ResultTypeAdminRecoveryCodes},
-		{ScopeAdminAssistedRecoveryGrant, ResultTypeAdminAssistedRecoveryGrant},
 	}
 	for _, pair := range allowed {
 		candidate := binding

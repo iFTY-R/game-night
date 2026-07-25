@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	adminDomain "github.com/iFTY-R/game-night/platform/admin"
+	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
 	"github.com/iFTY-R/game-night/platform/security"
 	"github.com/jackc/pgx/v5"
@@ -29,10 +30,6 @@ func adminAccountFromRow(row sqlcgen.AdminAccount) (adminDomain.Account, error) 
 	}
 	if row.PasswordParameters.Valid {
 		snapshot.PasswordParameters = row.PasswordParameters.String
-	}
-	if row.LastAcceptedTotpStep.Valid {
-		step := row.LastAcceptedTotpStep.Int64
-		snapshot.LastAcceptedTOTPStep = &step
 	}
 	account, err := adminDomain.RestoreAccount(snapshot)
 	if err != nil {
@@ -57,8 +54,12 @@ func adminEnrollmentFromRow(row sqlcgen.AdminTotpEnrollment) (adminDomain.Enroll
 	}
 	snapshot := adminDomain.EnrollmentSnapshot{
 		ID: uuid.UUID(row.EnrollmentID.Bytes), AdminID: uuid.UUID(row.AdminID.Bytes), Ciphertext: append([]byte(nil), row.Ciphertext...), Nonce: append([]byte(nil), row.Nonce...),
-		KeyVersion: uint32(row.KeyVersion), Status: adminDomain.EnrollmentStatus(row.Status), AdminVersion: row.AdminVersion, OperationID: row.OperationID,
-		CreatedAt: row.CreatedAt.Time,
+		KeyVersion: uint32(row.KeyVersion), Status: adminDomain.EnrollmentStatus(row.Status), AdminVersion: row.AdminVersion,
+		EnrollmentVersion: row.EnrollmentVersion, OperationID: row.OperationID, CreatedAt: row.CreatedAt.Time,
+	}
+	if row.ReplayFloor.Valid {
+		replayFloor := row.ReplayFloor.Int64
+		snapshot.ReplayFloor = &replayFloor
 	}
 	if row.ExpiresAt.Valid {
 		snapshot.ExpiresAt = row.ExpiresAt.Time
@@ -85,7 +86,8 @@ func adminSessionFromRow(row sqlcgen.AdminSession) (adminDomain.Session, error) 
 		ID: uuid.UUID(row.SessionID.Bytes), AdminID: uuid.UUID(row.AdminID.Bytes), Selector: row.Selector,
 		SecretMAC: security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: uint32(row.SecretKeyVersion), Value: append([]byte(nil), row.SecretHash...)},
 		CSRFHash:  security.MAC[security.AdminSessionKeyPurpose]{KeyVersion: uint32(row.SecretKeyVersion), Value: append([]byte(nil), row.CsrfHash...)},
-		Kind:      adminDomain.SessionKind(row.Kind), AdminVersion: row.AdminVersion, PasswordVersion: row.PasswordVersion,
+		Kind:      adminDomain.SessionKind(row.Kind), AdminVersion: row.AdminVersion, PasswordVersion: row.PasswordVersion, SessionVersion: row.SessionVersion,
+		ClientIP: row.ClientIp, UserAgent: row.UserAgent,
 		AttemptCount: uint32(row.AttemptCount), MaxAttempts: uint32(row.MaxAttempts), CreatedAt: row.CreatedAt.Time,
 		LastSeenAt: row.LastSeenAt.Time, IdleExpiresAt: row.IdleExpiresAt.Time, AbsoluteExpiresAt: row.AbsoluteExpiresAt.Time,
 	}
@@ -121,6 +123,59 @@ func adminRecoveryCodeFromRow(row sqlcgen.AdminRecoveryCode) (adminDomain.Recove
 		return adminDomain.RecoveryCode{}, adminDomain.ErrIntegrity
 	}
 	return code, nil
+}
+
+func adminElevationFromRow(row sqlcgen.AdminElevationGrant) (adminDomain.Elevation, error) {
+	if !row.AdminID.Valid || !row.SessionID.Valid || row.AdminVersion <= 0 || row.PasswordVersion < 0 ||
+		row.SessionVersion <= 0 || row.EnrollmentVersion < 0 || !row.GrantedAt.Valid || !row.ExpiresAt.Valid {
+		return adminDomain.Elevation{}, adminDomain.ErrIntegrity
+	}
+	elevation, err := adminDomain.RestoreElevation(adminDomain.ElevationSnapshot{
+		AdminID:           uuid.UUID(row.AdminID.Bytes),
+		SessionID:         uuid.UUID(row.SessionID.Bytes),
+		Scope:             adminDomain.ElevationScope(row.Scope),
+		AdminVersion:      row.AdminVersion,
+		PasswordVersion:   row.PasswordVersion,
+		SessionVersion:    row.SessionVersion,
+		EnrollmentVersion: row.EnrollmentVersion,
+		GrantedAt:         row.GrantedAt.Time,
+		ExpiresAt:         row.ExpiresAt.Time,
+		RevokedAt:         row.RevokedAt.Time,
+	})
+	if err != nil {
+		return adminDomain.Elevation{}, adminDomain.ErrIntegrity
+	}
+	return elevation, nil
+}
+
+func adminCommandReceiptFromRow(row sqlcgen.AdminCommandReceipt) (adminDomain.CommandReceipt, error) {
+	if !row.AdminID.Valid || row.Command == "" || row.TargetType == "" || row.TargetID == "" ||
+		row.ResultAdminVersion <= 0 || row.ResultPasswordVersion < 0 || row.ResultSessionVersion < 0 ||
+		row.ResultEnrollmentVersion < 0 || !row.AuditEventID.Valid || !row.CreatedAt.Valid {
+		return adminDomain.CommandReceipt{}, adminDomain.ErrIntegrity
+	}
+	operationID, err := idempotency.ParseOperationID(row.OperationID)
+	if err != nil {
+		return adminDomain.CommandReceipt{}, adminDomain.ErrIntegrity
+	}
+	requestDigest, err := idempotency.NewDigest(row.RequestDigest)
+	if err != nil {
+		return adminDomain.CommandReceipt{}, adminDomain.ErrIntegrity
+	}
+	return adminDomain.CommandReceipt{
+		AdminID:                 uuid.UUID(row.AdminID.Bytes),
+		OperationID:             operationID,
+		RequestDigest:           requestDigest,
+		Command:                 row.Command,
+		TargetType:              row.TargetType,
+		TargetID:                row.TargetID,
+		ResultAdminVersion:      row.ResultAdminVersion,
+		ResultPasswordVersion:   row.ResultPasswordVersion,
+		ResultSessionVersion:    row.ResultSessionVersion,
+		ResultEnrollmentVersion: row.ResultEnrollmentVersion,
+		AuditEventID:            uuid.UUID(row.AuditEventID.Bytes),
+		CreatedAt:               row.CreatedAt.Time,
+	}, nil
 }
 
 func mapAdminQueryError(err, notFound error) error {

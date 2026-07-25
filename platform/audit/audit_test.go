@@ -10,8 +10,36 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	auditv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1"
 	"github.com/iFTY-R/game-night/platform/security"
 )
+
+func TestAdminSecurityActionsRemainStableAndValid(t *testing.T) {
+	expected := map[Action]struct {
+		wire    auditv1.AuditAction
+		ordinal int32
+	}{
+		ActionAdminMFAEnabled:               {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_MFA_ENABLED, ordinal: 28},
+		ActionAdminMFADisabled:              {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_MFA_DISABLED, ordinal: 29},
+		ActionAdminRecoveryCodesRegenerated: {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_RECOVERY_CODES_REGENERATED, ordinal: 30},
+		ActionAdminSessionElevated:          {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_SESSION_ELEVATED, ordinal: 31},
+		ActionAdminElevationRevoked:         {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_ELEVATION_REVOKED, ordinal: 32},
+		ActionAdminLoginSucceeded:           {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_LOGIN_SUCCEEDED, ordinal: 33},
+		ActionAdminLoginFailed:              {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_LOGIN_FAILED, ordinal: 34},
+		ActionAdminSecretResultOpened:       {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_SECRET_RESULT_OPENED, ordinal: 35},
+		ActionAdminSecretResultConfirmed:    {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED, ordinal: 36},
+		ActionAdminElevationDenied:          {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_ELEVATION_DENIED, ordinal: 37},
+		ActionAdminElevationExpired:         {wire: auditv1.AuditAction_AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED, ordinal: 38},
+	}
+	for action, expectedValue := range expected {
+		if !action.Valid() {
+			t.Fatalf("admin security action %d must be valid", action)
+		}
+		if int32(action) != expectedValue.ordinal || int32(expectedValue.wire) != expectedValue.ordinal {
+			t.Fatalf("admin security action %d and wire value %d must retain ordinal %d", action, expectedValue.wire, expectedValue.ordinal)
+		}
+	}
+}
 
 func TestServiceProducesDeterministicCanonicalEvent(t *testing.T) {
 	now := time.Date(2026, 7, 18, 12, 0, 0, 123456789, time.FixedZone("test", 8*60*60))

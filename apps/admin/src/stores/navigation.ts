@@ -1,9 +1,7 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
-import type { AdminPermission } from "../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
 import { navigationItems, routeName, type AppRouteName } from "../constants/navigation";
-import { useAuthStore } from "./auth";
 import { usePreferencesStore } from "./preferences";
 
 export type TabItem = {
@@ -12,32 +10,13 @@ export type TabItem = {
   closable: boolean;
 };
 
-const layoutRouteNames = new Set<AppRouteName>([routeName.overview, routeName.users, routeName.audit, routeName.security]);
-const navigationItemByName = new Map(navigationItems.map((item) => [item.name, item] as const));
-
-const isTabAllowed = (name: AppRouteName, permissions: readonly AdminPermission[]): boolean => {
-  const item = navigationItemByName.get(name);
-  return item != null && (item.permission == null || permissions.includes(item.permission));
-};
-
-// Keep the persisted tab list aligned with the current admin's access scope before rendering.
-const normalizeTabNames = (names: readonly AppRouteName[], permissions: readonly AdminPermission[]): AppRouteName[] => {
-  const restored = names.filter(
-    (name, index, current) =>
-      name !== routeName.overview &&
-      layoutRouteNames.has(name) &&
-      current.indexOf(name) === index &&
-      isTabAllowed(name, permissions)
-  );
-  return [routeName.overview, ...restored];
-};
+const layoutRouteNames = new Set<AppRouteName>([routeName.security]);
 
 export const useNavigationStore = defineStore("admin-navigation", () => {
-  const auth = useAuthStore();
   const preferences = usePreferencesStore();
   const mobileOpen = ref(false);
   const tabs = ref<TabItem[]>([]);
-  const activeTab = ref<AppRouteName>(routeName.overview);
+  const activeTab = ref<AppRouteName>(routeName.security);
 
   const syncPersistedTabs = (): void => {
     preferences.persistedTabs = tabs.value.map((tab) => tab.name);
@@ -45,13 +24,13 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
 
   const syncFromRoute = (
     route: RouteLocationNormalizedLoaded,
-    permissions: readonly AdminPermission[] = auth.permissions
+    _permissions: readonly unknown[] = []
   ): void => {
     if (typeof route.name !== "string") {
       return;
     }
     const routeKey = route.name as AppRouteName;
-    if (!layoutRouteNames.has(routeKey) || !isTabAllowed(routeKey, permissions)) {
+    if (!layoutRouteNames.has(routeKey)) {
       return;
     }
     activeTab.value = routeKey;
@@ -63,26 +42,26 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
     syncPersistedTabs();
   };
 
-  const restoreTabs = (permissions: readonly AdminPermission[] = auth.permissions): void => {
-    const restoredNames = normalizeTabNames(preferences.persistedTabs, permissions);
-    tabs.value = restoredNames.map((name) => ({
-      name,
-      title: navigationItems.find((item) => item.name === name)?.title ?? name,
-      closable: name !== routeName.overview
-    }));
+  const restoreTabs = (_permissions: readonly unknown[] = []): void => {
+    // Retired modules must never be revived from an older local-storage snapshot.
+    tabs.value = [{
+      name: routeName.security,
+      title: navigationItems[0]?.title ?? "安全设置",
+      closable: false
+    }];
     syncPersistedTabs();
   };
 
   const closeTab = (name: AppRouteName): AppRouteName => {
-    if (name === routeName.overview) {
-      return routeName.overview;
+    if (name === routeName.security) {
+      return routeName.security;
     }
     const index = tabs.value.findIndex((tab) => tab.name === name);
     if (index >= 0) {
       tabs.value.splice(index, 1);
     }
     syncPersistedTabs();
-    return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.overview;
+    return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.security;
   };
 
   const breadcrumbs = computed(() => tabs.value.filter((tab) => tab.name === activeTab.value));

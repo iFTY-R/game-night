@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { Menu, MoonStar, SunMedium, SunMoon } from "lucide-vue-next";
+import { LogOut, Menu, MoonStar, SunMedium, SunMoon } from "lucide-vue-next";
 import { NButton, NDropdown, NTag } from "naive-ui";
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
+import LogoutConfirmDialog from "../../components/session/LogoutConfirmDialog.vue";
+import { routeName } from "../../constants/navigation";
 import { useAuthStore } from "../../stores/auth";
 import { usePreferencesStore } from "../../stores/preferences";
 import { summarizeSession } from "../../utils/format";
@@ -12,6 +15,9 @@ const emit = defineEmits<{
 
 const auth = useAuthStore();
 const preferences = usePreferencesStore();
+const router = useRouter();
+const logoutDialogRef = ref<InstanceType<typeof LogoutConfirmDialog> | null>(null);
+const loggingOut = ref(false);
 
 const themeLabel = computed(() => {
   switch (preferences.theme) {
@@ -29,6 +35,19 @@ const themeOptions = [
   { label: "暗色", key: "dark" },
   { label: "跟随系统", key: "system" }
 ];
+
+const handleLogout = async (): Promise<void> => {
+  loggingOut.value = true;
+  try {
+    await auth.logoutCurrentSession();
+  } catch {
+    // Local authentication state is cleared even when the remote logout call is unavailable.
+  } finally {
+    loggingOut.value = false;
+    logoutDialogRef.value?.toggleDialog(false);
+    await router.replace({ name: routeName.authLogin });
+  }
+};
 </script>
 
 <template>
@@ -56,6 +75,13 @@ const themeOptions = [
           <span class="admin-header__theme-label">{{ themeLabel }}</span>
         </NButton>
       </NDropdown>
+      <NButton tertiary aria-label="退出管理后台" @click="logoutDialogRef?.toggleDialog(true)">
+        <template #icon>
+          <LogOut :size="18" />
+        </template>
+        <span class="admin-header__theme-label">退出</span>
+      </NButton>
     </div>
   </header>
+  <LogoutConfirmDialog ref="logoutDialogRef" :pending="loggingOut" @confirm="handleLogout" />
 </template>

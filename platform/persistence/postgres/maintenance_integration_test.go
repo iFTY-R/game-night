@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
+	adminDomain "github.com/iFTY-R/game-night/platform/admin"
 	roomDomain "github.com/iFTY-R/game-night/platform/room"
 )
 
@@ -71,6 +72,85 @@ func TestExpiryCleanupClosesOnlyIdleLobbyRooms(t *testing.T) {
 	second, err := cleanup.RunReport(ctx)
 	if err != nil || second.ClosedRooms != 0 {
 		t.Fatalf("repeat idle cleanup: report=%+v err=%v", second, err)
+	}
+}
+
+func TestExpiryCleanupRevokesExpiredAdminElevations(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	applyTransactionTestMigrations(t, ctx, fixture)
+	unitOfWork := NewAdminUnitOfWork(fixture.Pool)
+	now := time.Date(2026, time.July, 25, 14, 0, 0, 0, time.UTC)
+
+	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.Transaction) error {
+		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now.Add(-10*time.Minute))
+		if err != nil {
+			return err
+		}
+		session := mustRestoreSession(t, adminDomain.SessionSnapshot{
+			ID:                uuid.New(),
+			AdminID:           account.Snapshot().ID,
+			Selector:          mustSelector(t, 0x61),
+			SecretMAC:         mustAdminSessionMAC(0x62),
+			CSRFHash:          mustAdminSessionMAC(0x63),
+			Kind:              adminDomain.SessionKindFull,
+			AdminVersion:      account.Snapshot().AdminVersion,
+			PasswordVersion:   account.Snapshot().PasswordVersion,
+			SessionVersion:    1,
+			ClientIP:          "203.0.113.44",
+			UserAgent:         "cleanup-test",
+			MaxAttempts:       5,
+			CreatedAt:         now.Add(-9 * time.Minute),
+			LastSeenAt:        now.Add(-9 * time.Minute),
+			IdleExpiresAt:     now.Add(20 * time.Minute),
+			AbsoluteExpiresAt: now.Add(2 * time.Hour),
+		})
+		if err := transaction.Sessions().Insert(ctx, session); err != nil {
+			return err
+		}
+		elevation, err := adminDomain.NewElevation(
+			session,
+			0,
+			adminDomain.ElevationScopeSecurityDisableMFA,
+			now.Add(-6*time.Minute),
+			now.Add(-time.Minute),
+		)
+		if err != nil {
+			return err
+		}
+		_, err = transaction.Elevations().UpsertLive(ctx, elevation)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := NewExpiryCleanup(fixture.Pool, 10*time.Minute).RunReport(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.ExpiredGrants != 1 || report.DeletedGrants != 0 {
+		t.Fatalf("unexpected expired elevation cleanup report: %+v", report)
+	}
+
+	var revokedCount int
+	if err := fixture.Pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM admin_elevation_grants
+		WHERE revoked_at IS NOT NULL
+	`).Scan(&revokedCount); err != nil {
+		t.Fatal(err)
+	}
+	if revokedCount != 1 {
+		t.Fatalf("revoked elevations = %d, want 1", revokedCount)
+	}
+
+	second, err := NewExpiryCleanup(fixture.Pool, 10*time.Minute).RunReport(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ExpiredGrants != 0 {
+		t.Fatalf("repeat cleanup re-revoked expired elevations: %+v", second)
 	}
 }
 

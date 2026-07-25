@@ -39,7 +39,6 @@ type Scope string
 
 const (
 	ScopeUserProfiles         Scope = "user_profiles"
-	ScopeProfileExportItems   Scope = "profile_export_items"
 	ScopeAdminTOTPEnrollments Scope = "admin_totp_enrollments"
 )
 
@@ -73,14 +72,6 @@ type UserProfileCiphertext struct {
 	UserID         uuid.UUID
 	ProfileVersion int64
 	Encrypted      profile.EncryptedValue
-}
-
-// ProfileExportCiphertext binds immutable export ciphertext to its composite stable cursor.
-type ProfileExportCiphertext struct {
-	ExportID  uuid.UUID
-	Ordinal   int64
-	UserID    uuid.UUID
-	Encrypted profile.EncryptedValue
 }
 
 // TOTPEnrollmentCiphertext carries only encrypted enrollment material and its row-level CAS version.
@@ -119,8 +110,6 @@ type Transaction interface {
 	AcquireJob(context.Context, outbox.LeaseOwner, time.Time, time.Time) (*AcquiredJob, error)
 	ListUserProfiles(context.Context, uint32, uuid.UUID, uint32) ([]UserProfileCiphertext, error)
 	RotateUserProfile(context.Context, UserProfileCiphertext, profile.EncryptedValue, uint32) (bool, error)
-	ListProfileExportItems(context.Context, uint32, uuid.UUID, int64, uint32) ([]ProfileExportCiphertext, error)
-	RotateProfileExportItem(context.Context, ProfileExportCiphertext, profile.EncryptedValue, uint32) (bool, error)
 	ListTOTPEnrollments(context.Context, uint32, uuid.UUID, uint32) ([]TOTPEnrollmentCiphertext, error)
 	RotateTOTPEnrollment(context.Context, TOTPEnrollmentCiphertext, security.Encrypted[security.TOTPKeyPurpose], uint32) (bool, error)
 	AdvanceCursor(context.Context, AdvanceRequest) error

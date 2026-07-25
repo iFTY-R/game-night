@@ -75,11 +75,13 @@ func TestTemplateKeepsExactServiceAllowlistAndNoStoreBoundaries(t *testing.T) {
 		"location ^~ /platform.game.v1.GameService/",
 		"location = /realtime/game {",
 		"location ^~ /platform.admin.v1.AdminAuthService/",
-		"location ^~ /platform.admin.v1.AdminIdentityService/",
 	} {
 		if strings.Count(template, path) != 1 {
 			t.Fatalf("allowlist entry %q must appear exactly once", path)
 		}
+	}
+	if strings.Contains(template, "location ^~ /platform.admin.v1.AdminIdentityService/") {
+		t.Fatal("legacy admin identity route must not be proxied")
 	}
 	for _, directive := range []string{
 		"proxy_set_header Forwarded \"for=\\\"$remote_addr\\\";proto=https;host=\\\"$host\\\"\";",
@@ -90,8 +92,8 @@ func TestTemplateKeepsExactServiceAllowlistAndNoStoreBoundaries(t *testing.T) {
 		"proxy_set_header X-Real-IP $remote_addr;",
 		"proxy_set_header Host $host;",
 	} {
-		if strings.Count(template, directive) != 8 {
-			t.Fatalf("forwarding directive %q must cover all eight proxied locations", directive)
+		if strings.Count(template, directive) != 7 {
+			t.Fatalf("forwarding directive %q must cover all seven proxied locations", directive)
 		}
 	}
 	for _, directive := range []string{
@@ -100,11 +102,11 @@ func TestTemplateKeepsExactServiceAllowlistAndNoStoreBoundaries(t *testing.T) {
 		"add_header Cache-Control \"no-store\" always;",
 		"add_header Pragma \"no-cache\" always;",
 	} {
-		if strings.Count(template, directive) != 6 {
-			t.Fatalf("no-store directive %q must cover the six RPC and WebSocket locations", directive)
+		if strings.Count(template, directive) != 5 {
+			t.Fatalf("no-store directive %q must cover the five RPC and WebSocket locations", directive)
 		}
 	}
-	if strings.Count(template, "proxy_set_header Connection \"\";") != 7 ||
+	if strings.Count(template, "proxy_set_header Connection \"\";") != 6 ||
 		strings.Count(template, "proxy_set_header Upgrade $http_upgrade;") != 1 ||
 		strings.Count(template, "proxy_set_header Connection \"upgrade\";") != 1 {
 		t.Fatal("RPC, SPA, and WebSocket connection headers are not isolated")

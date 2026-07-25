@@ -26,7 +26,6 @@ func TestPoliciesFreezeMethodBucketOrder(t *testing.T) {
 		{ratelimit.OperationAdminSecondFactor, []ratelimit.Dimension{ratelimit.DimensionIP, ratelimit.DimensionAdminAccount, ratelimit.DimensionFlowPurpose}},
 		{ratelimit.OperationRealNameRead, []ratelimit.Dimension{ratelimit.DimensionAdminSession, ratelimit.DimensionTargetUser}},
 		{ratelimit.OperationRealNameUpdate, []ratelimit.Dimension{ratelimit.DimensionAdminSession, ratelimit.DimensionTargetUser}},
-		{ratelimit.OperationProfileExport, []ratelimit.Dimension{ratelimit.DimensionAdminSession, ratelimit.DimensionTargetUser}},
 	}
 
 	for _, test := range tests {

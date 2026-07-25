@@ -15,7 +15,7 @@
 Copy-Item deploy/.env.example deploy/.env
 ```
 
-编辑 `deploy/.env`，替换所有 `change-me` 值。默认镜像为 `ghcr.io/ifty-r/game-night:latest`；生产发布建议把 `GAME_NIGHT_IMAGE` 固定为 workflow 输出的版本标签或 digest。私有 GHCR 包需要先执行 `docker login ghcr.io`。
+编辑 `deploy/.env`，替换所有 `change-me` 值。默认镜像为 `ghcr.io/ifty-r/game-night:latest`；生产发布建议把 `GAME_NIGHT_IMAGE` 固定为 workflow 输出的版本标签或 digest。私有 GHCR 包需要先执行 `docker login ghcr.io`。管理员 MFA 策略不再通过环境变量控制。
 
 在 `deploy/secrets` 中准备以下文件：
 

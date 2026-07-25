@@ -33,14 +33,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/apps/api/internal/bootstrap"
 	apiConfig "github.com/iFTY-R/game-night/apps/api/internal/config"
-	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminauth"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	identitytransport "github.com/iFTY-R/game-night/apps/api/internal/transport/identity"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/logging"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
-	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
-	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
@@ -51,7 +48,6 @@ import (
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1/roomv1connect"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
-	"github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/audit"
 	gameregistry "github.com/iFTY-R/game-night/tooling/game-registry"
 	"github.com/pressly/goose/v3"
@@ -65,14 +61,11 @@ const (
 	applicationUserOrigin              = "https://play.example.test"
 	applicationAdminOrigin             = "https://admin.example.test"
 	applicationBootstrapPassword       = "Night-admin-bootstrap-2026!"
-	applicationActivePassword          = "Night-admin-active-2026!"
-	applicationRotatedPassword         = "Night-admin-rotated-2026!"
-	applicationTestRealName            = "Integration Real Name"
 )
 
-// TestApplicationConnectIdentityAndAdminIntegration exercises the real application graph through browser-style TLS Connect clients.
-func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
-	runtime := newApplicationIntegrationRuntime(t, false)
+// TestApplicationConnectIdentityAndGameIntegration exercises the real application graph through browser-style TLS Connect clients.
+func TestApplicationConnectIdentityAndGameIntegration(t *testing.T) {
+	runtime := newApplicationIntegrationRuntime(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -81,15 +74,10 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 	exerciseRoomLifecycle(t, ctx, runtime, roomv1connect.NewRoomServiceClient(runtime.client, runtime.baseURL))
 	exerciseUnavailableRealtimeSurface(t, ctx, runtime, gamev1connect.NewGameServiceClient(runtime.client, runtime.baseURL))
 
-	authClient := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
-	adminIdentityClient := adminv1connect.NewAdminIdentityServiceClient(runtime.client, runtime.baseURL)
-	activateAdministrator(t, ctx, runtime, authClient)
-	exerciseAdminIdentity(t, ctx, runtime, adminIdentityClient, identity)
-
 	devicesRequest := connect.NewRequest(&identityv1.ListDevicesRequest{IncludeRevoked: true, Page: &commonv1.PageRequest{PageSize: 10}})
 	devices, err := identityClient.ListDevices(ctx, devicesRequest)
 	if err != nil || len(devices.Msg.GetDevices()) != 2 {
-		t.Fatalf("list devices after administrator revocation: count=%d err=%v", len(devices.Msg.GetDevices()), err)
+		t.Fatalf("list devices after identity recovery: count=%d err=%v", len(devices.Msg.GetDevices()), err)
 	}
 	revokeRequest := connect.NewRequest(&identityv1.RevokeDeviceRequest{CredentialId: identity.currentCredentialID, Reason: "user_requested"})
 	runtime.authorizeUserWrite(t, revokeRequest)
@@ -98,187 +86,9 @@ func TestApplicationConnectIdentityAndAdminIntegration(t *testing.T) {
 	if err != nil || !revoked.Msg.GetCurrentDeviceRevoked() {
 		t.Fatalf("revoke current device: revoked=%t err=%v", revoked.Msg.GetCurrentDeviceRevoked(), err)
 	}
-
-	suspendRequest := connect.NewRequest(&adminv1.SuspendUserRequest{UserId: identity.userID, Reason: "temporary moderation hold"})
-	runtime.authorizeAdminIdentity(t, suspendRequest)
-	suspended, err := adminIdentityClient.SuspendUser(ctx, suspendRequest)
-	if err != nil {
-		t.Fatalf("suspend integrated user: %v", err)
-	}
-	if suspended.Msg.GetUser().GetStatus() != identityv1.UserStatus_USER_STATUS_SUSPENDED {
-		t.Fatalf("suspend integrated user: status=%s", suspended.Msg.GetUser().GetStatus())
-	}
-	unsuspendRequest := connect.NewRequest(&adminv1.UnsuspendUserRequest{UserId: identity.userID, Reason: "moderation hold cleared"})
-	runtime.authorizeAdminIdentity(t, unsuspendRequest)
-	unsuspended, err := adminIdentityClient.UnsuspendUser(ctx, unsuspendRequest)
-	if err != nil {
-		t.Fatalf("unsuspend integrated user: %v", err)
-	}
-	if unsuspended.Msg.GetUser().GetStatus() != identityv1.UserStatus_USER_STATUS_ACTIVE {
-		t.Fatalf("unsuspend integrated user: status=%s", unsuspended.Msg.GetUser().GetStatus())
-	}
-
-	deleteRequest := connect.NewRequest(&adminv1.DeleteUserRequest{UserId: identity.userID, Reason: "completed integration lifecycle"})
-	runtime.authorizeAdminIdentity(t, deleteRequest)
-	deleted, err := adminIdentityClient.DeleteUser(ctx, deleteRequest)
-	if err != nil || deleted.Msg.GetUser().GetStatus() != identityv1.UserStatus_USER_STATUS_DELETED {
-		t.Fatalf("delete integrated user: status=%s err=%v", deleted.Msg.GetUser().GetStatus(), err)
-	}
-	auditRequest := connect.NewRequest(&adminv1.ListAuditEventsRequest{TargetUserId: identity.userID, Page: &commonv1.PageRequest{PageSize: 100}})
-	runtime.authorizeAdminIdentity(t, auditRequest)
-	auditEvents, err := adminIdentityClient.ListAuditEvents(ctx, auditRequest)
-	if err != nil || len(auditEvents.Msg.GetEvents()) == 0 {
-		t.Fatalf("list integrated audit events: count=%d err=%v", len(auditEvents.Msg.GetEvents()), err)
-	}
-
-	logoutRequest := connect.NewRequest(&adminv1.LogoutAllAdminSessionsRequest{})
-	runtime.authorizeAdminSession(t, logoutRequest)
-	logout, err := authClient.LogoutAllAdminSessions(ctx, logoutRequest)
-	if err != nil || logout.Msg.GetRevokedSessions() < 1 {
-		t.Fatalf("logout administrator sessions: count=%d err=%v", logout.Msg.GetRevokedSessions(), err)
-	}
 	if strings.Contains(runtime.logs.String(), applicationBootstrapPassword) ||
-		strings.Contains(runtime.logs.String(), applicationActivePassword) ||
-		strings.Contains(runtime.logs.String(), applicationTestRealName) {
+		strings.Contains(runtime.logs.String(), identity.userID) {
 		t.Fatal("application logs contain a configured password or real name")
-	}
-}
-
-// TestApplicationAdminPasswordOnlyIntegration proves an explicit MFA override still issues and persists full administrator sessions.
-func TestApplicationAdminPasswordOnlyIntegration(t *testing.T) {
-	runtime := newApplicationIntegrationRuntime(t, true)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	client := adminv1connect.NewAdminAuthServiceClient(runtime.client, runtime.baseURL)
-
-	bootstrapLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationBootstrapPassword)
-	if bootstrapLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_CHANGE_PASSWORD {
-		t.Fatalf("administrator bootstrap login: next=%s", bootstrapLogin.Msg.GetNextStep())
-	}
-	initialPasswordRequest := connect.NewRequest(&adminv1.ChangeInitialPasswordRequest{NewPassword: applicationActivePassword})
-	runtime.authorizeAdminSession(t, initialPasswordRequest)
-	initialPassword, err := client.ChangeInitialPassword(ctx, initialPasswordRequest)
-	if err != nil {
-		t.Fatalf("password-only initial password change: %v", err)
-	}
-	if initialPassword.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("password-only initial password change: next=%s", initialPassword.Msg.GetNextStep())
-	}
-	requireAuthenticatedAdminSession(t, ctx, runtime, client)
-	logoutAdministrator(t, ctx, runtime, client)
-
-	activeLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationActivePassword)
-	if activeLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("password-only active login: next=%s", activeLogin.Msg.GetNextStep())
-	}
-	requireAuthenticatedAdminSession(t, ctx, runtime, client)
-
-	rotationRequest := connect.NewRequest(&adminv1.ChangeAdminPasswordRequest{
-		CurrentPassword: applicationActivePassword,
-		NewPassword:     applicationRotatedPassword,
-	})
-	runtime.authorizeAdminSession(t, rotationRequest)
-	rotation, err := client.ChangeAdminPassword(ctx, rotationRequest)
-	if err != nil {
-		t.Fatalf("password-only password rotation: %v", err)
-	}
-	if rotation.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED ||
-		rotation.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL {
-		t.Fatalf("password-only password rotation: next=%s session=%s", rotation.Msg.GetNextStep(), rotation.Msg.GetSession().GetKind())
-	}
-	logoutAdministrator(t, ctx, runtime, client)
-
-	// Simulate an account left in the durable recovery state before a deployment temporarily disables MFA.
-	commandTag, err := runtime.application.pool.Exec(ctx, `
-		UPDATE admin_accounts
-		SET status = 'recovery_pending', admin_version = admin_version + 1, updated_at = transaction_timestamp()
-		WHERE singleton_id = 1 AND status = 'active'
-	`)
-	if err != nil || commandTag.RowsAffected() != 1 {
-		t.Fatalf("prepare recovery-pending administrator: rows=%d err=%v", commandTag.RowsAffected(), err)
-	}
-	recoveryLogin := loginAdministratorWithPassword(t, ctx, runtime, client, applicationRotatedPassword)
-	if recoveryLogin.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("password-only recovery login: next=%s", recoveryLogin.Msg.GetNextStep())
-	}
-	requireAuthenticatedAdminSession(t, ctx, runtime, client)
-	var status string
-	if err := runtime.application.pool.QueryRow(ctx, "SELECT status FROM admin_accounts WHERE singleton_id = 1").Scan(&status); err != nil || status != "active" {
-		t.Fatalf("administrator status after password-only recovery login: status=%q err=%v", status, err)
-	}
-
-	for _, secret := range []string{applicationBootstrapPassword, applicationActivePassword, applicationRotatedPassword} {
-		if strings.Contains(runtime.logs.String(), secret) {
-			t.Fatal("password-only application logs contain an administrator password")
-		}
-	}
-}
-
-// loginAdministratorWithPassword completes the browser-style challenge and preserves the resulting Cookie state in the shared client.
-func loginAdministratorWithPassword(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminAuthServiceClient,
-	password string,
-) *connect.Response[adminv1.LoginPasswordResponse] {
-	t.Helper()
-	flowID := "admin-login-" + uuid.NewString()
-	beginRequest := connect.NewRequest(&adminv1.BeginAdminLoginRequest{RequestFlowId: flowID})
-	runtime.setOrigin(beginRequest, applicationAdminOrigin)
-	begin, err := client.BeginAdminLogin(ctx, beginRequest)
-	if err != nil {
-		t.Fatalf("begin administrator login: %v", err)
-	}
-	loginRequest := connect.NewRequest(&adminv1.LoginPasswordRequest{
-		ChallengeProof: begin.Msg.GetChallenge().GetChallengeProof(),
-		Password:       password,
-	})
-	runtime.setOrigin(loginRequest, applicationAdminOrigin)
-	loginRequest.Header().Set(adminauth.RequestFlowIDHeader, flowID)
-	login, err := client.LoginPassword(ctx, loginRequest)
-	if err != nil {
-		t.Fatalf("administrator password login: %v", err)
-	}
-	return login
-}
-
-// requireAuthenticatedAdminSession verifies that response Cookies resolve to the durable unrestricted session returned by the API.
-func requireAuthenticatedAdminSession(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminAuthServiceClient,
-) {
-	t.Helper()
-	request := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
-	runtime.authorizeAdminSession(t, request)
-	response, err := client.GetCurrentAdminSession(ctx, request)
-	if err != nil {
-		t.Fatalf("authenticated administrator session: %v", err)
-	}
-	if response.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED ||
-		response.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL {
-		t.Fatalf("authenticated administrator session: next=%s session=%s", response.Msg.GetNextStep(), response.Msg.GetSession().GetKind())
-	}
-}
-
-// logoutAdministrator revokes the current session and clears the browser Cookie before the next login scenario.
-func logoutAdministrator(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminAuthServiceClient,
-) {
-	t.Helper()
-	request := connect.NewRequest(&adminv1.LogoutAdminRequest{})
-	runtime.authorizeAdminSession(t, request)
-	response, err := client.LogoutAdmin(ctx, request)
-	if err != nil {
-		t.Fatalf("logout administrator: %v", err)
-	}
-	if !response.Msg.GetLoggedOut() {
-		t.Fatal("logout administrator: logged_out=false")
 	}
 }
 
@@ -481,204 +291,10 @@ func confirmUserSecret(
 	}
 }
 
-// activateAdministrator completes the one-time password and TOTP setup through the isolated admin Cookie namespace.
-func activateAdministrator(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminAuthServiceClient,
-) {
-	t.Helper()
-	state, err := client.GetSetupState(ctx, connect.NewRequest(&adminv1.GetSetupStateRequest{}))
-	if err != nil || state.Msg.GetState() != adminv1.AdminSetupState_ADMIN_SETUP_STATE_SETUP_REQUIRED {
-		t.Fatalf("administrator setup state: state=%s err=%v", state.Msg.GetState(), err)
-	}
-	flowID := "admin-login-" + uuid.NewString()
-	beginRequest := connect.NewRequest(&adminv1.BeginAdminLoginRequest{RequestFlowId: flowID})
-	runtime.setOrigin(beginRequest, applicationAdminOrigin)
-	begin, err := client.BeginAdminLogin(ctx, beginRequest)
-	if err != nil {
-		t.Fatalf("begin administrator login: %v", err)
-	}
-	loginRequest := connect.NewRequest(&adminv1.LoginPasswordRequest{
-		ChallengeProof: begin.Msg.GetChallenge().GetChallengeProof(), Password: applicationBootstrapPassword,
-	})
-	runtime.setOrigin(loginRequest, applicationAdminOrigin)
-	loginRequest.Header().Set(adminauth.RequestFlowIDHeader, flowID)
-	login, err := client.LoginPassword(ctx, loginRequest)
-	if err != nil || login.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_CHANGE_PASSWORD {
-		t.Fatalf("administrator bootstrap login: next=%s err=%v", login.Msg.GetNextStep(), err)
-	}
-	passwordRequest := connect.NewRequest(&adminv1.ChangeInitialPasswordRequest{NewPassword: applicationActivePassword})
-	runtime.authorizeAdminSession(t, passwordRequest)
-	password, err := client.ChangeInitialPassword(ctx, passwordRequest)
-	if err != nil || password.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
-		t.Fatalf("change initial administrator password: next=%s err=%v", password.Msg.GetNextStep(), err)
-	}
-	sessionRequest := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
-	runtime.authorizeAdminSession(t, sessionRequest)
-	sessionState, err := client.GetCurrentAdminSession(ctx, sessionRequest)
-	if err != nil || sessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP {
-		t.Fatalf("current administrator session after password change: next=%s err=%v", sessionState.Msg.GetNextStep(), err)
-	}
-
-	enrollmentRequest := connect.NewRequest(&adminv1.BeginTotpEnrollmentRequest{OperationId: applicationOperationID(t)})
-	runtime.authorizeAdminSession(t, enrollmentRequest)
-	enrollment, err := client.BeginTotpEnrollment(ctx, enrollmentRequest)
-	if err != nil || enrollment.Msg.GetTotpSecret() == "" || enrollment.Msg.GetResult() == nil {
-		t.Fatalf("begin TOTP enrollment: err=%v", err)
-	}
-	code, err := admin.GenerateTOTPCode(enrollment.Msg.GetTotpSecret(), time.Now().UTC())
-	if err != nil {
-		t.Fatal("generate TOTP enrollment code")
-	}
-	completeRequest := connect.NewRequest(&adminv1.CompleteTotpEnrollmentRequest{
-		EnrollmentOperationId: enrollment.Msg.GetResult().GetOperationId(), RecoveryCodesOperationId: applicationOperationID(t), TotpCode: code,
-	})
-	runtime.authorizeAdminSession(t, completeRequest)
-	complete, err := client.CompleteTotpEnrollment(ctx, completeRequest)
-	if err != nil {
-		t.Fatalf("complete TOTP enrollment: %v", err)
-	}
-	if complete.Msg.GetSession().GetKind() != adminv1.AdminSessionKind_ADMIN_SESSION_KIND_FULL || len(complete.Msg.GetRecoveryCodes()) == 0 {
-		t.Fatalf("complete TOTP enrollment: session=%s codes=%d", complete.Msg.GetSession().GetKind(), len(complete.Msg.GetRecoveryCodes()))
-	}
-	fullSessionRequest := connect.NewRequest(&adminv1.GetCurrentAdminSessionRequest{})
-	runtime.authorizeAdminSession(t, fullSessionRequest)
-	fullSessionState, err := client.GetCurrentAdminSession(ctx, fullSessionRequest)
-	if err != nil {
-		t.Fatalf("current administrator session after enrollment: %v", err)
-	}
-	if fullSessionState.Msg.GetNextStep() != adminv1.AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED {
-		t.Fatalf("current administrator session after enrollment: next=%s", fullSessionState.Msg.GetNextStep())
-	}
-	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT, enrollment.Msg.GetResult())
-	confirmAdminSecret(t, ctx, runtime, client, adminv1.AdminSecretOperation_ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES, complete.Msg.GetResult())
-}
-
-// confirmAdminSecret verifies full-session authorization before deleting an administrator result envelope.
-func confirmAdminSecret(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminAuthServiceClient,
-	operation adminv1.AdminSecretOperation,
-	result *commonv1.OperationResult,
-) {
-	t.Helper()
-	request := connect.NewRequest(&adminv1.ConfirmAdminSecretReceiptRequest{
-		Operation: operation, OperationId: result.GetOperationId(), ResultId: result.GetResultId(),
-	})
-	runtime.authorizeAdminSession(t, request)
-	response, err := client.ConfirmAdminSecretReceipt(ctx, request)
-	if err != nil || !response.Msg.GetConfirmed() {
-		t.Fatalf("confirm administrator secret receipt: confirmed=%t err=%v", response.Msg.GetConfirmed(), err)
-	}
-}
-
-// exerciseAdminIdentity covers PII round trips, export lifecycle, governance, assisted recovery, device revocation, and audit reads.
-func exerciseAdminIdentity(
-	t testing.TB,
-	ctx context.Context,
-	runtime *applicationIntegrationRuntime,
-	client adminv1connect.AdminIdentityServiceClient,
-	identity integratedIdentity,
-) {
-	t.Helper()
-	getUserRequest := connect.NewRequest(&adminv1.GetUserRequest{Lookup: &adminv1.GetUserRequest_UserId{UserId: identity.userID}})
-	runtime.authorizeAdminIdentity(t, getUserRequest)
-	user, err := client.GetUser(ctx, getUserRequest)
-	if err != nil || user.Msg.GetUser().GetUserId() != identity.userID {
-		t.Fatalf("administrator get user: err=%v", err)
-	}
-
-	updateNameRequest := connect.NewRequest(&adminv1.UpdateRealNameRequest{
-		UserId: identity.userID, RealName: applicationTestRealName, Reason: "verified account ownership",
-	})
-	runtime.authorizeAdminIdentity(t, updateNameRequest)
-	updatedName, err := client.UpdateRealName(ctx, updateNameRequest)
-	if err != nil || updatedName.Msg.GetProfile().GetRealName() != applicationTestRealName {
-		t.Fatalf("administrator update real name: err=%v", err)
-	}
-	getNameRequest := connect.NewRequest(&adminv1.GetRealNameRequest{UserId: identity.userID, Reason: "support verification"})
-	runtime.authorizeAdminIdentity(t, getNameRequest)
-	readName, err := client.GetRealName(ctx, getNameRequest)
-	if err != nil || readName.Msg.GetProfile().GetRealName() != applicationTestRealName {
-		t.Fatalf("administrator read real name: err=%v", err)
-	}
-
-	createExportRequest := connect.NewRequest(&adminv1.CreateUserProfileExportRequest{
-		Filter: &adminv1.ProfileExportFilter{UserIds: []string{identity.userID}},
-		Fields: []adminv1.ProfileField{adminv1.ProfileField_PROFILE_FIELD_REAL_NAME}, Reason: "subject access export",
-	})
-	runtime.authorizeAdminIdentity(t, createExportRequest)
-	export, err := client.CreateUserProfileExport(ctx, createExportRequest)
-	if err != nil || export.Msg.GetExportId() == "" {
-		t.Fatalf("create profile export: err=%v", err)
-	}
-	exportPageRequest := connect.NewRequest(&adminv1.GetUserProfileExportPageRequest{ExportId: export.Msg.GetExportId(), PageSize: 10})
-	runtime.authorizeAdminIdentity(t, exportPageRequest)
-	exportPage, err := client.GetUserProfileExportPage(ctx, exportPageRequest)
-	if err != nil || len(exportPage.Msg.GetRecords()) != 1 || exportPage.Msg.GetRecords()[0].GetRealName() != applicationTestRealName {
-		t.Fatalf("read profile export page: count=%d err=%v", len(exportPage.Msg.GetRecords()), err)
-	}
-	completeExportRequest := connect.NewRequest(&adminv1.CompleteUserProfileExportRequest{ExportId: export.Msg.GetExportId()})
-	runtime.authorizeAdminIdentity(t, completeExportRequest)
-	completedExport, err := client.CompleteUserProfileExport(ctx, completeExportRequest)
-	if err != nil || !completedExport.Msg.GetCompleted() {
-		t.Fatalf("complete profile export: completed=%t err=%v", completedExport.Msg.GetCompleted(), err)
-	}
-
-	abortSourceRequest := connect.NewRequest(&adminv1.CreateUserProfileExportRequest{
-		Filter: &adminv1.ProfileExportFilter{UserIds: []string{identity.userID}},
-		Fields: []adminv1.ProfileField{adminv1.ProfileField_PROFILE_FIELD_REAL_NAME}, Reason: "cancelled subject access export",
-	})
-	runtime.authorizeAdminIdentity(t, abortSourceRequest)
-	abortSource, err := client.CreateUserProfileExport(ctx, abortSourceRequest)
-	if err != nil {
-		t.Fatalf("create abortable profile export: %v", err)
-	}
-	abortRequest := connect.NewRequest(&adminv1.AbortUserProfileExportRequest{ExportId: abortSource.Msg.GetExportId(), Reason: "operator cancelled export"})
-	runtime.authorizeAdminIdentity(t, abortRequest)
-	aborted, err := client.AbortUserProfileExport(ctx, abortRequest)
-	if err != nil || !aborted.Msg.GetAborted() {
-		t.Fatalf("abort profile export: aborted=%t err=%v", aborted.Msg.GetAborted(), err)
-	}
-
-	grantRequest := connect.NewRequest(&adminv1.CreateAssistedRecoveryGrantRequest{
-		UserId: identity.userID, OperationId: applicationOperationID(t), Reason: "verified assisted recovery",
-	})
-	runtime.authorizeAdminIdentity(t, grantRequest)
-	grant, err := client.CreateAssistedRecoveryGrant(ctx, grantRequest)
-	if err != nil || grant.Msg.GetAssistedRecoveryGrant() == "" {
-		t.Fatalf("create assisted recovery grant: err=%v", err)
-	}
-	usernameRequest := connect.NewRequest(&adminv1.ForceChangeUsernameRequest{
-		UserId: identity.userID, Username: "CA09", Reason: "moderated username change",
-	})
-	runtime.authorizeAdminIdentity(t, usernameRequest)
-	username, err := client.ForceChangeUsername(ctx, usernameRequest)
-	if err != nil || username.Msg.GetUser().GetUsername() != "CA09" {
-		t.Fatalf("force username change: err=%v", err)
-	}
-
-	revokeDeviceRequest := connect.NewRequest(&adminv1.RevokeUserDeviceRequest{
-		UserId: identity.userID, CredentialId: identity.initialCredentialID, Reason: "stale device removed",
-	})
-	runtime.authorizeAdminIdentity(t, revokeDeviceRequest)
-	revoked, err := client.RevokeUserDevice(ctx, revokeDeviceRequest)
-	if err != nil {
-		t.Fatalf("administrator revoke user device: %v", err)
-	}
-	if !revoked.Msg.GetRevoked() {
-		t.Fatal("administrator did not revoke the stale user device")
-	}
-}
-
 type applicationIntegrationRuntime struct {
 	// application owns the real PostgreSQL, Redis, Argon2, handler, and shutdown lifecycle used by the test client.
 	application *Application
-	// client retains both the generated TLS trust root and browser Cookie Jar across user and administrator calls.
+	// client retains both the generated TLS trust root and browser Cookie Jar across user calls.
 	client *http.Client
 	// serverURL is the parsed Cookie origin used to retrieve double-submit values from the Jar.
 	serverURL *url.URL
@@ -692,8 +308,8 @@ type applicationIntegrationRuntime struct {
 	logs *bytes.Buffer
 }
 
-// newApplicationIntegrationRuntime starts the production dependency graph with an explicit administrator MFA policy.
-func newApplicationIntegrationRuntime(t testing.TB, adminPasswordOnly bool) *applicationIntegrationRuntime {
+// newApplicationIntegrationRuntime starts the production dependency graph used by the browser-style TLS integration client.
+func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRuntime {
 	t.Helper()
 	values := integrationtest.RequireEnvironment(t, integrationtest.DependencyPostgres, applicationTestDatabaseEnvironment)
 	redisValues := integrationtest.RequireEnvironment(t, integrationtest.DependencyRedis, applicationTestRedisEnvironment)
@@ -732,7 +348,6 @@ func newApplicationIntegrationRuntime(t testing.TB, adminPasswordOnly bool) *app
 		Realtime: apiConfig.RealtimeConfig{
 			BootstrapURL: realtimeServer.URL, PeerURLs: []string{realtimeServer.URL}, InternalToken: strings.Repeat("r", 32),
 		},
-		AdminPasswordOnly: adminPasswordOnly,
 	}
 	logs := &bytes.Buffer{}
 	registry, err := gameregistry.New()
@@ -829,20 +444,6 @@ func (runtime *applicationIntegrationRuntime) authorizeUserWrite(t testing.TB, r
 	t.Helper()
 	runtime.setOriginHeader(request.Header(), applicationUserOrigin)
 	request.Header().Set(csrf.HeaderName, runtime.cookie(t, cookies.UserCSRFCookieName))
-}
-
-// authorizeAdminSession applies administrator Origin and CSRF without adding identity-only audit metadata.
-func (runtime *applicationIntegrationRuntime) authorizeAdminSession(t testing.TB, request interface{ Header() http.Header }) {
-	t.Helper()
-	runtime.setOriginHeader(request.Header(), applicationAdminOrigin)
-	request.Header().Set(csrf.HeaderName, runtime.cookie(t, cookies.AdminCSRFCookieName))
-}
-
-// authorizeAdminIdentity adds the mandatory correlation ID after establishing the administrator session proof.
-func (runtime *applicationIntegrationRuntime) authorizeAdminIdentity(t testing.TB, request interface{ Header() http.Header }) {
-	t.Helper()
-	runtime.authorizeAdminSession(t, request)
-	request.Header().Set(adminauth.RequestIDHeader, "request-"+uuid.NewString())
 }
 
 func (runtime *applicationIntegrationRuntime) setOrigin(request interface{ Header() http.Header }, origin string) {

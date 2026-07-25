@@ -28,8 +28,6 @@ const (
 	OperationRealNameRead Operation = "admin.real_name_read"
 	// OperationRealNameUpdate protects privileged PII writes before encryption or disclosure audit work begins.
 	OperationRealNameUpdate Operation = "admin.real_name_update"
-	// OperationProfileExport protects export creation and paging before materialization or decryption.
-	OperationProfileExport Operation = "admin.profile_export"
 )
 
 // String returns the stable operation label suitable for bounded metrics and adapter namespaces.
@@ -62,7 +60,6 @@ var policies = map[Operation]Policy{
 	OperationAdminSecondFactor:        newPolicy(OperationAdminSecondFactor, DimensionIP, DimensionAdminAccount, DimensionFlowPurpose),
 	OperationRealNameRead:             newPolicy(OperationRealNameRead, DimensionAdminSession, DimensionTargetUser),
 	OperationRealNameUpdate:           newPolicy(OperationRealNameUpdate, DimensionAdminSession, DimensionTargetUser),
-	OperationProfileExport:            newPolicy(OperationProfileExport, DimensionAdminSession, DimensionTargetUser),
 }
 
 // PolicyFor returns the immutable ordering contract for one protected operation.

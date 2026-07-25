@@ -11,28 +11,20 @@ import (
 )
 
 type Querier interface {
-	//AbortProfileExportContextCAS
+	//AcceptAdminTotpReplayCAS
 	//
-	//  UPDATE profile_export_contexts
-	//  SET status = 'aborted',
-	//      aborted_at = $1
-	//  WHERE export_id = $2
-	//    AND created_by_admin_id = $3
+	//  UPDATE admin_totp_enrollments
+	//  SET replay_floor = $1,
+	//      enrollment_version = enrollment_version + 1
+	//  WHERE admin_id = $2
+	//    AND enrollment_id = $3
 	//    AND status = 'active'
-	//  RETURNING export_id, status, aborted_at
-	AbortProfileExportContextCAS(ctx context.Context, arg AbortProfileExportContextCASParams) (AbortProfileExportContextCASRow, error)
-	//AcceptAdminTotpStepCAS
-	//
-	//  UPDATE admin_accounts
-	//  SET last_accepted_totp_step = $1,
-	//      updated_at = $2
-	//  WHERE singleton_id = 1
-	//    AND admin_id = $3
-	//    AND status IN ('setup_required', 'recovery_pending', 'active')
 	//    AND admin_version = $4
-	//    AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step < $1)
-	//  RETURNING admin_id, admin_version, last_accepted_totp_step, updated_at
-	AcceptAdminTotpStepCAS(ctx context.Context, arg AcceptAdminTotpStepCASParams) (AcceptAdminTotpStepCASRow, error)
+	//    AND enrollment_version = $5
+	//    AND replay_floor < $1
+	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+	AcceptAdminTotpReplayCAS(ctx context.Context, arg AcceptAdminTotpReplayCASParams) (AcceptAdminTotpReplayCASRow, error)
 	//AckOutboxConsumerOffsetCAS
 	//
 	//  UPDATE outbox_consumers
@@ -132,16 +124,20 @@ type Querier interface {
 	//
 	//  UPDATE admin_totp_enrollments
 	//  SET status = 'active',
+	//      admin_version = $1,
+	//      enrollment_version = enrollment_version + 1,
+	//      replay_floor = $2,
 	//      expires_at = NULL,
-	//      activated_at = $1
-	//  WHERE admin_id = $2
-	//    AND enrollment_id = $3
+	//      activated_at = $3
+	//  WHERE admin_id = $4
+	//    AND enrollment_id = $5
 	//    AND status = 'pending'
-	//    AND admin_version = $4
-	//    AND expires_at > $1
+	//    AND admin_version = $6
+	//    AND enrollment_version = $7
+	//    AND expires_at > $3
 	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-	//            operation_id, created_at, expires_at, activated_at, disabled_at
-	ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg ActivatePendingAdminTotpEnrollmentCASParams) (AdminTotpEnrollment, error)
+	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+	ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg ActivatePendingAdminTotpEnrollmentCASParams) (ActivatePendingAdminTotpEnrollmentCASRow, error)
 	//AdvanceKeyRotationCursorCAS
 	//
 	//  UPDATE key_rotation_jobs
@@ -344,17 +340,6 @@ type Querier interface {
 	//    AND created_at > $3 - INTERVAL '86400 seconds'
 	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 	CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnboardingUserCASParams) (User, error)
-	//CompleteProfileExportContextCAS
-	//
-	//  UPDATE profile_export_contexts
-	//  SET status = 'completed',
-	//      completed_at = $1
-	//  WHERE export_id = $2
-	//    AND created_by_admin_id = $3
-	//    AND status = 'active'
-	//    AND expires_at > $1
-	//  RETURNING export_id, status, completed_at
-	CompleteProfileExportContextCAS(ctx context.Context, arg CompleteProfileExportContextCASParams) (CompleteProfileExportContextCASRow, error)
 	//ConfirmSecretOperationResultCAS
 	//
 	//  UPDATE secret_operation_results
@@ -504,11 +489,9 @@ type Querier interface {
 	ConsumeUserRecoveryCredentialCAS(ctx context.Context, arg ConsumeUserRecoveryCredentialCASParams) (UserRecoveryCredential, error)
 	//CountPIIKeyReferences
 	//
-	//  SELECT (
-	//      (SELECT count(*) FROM user_profiles AS profile WHERE profile.real_name_key_version = $1)
-	//      +
-	//      (SELECT count(*) FROM profile_export_items AS item WHERE item.real_name_key_version = $1)
-	//  )::bigint AS reference_count
+	//  SELECT count(*)::bigint AS reference_count
+	//  FROM user_profiles
+	//  WHERE real_name_key_version = $1
 	CountPIIKeyReferences(ctx context.Context, arg CountPIIKeyReferencesParams) (int64, error)
 	//CountTotpKeyReferences
 	//
@@ -590,6 +573,39 @@ type Querier interface {
 	//            attempt_count, max_attempts, status, created_at, expires_at, consumed_at,
 	//            revoked_at, replay_until, operation_id, request_digest, result_id
 	CreateAdminChallenge(ctx context.Context, arg CreateAdminChallengeParams) (AdminChallenge, error)
+	//CreateAdminCommandReceipt
+	//
+	//  INSERT INTO admin_command_receipts (
+	//      admin_id,
+	//      operation_id,
+	//      request_digest,
+	//      command,
+	//      target_type,
+	//      target_id,
+	//      result_admin_version,
+	//      result_password_version,
+	//      result_session_version,
+	//      result_enrollment_version,
+	//      audit_event_id,
+	//      created_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10,
+	//      $11,
+	//      $12
+	//  )
+	//  RETURNING admin_id, operation_id, request_digest, command, target_type, target_id,
+	//            result_admin_version, result_password_version, result_session_version,
+	//            result_enrollment_version, audit_event_id, created_at
+	CreateAdminCommandReceipt(ctx context.Context, arg CreateAdminCommandReceiptParams) (AdminCommandReceipt, error)
 	//CreateAdminRecoveryCode
 	//
 	//  INSERT INTO admin_recovery_codes (
@@ -624,6 +640,9 @@ type Querier interface {
 	//      kind,
 	//      admin_version,
 	//      password_version,
+	//      session_version,
+	//      client_ip,
+	//      user_agent,
 	//      attempt_count,
 	//      max_attempts,
 	//      created_at,
@@ -640,17 +659,21 @@ type Querier interface {
 	//      $7,
 	//      $8,
 	//      $9,
-	//      0,
 	//      $10,
 	//      $11,
-	//      $11,
 	//      $12,
-	//      $13
+	//      0,
+	//      $13,
+	//      $14,
+	//      $14,
+	//      $15,
+	//      $16
 	//  )
 	//  RETURNING session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-	//            kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-	//            last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
-	CreateAdminSession(ctx context.Context, arg CreateAdminSessionParams) (AdminSession, error)
+	//            kind, admin_version, password_version, session_version, client_ip, user_agent,
+	//            attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+	//            absolute_expires_at, revoked_at, revoke_reason
+	CreateAdminSession(ctx context.Context, arg CreateAdminSessionParams) (CreateAdminSessionRow, error)
 	//CreateAnonymousChallenge
 	//
 	//  INSERT INTO anonymous_challenges (
@@ -1095,6 +1118,7 @@ type Querier interface {
 	//      key_version,
 	//      status,
 	//      admin_version,
+	//      enrollment_version,
 	//      operation_id,
 	//      created_at,
 	//      expires_at
@@ -1106,66 +1130,15 @@ type Querier interface {
 	//      $5,
 	//      'pending',
 	//      $6,
+	//      1,
 	//      $7,
 	//      $8,
 	//      $9
 	//  )
 	//  ON CONFLICT (admin_id) WHERE status = 'pending' DO NOTHING
 	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-	//            operation_id, created_at, expires_at, activated_at, disabled_at
-	CreatePendingAdminTotpEnrollment(ctx context.Context, arg CreatePendingAdminTotpEnrollmentParams) (AdminTotpEnrollment, error)
-	//CreateProfileExportContext
-	//
-	//  INSERT INTO profile_export_contexts (
-	//      export_id,
-	//      created_by_admin_id,
-	//      filter_digest,
-	//      requested_fields,
-	//      schema_version,
-	//      item_count,
-	//      status,
-	//      reason,
-	//      created_at,
-	//      expires_at
-	//  ) VALUES (
-	//      $1,
-	//      $2,
-	//      $3,
-	//      $4,
-	//      $5,
-	//      $6,
-	//      'active',
-	//      $7,
-	//      $8,
-	//      $9
-	//  )
-	//  RETURNING export_id, created_by_admin_id, filter_digest, requested_fields, schema_version,
-	//            item_count, status, reason, created_at, expires_at, completed_at, aborted_at, expired_at
-	CreateProfileExportContext(ctx context.Context, arg CreateProfileExportContextParams) (ProfileExportContext, error)
-	//CreateProfileExportItem
-	//
-	//  INSERT INTO profile_export_items (
-	//      export_id,
-	//      ordinal,
-	//      user_id,
-	//      username,
-	//      profile_version,
-	//      real_name_ciphertext,
-	//      real_name_nonce,
-	//      real_name_key_version
-	//  ) VALUES (
-	//      $1,
-	//      $2,
-	//      $3,
-	//      $4,
-	//      $5,
-	//      $6,
-	//      $7,
-	//      $8
-	//  )
-	//  RETURNING export_id, ordinal, user_id, username, profile_version,
-	//            real_name_ciphertext, real_name_nonce, real_name_key_version
-	CreateProfileExportItem(ctx context.Context, arg CreateProfileExportItemParams) (ProfileExportItem, error)
+	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
+	CreatePendingAdminTotpEnrollment(ctx context.Context, arg CreatePendingAdminTotpEnrollmentParams) (CreatePendingAdminTotpEnrollmentRow, error)
 	//CreateRoomActivityLease
 	//
 	//  INSERT INTO room_activity_leases (room_id, last_seen_at)
@@ -1489,25 +1462,19 @@ type Querier interface {
 	//
 	//  UPDATE admin_totp_enrollments
 	//  SET status = 'disabled',
+	//      admin_version = $1,
+	//      enrollment_version = enrollment_version + 1,
 	//      ciphertext = NULL,
 	//      nonce = NULL,
-	//      disabled_at = $1
-	//  WHERE admin_id = $2
-	//    AND enrollment_id = $3
+	//      disabled_at = $2
+	//  WHERE admin_id = $3
+	//    AND enrollment_id = $4
 	//    AND status = 'active'
-	//    AND admin_version = $4
-	//  RETURNING enrollment_id, admin_id, status, disabled_at
+	//    AND admin_version = $5
+	//    AND enrollment_version = $6
+	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
+	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 	DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg DisableActiveAdminTotpEnrollmentCASParams) (DisableActiveAdminTotpEnrollmentCASRow, error)
-	//ExpireProfileExportContextCAS
-	//
-	//  UPDATE profile_export_contexts
-	//  SET status = 'expired',
-	//      expired_at = $1
-	//  WHERE export_id = $2
-	//    AND status = 'active'
-	//    AND expires_at <= $1
-	//  RETURNING export_id, status, expired_at
-	ExpireProfileExportContextCAS(ctx context.Context, arg ExpireProfileExportContextCASParams) (ExpireProfileExportContextCASRow, error)
 	//ExpireRoomPendingStarts
 	//
 	//  UPDATE room_pending_starts
@@ -1567,12 +1534,12 @@ type Querier interface {
 	//GetActiveAdminTotpEnrollmentForUpdate
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-	//         operation_id, created_at, expires_at, activated_at, disabled_at
+	//         enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 	//  FROM admin_totp_enrollments
 	//  WHERE admin_id = $1
 	//    AND status = 'active'
 	//  FOR UPDATE
-	GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error)
+	GetActiveAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetActiveAdminTotpEnrollmentForUpdateParams) (GetActiveAdminTotpEnrollmentForUpdateRow, error)
 	//GetActiveUserRecoveryCredentialForUpdate
 	//
 	//  SELECT recovery_credential_id, user_id, selector, secret_hash, version, status,
@@ -1630,6 +1597,24 @@ type Querier interface {
 	//    AND challenge.password_version = current_admin.password_version
 	//  FOR UPDATE OF challenge
 	GetAdminChallengeForUpdate(ctx context.Context, arg GetAdminChallengeForUpdateParams) (AdminChallenge, error)
+	//GetAdminCommandReceipt
+	//
+	//  SELECT admin_id, operation_id, request_digest, command, target_type, target_id,
+	//         result_admin_version, result_password_version, result_session_version,
+	//         result_enrollment_version, audit_event_id, created_at
+	//  FROM admin_command_receipts
+	//  WHERE admin_id = $1
+	//    AND operation_id = $2
+	GetAdminCommandReceipt(ctx context.Context, arg GetAdminCommandReceiptParams) (AdminCommandReceipt, error)
+	//GetAdminElevationGrantForSessionScope
+	//
+	//  SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+	//         enrollment_version, granted_at, expires_at, revoked_at
+	//  FROM admin_elevation_grants
+	//  WHERE session_id = $1
+	//    AND scope = $2
+	//  FOR UPDATE
+	GetAdminElevationGrantForSessionScope(ctx context.Context, arg GetAdminElevationGrantForSessionScopeParams) (AdminElevationGrant, error)
 	//GetAdminRecoveryCodeForUpdate
 	//
 	//  SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
@@ -1638,15 +1623,41 @@ type Querier interface {
 	//  WHERE selector = $1
 	//  FOR UPDATE
 	GetAdminRecoveryCodeForUpdate(ctx context.Context, arg GetAdminRecoveryCodeForUpdateParams) (AdminRecoveryCode, error)
+	//GetAdminRecoveryCodeSetState
+	//
+	//  WITH latest AS (
+	//      SELECT COALESCE(MAX(set_version), 0)::bigint AS set_version
+	//      FROM admin_recovery_codes
+	//      WHERE admin_id = $1
+	//  )
+	//  SELECT latest.set_version,
+	//         COUNT(code.recovery_code_id) FILTER (WHERE code.status = 'active')::bigint AS remaining_active
+	//  FROM latest
+	//  LEFT JOIN admin_recovery_codes AS code
+	//    ON code.admin_id = $1
+	//   AND code.set_version = latest.set_version
+	//  GROUP BY latest.set_version
+	GetAdminRecoveryCodeSetState(ctx context.Context, arg GetAdminRecoveryCodeSetStateParams) (GetAdminRecoveryCodeSetStateRow, error)
+	//GetAdminSessionByIDForUpdate
+	//
+	//  SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+	//         kind, admin_version, password_version, session_version, client_ip, user_agent,
+	//         attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+	//         absolute_expires_at, revoked_at, revoke_reason
+	//  FROM admin_sessions
+	//  WHERE session_id = $1
+	//  FOR UPDATE
+	GetAdminSessionByIDForUpdate(ctx context.Context, arg GetAdminSessionByIDForUpdateParams) (GetAdminSessionByIDForUpdateRow, error)
 	//GetAdminSessionForUpdate
 	//
 	//  SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
-	//         kind, admin_version, password_version, attempt_count, max_attempts, created_at,
-	//         last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoke_reason
+	//         kind, admin_version, password_version, session_version, client_ip, user_agent,
+	//         attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+	//         absolute_expires_at, revoked_at, revoke_reason
 	//  FROM admin_sessions
 	//  WHERE selector = $1
 	//  FOR UPDATE
-	GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSessionForUpdateParams) (AdminSession, error)
+	GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSessionForUpdateParams) (GetAdminSessionForUpdateRow, error)
 	//GetAnonymousChallengeForUpdate
 	//
 	//  SELECT challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
@@ -1926,20 +1937,12 @@ type Querier interface {
 	//GetPendingAdminTotpEnrollmentForUpdate
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
-	//         operation_id, created_at, expires_at, activated_at, disabled_at
+	//         enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 	//  FROM admin_totp_enrollments
 	//  WHERE admin_id = $1
 	//    AND status = 'pending'
 	//  FOR UPDATE
-	GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetPendingAdminTotpEnrollmentForUpdateParams) (AdminTotpEnrollment, error)
-	//GetProfileExportContextForUpdate
-	//
-	//  SELECT export_id, created_by_admin_id, filter_digest, requested_fields, schema_version,
-	//         item_count, status, reason, created_at, expires_at, completed_at, aborted_at, expired_at
-	//  FROM profile_export_contexts
-	//  WHERE export_id = $1
-	//  FOR UPDATE
-	GetProfileExportContextForUpdate(ctx context.Context, arg GetProfileExportContextForUpdateParams) (ProfileExportContext, error)
+	GetPendingAdminTotpEnrollmentForUpdate(ctx context.Context, arg GetPendingAdminTotpEnrollmentForUpdateParams) (GetPendingAdminTotpEnrollmentForUpdateRow, error)
 	//GetRoomGameConfigDraft
 	//
 	//  SELECT room_id, game_id, engine_version, protocol_version, client_version,
@@ -2012,8 +2015,7 @@ type Querier interface {
 	//GetSingletonAdminForUpdate
 	//
 	//  SELECT singleton_id, admin_id, username, status, password_hash, password_algorithm,
-	//         password_parameters, password_version, admin_version, last_accepted_totp_step,
-	//         created_at, updated_at
+	//         password_parameters, password_version, admin_version, created_at, updated_at
 	//  FROM admin_accounts
 	//  WHERE singleton_id = 1
 	//  FOR UPDATE
@@ -2133,6 +2135,19 @@ type Querier interface {
 	//      logical_digest, status, result_code, result_digest, committed_state_version,
 	//      batch_id, created_at, completed_at
 	InsertGameSystemOperationPending(ctx context.Context, arg InsertGameSystemOperationPendingParams) (GameSystemOperation, error)
+	//ListActiveAdminSessions
+	//
+	//  SELECT session_id, admin_id, selector, secret_hash, secret_key_version, csrf_hash,
+	//         kind, admin_version, password_version, session_version, client_ip, user_agent,
+	//         attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
+	//         absolute_expires_at, revoked_at, revoke_reason
+	//  FROM admin_sessions
+	//  WHERE admin_id = $1
+	//    AND revoked_at IS NULL
+	//    AND idle_expires_at > $2
+	//    AND absolute_expires_at > $2
+	//  ORDER BY created_at ASC, session_id ASC
+	ListActiveAdminSessions(ctx context.Context, arg ListActiveAdminSessionsParams) ([]ListActiveAdminSessionsRow, error)
 	//ListAdminTotpEnrollmentsForKeyRotation
 	//
 	//  SELECT enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
@@ -2143,7 +2158,7 @@ type Querier interface {
 	//    AND ($2::uuid IS NULL OR enrollment_id > $2::uuid)
 	//  ORDER BY enrollment_id
 	//  LIMIT $3
-	ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, arg ListAdminTotpEnrollmentsForKeyRotationParams) ([]AdminTotpEnrollment, error)
+	ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, arg ListAdminTotpEnrollmentsForKeyRotationParams) ([]ListAdminTotpEnrollmentsForKeyRotationRow, error)
 	//ListAuditEvents
 	//
 	//  SELECT chain_id, sequence, event_id, previous_hash, canonical_event, event_hash,
@@ -2217,6 +2232,17 @@ type Querier interface {
 	//  ORDER BY timer_id
 	//  FOR UPDATE
 	ListGameSessionTimersForUpdate(ctx context.Context, arg ListGameSessionTimersForUpdateParams) ([]GameSessionTimer, error)
+	//ListLiveAdminElevationGrantsForSessions
+	//
+	//  SELECT admin_id, session_id, scope, admin_version, password_version, session_version,
+	//         enrollment_version, granted_at, expires_at, revoked_at
+	//  FROM admin_elevation_grants
+	//  WHERE admin_id = $1
+	//    AND session_id = ANY($2::uuid[])
+	//    AND revoked_at IS NULL
+	//    AND expires_at > $3
+	//  ORDER BY session_id, scope
+	ListLiveAdminElevationGrantsForSessions(ctx context.Context, arg ListLiveAdminElevationGrantsForSessionsParams) ([]AdminElevationGrant, error)
 	//ListMyRoomCards
 	//
 	//  SELECT room.room_id,
@@ -2301,54 +2327,10 @@ type Querier interface {
 	//ListPIIKeyVersionsWithReferences
 	//
 	//  SELECT DISTINCT real_name_key_version
-	//  FROM (
-	//      SELECT real_name_key_version FROM user_profiles
-	//      UNION ALL
-	//      SELECT real_name_key_version FROM profile_export_items
-	//  ) AS key_refs
+	//  FROM user_profiles
 	//  WHERE real_name_key_version IS NOT NULL
 	//  ORDER BY real_name_key_version
 	ListPIIKeyVersionsWithReferences(ctx context.Context) ([]int32, error)
-	//ListProfileExportItems
-	//
-	//  SELECT export_id, ordinal, user_id, username, profile_version,
-	//         real_name_ciphertext, real_name_nonce, real_name_key_version
-	//  FROM profile_export_items
-	//  WHERE export_id = $1
-	//    AND ordinal > $2
-	//  ORDER BY ordinal
-	//  LIMIT $3
-	ListProfileExportItems(ctx context.Context, arg ListProfileExportItemsParams) ([]ProfileExportItem, error)
-	//ListProfileExportItemsForKeyRotation
-	//
-	//  SELECT export_id, ordinal, user_id, profile_version, real_name_ciphertext,
-	//         real_name_nonce, real_name_key_version
-	//  FROM profile_export_items
-	//  WHERE real_name_key_version = $1
-	//    AND (
-	//        $2::uuid IS NULL
-	//        OR (export_id, ordinal) > (
-	//            $2::uuid,
-	//            $3::bigint
-	//        )
-	//    )
-	//  ORDER BY export_id, ordinal
-	//  LIMIT $4
-	ListProfileExportItemsForKeyRotation(ctx context.Context, arg ListProfileExportItemsForKeyRotationParams) ([]ListProfileExportItemsForKeyRotationRow, error)
-	//ListProfileExportSources
-	//
-	//  SELECT users.user_id,
-	//         users.username,
-	//         user_profiles.profile_version,
-	//         user_profiles.real_name_ciphertext,
-	//         user_profiles.real_name_nonce,
-	//         user_profiles.real_name_key_version
-	//  FROM users
-	//  LEFT JOIN user_profiles ON user_profiles.user_id = users.user_id
-	//  WHERE (cardinality($1::uuid[]) = 0 OR users.user_id = ANY($1::uuid[]))
-	//    AND (cardinality($2::text[]) = 0 OR users.status = ANY($2::text[]))
-	//  ORDER BY users.user_id
-	ListProfileExportSources(ctx context.Context, arg ListProfileExportSourcesParams) ([]ListProfileExportSourcesRow, error)
 	//ListPublicRoomCards
 	//
 	//  SELECT room.room_id,
@@ -2526,6 +2508,17 @@ type Querier interface {
 	//    AND attempt_count < max_attempts
 	//  RETURNING challenge_id, attempt_count, max_attempts, status, expires_at
 	RecordAdminChallengeFailureCAS(ctx context.Context, arg RecordAdminChallengeFailureCASParams) (RecordAdminChallengeFailureCASRow, error)
+	//RecordAdminMFAChangeCAS
+	//
+	//  UPDATE admin_accounts
+	//  SET admin_version = admin_version + 1,
+	//      updated_at = $1
+	//  WHERE singleton_id = 1
+	//    AND admin_id = $2
+	//    AND status = 'active'
+	//    AND admin_version = $3
+	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
+	RecordAdminMFAChangeCAS(ctx context.Context, arg RecordAdminMFAChangeCASParams) (RecordAdminMFAChangeCASRow, error)
 	//RecordAnonymousChallengeFailureCAS
 	//
 	//  UPDATE anonymous_challenges
@@ -2679,6 +2672,20 @@ type Querier interface {
 	//  WHERE admin_id = $2
 	//    AND status = 'active'
 	RevokeAdminChallenges(ctx context.Context, arg RevokeAdminChallengesParams) (int64, error)
+	//RevokeAdminElevationGrantCAS
+	//
+	//  UPDATE admin_elevation_grants
+	//  SET revoked_at = $1
+	//  WHERE session_id = $2
+	//    AND scope = $3
+	//    AND admin_version = $4
+	//    AND password_version = $5
+	//    AND session_version = $6
+	//    AND enrollment_version = $7
+	//    AND revoked_at IS NULL
+	//  RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+	//            enrollment_version, granted_at, expires_at, revoked_at
+	RevokeAdminElevationGrantCAS(ctx context.Context, arg RevokeAdminElevationGrantCASParams) (AdminElevationGrant, error)
 	//RevokeAdminRecoveryCodeSet
 	//
 	//  UPDATE admin_recovery_codes
@@ -2692,10 +2699,13 @@ type Querier interface {
 	//
 	//  UPDATE admin_sessions
 	//  SET revoked_at = $1,
-	//      revoke_reason = $2
+	//      revoke_reason = $2,
+	//      session_version = session_version + 1
 	//  WHERE session_id = $3
+	//    AND admin_id = $4
+	//    AND session_version = $5
 	//    AND revoked_at IS NULL
-	//  RETURNING session_id, revoked_at, revoke_reason
+	//  RETURNING session_id, session_version, revoked_at, revoke_reason
 	RevokeAdminSessionCAS(ctx context.Context, arg RevokeAdminSessionCASParams) (RevokeAdminSessionCASRow, error)
 	//RevokeAllAdminRecoveryCodeSets
 	//
@@ -2705,14 +2715,6 @@ type Querier interface {
 	//  WHERE admin_id = $2
 	//    AND status = 'active'
 	RevokeAllAdminRecoveryCodeSets(ctx context.Context, arg RevokeAllAdminRecoveryCodeSetsParams) (int64, error)
-	//RevokeAllAdminSessions
-	//
-	//  UPDATE admin_sessions
-	//  SET revoked_at = $1,
-	//      revoke_reason = $2
-	//  WHERE admin_id = $3
-	//    AND revoked_at IS NULL
-	RevokeAllAdminSessions(ctx context.Context, arg RevokeAllAdminSessionsParams) (int64, error)
 	//RevokeDeviceCredentialCAS
 	//
 	//  UPDATE device_credentials
@@ -2728,6 +2730,36 @@ type Querier interface {
 	//            created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
 	//            revoked_at, revoke_reason
 	RevokeDeviceCredentialCAS(ctx context.Context, arg RevokeDeviceCredentialCASParams) (DeviceCredential, error)
+	//RevokeOtherActiveAdminSessionsCAS
+	//
+	//  WITH preserved AS MATERIALIZED (
+	//      SELECT preserved_session.session_id
+	//      FROM admin_sessions AS preserved_session
+	//      WHERE preserved_session.session_id = $4
+	//        AND preserved_session.admin_id = $3
+	//        AND preserved_session.admin_version = $5
+	//        AND preserved_session.session_version = $6
+	//        AND preserved_session.revoked_at IS NULL
+	//        AND preserved_session.idle_expires_at > $1
+	//        AND preserved_session.absolute_expires_at > $1
+	//      FOR UPDATE OF preserved_session
+	//  )
+	//  UPDATE admin_sessions AS sessions
+	//  SET revoked_at = $1,
+	//      revoke_reason = $2,
+	//      session_version = sessions.session_version + 1
+	//  FROM preserved
+	//  WHERE sessions.admin_id = $3
+	//    AND sessions.session_id <> preserved.session_id
+	//    AND sessions.revoked_at IS NULL
+	//    AND sessions.idle_expires_at > $1
+	//    AND sessions.absolute_expires_at > $1
+	//  RETURNING sessions.session_id, sessions.admin_id, sessions.selector, sessions.secret_hash,
+	//            sessions.secret_key_version, sessions.csrf_hash, sessions.kind, sessions.admin_version,
+	//            sessions.password_version, sessions.session_version, sessions.client_ip, sessions.user_agent,
+	//            sessions.attempt_count, sessions.max_attempts, sessions.created_at, sessions.last_seen_at,
+	//            sessions.idle_expires_at, sessions.absolute_expires_at, sessions.revoked_at, sessions.revoke_reason
+	RevokeOtherActiveAdminSessionsCAS(ctx context.Context, arg RevokeOtherActiveAdminSessionsCASParams) ([]RevokeOtherActiveAdminSessionsCASRow, error)
 	//RevokeOtherDeviceCredentialsForRecovery
 	//
 	//  UPDATE device_credentials
@@ -2811,17 +2843,6 @@ type Querier interface {
 	//            created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at,
 	//            revoked_at, revoke_reason
 	RotateDeviceCredentialCAS(ctx context.Context, arg RotateDeviceCredentialCASParams) (DeviceCredential, error)
-	//RotateProfileExportItemCiphertextCAS
-	//
-	//  UPDATE profile_export_items
-	//  SET real_name_ciphertext = $1,
-	//      real_name_nonce = $2,
-	//      real_name_key_version = $3
-	//  WHERE export_id = $4
-	//    AND ordinal = $5
-	//    AND real_name_key_version = $6
-	//  RETURNING export_id, ordinal, user_id, real_name_key_version
-	RotateProfileExportItemCiphertextCAS(ctx context.Context, arg RotateProfileExportItemCiphertextCASParams) (RotateProfileExportItemCiphertextCASRow, error)
 	//RotateUserProfileCiphertextCAS
 	//
 	//  UPDATE user_profiles
@@ -2884,14 +2905,16 @@ type Querier interface {
 	//
 	//  UPDATE admin_sessions
 	//  SET last_seen_at = $1,
-	//      idle_expires_at = LEAST($2::timestamptz, absolute_expires_at)
+	//      idle_expires_at = LEAST($2::timestamptz, absolute_expires_at),
+	//      session_version = session_version + 1
 	//  WHERE session_id = $3
 	//    AND admin_version = $4
 	//    AND password_version = $5
+	//    AND session_version = $6
 	//    AND revoked_at IS NULL
 	//    AND idle_expires_at > $1
 	//    AND absolute_expires_at > $1
-	//  RETURNING session_id, kind, last_seen_at, idle_expires_at, absolute_expires_at
+	//  RETURNING session_id, kind, session_version, last_seen_at, idle_expires_at, absolute_expires_at
 	TouchAdminSessionCAS(ctx context.Context, arg TouchAdminSessionCASParams) (TouchAdminSessionCASRow, error)
 	//TouchDeviceCredentialCAS
 	//
@@ -3093,6 +3116,43 @@ type Querier interface {
 	//  RETURNING user_id, real_name_ciphertext, real_name_nonce, real_name_key_version,
 	//            profile_version, real_name_updated_at, real_name_updated_by
 	UpdateUserProfileCAS(ctx context.Context, arg UpdateUserProfileCASParams) (UserProfile, error)
+	//UpsertAdminElevationGrant
+	//
+	//  INSERT INTO admin_elevation_grants (
+	//      admin_id,
+	//      session_id,
+	//      scope,
+	//      admin_version,
+	//      password_version,
+	//      session_version,
+	//      enrollment_version,
+	//      granted_at,
+	//      expires_at,
+	//      revoked_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      $7,
+	//      $8,
+	//      $9,
+	//      $10
+	//  )
+	//  ON CONFLICT (session_id, scope) DO UPDATE
+	//  SET admin_id = EXCLUDED.admin_id,
+	//      admin_version = EXCLUDED.admin_version,
+	//      password_version = EXCLUDED.password_version,
+	//      session_version = EXCLUDED.session_version,
+	//      enrollment_version = EXCLUDED.enrollment_version,
+	//      granted_at = EXCLUDED.granted_at,
+	//      expires_at = EXCLUDED.expires_at,
+	//      revoked_at = EXCLUDED.revoked_at
+	//  RETURNING admin_id, session_id, scope, admin_version, password_version, session_version,
+	//            enrollment_version, granted_at, expires_at, revoked_at
+	UpsertAdminElevationGrant(ctx context.Context, arg UpsertAdminElevationGrantParams) (AdminElevationGrant, error)
 }
 
 var _ Querier = (*Queries)(nil)

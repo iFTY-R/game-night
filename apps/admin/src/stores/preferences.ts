@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { approvedPreferenceKeys } from "../api/cookies";
 import type { AppRouteName } from "../constants/navigation";
@@ -28,16 +28,33 @@ export const usePreferencesStore = defineStore("admin-preferences", () => {
   // Only non-sensitive UI preferences may survive a page refresh.
   const theme = ref<ThemePreference>(readStored(storageKey.theme, "system"));
   const siderCollapsed = ref<boolean>(readStored(storageKey.collapsed, false));
-  const persistedTabs = ref<AppRouteName[]>(readStored(storageKey.tabs, ["overview"]));
+  const persistedTabs = ref<AppRouteName[]>(readStored(storageKey.tabs, ["security"]));
+
+  const systemThemeQuery =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-color-scheme: dark)")
+      : null;
+  // This reactive value bridges browser media-query changes into Vue's computed theme state.
+  const systemTheme = ref<ResolvedTheme>(systemThemeQuery?.matches ? "dark" : "light");
+
+  const handleSystemThemeChange = (event: MediaQueryListEvent): void => {
+    systemTheme.value = event.matches ? "dark" : "light";
+  };
+
+  if (systemThemeQuery) {
+    // Keep a long-lived system preference listener because "system" remains selectable after store creation.
+    systemThemeQuery.addEventListener("change", handleSystemThemeChange);
+    onScopeDispose(() => {
+      // Pinia store disposal must release the browser listener used by tests and hot module replacement.
+      systemThemeQuery.removeEventListener("change", handleSystemThemeChange);
+    });
+  }
 
   const resolvedTheme = computed<ResolvedTheme>(() => {
     if (theme.value !== "system") {
       return theme.value;
     }
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return "light";
-    }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return systemTheme.value;
   });
 
   watch(theme, (value) => localStorage.setItem(storageKey.theme, JSON.stringify(value)), { deep: false });

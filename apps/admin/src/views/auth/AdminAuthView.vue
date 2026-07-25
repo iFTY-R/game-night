@@ -2,55 +2,54 @@
 import { computed, ref, watch } from "vue";
 import { NAlert, NButton, NCard } from "naive-ui";
 import { useRouter } from "vue-router";
+import { AdminAccountState, AdminSessionKind } from "../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
+import AdminLoginForm from "./components/AdminLoginForm.vue";
+import InitialPasswordForm from "./components/InitialPasswordForm.vue";
+import MfaChallengeForm from "./components/MfaChallengeForm.vue";
 import BootstrapPendingState from "../../components/auth/BootstrapPendingState.vue";
-import ChangePasswordStep from "../../components/auth/ChangePasswordStep.vue";
-import LoginPasswordStep from "../../components/auth/LoginPasswordStep.vue";
-import MfaVerificationStep from "../../components/auth/MfaVerificationStep.vue";
-import TotpEnrollmentStep from "../../components/auth/TotpEnrollmentStep.vue";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
 const router = useRouter();
 const submitting = ref(false);
 
+// Compute panel title based on session kind
 const panelTitle = computed(() => {
-  switch (auth.currentStep) {
-    case "bootstrap":
-      return "等待初始化";
-    case "changePassword":
+  if (!auth.session) {
+    return auth.setupState === AdminAccountState.BOOTSTRAP_PENDING ? "等待初始化" : "管理员登录";
+  }
+  switch (auth.session.kind) {
+    case AdminSessionKind.SETUP_PASSWORD_PENDING:
       return "修改初始密码";
-    case "enrollTotp":
-      return "绑定身份验证器";
-    case "verifyMfa":
+    case AdminSessionKind.MFA_PENDING:
       return "多因素验证";
-    case "rebindTotp":
-      return "重绑验证器";
-    case "authenticated":
+    case AdminSessionKind.FULL:
       return "已通过认证";
     default:
       return "管理员登录";
   }
 });
 
+// Sync route based on session state
 const syncRoute = async (): Promise<void> => {
-  switch (auth.currentStep) {
-    case "authenticated":
-      await router.replace({ name: "overview" });
-      break;
-    case "bootstrap":
+  if (!auth.session) {
+    if (auth.setupState === AdminAccountState.BOOTSTRAP_PENDING) {
       await router.replace({ name: "auth-bootstrap" });
+    } else {
+      await router.replace({ name: "auth-login" });
+    }
+    return;
+  }
+
+  switch (auth.session.kind) {
+    case AdminSessionKind.FULL:
+      await router.replace({ name: "security" });
       break;
-    case "changePassword":
+    case AdminSessionKind.SETUP_PASSWORD_PENDING:
       await router.replace({ name: "auth-change-password" });
       break;
-    case "enrollTotp":
-      await router.replace({ name: "auth-enroll-totp" });
-      break;
-    case "verifyMfa":
+    case AdminSessionKind.MFA_PENDING:
       await router.replace({ name: "auth-verify-mfa" });
-      break;
-    case "rebindTotp":
-      await router.replace({ name: "auth-rebind-totp" });
       break;
     default:
       await router.replace({ name: "auth-login" });
@@ -58,7 +57,7 @@ const syncRoute = async (): Promise<void> => {
 };
 
 watch(
-  () => auth.currentStep,
+  () => [auth.session?.kind, auth.setupState],
   () => {
     void syncRoute();
   },
@@ -74,7 +73,8 @@ const run = async (work: () => Promise<void>): Promise<void> => {
   }
 };
 
-if (auth.currentStep === "login" && !auth.challenge) {
+// Start login flow if no challenge
+if (!auth.session && !auth.challenge) {
   void auth.startLogin();
 }
 </script>
@@ -99,53 +99,32 @@ if (auth.currentStep === "login" && !auth.challenge) {
 
       <NCard class="admin-card-shell auth-shell__card" :bordered="false" :title="panelTitle">
         <BootstrapPendingState
-          v-if="auth.currentStep === 'bootstrap'"
+          v-if="!auth.session && auth.setupState === AdminAccountState.BOOTSTRAP_PENDING"
           :loading="auth.restoring"
           @retry="auth.restore"
         />
-        <LoginPasswordStep
-          v-else-if="auth.currentStep === 'login'"
+        <AdminLoginForm
+          v-else-if="!auth.session"
           :pending="submitting"
           :error-message="auth.errorMessage"
           @submit="(password) => run(() => auth.submitPassword(password))"
         />
-        <ChangePasswordStep
-          v-else-if="auth.currentStep === 'changePassword'"
+        <InitialPasswordForm
+          v-else-if="auth.session.kind === AdminSessionKind.SETUP_PASSWORD_PENDING"
           :pending="submitting"
+          :error-message="auth.errorMessage"
           @submit="(password) => run(() => auth.submitInitialPassword(password))"
         />
-        <MfaVerificationStep
-          v-else-if="auth.currentStep === 'verifyMfa'"
+        <MfaChallengeForm
+          v-else-if="auth.session.kind === AdminSessionKind.MFA_PENDING"
           :pending="submitting"
+          :error-message="auth.errorMessage"
           @totp="(code) => run(() => auth.submitTotp(code))"
           @recovery="(code) => run(() => auth.submitRecoveryCode(code))"
         />
-        <TotpEnrollmentStep
-          v-else-if="auth.currentStep === 'enrollTotp'"
-          :pending="submitting"
-          :operation="auth.secretEnvelope?.result ?? null"
-          :secret="auth.secretEnvelope?.totpSecret ?? null"
-          :otpauth-uri="auth.secretEnvelope?.otpauthUri ?? null"
-          :recovery-codes="auth.secretEnvelope?.recoveryCodes ?? null"
-          @begin="() => run(() => auth.openTotpEnrollment())"
-          @complete="(code) => run(() => auth.finishTotpEnrollment(code))"
-          @acknowledge="() => run(() => auth.acknowledgeSecretReceipt())"
-        />
-        <TotpEnrollmentStep
-          v-else-if="auth.currentStep === 'rebindTotp'"
-          rebind
-          :pending="submitting"
-          :operation="auth.secretEnvelope?.result ?? null"
-          :secret="auth.secretEnvelope?.totpSecret ?? null"
-          :otpauth-uri="auth.secretEnvelope?.otpauthUri ?? null"
-          :recovery-codes="auth.secretEnvelope?.recoveryCodes ?? null"
-          @begin="() => run(() => auth.openTotpRebind())"
-          @complete="(code) => run(() => auth.finishTotpRebind(code))"
-          @acknowledge="() => run(() => auth.acknowledgeSecretReceipt())"
-        />
         <div v-else class="admin-grid">
           <NAlert type="success" title="认证完成">页面正在进入管理后台。</NAlert>
-          <NButton type="primary" @click="router.replace({ name: 'overview' })">进入后台</NButton>
+          <NButton type="primary" @click="router.replace({ name: 'security' })">进入后台</NButton>
         </div>
       </NCard>
     </div>

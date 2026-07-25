@@ -33,7 +33,6 @@ import (
 	identitydomain "github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
-	"github.com/iFTY-R/game-night/platform/profile"
 	roomdomain "github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/iFTY-R/game-night/platform/security"
@@ -182,8 +181,8 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
-	userService, adminService, adminIdentityService, err := domainServices(
-		keyrings, source, pool, userLimiter, adminLimiter, argon2Service, auditService, checkpointPolicy, config.AdminPasswordOnly,
+	userService, adminService, err := domainServices(
+		keyrings, source, pool, userLimiter, adminLimiter, argon2Service, auditService, checkpointPolicy,
 	)
 	if err != nil {
 		return nil, errInitializeServices
@@ -207,7 +206,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	handler, err := transportHandler(
 		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameSessionRepository, roomRepository,
-		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminIdentityService,
+		ruleRepository, replayAccessRepository, gameCoordinator, adminService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -335,85 +334,73 @@ func domainServices(
 	argon2Service *security.Argon2Service,
 	auditService *audit.Service,
 	checkpointPolicy *audit.CheckpointHealthPolicy,
-	allowAdminPasswordOnly bool,
-) (*identitydomain.Service, *admin.Service, *admin.IdentityService, error) {
+) (*identitydomain.Service, *admin.Service, error) {
 	userChallenges, err := identitydomain.NewChallengeService(keyrings.UserChallenge, source)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	adminChallenges, err := admin.NewChallengeService(keyrings.AdminChallenge, source)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	devices, err := identitydomain.NewDeviceService(keyrings.Device, source)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	envelope, err := secretresult.NewEnvelopeCipher(keyrings.ResultEnvelope)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	userResults, err := secretresult.NewServiceWithIdentityAccess(envelope, source, keyrings.Device, keyrings.UserChallenge)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	adminResults, err := secretresult.NewServiceWithAdminAccess(envelope, source, keyrings.AdminSession)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	identityRecovery, err := identitydomain.NewRecoveryCodeService(argon2Service)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	recoveryAttempts, err := identitydomain.NewRecoveryAttemptService(keyrings.UserChallenge, source)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	usernames, err := identifier.NewUsernameValidator(nil, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	identityService, err := identitydomain.NewServiceWithRecovery(
 		userChallenges, devices, identityRecovery, recoveryAttempts, userResults,
 		postgres.NewIdentityUnitOfWorkWithAudit(pool, auditService), userLimiter, usernames, source, auditService, checkpointPolicy,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	adminRecovery, err := admin.NewRecoveryCodeService(argon2Service)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	totpService, err := admin.NewTOTPService(keyrings.TOTP)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	sessions, err := admin.NewSessionService(keyrings.AdminSession, source)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	adminUnitOfWork := postgres.NewAdminUnitOfWorkWithAudit(pool, auditService)
 	adminService, err := admin.NewService(admin.ServiceDependencies{
 		Challenge: adminChallenges, Passwords: argon2Service, PasswordPolicy: admin.DefaultPasswordPolicy(),
 		TOTP: totpService, Sessions: sessions, RecoveryCodes: adminRecovery, Results: adminResults,
-		Clock: source, UnitOfWork: adminUnitOfWork, Limiter: adminLimiter, AllowPasswordOnly: allowAdminPasswordOnly,
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	pii, err := profile.NewDefaultPIIProtector(keyrings.PII)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	adminIdentityService, err := admin.NewIdentityService(admin.IdentityServiceDependencies{
-		Clock: source, UnitOfWork: adminUnitOfWork, Sessions: sessions, Authorizer: admin.NewAdminAuthorizer(),
-		Limiter: adminLimiter, PII: pii, RecoveryCodes: identityRecovery, Results: adminResults,
+		Clock: source, UnitOfWork: adminUnitOfWork, Limiter: adminLimiter,
 		Audit: auditService, CheckpointHealth: checkpointPolicy,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return identityService, adminService, adminIdentityService, nil
+	return identityService, adminService, nil
 }
 
 func transportHandler(
@@ -429,7 +416,6 @@ func transportHandler(
 	replays *postgres.ReplayAccessRepository,
 	gameCoordinator *redisstore.GameCoordinator,
 	adminService *admin.Service,
-	adminIdentityService *admin.IdentityService,
 	metricRegistry *metrics.Registry,
 	readiness *server.Readiness,
 	logger *slog.Logger,
@@ -488,7 +474,7 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	adminContext, err := adminauth.NewContextInterceptor(adminOrigins, csrf.NewAdminValidator(), adminProxy)
+	adminContext, err := adminauth.NewContextInterceptor(adminService, adminOrigins, csrf.NewAdminValidator(), adminProxy)
 	if err != nil {
 		return nil, err
 	}
@@ -496,11 +482,7 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	adminAuthHandler, err := adminauth.NewRuntimeReadinessService(adminService, adminEffects, readiness)
-	if err != nil {
-		return nil, err
-	}
-	adminIdentityHandler, err := admin.NewConnectAdminIdentityService(adminIdentityService, adminService)
+	adminAuthHandler, err := adminauth.NewService(adminService, adminEffects, readiness)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +492,7 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	adminOperations := append(append([]string(nil), sensitive.AdminAuthOperations...), sensitive.AdminIdentityOperations...)
+	adminOperations := append([]string(nil), sensitive.AdminAuthOperations...)
 	adminSensitive, err := sensitive.New(adminOperations...)
 	if err != nil {
 		return nil, err
@@ -531,7 +513,7 @@ func transportHandler(
 		return nil, err
 	}
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
-		Auth: adminAuthHandler, Identity: adminIdentityHandler,
+		Auth:         adminAuthHandler,
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {

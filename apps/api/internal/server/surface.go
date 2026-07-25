@@ -33,7 +33,6 @@ type UserSurfaceConfig struct {
 // identity handlers cannot be registered through this configuration.
 type AdminSurfaceConfig struct {
 	Auth         adminv1connect.AdminAuthServiceHandler
-	Identity     adminv1connect.AdminIdentityServiceHandler
 	Interceptors []connect.Interceptor
 }
 
@@ -66,22 +65,20 @@ func (surface *UserSurface) ServeHTTP(writer http.ResponseWriter, request *http.
 	surface.handler.ServeHTTP(writer, request)
 }
 
-// AdminSurface exposes only AdminAuthService and AdminIdentityService.
+// AdminSurface exposes only AdminAuthService.
 // Operational readiness is available through the authenticated AdminAuthService RPC.
 type AdminSurface struct{ handler http.Handler }
 
 // NewAdminSurface builds an immutable administrator mux with an interceptor
 // chain independent from the one supplied to NewUserSurface.
 func NewAdminSurface(config AdminSurfaceConfig) (*AdminSurface, error) {
-	if config.Auth == nil || config.Identity == nil || invalidInterceptors(config.Interceptors) {
+	if config.Auth == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
 	authPath, authHandler := adminv1connect.NewAdminAuthServiceHandler(config.Auth, options...)
-	identityPath, identityHandler := adminv1connect.NewAdminIdentityServiceHandler(config.Identity, options...)
 	mux := http.NewServeMux()
 	mux.Handle(authPath, authHandler)
-	mux.Handle(identityPath, identityHandler)
 	return &AdminSurface{handler: mux}, nil
 }
 
@@ -111,7 +108,6 @@ func NewHandler(config HandlerConfig) (http.Handler, error) {
 	mux.Handle("/"+roomv1connect.RoomServiceName+"/", config.User)
 	mux.Handle("/"+gamev1connect.GameServiceName+"/", config.User)
 	mux.Handle("/"+adminv1connect.AdminAuthServiceName+"/", config.Admin)
-	mux.Handle("/"+adminv1connect.AdminIdentityServiceName+"/", config.Admin)
 	// Both immutable surfaces own the same readiness instance; routing through one avoids duplicate public paths.
 	mux.Handle(ReadinessPath, config.User)
 	mux.Handle(SensitiveReadinessPath, config.User)

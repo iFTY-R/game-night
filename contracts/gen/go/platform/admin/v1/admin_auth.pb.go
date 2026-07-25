@@ -10,7 +10,7 @@ import (
 	v1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -23,256 +23,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type AdminSetupState int32
-
-const (
-	AdminSetupState_ADMIN_SETUP_STATE_UNSPECIFIED       AdminSetupState = 0
-	AdminSetupState_ADMIN_SETUP_STATE_BOOTSTRAP_PENDING AdminSetupState = 1
-	AdminSetupState_ADMIN_SETUP_STATE_SETUP_REQUIRED    AdminSetupState = 2
-	AdminSetupState_ADMIN_SETUP_STATE_ACTIVE            AdminSetupState = 3
-)
-
-// Enum value maps for AdminSetupState.
-var (
-	AdminSetupState_name = map[int32]string{
-		0: "ADMIN_SETUP_STATE_UNSPECIFIED",
-		1: "ADMIN_SETUP_STATE_BOOTSTRAP_PENDING",
-		2: "ADMIN_SETUP_STATE_SETUP_REQUIRED",
-		3: "ADMIN_SETUP_STATE_ACTIVE",
-	}
-	AdminSetupState_value = map[string]int32{
-		"ADMIN_SETUP_STATE_UNSPECIFIED":       0,
-		"ADMIN_SETUP_STATE_BOOTSTRAP_PENDING": 1,
-		"ADMIN_SETUP_STATE_SETUP_REQUIRED":    2,
-		"ADMIN_SETUP_STATE_ACTIVE":            3,
-	}
-)
-
-func (x AdminSetupState) Enum() *AdminSetupState {
-	p := new(AdminSetupState)
-	*p = x
-	return p
-}
-
-func (x AdminSetupState) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (AdminSetupState) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_admin_v1_admin_auth_proto_enumTypes[0].Descriptor()
-}
-
-func (AdminSetupState) Type() protoreflect.EnumType {
-	return &file_platform_admin_v1_admin_auth_proto_enumTypes[0]
-}
-
-func (x AdminSetupState) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use AdminSetupState.Descriptor instead.
-func (AdminSetupState) EnumDescriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{0}
-}
-
-type AdminNextStep int32
-
-const (
-	AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED     AdminNextStep = 0
-	AdminNextStep_ADMIN_NEXT_STEP_CHANGE_PASSWORD AdminNextStep = 1
-	AdminNextStep_ADMIN_NEXT_STEP_ENROLL_TOTP     AdminNextStep = 2
-	AdminNextStep_ADMIN_NEXT_STEP_VERIFY_MFA      AdminNextStep = 3
-	AdminNextStep_ADMIN_NEXT_STEP_REBIND_TOTP     AdminNextStep = 4
-	AdminNextStep_ADMIN_NEXT_STEP_AUTHENTICATED   AdminNextStep = 5
-)
-
-// Enum value maps for AdminNextStep.
-var (
-	AdminNextStep_name = map[int32]string{
-		0: "ADMIN_NEXT_STEP_UNSPECIFIED",
-		1: "ADMIN_NEXT_STEP_CHANGE_PASSWORD",
-		2: "ADMIN_NEXT_STEP_ENROLL_TOTP",
-		3: "ADMIN_NEXT_STEP_VERIFY_MFA",
-		4: "ADMIN_NEXT_STEP_REBIND_TOTP",
-		5: "ADMIN_NEXT_STEP_AUTHENTICATED",
-	}
-	AdminNextStep_value = map[string]int32{
-		"ADMIN_NEXT_STEP_UNSPECIFIED":     0,
-		"ADMIN_NEXT_STEP_CHANGE_PASSWORD": 1,
-		"ADMIN_NEXT_STEP_ENROLL_TOTP":     2,
-		"ADMIN_NEXT_STEP_VERIFY_MFA":      3,
-		"ADMIN_NEXT_STEP_REBIND_TOTP":     4,
-		"ADMIN_NEXT_STEP_AUTHENTICATED":   5,
-	}
-)
-
-func (x AdminNextStep) Enum() *AdminNextStep {
-	p := new(AdminNextStep)
-	*p = x
-	return p
-}
-
-func (x AdminNextStep) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (AdminNextStep) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_admin_v1_admin_auth_proto_enumTypes[1].Descriptor()
-}
-
-func (AdminNextStep) Type() protoreflect.EnumType {
-	return &file_platform_admin_v1_admin_auth_proto_enumTypes[1]
-}
-
-func (x AdminNextStep) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use AdminNextStep.Descriptor instead.
-func (AdminNextStep) EnumDescriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{1}
-}
-
-type AdminSessionKind int32
-
-const (
-	AdminSessionKind_ADMIN_SESSION_KIND_UNSPECIFIED             AdminSessionKind = 0
-	AdminSessionKind_ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING  AdminSessionKind = 1
-	AdminSessionKind_ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING AdminSessionKind = 2
-	AdminSessionKind_ADMIN_SESSION_KIND_MFA_PENDING             AdminSessionKind = 3
-	AdminSessionKind_ADMIN_SESSION_KIND_RECOVERY_PENDING        AdminSessionKind = 4
-	AdminSessionKind_ADMIN_SESSION_KIND_FULL                    AdminSessionKind = 5
-)
-
-// Enum value maps for AdminSessionKind.
-var (
-	AdminSessionKind_name = map[int32]string{
-		0: "ADMIN_SESSION_KIND_UNSPECIFIED",
-		1: "ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING",
-		2: "ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING",
-		3: "ADMIN_SESSION_KIND_MFA_PENDING",
-		4: "ADMIN_SESSION_KIND_RECOVERY_PENDING",
-		5: "ADMIN_SESSION_KIND_FULL",
-	}
-	AdminSessionKind_value = map[string]int32{
-		"ADMIN_SESSION_KIND_UNSPECIFIED":             0,
-		"ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING":  1,
-		"ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING": 2,
-		"ADMIN_SESSION_KIND_MFA_PENDING":             3,
-		"ADMIN_SESSION_KIND_RECOVERY_PENDING":        4,
-		"ADMIN_SESSION_KIND_FULL":                    5,
-	}
-)
-
-func (x AdminSessionKind) Enum() *AdminSessionKind {
-	p := new(AdminSessionKind)
-	*p = x
-	return p
-}
-
-func (x AdminSessionKind) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (AdminSessionKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_admin_v1_admin_auth_proto_enumTypes[2].Descriptor()
-}
-
-func (AdminSessionKind) Type() protoreflect.EnumType {
-	return &file_platform_admin_v1_admin_auth_proto_enumTypes[2]
-}
-
-func (x AdminSessionKind) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use AdminSessionKind.Descriptor instead.
-func (AdminSessionKind) EnumDescriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{2}
-}
-
-type AdminPermission int32
-
-const (
-	AdminPermission_ADMIN_PERMISSION_UNSPECIFIED      AdminPermission = 0
-	AdminPermission_ADMIN_PERMISSION_GET_USER         AdminPermission = 1
-	AdminPermission_ADMIN_PERMISSION_GET_REAL_NAME    AdminPermission = 2
-	AdminPermission_ADMIN_PERMISSION_UPDATE_REAL_NAME AdminPermission = 3
-	AdminPermission_ADMIN_PERMISSION_EXPORT_PROFILE   AdminPermission = 4
-	AdminPermission_ADMIN_PERMISSION_MANAGE_RECOVERY  AdminPermission = 5
-	AdminPermission_ADMIN_PERMISSION_FORCE_USERNAME   AdminPermission = 6
-	AdminPermission_ADMIN_PERMISSION_SUSPEND_USER     AdminPermission = 7
-	AdminPermission_ADMIN_PERMISSION_DELETE_USER      AdminPermission = 8
-	AdminPermission_ADMIN_PERMISSION_REVOKE_DEVICE    AdminPermission = 9
-	AdminPermission_ADMIN_PERMISSION_READ_AUDIT       AdminPermission = 10
-)
-
-// Enum value maps for AdminPermission.
-var (
-	AdminPermission_name = map[int32]string{
-		0:  "ADMIN_PERMISSION_UNSPECIFIED",
-		1:  "ADMIN_PERMISSION_GET_USER",
-		2:  "ADMIN_PERMISSION_GET_REAL_NAME",
-		3:  "ADMIN_PERMISSION_UPDATE_REAL_NAME",
-		4:  "ADMIN_PERMISSION_EXPORT_PROFILE",
-		5:  "ADMIN_PERMISSION_MANAGE_RECOVERY",
-		6:  "ADMIN_PERMISSION_FORCE_USERNAME",
-		7:  "ADMIN_PERMISSION_SUSPEND_USER",
-		8:  "ADMIN_PERMISSION_DELETE_USER",
-		9:  "ADMIN_PERMISSION_REVOKE_DEVICE",
-		10: "ADMIN_PERMISSION_READ_AUDIT",
-	}
-	AdminPermission_value = map[string]int32{
-		"ADMIN_PERMISSION_UNSPECIFIED":      0,
-		"ADMIN_PERMISSION_GET_USER":         1,
-		"ADMIN_PERMISSION_GET_REAL_NAME":    2,
-		"ADMIN_PERMISSION_UPDATE_REAL_NAME": 3,
-		"ADMIN_PERMISSION_EXPORT_PROFILE":   4,
-		"ADMIN_PERMISSION_MANAGE_RECOVERY":  5,
-		"ADMIN_PERMISSION_FORCE_USERNAME":   6,
-		"ADMIN_PERMISSION_SUSPEND_USER":     7,
-		"ADMIN_PERMISSION_DELETE_USER":      8,
-		"ADMIN_PERMISSION_REVOKE_DEVICE":    9,
-		"ADMIN_PERMISSION_READ_AUDIT":       10,
-	}
-)
-
-func (x AdminPermission) Enum() *AdminPermission {
-	p := new(AdminPermission)
-	*p = x
-	return p
-}
-
-func (x AdminPermission) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (AdminPermission) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_admin_v1_admin_auth_proto_enumTypes[3].Descriptor()
-}
-
-func (AdminPermission) Type() protoreflect.EnumType {
-	return &file_platform_admin_v1_admin_auth_proto_enumTypes[3]
-}
-
-func (x AdminPermission) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use AdminPermission.Descriptor instead.
-func (AdminPermission) EnumDescriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{3}
-}
-
 type AdminSecretOperation int32
 
 const (
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_UNSPECIFIED               AdminSecretOperation = 0
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT           AdminSecretOperation = 1
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES    AdminSecretOperation = 2
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_REBIND               AdminSecretOperation = 3
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES AdminSecretOperation = 4
-	AdminSecretOperation_ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT   AdminSecretOperation = 5
+	AdminSecretOperation_ADMIN_SECRET_OPERATION_UNSPECIFIED                AdminSecretOperation = 0
+	AdminSecretOperation_ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT            AdminSecretOperation = 1
+	AdminSecretOperation_ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES     AdminSecretOperation = 2
+	AdminSecretOperation_ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES AdminSecretOperation = 3
 )
 
 // Enum value maps for AdminSecretOperation.
@@ -281,17 +38,13 @@ var (
 		0: "ADMIN_SECRET_OPERATION_UNSPECIFIED",
 		1: "ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT",
 		2: "ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES",
-		3: "ADMIN_SECRET_OPERATION_TOTP_REBIND",
-		4: "ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES",
-		5: "ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT",
+		3: "ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES",
 	}
 	AdminSecretOperation_value = map[string]int32{
-		"ADMIN_SECRET_OPERATION_UNSPECIFIED":               0,
-		"ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT":           1,
-		"ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES":    2,
-		"ADMIN_SECRET_OPERATION_TOTP_REBIND":               3,
-		"ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES": 4,
-		"ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT":   5,
+		"ADMIN_SECRET_OPERATION_UNSPECIFIED":                0,
+		"ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT":            1,
+		"ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES":     2,
+		"ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES": 3,
 	}
 )
 
@@ -306,11 +59,11 @@ func (x AdminSecretOperation) String() string {
 }
 
 func (AdminSecretOperation) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_admin_v1_admin_auth_proto_enumTypes[4].Descriptor()
+	return file_platform_admin_v1_admin_auth_proto_enumTypes[0].Descriptor()
 }
 
 func (AdminSecretOperation) Type() protoreflect.EnumType {
-	return &file_platform_admin_v1_admin_auth_proto_enumTypes[4]
+	return &file_platform_admin_v1_admin_auth_proto_enumTypes[0]
 }
 
 func (x AdminSecretOperation) Number() protoreflect.EnumNumber {
@@ -319,83 +72,56 @@ func (x AdminSecretOperation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AdminSecretOperation.Descriptor instead.
 func (AdminSecretOperation) EnumDescriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{4}
-}
-
-type AdminSessionSummary struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	AdminId           string                 `protobuf:"bytes,1,opt,name=admin_id,json=adminId,proto3" json:"admin_id,omitempty"`
-	Kind              AdminSessionKind       `protobuf:"varint,2,opt,name=kind,proto3,enum=platform.admin.v1.AdminSessionKind" json:"kind,omitempty"`
-	Permissions       []AdminPermission      `protobuf:"varint,3,rep,packed,name=permissions,proto3,enum=platform.admin.v1.AdminPermission" json:"permissions,omitempty"`
-	IdleExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=idle_expires_at,json=idleExpiresAt,proto3" json:"idle_expires_at,omitempty"`
-	AbsoluteExpiresAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=absolute_expires_at,json=absoluteExpiresAt,proto3" json:"absolute_expires_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *AdminSessionSummary) Reset() {
-	*x = AdminSessionSummary{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AdminSessionSummary) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AdminSessionSummary) ProtoMessage() {}
-
-func (x *AdminSessionSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AdminSessionSummary.ProtoReflect.Descriptor instead.
-func (*AdminSessionSummary) Descriptor() ([]byte, []int) {
 	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *AdminSessionSummary) GetAdminId() string {
-	if x != nil {
-		return x.AdminId
+type AdminElevationSecondFactor int32
+
+const (
+	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED   AdminElevationSecondFactor = 0
+	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_TOTP          AdminElevationSecondFactor = 1
+	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE AdminElevationSecondFactor = 2
+)
+
+// Enum value maps for AdminElevationSecondFactor.
+var (
+	AdminElevationSecondFactor_name = map[int32]string{
+		0: "ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED",
+		1: "ADMIN_ELEVATION_SECOND_FACTOR_TOTP",
+		2: "ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE",
 	}
-	return ""
+	AdminElevationSecondFactor_value = map[string]int32{
+		"ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED":   0,
+		"ADMIN_ELEVATION_SECOND_FACTOR_TOTP":          1,
+		"ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE": 2,
+	}
+)
+
+func (x AdminElevationSecondFactor) Enum() *AdminElevationSecondFactor {
+	p := new(AdminElevationSecondFactor)
+	*p = x
+	return p
 }
 
-func (x *AdminSessionSummary) GetKind() AdminSessionKind {
-	if x != nil {
-		return x.Kind
-	}
-	return AdminSessionKind_ADMIN_SESSION_KIND_UNSPECIFIED
+func (x AdminElevationSecondFactor) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (x *AdminSessionSummary) GetPermissions() []AdminPermission {
-	if x != nil {
-		return x.Permissions
-	}
-	return nil
+func (AdminElevationSecondFactor) Descriptor() protoreflect.EnumDescriptor {
+	return file_platform_admin_v1_admin_auth_proto_enumTypes[1].Descriptor()
 }
 
-func (x *AdminSessionSummary) GetIdleExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.IdleExpiresAt
-	}
-	return nil
+func (AdminElevationSecondFactor) Type() protoreflect.EnumType {
+	return &file_platform_admin_v1_admin_auth_proto_enumTypes[1]
 }
 
-func (x *AdminSessionSummary) GetAbsoluteExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.AbsoluteExpiresAt
-	}
-	return nil
+func (x AdminElevationSecondFactor) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AdminElevationSecondFactor.Descriptor instead.
+func (AdminElevationSecondFactor) EnumDescriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{1}
 }
 
 type GetSetupStateRequest struct {
@@ -406,7 +132,7 @@ type GetSetupStateRequest struct {
 
 func (x *GetSetupStateRequest) Reset() {
 	*x = GetSetupStateRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[1]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -418,7 +144,7 @@ func (x *GetSetupStateRequest) String() string {
 func (*GetSetupStateRequest) ProtoMessage() {}
 
 func (x *GetSetupStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[1]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -431,19 +157,19 @@ func (x *GetSetupStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSetupStateRequest.ProtoReflect.Descriptor instead.
 func (*GetSetupStateRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{1}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{0}
 }
 
 type GetSetupStateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         AdminSetupState        `protobuf:"varint,1,opt,name=state,proto3,enum=platform.admin.v1.AdminSetupState" json:"state,omitempty"`
+	State         AdminAccountState      `protobuf:"varint,1,opt,name=state,proto3,enum=platform.admin.v1.AdminAccountState" json:"state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetSetupStateResponse) Reset() {
 	*x = GetSetupStateResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[2]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +181,7 @@ func (x *GetSetupStateResponse) String() string {
 func (*GetSetupStateResponse) ProtoMessage() {}
 
 func (x *GetSetupStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[2]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,14 +194,14 @@ func (x *GetSetupStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSetupStateResponse.ProtoReflect.Descriptor instead.
 func (*GetSetupStateResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{2}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GetSetupStateResponse) GetState() AdminSetupState {
+func (x *GetSetupStateResponse) GetState() AdminAccountState {
 	if x != nil {
 		return x.State
 	}
-	return AdminSetupState_ADMIN_SETUP_STATE_UNSPECIFIED
+	return AdminAccountState_ADMIN_ACCOUNT_STATE_UNSPECIFIED
 }
 
 type GetCurrentAdminSessionRequest struct {
@@ -486,7 +212,7 @@ type GetCurrentAdminSessionRequest struct {
 
 func (x *GetCurrentAdminSessionRequest) Reset() {
 	*x = GetCurrentAdminSessionRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[3]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +224,7 @@ func (x *GetCurrentAdminSessionRequest) String() string {
 func (*GetCurrentAdminSessionRequest) ProtoMessage() {}
 
 func (x *GetCurrentAdminSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[3]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,20 +237,19 @@ func (x *GetCurrentAdminSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentAdminSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetCurrentAdminSessionRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{3}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{2}
 }
 
 type GetCurrentAdminSessionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
-	NextStep      AdminNextStep          `protobuf:"varint,2,opt,name=next_step,json=nextStep,proto3,enum=platform.admin.v1.AdminNextStep" json:"next_step,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetCurrentAdminSessionResponse) Reset() {
 	*x = GetCurrentAdminSessionResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[4]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +261,7 @@ func (x *GetCurrentAdminSessionResponse) String() string {
 func (*GetCurrentAdminSessionResponse) ProtoMessage() {}
 
 func (x *GetCurrentAdminSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[4]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +274,7 @@ func (x *GetCurrentAdminSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentAdminSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetCurrentAdminSessionResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{4}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetCurrentAdminSessionResponse) GetSession() *AdminSessionSummary {
@@ -557,13 +282,6 @@ func (x *GetCurrentAdminSessionResponse) GetSession() *AdminSessionSummary {
 		return x.Session
 	}
 	return nil
-}
-
-func (x *GetCurrentAdminSessionResponse) GetNextStep() AdminNextStep {
-	if x != nil {
-		return x.NextStep
-	}
-	return AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED
 }
 
 type GetRuntimeReadinessRequest struct {
@@ -574,7 +292,7 @@ type GetRuntimeReadinessRequest struct {
 
 func (x *GetRuntimeReadinessRequest) Reset() {
 	*x = GetRuntimeReadinessRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[5]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +304,7 @@ func (x *GetRuntimeReadinessRequest) String() string {
 func (*GetRuntimeReadinessRequest) ProtoMessage() {}
 
 func (x *GetRuntimeReadinessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[5]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +317,7 @@ func (x *GetRuntimeReadinessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRuntimeReadinessRequest.ProtoReflect.Descriptor instead.
 func (*GetRuntimeReadinessRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{5}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{4}
 }
 
 type RuntimeReadinessState struct {
@@ -613,7 +331,7 @@ type RuntimeReadinessState struct {
 
 func (x *RuntimeReadinessState) Reset() {
 	*x = RuntimeReadinessState{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[6]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -625,7 +343,7 @@ func (x *RuntimeReadinessState) String() string {
 func (*RuntimeReadinessState) ProtoMessage() {}
 
 func (x *RuntimeReadinessState) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[6]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -638,7 +356,7 @@ func (x *RuntimeReadinessState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeReadinessState.ProtoReflect.Descriptor instead.
 func (*RuntimeReadinessState) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{6}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RuntimeReadinessState) GetMode() string {
@@ -672,7 +390,7 @@ type GetRuntimeReadinessResponse struct {
 
 func (x *GetRuntimeReadinessResponse) Reset() {
 	*x = GetRuntimeReadinessResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[7]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +402,7 @@ func (x *GetRuntimeReadinessResponse) String() string {
 func (*GetRuntimeReadinessResponse) ProtoMessage() {}
 
 func (x *GetRuntimeReadinessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[7]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +415,7 @@ func (x *GetRuntimeReadinessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRuntimeReadinessResponse.ProtoReflect.Descriptor instead.
 func (*GetRuntimeReadinessResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{7}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetRuntimeReadinessResponse) GetOrdinary() *RuntimeReadinessState {
@@ -723,7 +441,7 @@ type BeginAdminLoginRequest struct {
 
 func (x *BeginAdminLoginRequest) Reset() {
 	*x = BeginAdminLoginRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[8]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -735,7 +453,7 @@ func (x *BeginAdminLoginRequest) String() string {
 func (*BeginAdminLoginRequest) ProtoMessage() {}
 
 func (x *BeginAdminLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[8]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -748,7 +466,7 @@ func (x *BeginAdminLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginAdminLoginRequest.ProtoReflect.Descriptor instead.
 func (*BeginAdminLoginRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{8}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BeginAdminLoginRequest) GetRequestFlowId() string {
@@ -767,7 +485,7 @@ type BeginAdminLoginResponse struct {
 
 func (x *BeginAdminLoginResponse) Reset() {
 	*x = BeginAdminLoginResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[9]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -779,7 +497,7 @@ func (x *BeginAdminLoginResponse) String() string {
 func (*BeginAdminLoginResponse) ProtoMessage() {}
 
 func (x *BeginAdminLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[9]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -792,7 +510,7 @@ func (x *BeginAdminLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginAdminLoginResponse.ProtoReflect.Descriptor instead.
 func (*BeginAdminLoginResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{9}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BeginAdminLoginResponse) GetChallenge() *v1.AnonymousChallenge {
@@ -812,7 +530,7 @@ type LoginPasswordRequest struct {
 
 func (x *LoginPasswordRequest) Reset() {
 	*x = LoginPasswordRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[10]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -824,7 +542,7 @@ func (x *LoginPasswordRequest) String() string {
 func (*LoginPasswordRequest) ProtoMessage() {}
 
 func (x *LoginPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[10]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -837,7 +555,7 @@ func (x *LoginPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginPasswordRequest.ProtoReflect.Descriptor instead.
 func (*LoginPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{10}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *LoginPasswordRequest) GetChallengeProof() string {
@@ -854,17 +572,109 @@ func (x *LoginPasswordRequest) GetPassword() string {
 	return ""
 }
 
-type LoginPasswordResponse struct {
+type LoginRequiresInitialPasswordChange struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NextStep      AdminNextStep          `protobuf:"varint,1,opt,name=next_step,json=nextStep,proto3,enum=platform.admin.v1.AdminNextStep" json:"next_step,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginRequiresInitialPasswordChange) Reset() {
+	*x = LoginRequiresInitialPasswordChange{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginRequiresInitialPasswordChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginRequiresInitialPasswordChange) ProtoMessage() {}
+
+func (x *LoginRequiresInitialPasswordChange) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginRequiresInitialPasswordChange.ProtoReflect.Descriptor instead.
+func (*LoginRequiresInitialPasswordChange) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *LoginRequiresInitialPasswordChange) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type LoginRequiresMfa struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginRequiresMfa) Reset() {
+	*x = LoginRequiresMfa{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginRequiresMfa) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginRequiresMfa) ProtoMessage() {}
+
+func (x *LoginRequiresMfa) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginRequiresMfa.ProtoReflect.Descriptor instead.
+func (*LoginRequiresMfa) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LoginRequiresMfa) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type LoginPasswordResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Outcome:
+	//
+	//	*LoginPasswordResponse_RequiresInitialPasswordChange
+	//	*LoginPasswordResponse_RequiresMfa
+	//	*LoginPasswordResponse_Session
+	Outcome       isLoginPasswordResponse_Outcome `protobuf_oneof:"outcome"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LoginPasswordResponse) Reset() {
 	*x = LoginPasswordResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[11]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -876,7 +686,7 @@ func (x *LoginPasswordResponse) String() string {
 func (*LoginPasswordResponse) ProtoMessage() {}
 
 func (x *LoginPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[11]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -889,45 +699,87 @@ func (x *LoginPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginPasswordResponse.ProtoReflect.Descriptor instead.
 func (*LoginPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{11}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *LoginPasswordResponse) GetNextStep() AdminNextStep {
+func (x *LoginPasswordResponse) GetOutcome() isLoginPasswordResponse_Outcome {
 	if x != nil {
-		return x.NextStep
-	}
-	return AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED
-}
-
-func (x *LoginPasswordResponse) GetExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ExpiresAt
+		return x.Outcome
 	}
 	return nil
 }
 
-type VerifyTotpRequest struct {
+func (x *LoginPasswordResponse) GetRequiresInitialPasswordChange() *LoginRequiresInitialPasswordChange {
+	if x != nil {
+		if x, ok := x.Outcome.(*LoginPasswordResponse_RequiresInitialPasswordChange); ok {
+			return x.RequiresInitialPasswordChange
+		}
+	}
+	return nil
+}
+
+func (x *LoginPasswordResponse) GetRequiresMfa() *LoginRequiresMfa {
+	if x != nil {
+		if x, ok := x.Outcome.(*LoginPasswordResponse_RequiresMfa); ok {
+			return x.RequiresMfa
+		}
+	}
+	return nil
+}
+
+func (x *LoginPasswordResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		if x, ok := x.Outcome.(*LoginPasswordResponse_Session); ok {
+			return x.Session
+		}
+	}
+	return nil
+}
+
+type isLoginPasswordResponse_Outcome interface {
+	isLoginPasswordResponse_Outcome()
+}
+
+type LoginPasswordResponse_RequiresInitialPasswordChange struct {
+	RequiresInitialPasswordChange *LoginRequiresInitialPasswordChange `protobuf:"bytes,1,opt,name=requires_initial_password_change,json=requiresInitialPasswordChange,proto3,oneof"`
+}
+
+type LoginPasswordResponse_RequiresMfa struct {
+	RequiresMfa *LoginRequiresMfa `protobuf:"bytes,2,opt,name=requires_mfa,json=requiresMfa,proto3,oneof"`
+}
+
+type LoginPasswordResponse_Session struct {
+	Session *AdminSessionSummary `protobuf:"bytes,3,opt,name=session,proto3,oneof"`
+}
+
+func (*LoginPasswordResponse_RequiresInitialPasswordChange) isLoginPasswordResponse_Outcome() {}
+
+func (*LoginPasswordResponse_RequiresMfa) isLoginPasswordResponse_Outcome() {}
+
+func (*LoginPasswordResponse_Session) isLoginPasswordResponse_Outcome() {}
+
+type VerifyAdminTotpRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TotpCode      string                 `protobuf:"bytes,1,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *VerifyTotpRequest) Reset() {
-	*x = VerifyTotpRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[12]
+func (x *VerifyAdminTotpRequest) Reset() {
+	*x = VerifyAdminTotpRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *VerifyTotpRequest) String() string {
+func (x *VerifyAdminTotpRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*VerifyTotpRequest) ProtoMessage() {}
+func (*VerifyAdminTotpRequest) ProtoMessage() {}
 
-func (x *VerifyTotpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[12]
+func (x *VerifyAdminTotpRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -938,40 +790,40 @@ func (x *VerifyTotpRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use VerifyTotpRequest.ProtoReflect.Descriptor instead.
-func (*VerifyTotpRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{12}
+// Deprecated: Use VerifyAdminTotpRequest.ProtoReflect.Descriptor instead.
+func (*VerifyAdminTotpRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *VerifyTotpRequest) GetTotpCode() string {
+func (x *VerifyAdminTotpRequest) GetTotpCode() string {
 	if x != nil {
 		return x.TotpCode
 	}
 	return ""
 }
 
-type VerifyTotpResponse struct {
+type VerifyAdminTotpResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *VerifyTotpResponse) Reset() {
-	*x = VerifyTotpResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[13]
+func (x *VerifyAdminTotpResponse) Reset() {
+	*x = VerifyAdminTotpResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *VerifyTotpResponse) String() string {
+func (x *VerifyAdminTotpResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*VerifyTotpResponse) ProtoMessage() {}
+func (*VerifyAdminTotpResponse) ProtoMessage() {}
 
-func (x *VerifyTotpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[13]
+func (x *VerifyAdminTotpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -982,12 +834,100 @@ func (x *VerifyTotpResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use VerifyTotpResponse.ProtoReflect.Descriptor instead.
-func (*VerifyTotpResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{13}
+// Deprecated: Use VerifyAdminTotpResponse.ProtoReflect.Descriptor instead.
+func (*VerifyAdminTotpResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *VerifyTotpResponse) GetSession() *AdminSessionSummary {
+func (x *VerifyAdminTotpResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type VerifyAdminRecoveryCodeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RecoveryCode  string                 `protobuf:"bytes,1,opt,name=recovery_code,json=recoveryCode,proto3" json:"recovery_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyAdminRecoveryCodeRequest) Reset() {
+	*x = VerifyAdminRecoveryCodeRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyAdminRecoveryCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyAdminRecoveryCodeRequest) ProtoMessage() {}
+
+func (x *VerifyAdminRecoveryCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyAdminRecoveryCodeRequest.ProtoReflect.Descriptor instead.
+func (*VerifyAdminRecoveryCodeRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *VerifyAdminRecoveryCodeRequest) GetRecoveryCode() string {
+	if x != nil {
+		return x.RecoveryCode
+	}
+	return ""
+}
+
+type VerifyAdminRecoveryCodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyAdminRecoveryCodeResponse) Reset() {
+	*x = VerifyAdminRecoveryCodeResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyAdminRecoveryCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyAdminRecoveryCodeResponse) ProtoMessage() {}
+
+func (x *VerifyAdminRecoveryCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyAdminRecoveryCodeResponse.ProtoReflect.Descriptor instead.
+func (*VerifyAdminRecoveryCodeResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *VerifyAdminRecoveryCodeResponse) GetSession() *AdminSessionSummary {
 	if x != nil {
 		return x.Session
 	}
@@ -1003,7 +943,7 @@ type ChangeInitialPasswordRequest struct {
 
 func (x *ChangeInitialPasswordRequest) Reset() {
 	*x = ChangeInitialPasswordRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[14]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1015,7 +955,7 @@ func (x *ChangeInitialPasswordRequest) String() string {
 func (*ChangeInitialPasswordRequest) ProtoMessage() {}
 
 func (x *ChangeInitialPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[14]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +968,7 @@ func (x *ChangeInitialPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeInitialPasswordRequest.ProtoReflect.Descriptor instead.
 func (*ChangeInitialPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{14}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ChangeInitialPasswordRequest) GetNewPassword() string {
@@ -1040,15 +980,14 @@ func (x *ChangeInitialPasswordRequest) GetNewPassword() string {
 
 type ChangeInitialPasswordResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NextStep      AdminNextStep          `protobuf:"varint,1,opt,name=next_step,json=nextStep,proto3,enum=platform.admin.v1.AdminNextStep" json:"next_step,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Session       *AdminSessionSummary   `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ChangeInitialPasswordResponse) Reset() {
 	*x = ChangeInitialPasswordResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[15]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +999,7 @@ func (x *ChangeInitialPasswordResponse) String() string {
 func (*ChangeInitialPasswordResponse) ProtoMessage() {}
 
 func (x *ChangeInitialPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[15]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,33 +1012,155 @@ func (x *ChangeInitialPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeInitialPasswordResponse.ProtoReflect.Descriptor instead.
 func (*ChangeInitialPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{15}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *ChangeInitialPasswordResponse) GetNextStep() AdminNextStep {
+func (x *ChangeInitialPasswordResponse) GetSession() *AdminSessionSummary {
 	if x != nil {
-		return x.NextStep
-	}
-	return AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED
-}
-
-func (x *ChangeInitialPasswordResponse) GetExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ExpiresAt
+		return x.Session
 	}
 	return nil
 }
 
+type ChangeAdminPasswordRequest struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	OperationId             string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	CurrentPassword         string                 `protobuf:"bytes,2,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	NewPassword             string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	ExpectedPasswordVersion uint64                 `protobuf:"varint,4,opt,name=expected_password_version,json=expectedPasswordVersion,proto3" json:"expected_password_version,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *ChangeAdminPasswordRequest) Reset() {
+	*x = ChangeAdminPasswordRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeAdminPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeAdminPasswordRequest) ProtoMessage() {}
+
+func (x *ChangeAdminPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeAdminPasswordRequest.ProtoReflect.Descriptor instead.
+func (*ChangeAdminPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ChangeAdminPasswordRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *ChangeAdminPasswordRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
+func (x *ChangeAdminPasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+func (x *ChangeAdminPasswordRequest) GetExpectedPasswordVersion() uint64 {
+	if x != nil {
+		return x.ExpectedPasswordVersion
+	}
+	return 0
+}
+
+type ChangeAdminPasswordResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OperationId     string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Session         *AdminSessionSummary   `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	RevokedSessions int32                  `protobuf:"varint,3,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ChangeAdminPasswordResponse) Reset() {
+	*x = ChangeAdminPasswordResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeAdminPasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeAdminPasswordResponse) ProtoMessage() {}
+
+func (x *ChangeAdminPasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeAdminPasswordResponse.ProtoReflect.Descriptor instead.
+func (*ChangeAdminPasswordResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ChangeAdminPasswordResponse) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *ChangeAdminPasswordResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *ChangeAdminPasswordResponse) GetRevokedSessions() int32 {
+	if x != nil {
+		return x.RevokedSessions
+	}
+	return 0
+}
+
 type BeginTotpEnrollmentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OperationId     string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	CurrentPassword string                 `protobuf:"bytes,2,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *BeginTotpEnrollmentRequest) Reset() {
 	*x = BeginTotpEnrollmentRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[16]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1172,7 @@ func (x *BeginTotpEnrollmentRequest) String() string {
 func (*BeginTotpEnrollmentRequest) ProtoMessage() {}
 
 func (x *BeginTotpEnrollmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[16]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1185,7 @@ func (x *BeginTotpEnrollmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginTotpEnrollmentRequest.ProtoReflect.Descriptor instead.
 func (*BeginTotpEnrollmentRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{16}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *BeginTotpEnrollmentRequest) GetOperationId() string {
@@ -1134,18 +1195,25 @@ func (x *BeginTotpEnrollmentRequest) GetOperationId() string {
 	return ""
 }
 
+func (x *BeginTotpEnrollmentRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
 type BeginTotpEnrollmentResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	TotpSecret    string                 `protobuf:"bytes,2,opt,name=totp_secret,json=totpSecret,proto3" json:"totp_secret,omitempty"`
-	OtpauthUri    string                 `protobuf:"bytes,3,opt,name=otpauth_uri,json=otpauthUri,proto3" json:"otpauth_uri,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Result         *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	ManualEntryKey string                 `protobuf:"bytes,2,opt,name=manual_entry_key,json=manualEntryKey,proto3" json:"manual_entry_key,omitempty"`
+	OtpauthUri     string                 `protobuf:"bytes,3,opt,name=otpauth_uri,json=otpauthUri,proto3" json:"otpauth_uri,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeginTotpEnrollmentResponse) Reset() {
 	*x = BeginTotpEnrollmentResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[17]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1157,7 +1225,7 @@ func (x *BeginTotpEnrollmentResponse) String() string {
 func (*BeginTotpEnrollmentResponse) ProtoMessage() {}
 
 func (x *BeginTotpEnrollmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[17]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1170,7 +1238,7 @@ func (x *BeginTotpEnrollmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginTotpEnrollmentResponse.ProtoReflect.Descriptor instead.
 func (*BeginTotpEnrollmentResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{17}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *BeginTotpEnrollmentResponse) GetResult() *v1.OperationResult {
@@ -1180,9 +1248,9 @@ func (x *BeginTotpEnrollmentResponse) GetResult() *v1.OperationResult {
 	return nil
 }
 
-func (x *BeginTotpEnrollmentResponse) GetTotpSecret() string {
+func (x *BeginTotpEnrollmentResponse) GetManualEntryKey() string {
 	if x != nil {
-		return x.TotpSecret
+		return x.ManualEntryKey
 	}
 	return ""
 }
@@ -1205,7 +1273,7 @@ type CompleteTotpEnrollmentRequest struct {
 
 func (x *CompleteTotpEnrollmentRequest) Reset() {
 	*x = CompleteTotpEnrollmentRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[18]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +1285,7 @@ func (x *CompleteTotpEnrollmentRequest) String() string {
 func (*CompleteTotpEnrollmentRequest) ProtoMessage() {}
 
 func (x *CompleteTotpEnrollmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[18]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1230,7 +1298,7 @@ func (x *CompleteTotpEnrollmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteTotpEnrollmentRequest.ProtoReflect.Descriptor instead.
 func (*CompleteTotpEnrollmentRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{18}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CompleteTotpEnrollmentRequest) GetEnrollmentOperationId() string {
@@ -1255,17 +1323,18 @@ func (x *CompleteTotpEnrollmentRequest) GetTotpCode() string {
 }
 
 type CompleteTotpEnrollmentResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	RecoveryCodes []string               `protobuf:"bytes,2,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
-	Session       *AdminSessionSummary   `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Result          *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	RecoveryCodes   []string               `protobuf:"bytes,2,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
+	Session         *AdminSessionSummary   `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	RevokedSessions int32                  `protobuf:"varint,4,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CompleteTotpEnrollmentResponse) Reset() {
 	*x = CompleteTotpEnrollmentResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[19]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1277,7 +1346,7 @@ func (x *CompleteTotpEnrollmentResponse) String() string {
 func (*CompleteTotpEnrollmentResponse) ProtoMessage() {}
 
 func (x *CompleteTotpEnrollmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[19]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1290,7 +1359,7 @@ func (x *CompleteTotpEnrollmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteTotpEnrollmentResponse.ProtoReflect.Descriptor instead.
 func (*CompleteTotpEnrollmentResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{19}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CompleteTotpEnrollmentResponse) GetResult() *v1.OperationResult {
@@ -1314,6 +1383,253 @@ func (x *CompleteTotpEnrollmentResponse) GetSession() *AdminSessionSummary {
 	return nil
 }
 
+func (x *CompleteTotpEnrollmentResponse) GetRevokedSessions() int32 {
+	if x != nil {
+		return x.RevokedSessions
+	}
+	return 0
+}
+
+type DisableTotpRequest struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	OperationId               string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Reason                    string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedEnrollmentVersion uint64                 `protobuf:"varint,3,opt,name=expected_enrollment_version,json=expectedEnrollmentVersion,proto3" json:"expected_enrollment_version,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *DisableTotpRequest) Reset() {
+	*x = DisableTotpRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisableTotpRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisableTotpRequest) ProtoMessage() {}
+
+func (x *DisableTotpRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisableTotpRequest.ProtoReflect.Descriptor instead.
+func (*DisableTotpRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *DisableTotpRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *DisableTotpRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *DisableTotpRequest) GetExpectedEnrollmentVersion() uint64 {
+	if x != nil {
+		return x.ExpectedEnrollmentVersion
+	}
+	return 0
+}
+
+type DisableTotpResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OperationId     string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Session         *AdminSessionSummary   `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	RevokedSessions int32                  `protobuf:"varint,3,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
+	AlreadyDisabled bool                   `protobuf:"varint,4,opt,name=already_disabled,json=alreadyDisabled,proto3" json:"already_disabled,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DisableTotpResponse) Reset() {
+	*x = DisableTotpResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisableTotpResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisableTotpResponse) ProtoMessage() {}
+
+func (x *DisableTotpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisableTotpResponse.ProtoReflect.Descriptor instead.
+func (*DisableTotpResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *DisableTotpResponse) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *DisableTotpResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *DisableTotpResponse) GetRevokedSessions() int32 {
+	if x != nil {
+		return x.RevokedSessions
+	}
+	return 0
+}
+
+func (x *DisableTotpResponse) GetAlreadyDisabled() bool {
+	if x != nil {
+		return x.AlreadyDisabled
+	}
+	return false
+}
+
+type RegenerateAdminRecoveryCodesRequest struct {
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	OperationId                  string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	ExpectedRecoveryCodesVersion uint64                 `protobuf:"varint,2,opt,name=expected_recovery_codes_version,json=expectedRecoveryCodesVersion,proto3" json:"expected_recovery_codes_version,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
+}
+
+func (x *RegenerateAdminRecoveryCodesRequest) Reset() {
+	*x = RegenerateAdminRecoveryCodesRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegenerateAdminRecoveryCodesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegenerateAdminRecoveryCodesRequest) ProtoMessage() {}
+
+func (x *RegenerateAdminRecoveryCodesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegenerateAdminRecoveryCodesRequest.ProtoReflect.Descriptor instead.
+func (*RegenerateAdminRecoveryCodesRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RegenerateAdminRecoveryCodesRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *RegenerateAdminRecoveryCodesRequest) GetExpectedRecoveryCodesVersion() uint64 {
+	if x != nil {
+		return x.ExpectedRecoveryCodesVersion
+	}
+	return 0
+}
+
+type RegenerateAdminRecoveryCodesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	RecoveryCodes []string               `protobuf:"bytes,2,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
+	Session       *AdminSessionSummary   `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegenerateAdminRecoveryCodesResponse) Reset() {
+	*x = RegenerateAdminRecoveryCodesResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegenerateAdminRecoveryCodesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegenerateAdminRecoveryCodesResponse) ProtoMessage() {}
+
+func (x *RegenerateAdminRecoveryCodesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegenerateAdminRecoveryCodesResponse.ProtoReflect.Descriptor instead.
+func (*RegenerateAdminRecoveryCodesResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RegenerateAdminRecoveryCodesResponse) GetResult() *v1.OperationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *RegenerateAdminRecoveryCodesResponse) GetRecoveryCodes() []string {
+	if x != nil {
+		return x.RecoveryCodes
+	}
+	return nil
+}
+
+func (x *RegenerateAdminRecoveryCodesResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
 type ConfirmAdminSecretReceiptRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Operation     AdminSecretOperation   `protobuf:"varint,1,opt,name=operation,proto3,enum=platform.admin.v1.AdminSecretOperation" json:"operation,omitempty"`
@@ -1325,7 +1641,7 @@ type ConfirmAdminSecretReceiptRequest struct {
 
 func (x *ConfirmAdminSecretReceiptRequest) Reset() {
 	*x = ConfirmAdminSecretReceiptRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[20]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1653,7 @@ func (x *ConfirmAdminSecretReceiptRequest) String() string {
 func (*ConfirmAdminSecretReceiptRequest) ProtoMessage() {}
 
 func (x *ConfirmAdminSecretReceiptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[20]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1666,7 @@ func (x *ConfirmAdminSecretReceiptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmAdminSecretReceiptRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmAdminSecretReceiptRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{20}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ConfirmAdminSecretReceiptRequest) GetOperation() AdminSecretOperation {
@@ -1383,7 +1699,7 @@ type ConfirmAdminSecretReceiptResponse struct {
 
 func (x *ConfirmAdminSecretReceiptResponse) Reset() {
 	*x = ConfirmAdminSecretReceiptResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[21]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1395,7 +1711,7 @@ func (x *ConfirmAdminSecretReceiptResponse) String() string {
 func (*ConfirmAdminSecretReceiptResponse) ProtoMessage() {}
 
 func (x *ConfirmAdminSecretReceiptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[21]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1408,7 +1724,7 @@ func (x *ConfirmAdminSecretReceiptResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ConfirmAdminSecretReceiptResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmAdminSecretReceiptResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{21}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ConfirmAdminSecretReceiptResponse) GetConfirmed() bool {
@@ -1418,28 +1734,35 @@ func (x *ConfirmAdminSecretReceiptResponse) GetConfirmed() bool {
 	return false
 }
 
-type RecoverAdminRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RecoveryCode  string                 `protobuf:"bytes,1,opt,name=recovery_code,json=recoveryCode,proto3" json:"recovery_code,omitempty"`
+type ElevateAdminSessionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OperationId     string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Scope           AdminElevationScope    `protobuf:"varint,2,opt,name=scope,proto3,enum=platform.admin.v1.AdminElevationScope" json:"scope,omitempty"`
+	CurrentPassword string                 `protobuf:"bytes,3,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	// Types that are valid to be assigned to SecondFactor:
+	//
+	//	*ElevateAdminSessionRequest_TotpCode
+	//	*ElevateAdminSessionRequest_RecoveryCode
+	SecondFactor  isElevateAdminSessionRequest_SecondFactor `protobuf_oneof:"second_factor"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RecoverAdminRequest) Reset() {
-	*x = RecoverAdminRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[22]
+func (x *ElevateAdminSessionRequest) Reset() {
+	*x = ElevateAdminSessionRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RecoverAdminRequest) String() string {
+func (x *ElevateAdminSessionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RecoverAdminRequest) ProtoMessage() {}
+func (*ElevateAdminSessionRequest) ProtoMessage() {}
 
-func (x *RecoverAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[22]
+func (x *ElevateAdminSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1450,145 +1773,208 @@ func (x *RecoverAdminRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RecoverAdminRequest.ProtoReflect.Descriptor instead.
-func (*RecoverAdminRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{22}
+// Deprecated: Use ElevateAdminSessionRequest.ProtoReflect.Descriptor instead.
+func (*ElevateAdminSessionRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *RecoverAdminRequest) GetRecoveryCode() string {
+func (x *ElevateAdminSessionRequest) GetOperationId() string {
 	if x != nil {
-		return x.RecoveryCode
+		return x.OperationId
 	}
 	return ""
 }
 
-type RecoverAdminResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NextStep      AdminNextStep          `protobuf:"varint,1,opt,name=next_step,json=nextStep,proto3,enum=platform.admin.v1.AdminNextStep" json:"next_step,omitempty"`
-	Session       *AdminSessionSummary   `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RecoverAdminResponse) Reset() {
-	*x = RecoverAdminResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[23]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RecoverAdminResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RecoverAdminResponse) ProtoMessage() {}
-
-func (x *RecoverAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[23]
+func (x *ElevateAdminSessionRequest) GetScope() AdminElevationScope {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.Scope
 	}
-	return mi.MessageOf(x)
+	return AdminElevationScope_ADMIN_ELEVATION_SCOPE_UNSPECIFIED
 }
 
-// Deprecated: Use RecoverAdminResponse.ProtoReflect.Descriptor instead.
-func (*RecoverAdminResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *RecoverAdminResponse) GetNextStep() AdminNextStep {
-	if x != nil {
-		return x.NextStep
-	}
-	return AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED
-}
-
-func (x *RecoverAdminResponse) GetSession() *AdminSessionSummary {
-	if x != nil {
-		return x.Session
-	}
-	return nil
-}
-
-type ChangeAdminPasswordRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	CurrentPassword string                 `protobuf:"bytes,1,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
-	NewPassword     string                 `protobuf:"bytes,2,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *ChangeAdminPasswordRequest) Reset() {
-	*x = ChangeAdminPasswordRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[24]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ChangeAdminPasswordRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChangeAdminPasswordRequest) ProtoMessage() {}
-
-func (x *ChangeAdminPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[24]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChangeAdminPasswordRequest.ProtoReflect.Descriptor instead.
-func (*ChangeAdminPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *ChangeAdminPasswordRequest) GetCurrentPassword() string {
+func (x *ElevateAdminSessionRequest) GetCurrentPassword() string {
 	if x != nil {
 		return x.CurrentPassword
 	}
 	return ""
 }
 
-func (x *ChangeAdminPasswordRequest) GetNewPassword() string {
+func (x *ElevateAdminSessionRequest) GetSecondFactor() isElevateAdminSessionRequest_SecondFactor {
 	if x != nil {
-		return x.NewPassword
+		return x.SecondFactor
+	}
+	return nil
+}
+
+func (x *ElevateAdminSessionRequest) GetTotpCode() string {
+	if x != nil {
+		if x, ok := x.SecondFactor.(*ElevateAdminSessionRequest_TotpCode); ok {
+			return x.TotpCode
+		}
 	}
 	return ""
 }
 
-type ChangeAdminPasswordResponse struct {
+func (x *ElevateAdminSessionRequest) GetRecoveryCode() string {
+	if x != nil {
+		if x, ok := x.SecondFactor.(*ElevateAdminSessionRequest_RecoveryCode); ok {
+			return x.RecoveryCode
+		}
+	}
+	return ""
+}
+
+type isElevateAdminSessionRequest_SecondFactor interface {
+	isElevateAdminSessionRequest_SecondFactor()
+}
+
+type ElevateAdminSessionRequest_TotpCode struct {
+	TotpCode string `protobuf:"bytes,4,opt,name=totp_code,json=totpCode,proto3,oneof"`
+}
+
+type ElevateAdminSessionRequest_RecoveryCode struct {
+	RecoveryCode string `protobuf:"bytes,5,opt,name=recovery_code,json=recoveryCode,proto3,oneof"`
+}
+
+func (*ElevateAdminSessionRequest_TotpCode) isElevateAdminSessionRequest_SecondFactor() {}
+
+func (*ElevateAdminSessionRequest_RecoveryCode) isElevateAdminSessionRequest_SecondFactor() {}
+
+type ElevateAdminSessionResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	OperationId   string                     `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Elevation     *AdminElevationSummary     `protobuf:"bytes,2,opt,name=elevation,proto3" json:"elevation,omitempty"`
+	Session       *AdminSessionSummary       `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	SecondFactor  AdminElevationSecondFactor `protobuf:"varint,4,opt,name=second_factor,json=secondFactor,proto3,enum=platform.admin.v1.AdminElevationSecondFactor" json:"second_factor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElevateAdminSessionResponse) Reset() {
+	*x = ElevateAdminSessionResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElevateAdminSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElevateAdminSessionResponse) ProtoMessage() {}
+
+func (x *ElevateAdminSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElevateAdminSessionResponse.ProtoReflect.Descriptor instead.
+func (*ElevateAdminSessionResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ElevateAdminSessionResponse) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *ElevateAdminSessionResponse) GetElevation() *AdminElevationSummary {
+	if x != nil {
+		return x.Elevation
+	}
+	return nil
+}
+
+func (x *ElevateAdminSessionResponse) GetSession() *AdminSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *ElevateAdminSessionResponse) GetSecondFactor() AdminElevationSecondFactor {
+	if x != nil {
+		return x.SecondFactor
+	}
+	return AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED
+}
+
+type RevokeCurrentAdminElevationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NextStep      AdminNextStep          `protobuf:"varint,1,opt,name=next_step,json=nextStep,proto3,enum=platform.admin.v1.AdminNextStep" json:"next_step,omitempty"`
+	Scope         AdminElevationScope    `protobuf:"varint,1,opt,name=scope,proto3,enum=platform.admin.v1.AdminElevationScope" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeCurrentAdminElevationRequest) Reset() {
+	*x = RevokeCurrentAdminElevationRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeCurrentAdminElevationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeCurrentAdminElevationRequest) ProtoMessage() {}
+
+func (x *RevokeCurrentAdminElevationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeCurrentAdminElevationRequest.ProtoReflect.Descriptor instead.
+func (*RevokeCurrentAdminElevationRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RevokeCurrentAdminElevationRequest) GetScope() AdminElevationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return AdminElevationScope_ADMIN_ELEVATION_SCOPE_UNSPECIFIED
+}
+
+type RevokeCurrentAdminElevationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revoked       bool                   `protobuf:"varint,1,opt,name=revoked,proto3" json:"revoked,omitempty"`
 	Session       *AdminSessionSummary   `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangeAdminPasswordResponse) Reset() {
-	*x = ChangeAdminPasswordResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[25]
+func (x *RevokeCurrentAdminElevationResponse) Reset() {
+	*x = RevokeCurrentAdminElevationResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangeAdminPasswordResponse) String() string {
+func (x *RevokeCurrentAdminElevationResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangeAdminPasswordResponse) ProtoMessage() {}
+func (*RevokeCurrentAdminElevationResponse) ProtoMessage() {}
 
-func (x *ChangeAdminPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[25]
+func (x *RevokeCurrentAdminElevationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1599,47 +1985,46 @@ func (x *ChangeAdminPasswordResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangeAdminPasswordResponse.ProtoReflect.Descriptor instead.
-func (*ChangeAdminPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{25}
+// Deprecated: Use RevokeCurrentAdminElevationResponse.ProtoReflect.Descriptor instead.
+func (*RevokeCurrentAdminElevationResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *ChangeAdminPasswordResponse) GetNextStep() AdminNextStep {
+func (x *RevokeCurrentAdminElevationResponse) GetRevoked() bool {
 	if x != nil {
-		return x.NextStep
+		return x.Revoked
 	}
-	return AdminNextStep_ADMIN_NEXT_STEP_UNSPECIFIED
+	return false
 }
 
-func (x *ChangeAdminPasswordResponse) GetSession() *AdminSessionSummary {
+func (x *RevokeCurrentAdminElevationResponse) GetSession() *AdminSessionSummary {
 	if x != nil {
 		return x.Session
 	}
 	return nil
 }
 
-type BeginTotpRebindRequest struct {
+type ListAdminSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BeginTotpRebindRequest) Reset() {
-	*x = BeginTotpRebindRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[26]
+func (x *ListAdminSessionsRequest) Reset() {
+	*x = ListAdminSessionsRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BeginTotpRebindRequest) String() string {
+func (x *ListAdminSessionsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BeginTotpRebindRequest) ProtoMessage() {}
+func (*ListAdminSessionsRequest) ProtoMessage() {}
 
-func (x *BeginTotpRebindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[26]
+func (x *ListAdminSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1650,42 +2035,139 @@ func (x *BeginTotpRebindRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BeginTotpRebindRequest.ProtoReflect.Descriptor instead.
-func (*BeginTotpRebindRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{26}
+// Deprecated: Use ListAdminSessionsRequest.ProtoReflect.Descriptor instead.
+func (*ListAdminSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *BeginTotpRebindRequest) GetOperationId() string {
+type ListAdminSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sessions      []*AdminSessionInfo    `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAdminSessionsResponse) Reset() {
+	*x = ListAdminSessionsResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAdminSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAdminSessionsResponse) ProtoMessage() {}
+
+func (x *ListAdminSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAdminSessionsResponse.ProtoReflect.Descriptor instead.
+func (*ListAdminSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ListAdminSessionsResponse) GetSessions() []*AdminSessionInfo {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+type RevokeAdminSessionRequest struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	OperationId            string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	SessionId              string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ExpectedSessionVersion uint64                 `protobuf:"varint,3,opt,name=expected_session_version,json=expectedSessionVersion,proto3" json:"expected_session_version,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *RevokeAdminSessionRequest) Reset() {
+	*x = RevokeAdminSessionRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAdminSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAdminSessionRequest) ProtoMessage() {}
+
+func (x *RevokeAdminSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAdminSessionRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAdminSessionRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RevokeAdminSessionRequest) GetOperationId() string {
 	if x != nil {
 		return x.OperationId
 	}
 	return ""
 }
 
-type BeginTotpRebindResponse struct {
+func (x *RevokeAdminSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RevokeAdminSessionRequest) GetExpectedSessionVersion() uint64 {
+	if x != nil {
+		return x.ExpectedSessionVersion
+	}
+	return 0
+}
+
+type RevokeAdminSessionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	TotpSecret    string                 `protobuf:"bytes,2,opt,name=totp_secret,json=totpSecret,proto3" json:"totp_secret,omitempty"`
-	OtpauthUri    string                 `protobuf:"bytes,3,opt,name=otpauth_uri,json=otpauthUri,proto3" json:"otpauth_uri,omitempty"`
+	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Revoked       bool                   `protobuf:"varint,3,opt,name=revoked,proto3" json:"revoked,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BeginTotpRebindResponse) Reset() {
-	*x = BeginTotpRebindResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[27]
+func (x *RevokeAdminSessionResponse) Reset() {
+	*x = RevokeAdminSessionResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BeginTotpRebindResponse) String() string {
+func (x *RevokeAdminSessionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BeginTotpRebindResponse) ProtoMessage() {}
+func (*RevokeAdminSessionResponse) ProtoMessage() {}
 
-func (x *BeginTotpRebindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[27]
+func (x *RevokeAdminSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1696,116 +2178,53 @@ func (x *BeginTotpRebindResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BeginTotpRebindResponse.ProtoReflect.Descriptor instead.
-func (*BeginTotpRebindResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{27}
+// Deprecated: Use RevokeAdminSessionResponse.ProtoReflect.Descriptor instead.
+func (*RevokeAdminSessionResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{38}
 }
 
-func (x *BeginTotpRebindResponse) GetResult() *v1.OperationResult {
+func (x *RevokeAdminSessionResponse) GetOperationId() string {
 	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-func (x *BeginTotpRebindResponse) GetTotpSecret() string {
-	if x != nil {
-		return x.TotpSecret
+		return x.OperationId
 	}
 	return ""
 }
 
-func (x *BeginTotpRebindResponse) GetOtpauthUri() string {
+func (x *RevokeAdminSessionResponse) GetSessionId() string {
 	if x != nil {
-		return x.OtpauthUri
+		return x.SessionId
 	}
 	return ""
 }
 
-type CompleteTotpRebindRequest struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	EnrollmentOperationId    string                 `protobuf:"bytes,1,opt,name=enrollment_operation_id,json=enrollmentOperationId,proto3" json:"enrollment_operation_id,omitempty"`
-	RecoveryCodesOperationId string                 `protobuf:"bytes,2,opt,name=recovery_codes_operation_id,json=recoveryCodesOperationId,proto3" json:"recovery_codes_operation_id,omitempty"`
-	TotpCode                 string                 `protobuf:"bytes,3,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
-}
-
-func (x *CompleteTotpRebindRequest) Reset() {
-	*x = CompleteTotpRebindRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[28]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CompleteTotpRebindRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CompleteTotpRebindRequest) ProtoMessage() {}
-
-func (x *CompleteTotpRebindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[28]
+func (x *RevokeAdminSessionResponse) GetRevoked() bool {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.Revoked
 	}
-	return mi.MessageOf(x)
+	return false
 }
 
-// Deprecated: Use CompleteTotpRebindRequest.ProtoReflect.Descriptor instead.
-func (*CompleteTotpRebindRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{28}
-}
-
-func (x *CompleteTotpRebindRequest) GetEnrollmentOperationId() string {
-	if x != nil {
-		return x.EnrollmentOperationId
-	}
-	return ""
-}
-
-func (x *CompleteTotpRebindRequest) GetRecoveryCodesOperationId() string {
-	if x != nil {
-		return x.RecoveryCodesOperationId
-	}
-	return ""
-}
-
-func (x *CompleteTotpRebindRequest) GetTotpCode() string {
-	if x != nil {
-		return x.TotpCode
-	}
-	return ""
-}
-
-type CompleteTotpRebindResponse struct {
+type PreviewRevokeOtherAdminSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	RecoveryCodes []string               `protobuf:"bytes,2,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
-	Session       *AdminSessionSummary   `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CompleteTotpRebindResponse) Reset() {
-	*x = CompleteTotpRebindResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[29]
+func (x *PreviewRevokeOtherAdminSessionsRequest) Reset() {
+	*x = PreviewRevokeOtherAdminSessionsRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CompleteTotpRebindResponse) String() string {
+func (x *PreviewRevokeOtherAdminSessionsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CompleteTotpRebindResponse) ProtoMessage() {}
+func (*PreviewRevokeOtherAdminSessionsRequest) ProtoMessage() {}
 
-func (x *CompleteTotpRebindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[29]
+func (x *PreviewRevokeOtherAdminSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1816,132 +2235,211 @@ func (x *CompleteTotpRebindResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CompleteTotpRebindResponse.ProtoReflect.Descriptor instead.
-func (*CompleteTotpRebindResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{29}
+// Deprecated: Use PreviewRevokeOtherAdminSessionsRequest.ProtoReflect.Descriptor instead.
+func (*PreviewRevokeOtherAdminSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{39}
 }
 
-func (x *CompleteTotpRebindResponse) GetResult() *v1.OperationResult {
+type PreviewRevokeOtherAdminSessionsResponse struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	PreviewVersion        string                 `protobuf:"bytes,1,opt,name=preview_version,json=previewVersion,proto3" json:"preview_version,omitempty"`
+	CurrentAdminVersion   uint64                 `protobuf:"varint,2,opt,name=current_admin_version,json=currentAdminVersion,proto3" json:"current_admin_version,omitempty"`
+	CurrentSessionVersion uint64                 `protobuf:"varint,3,opt,name=current_session_version,json=currentSessionVersion,proto3" json:"current_session_version,omitempty"`
+	OtherSessionCount     int32                  `protobuf:"varint,4,opt,name=other_session_count,json=otherSessionCount,proto3" json:"other_session_count,omitempty"`
+	Sessions              []*AdminSessionInfo    `protobuf:"bytes,5,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) Reset() {
+	*x = PreviewRevokeOtherAdminSessionsResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewRevokeOtherAdminSessionsResponse) ProtoMessage() {}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[40]
 	if x != nil {
-		return x.Result
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewRevokeOtherAdminSessionsResponse.ProtoReflect.Descriptor instead.
+func (*PreviewRevokeOtherAdminSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) GetPreviewVersion() string {
+	if x != nil {
+		return x.PreviewVersion
+	}
+	return ""
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) GetCurrentAdminVersion() uint64 {
+	if x != nil {
+		return x.CurrentAdminVersion
+	}
+	return 0
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) GetCurrentSessionVersion() uint64 {
+	if x != nil {
+		return x.CurrentSessionVersion
+	}
+	return 0
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) GetOtherSessionCount() int32 {
+	if x != nil {
+		return x.OtherSessionCount
+	}
+	return 0
+}
+
+func (x *PreviewRevokeOtherAdminSessionsResponse) GetSessions() []*AdminSessionInfo {
+	if x != nil {
+		return x.Sessions
 	}
 	return nil
 }
 
-func (x *CompleteTotpRebindResponse) GetRecoveryCodes() []string {
-	if x != nil {
-		return x.RecoveryCodes
-	}
-	return nil
+type RevokeOtherAdminSessionsRequest struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	OperationId                   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	PreviewVersion                string                 `protobuf:"bytes,2,opt,name=preview_version,json=previewVersion,proto3" json:"preview_version,omitempty"`
+	ExpectedAdminVersion          uint64                 `protobuf:"varint,3,opt,name=expected_admin_version,json=expectedAdminVersion,proto3" json:"expected_admin_version,omitempty"`
+	ExpectedCurrentSessionVersion uint64                 `protobuf:"varint,4,opt,name=expected_current_session_version,json=expectedCurrentSessionVersion,proto3" json:"expected_current_session_version,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
-func (x *CompleteTotpRebindResponse) GetSession() *AdminSessionSummary {
+func (x *RevokeOtherAdminSessionsRequest) Reset() {
+	*x = RevokeOtherAdminSessionsRequest{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOtherAdminSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOtherAdminSessionsRequest) ProtoMessage() {}
+
+func (x *RevokeOtherAdminSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOtherAdminSessionsRequest.ProtoReflect.Descriptor instead.
+func (*RevokeOtherAdminSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *RevokeOtherAdminSessionsRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *RevokeOtherAdminSessionsRequest) GetPreviewVersion() string {
+	if x != nil {
+		return x.PreviewVersion
+	}
+	return ""
+}
+
+func (x *RevokeOtherAdminSessionsRequest) GetExpectedAdminVersion() uint64 {
+	if x != nil {
+		return x.ExpectedAdminVersion
+	}
+	return 0
+}
+
+func (x *RevokeOtherAdminSessionsRequest) GetExpectedCurrentSessionVersion() uint64 {
+	if x != nil {
+		return x.ExpectedCurrentSessionVersion
+	}
+	return 0
+}
+
+type RevokeOtherAdminSessionsResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OperationId     string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	RevokedSessions int32                  `protobuf:"varint,2,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
+	Session         *AdminSessionSummary   `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RevokeOtherAdminSessionsResponse) Reset() {
+	*x = RevokeOtherAdminSessionsResponse{}
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOtherAdminSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOtherAdminSessionsResponse) ProtoMessage() {}
+
+func (x *RevokeOtherAdminSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOtherAdminSessionsResponse.ProtoReflect.Descriptor instead.
+func (*RevokeOtherAdminSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *RevokeOtherAdminSessionsResponse) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *RevokeOtherAdminSessionsResponse) GetRevokedSessions() int32 {
+	if x != nil {
+		return x.RevokedSessions
+	}
+	return 0
+}
+
+func (x *RevokeOtherAdminSessionsResponse) GetSession() *AdminSessionSummary {
 	if x != nil {
 		return x.Session
-	}
-	return nil
-}
-
-type RegenerateAdminRecoveryCodesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
-	TotpCode      string                 `protobuf:"bytes,2,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegenerateAdminRecoveryCodesRequest) Reset() {
-	*x = RegenerateAdminRecoveryCodesRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[30]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegenerateAdminRecoveryCodesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegenerateAdminRecoveryCodesRequest) ProtoMessage() {}
-
-func (x *RegenerateAdminRecoveryCodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[30]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegenerateAdminRecoveryCodesRequest.ProtoReflect.Descriptor instead.
-func (*RegenerateAdminRecoveryCodesRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{30}
-}
-
-func (x *RegenerateAdminRecoveryCodesRequest) GetOperationId() string {
-	if x != nil {
-		return x.OperationId
-	}
-	return ""
-}
-
-func (x *RegenerateAdminRecoveryCodesRequest) GetTotpCode() string {
-	if x != nil {
-		return x.TotpCode
-	}
-	return ""
-}
-
-type RegenerateAdminRecoveryCodesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *v1.OperationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	RecoveryCodes []string               `protobuf:"bytes,2,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegenerateAdminRecoveryCodesResponse) Reset() {
-	*x = RegenerateAdminRecoveryCodesResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[31]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegenerateAdminRecoveryCodesResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegenerateAdminRecoveryCodesResponse) ProtoMessage() {}
-
-func (x *RegenerateAdminRecoveryCodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[31]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegenerateAdminRecoveryCodesResponse.ProtoReflect.Descriptor instead.
-func (*RegenerateAdminRecoveryCodesResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{31}
-}
-
-func (x *RegenerateAdminRecoveryCodesResponse) GetResult() *v1.OperationResult {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-func (x *RegenerateAdminRecoveryCodesResponse) GetRecoveryCodes() []string {
-	if x != nil {
-		return x.RecoveryCodes
 	}
 	return nil
 }
@@ -1954,7 +2452,7 @@ type LogoutAdminRequest struct {
 
 func (x *LogoutAdminRequest) Reset() {
 	*x = LogoutAdminRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[32]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1966,7 +2464,7 @@ func (x *LogoutAdminRequest) String() string {
 func (*LogoutAdminRequest) ProtoMessage() {}
 
 func (x *LogoutAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[32]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1979,7 +2477,7 @@ func (x *LogoutAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutAdminRequest.ProtoReflect.Descriptor instead.
 func (*LogoutAdminRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{32}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{43}
 }
 
 type LogoutAdminResponse struct {
@@ -1991,7 +2489,7 @@ type LogoutAdminResponse struct {
 
 func (x *LogoutAdminResponse) Reset() {
 	*x = LogoutAdminResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[33]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2003,7 +2501,7 @@ func (x *LogoutAdminResponse) String() string {
 func (*LogoutAdminResponse) ProtoMessage() {}
 
 func (x *LogoutAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[33]
+	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2016,7 +2514,7 @@ func (x *LogoutAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutAdminResponse.ProtoReflect.Descriptor instead.
 func (*LogoutAdminResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{33}
+	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *LogoutAdminResponse) GetLoggedOut() bool {
@@ -2026,104 +2524,17 @@ func (x *LogoutAdminResponse) GetLoggedOut() bool {
 	return false
 }
 
-type LogoutAllAdminSessionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LogoutAllAdminSessionsRequest) Reset() {
-	*x = LogoutAllAdminSessionsRequest{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[34]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LogoutAllAdminSessionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LogoutAllAdminSessionsRequest) ProtoMessage() {}
-
-func (x *LogoutAllAdminSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[34]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LogoutAllAdminSessionsRequest.ProtoReflect.Descriptor instead.
-func (*LogoutAllAdminSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{34}
-}
-
-type LogoutAllAdminSessionsResponse struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RevokedSessions int32                  `protobuf:"varint,1,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *LogoutAllAdminSessionsResponse) Reset() {
-	*x = LogoutAllAdminSessionsResponse{}
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[35]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LogoutAllAdminSessionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LogoutAllAdminSessionsResponse) ProtoMessage() {}
-
-func (x *LogoutAllAdminSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_admin_v1_admin_auth_proto_msgTypes[35]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LogoutAllAdminSessionsResponse.ProtoReflect.Descriptor instead.
-func (*LogoutAllAdminSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_platform_admin_v1_admin_auth_proto_rawDescGZIP(), []int{35}
-}
-
-func (x *LogoutAllAdminSessionsResponse) GetRevokedSessions() int32 {
-	if x != nil {
-		return x.RevokedSessions
-	}
-	return 0
-}
-
 var File_platform_admin_v1_admin_auth_proto protoreflect.FileDescriptor
 
 const file_platform_admin_v1_admin_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"platform/admin/v1/admin_auth.proto\x12\x11platform.admin.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/common.proto\"\xbf\x02\n" +
-	"\x13AdminSessionSummary\x12\x19\n" +
-	"\badmin_id\x18\x01 \x01(\tR\aadminId\x127\n" +
-	"\x04kind\x18\x02 \x01(\x0e2#.platform.admin.v1.AdminSessionKindR\x04kind\x12D\n" +
-	"\vpermissions\x18\x03 \x03(\x0e2\".platform.admin.v1.AdminPermissionR\vpermissions\x12B\n" +
-	"\x0fidle_expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ridleExpiresAt\x12J\n" +
-	"\x13absolute_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x11absoluteExpiresAt\"\x16\n" +
-	"\x14GetSetupStateRequest\"Q\n" +
-	"\x15GetSetupStateResponse\x128\n" +
-	"\x05state\x18\x01 \x01(\x0e2\".platform.admin.v1.AdminSetupStateR\x05state\"\x1f\n" +
-	"\x1dGetCurrentAdminSessionRequest\"\xa1\x01\n" +
+	"\"platform/admin/v1/admin_auth.proto\x12\x11platform.admin.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$platform/admin/v1/admin_common.proto\x1a\x1fplatform/common/v1/common.proto\"\x16\n" +
+	"\x14GetSetupStateRequest\"S\n" +
+	"\x15GetSetupStateResponse\x12:\n" +
+	"\x05state\x18\x01 \x01(\x0e2$.platform.admin.v1.AdminAccountStateR\x05state\"\x1f\n" +
+	"\x1dGetCurrentAdminSessionRequest\"b\n" +
 	"\x1eGetCurrentAdminSessionResponse\x12@\n" +
-	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\x12=\n" +
-	"\tnext_step\x18\x02 \x01(\x0e2 .platform.admin.v1.AdminNextStepR\bnextStep\"\x1c\n" +
+	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\x1c\n" +
 	"\x1aGetRuntimeReadinessRequest\"\xda\x01\n" +
 	"\x15RuntimeReadinessState\x12\x12\n" +
 	"\x04mode\x18\x01 \x01(\tR\x04mode\x12\x14\n" +
@@ -2143,34 +2554,67 @@ const file_platform_admin_v1_admin_auth_proto_rawDesc = "" +
 	"\tchallenge\x18\x01 \x01(\v2&.platform.common.v1.AnonymousChallengeR\tchallenge\"[\n" +
 	"\x14LoginPasswordRequest\x12'\n" +
 	"\x0fchallenge_proof\x18\x01 \x01(\tR\x0echallengeProof\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"\x91\x01\n" +
-	"\x15LoginPasswordResponse\x12=\n" +
-	"\tnext_step\x18\x01 \x01(\x0e2 .platform.admin.v1.AdminNextStepR\bnextStep\x129\n" +
-	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"0\n" +
-	"\x11VerifyTotpRequest\x12\x1b\n" +
-	"\ttotp_code\x18\x01 \x01(\tR\btotpCode\"V\n" +
-	"\x12VerifyTotpResponse\x12@\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"f\n" +
+	"\"LoginRequiresInitialPasswordChange\x12@\n" +
+	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"T\n" +
+	"\x10LoginRequiresMfa\x12@\n" +
+	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\xb3\x02\n" +
+	"\x15LoginPasswordResponse\x12\x80\x01\n" +
+	" requires_initial_password_change\x18\x01 \x01(\v25.platform.admin.v1.LoginRequiresInitialPasswordChangeH\x00R\x1drequiresInitialPasswordChange\x12H\n" +
+	"\frequires_mfa\x18\x02 \x01(\v2#.platform.admin.v1.LoginRequiresMfaH\x00R\vrequiresMfa\x12B\n" +
+	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryH\x00R\asessionB\t\n" +
+	"\aoutcome\"5\n" +
+	"\x16VerifyAdminTotpRequest\x12\x1b\n" +
+	"\ttotp_code\x18\x01 \x01(\tR\btotpCode\"[\n" +
+	"\x17VerifyAdminTotpResponse\x12@\n" +
+	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"E\n" +
+	"\x1eVerifyAdminRecoveryCodeRequest\x12#\n" +
+	"\rrecovery_code\x18\x01 \x01(\tR\frecoveryCode\"c\n" +
+	"\x1fVerifyAdminRecoveryCodeResponse\x12@\n" +
 	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"A\n" +
 	"\x1cChangeInitialPasswordRequest\x12!\n" +
-	"\fnew_password\x18\x01 \x01(\tR\vnewPassword\"\x99\x01\n" +
-	"\x1dChangeInitialPasswordResponse\x12=\n" +
-	"\tnext_step\x18\x01 \x01(\x0e2 .platform.admin.v1.AdminNextStepR\bnextStep\x129\n" +
-	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"?\n" +
+	"\fnew_password\x18\x01 \x01(\tR\vnewPassword\"a\n" +
+	"\x1dChangeInitialPasswordResponse\x12@\n" +
+	"\asession\x18\x01 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\xc9\x01\n" +
+	"\x1aChangeAdminPasswordRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12)\n" +
+	"\x10current_password\x18\x02 \x01(\tR\x0fcurrentPassword\x12!\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12:\n" +
+	"\x19expected_password_version\x18\x04 \x01(\x04R\x17expectedPasswordVersion\"\xad\x01\n" +
+	"\x1bChangeAdminPasswordResponse\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12@\n" +
+	"\asession\x18\x02 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\x12)\n" +
+	"\x10revoked_sessions\x18\x03 \x01(\x05R\x0frevokedSessions\"j\n" +
 	"\x1aBeginTotpEnrollmentRequest\x12!\n" +
-	"\foperation_id\x18\x01 \x01(\tR\voperationId\"\x9c\x01\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12)\n" +
+	"\x10current_password\x18\x02 \x01(\tR\x0fcurrentPassword\"\xa5\x01\n" +
 	"\x1bBeginTotpEnrollmentResponse\x12;\n" +
-	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12\x1f\n" +
-	"\vtotp_secret\x18\x02 \x01(\tR\n" +
-	"totpSecret\x12\x1f\n" +
+	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12(\n" +
+	"\x10manual_entry_key\x18\x02 \x01(\tR\x0emanualEntryKey\x12\x1f\n" +
 	"\votpauth_uri\x18\x03 \x01(\tR\n" +
 	"otpauthUri\"\xb3\x01\n" +
 	"\x1dCompleteTotpEnrollmentRequest\x126\n" +
 	"\x17enrollment_operation_id\x18\x01 \x01(\tR\x15enrollmentOperationId\x12=\n" +
 	"\x1brecovery_codes_operation_id\x18\x02 \x01(\tR\x18recoveryCodesOperationId\x12\x1b\n" +
-	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\"\xc6\x01\n" +
+	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\"\xf1\x01\n" +
 	"\x1eCompleteTotpEnrollmentResponse\x12;\n" +
+	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12%\n" +
+	"\x0erecovery_codes\x18\x02 \x03(\tR\rrecoveryCodes\x12@\n" +
+	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\x12)\n" +
+	"\x10revoked_sessions\x18\x04 \x01(\x05R\x0frevokedSessions\"\x8f\x01\n" +
+	"\x12DisableTotpRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12>\n" +
+	"\x1bexpected_enrollment_version\x18\x03 \x01(\x04R\x19expectedEnrollmentVersion\"\xd0\x01\n" +
+	"\x13DisableTotpResponse\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12@\n" +
+	"\asession\x18\x02 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\x12)\n" +
+	"\x10revoked_sessions\x18\x03 \x01(\x05R\x0frevokedSessions\x12)\n" +
+	"\x10already_disabled\x18\x04 \x01(\bR\x0falreadyDisabled\"\x8f\x01\n" +
+	"#RegenerateAdminRecoveryCodesRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12E\n" +
+	"\x1fexpected_recovery_codes_version\x18\x02 \x01(\x04R\x1cexpectedRecoveryCodesVersion\"\xcc\x01\n" +
+	"$RegenerateAdminRecoveryCodesResponse\x12;\n" +
 	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12%\n" +
 	"\x0erecovery_codes\x18\x02 \x03(\tR\rrecoveryCodes\x12@\n" +
 	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\xa9\x01\n" +
@@ -2179,105 +2623,88 @@ const file_platform_admin_v1_admin_auth_proto_rawDesc = "" +
 	"\foperation_id\x18\x02 \x01(\tR\voperationId\x12\x1b\n" +
 	"\tresult_id\x18\x03 \x01(\tR\bresultId\"A\n" +
 	"!ConfirmAdminSecretReceiptResponse\x12\x1c\n" +
-	"\tconfirmed\x18\x01 \x01(\bR\tconfirmed\":\n" +
-	"\x13RecoverAdminRequest\x12#\n" +
-	"\rrecovery_code\x18\x01 \x01(\tR\frecoveryCode\"\x97\x01\n" +
-	"\x14RecoverAdminResponse\x12=\n" +
-	"\tnext_step\x18\x01 \x01(\x0e2 .platform.admin.v1.AdminNextStepR\bnextStep\x12@\n" +
-	"\asession\x18\x02 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"j\n" +
-	"\x1aChangeAdminPasswordRequest\x12)\n" +
-	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\x12!\n" +
-	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\"\x9e\x01\n" +
-	"\x1bChangeAdminPasswordResponse\x12=\n" +
-	"\tnext_step\x18\x01 \x01(\x0e2 .platform.admin.v1.AdminNextStepR\bnextStep\x12@\n" +
-	"\asession\x18\x02 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\";\n" +
-	"\x16BeginTotpRebindRequest\x12!\n" +
-	"\foperation_id\x18\x01 \x01(\tR\voperationId\"\x98\x01\n" +
-	"\x17BeginTotpRebindResponse\x12;\n" +
-	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12\x1f\n" +
-	"\vtotp_secret\x18\x02 \x01(\tR\n" +
-	"totpSecret\x12\x1f\n" +
-	"\votpauth_uri\x18\x03 \x01(\tR\n" +
-	"otpauthUri\"\xaf\x01\n" +
-	"\x19CompleteTotpRebindRequest\x126\n" +
-	"\x17enrollment_operation_id\x18\x01 \x01(\tR\x15enrollmentOperationId\x12=\n" +
-	"\x1brecovery_codes_operation_id\x18\x02 \x01(\tR\x18recoveryCodesOperationId\x12\x1b\n" +
-	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\"\xc2\x01\n" +
-	"\x1aCompleteTotpRebindResponse\x12;\n" +
-	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12%\n" +
-	"\x0erecovery_codes\x18\x02 \x03(\tR\rrecoveryCodes\x12@\n" +
-	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"e\n" +
-	"#RegenerateAdminRecoveryCodesRequest\x12!\n" +
-	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x1b\n" +
-	"\ttotp_code\x18\x02 \x01(\tR\btotpCode\"\x8a\x01\n" +
-	"$RegenerateAdminRecoveryCodesResponse\x12;\n" +
-	"\x06result\x18\x01 \x01(\v2#.platform.common.v1.OperationResultR\x06result\x12%\n" +
-	"\x0erecovery_codes\x18\x02 \x03(\tR\rrecoveryCodes\"\x14\n" +
+	"\tconfirmed\x18\x01 \x01(\bR\tconfirmed\"\xff\x01\n" +
+	"\x1aElevateAdminSessionRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12<\n" +
+	"\x05scope\x18\x02 \x01(\x0e2&.platform.admin.v1.AdminElevationScopeR\x05scope\x12)\n" +
+	"\x10current_password\x18\x03 \x01(\tR\x0fcurrentPassword\x12\x1d\n" +
+	"\ttotp_code\x18\x04 \x01(\tH\x00R\btotpCode\x12%\n" +
+	"\rrecovery_code\x18\x05 \x01(\tH\x00R\frecoveryCodeB\x0f\n" +
+	"\rsecond_factor\"\x9e\x02\n" +
+	"\x1bElevateAdminSessionResponse\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12F\n" +
+	"\televation\x18\x02 \x01(\v2(.platform.admin.v1.AdminElevationSummaryR\televation\x12@\n" +
+	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\x12R\n" +
+	"\rsecond_factor\x18\x04 \x01(\x0e2-.platform.admin.v1.AdminElevationSecondFactorR\fsecondFactor\"b\n" +
+	"\"RevokeCurrentAdminElevationRequest\x12<\n" +
+	"\x05scope\x18\x01 \x01(\x0e2&.platform.admin.v1.AdminElevationScopeR\x05scope\"\x81\x01\n" +
+	"#RevokeCurrentAdminElevationResponse\x12\x18\n" +
+	"\arevoked\x18\x01 \x01(\bR\arevoked\x12@\n" +
+	"\asession\x18\x02 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\x1a\n" +
+	"\x18ListAdminSessionsRequest\"\\\n" +
+	"\x19ListAdminSessionsResponse\x12?\n" +
+	"\bsessions\x18\x01 \x03(\v2#.platform.admin.v1.AdminSessionInfoR\bsessions\"\x97\x01\n" +
+	"\x19RevokeAdminSessionRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x128\n" +
+	"\x18expected_session_version\x18\x03 \x01(\x04R\x16expectedSessionVersion\"x\n" +
+	"\x1aRevokeAdminSessionResponse\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x18\n" +
+	"\arevoked\x18\x03 \x01(\bR\arevoked\"(\n" +
+	"&PreviewRevokeOtherAdminSessionsRequest\"\xaf\x02\n" +
+	"'PreviewRevokeOtherAdminSessionsResponse\x12'\n" +
+	"\x0fpreview_version\x18\x01 \x01(\tR\x0epreviewVersion\x122\n" +
+	"\x15current_admin_version\x18\x02 \x01(\x04R\x13currentAdminVersion\x126\n" +
+	"\x17current_session_version\x18\x03 \x01(\x04R\x15currentSessionVersion\x12.\n" +
+	"\x13other_session_count\x18\x04 \x01(\x05R\x11otherSessionCount\x12?\n" +
+	"\bsessions\x18\x05 \x03(\v2#.platform.admin.v1.AdminSessionInfoR\bsessions\"\xec\x01\n" +
+	"\x1fRevokeOtherAdminSessionsRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12'\n" +
+	"\x0fpreview_version\x18\x02 \x01(\tR\x0epreviewVersion\x124\n" +
+	"\x16expected_admin_version\x18\x03 \x01(\x04R\x14expectedAdminVersion\x12G\n" +
+	" expected_current_session_version\x18\x04 \x01(\x04R\x1dexpectedCurrentSessionVersion\"\xb2\x01\n" +
+	" RevokeOtherAdminSessionsResponse\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12)\n" +
+	"\x10revoked_sessions\x18\x02 \x01(\x05R\x0frevokedSessions\x12@\n" +
+	"\asession\x18\x03 \x01(\v2&.platform.admin.v1.AdminSessionSummaryR\asession\"\x14\n" +
 	"\x12LogoutAdminRequest\"4\n" +
 	"\x13LogoutAdminResponse\x12\x1d\n" +
 	"\n" +
-	"logged_out\x18\x01 \x01(\bR\tloggedOut\"\x1f\n" +
-	"\x1dLogoutAllAdminSessionsRequest\"K\n" +
-	"\x1eLogoutAllAdminSessionsResponse\x12)\n" +
-	"\x10revoked_sessions\x18\x01 \x01(\x05R\x0frevokedSessions*\xa1\x01\n" +
-	"\x0fAdminSetupState\x12!\n" +
-	"\x1dADMIN_SETUP_STATE_UNSPECIFIED\x10\x00\x12'\n" +
-	"#ADMIN_SETUP_STATE_BOOTSTRAP_PENDING\x10\x01\x12$\n" +
-	" ADMIN_SETUP_STATE_SETUP_REQUIRED\x10\x02\x12\x1c\n" +
-	"\x18ADMIN_SETUP_STATE_ACTIVE\x10\x03*\xda\x01\n" +
-	"\rAdminNextStep\x12\x1f\n" +
-	"\x1bADMIN_NEXT_STEP_UNSPECIFIED\x10\x00\x12#\n" +
-	"\x1fADMIN_NEXT_STEP_CHANGE_PASSWORD\x10\x01\x12\x1f\n" +
-	"\x1bADMIN_NEXT_STEP_ENROLL_TOTP\x10\x02\x12\x1e\n" +
-	"\x1aADMIN_NEXT_STEP_VERIFY_MFA\x10\x03\x12\x1f\n" +
-	"\x1bADMIN_NEXT_STEP_REBIND_TOTP\x10\x04\x12!\n" +
-	"\x1dADMIN_NEXT_STEP_AUTHENTICATED\x10\x05*\xff\x01\n" +
-	"\x10AdminSessionKind\x12\"\n" +
-	"\x1eADMIN_SESSION_KIND_UNSPECIFIED\x10\x00\x12-\n" +
-	")ADMIN_SESSION_KIND_SETUP_PASSWORD_PENDING\x10\x01\x12.\n" +
-	"*ADMIN_SESSION_KIND_TOTP_ENROLLMENT_PENDING\x10\x02\x12\"\n" +
-	"\x1eADMIN_SESSION_KIND_MFA_PENDING\x10\x03\x12'\n" +
-	"#ADMIN_SESSION_KIND_RECOVERY_PENDING\x10\x04\x12\x1b\n" +
-	"\x17ADMIN_SESSION_KIND_FULL\x10\x05*\x97\x03\n" +
-	"\x0fAdminPermission\x12 \n" +
-	"\x1cADMIN_PERMISSION_UNSPECIFIED\x10\x00\x12\x1d\n" +
-	"\x19ADMIN_PERMISSION_GET_USER\x10\x01\x12\"\n" +
-	"\x1eADMIN_PERMISSION_GET_REAL_NAME\x10\x02\x12%\n" +
-	"!ADMIN_PERMISSION_UPDATE_REAL_NAME\x10\x03\x12#\n" +
-	"\x1fADMIN_PERMISSION_EXPORT_PROFILE\x10\x04\x12$\n" +
-	" ADMIN_PERMISSION_MANAGE_RECOVERY\x10\x05\x12#\n" +
-	"\x1fADMIN_PERMISSION_FORCE_USERNAME\x10\x06\x12!\n" +
-	"\x1dADMIN_PERMISSION_SUSPEND_USER\x10\a\x12 \n" +
-	"\x1cADMIN_PERMISSION_DELETE_USER\x10\b\x12\"\n" +
-	"\x1eADMIN_PERMISSION_REVOKE_DEVICE\x10\t\x12\x1f\n" +
-	"\x1bADMIN_PERMISSION_READ_AUDIT\x10\n" +
-	"*\xaf\x02\n" +
+	"logged_out\x18\x01 \x01(\bR\tloggedOut*\xd4\x01\n" +
 	"\x14AdminSecretOperation\x12&\n" +
 	"\"ADMIN_SECRET_OPERATION_UNSPECIFIED\x10\x00\x12*\n" +
 	"&ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT\x10\x01\x121\n" +
-	"-ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES\x10\x02\x12&\n" +
-	"\"ADMIN_SECRET_OPERATION_TOTP_REBIND\x10\x03\x124\n" +
-	"0ADMIN_SECRET_OPERATION_REGENERATE_RECOVERY_CODES\x10\x04\x122\n" +
-	".ADMIN_SECRET_OPERATION_ASSISTED_RECOVERY_GRANT\x10\x052\xb1\x0f\n" +
+	"-ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES\x10\x02\x125\n" +
+	"1ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES\x10\x03*\xa4\x01\n" +
+	"\x1aAdminElevationSecondFactor\x12-\n" +
+	")ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"ADMIN_ELEVATION_SECOND_FACTOR_TOTP\x10\x01\x12/\n" +
+	"+ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE\x10\x022\xed\x13\n" +
 	"\x10AdminAuthService\x12b\n" +
 	"\rGetSetupState\x12'.platform.admin.v1.GetSetupStateRequest\x1a(.platform.admin.v1.GetSetupStateResponse\x12}\n" +
 	"\x16GetCurrentAdminSession\x120.platform.admin.v1.GetCurrentAdminSessionRequest\x1a1.platform.admin.v1.GetCurrentAdminSessionResponse\x12t\n" +
 	"\x13GetRuntimeReadiness\x12-.platform.admin.v1.GetRuntimeReadinessRequest\x1a..platform.admin.v1.GetRuntimeReadinessResponse\x12h\n" +
 	"\x0fBeginAdminLogin\x12).platform.admin.v1.BeginAdminLoginRequest\x1a*.platform.admin.v1.BeginAdminLoginResponse\x12b\n" +
-	"\rLoginPassword\x12'.platform.admin.v1.LoginPasswordRequest\x1a(.platform.admin.v1.LoginPasswordResponse\x12Y\n" +
-	"\n" +
-	"VerifyTotp\x12$.platform.admin.v1.VerifyTotpRequest\x1a%.platform.admin.v1.VerifyTotpResponse\x12z\n" +
+	"\rLoginPassword\x12'.platform.admin.v1.LoginPasswordRequest\x1a(.platform.admin.v1.LoginPasswordResponse\x12h\n" +
+	"\x0fVerifyAdminTotp\x12).platform.admin.v1.VerifyAdminTotpRequest\x1a*.platform.admin.v1.VerifyAdminTotpResponse\x12\x80\x01\n" +
+	"\x17VerifyAdminRecoveryCode\x121.platform.admin.v1.VerifyAdminRecoveryCodeRequest\x1a2.platform.admin.v1.VerifyAdminRecoveryCodeResponse\x12z\n" +
 	"\x15ChangeInitialPassword\x12/.platform.admin.v1.ChangeInitialPasswordRequest\x1a0.platform.admin.v1.ChangeInitialPasswordResponse\x12t\n" +
+	"\x13ChangeAdminPassword\x12-.platform.admin.v1.ChangeAdminPasswordRequest\x1a..platform.admin.v1.ChangeAdminPasswordResponse\x12t\n" +
 	"\x13BeginTotpEnrollment\x12-.platform.admin.v1.BeginTotpEnrollmentRequest\x1a..platform.admin.v1.BeginTotpEnrollmentResponse\x12}\n" +
-	"\x16CompleteTotpEnrollment\x120.platform.admin.v1.CompleteTotpEnrollmentRequest\x1a1.platform.admin.v1.CompleteTotpEnrollmentResponse\x12\x86\x01\n" +
-	"\x19ConfirmAdminSecretReceipt\x123.platform.admin.v1.ConfirmAdminSecretReceiptRequest\x1a4.platform.admin.v1.ConfirmAdminSecretReceiptResponse\x12_\n" +
-	"\fRecoverAdmin\x12&.platform.admin.v1.RecoverAdminRequest\x1a'.platform.admin.v1.RecoverAdminResponse\x12t\n" +
-	"\x13ChangeAdminPassword\x12-.platform.admin.v1.ChangeAdminPasswordRequest\x1a..platform.admin.v1.ChangeAdminPasswordResponse\x12h\n" +
-	"\x0fBeginTotpRebind\x12).platform.admin.v1.BeginTotpRebindRequest\x1a*.platform.admin.v1.BeginTotpRebindResponse\x12q\n" +
-	"\x12CompleteTotpRebind\x12,.platform.admin.v1.CompleteTotpRebindRequest\x1a-.platform.admin.v1.CompleteTotpRebindResponse\x12\x8f\x01\n" +
-	"\x1cRegenerateAdminRecoveryCodes\x126.platform.admin.v1.RegenerateAdminRecoveryCodesRequest\x1a7.platform.admin.v1.RegenerateAdminRecoveryCodesResponse\x12\\\n" +
-	"\vLogoutAdmin\x12%.platform.admin.v1.LogoutAdminRequest\x1a&.platform.admin.v1.LogoutAdminResponse\x12}\n" +
-	"\x16LogoutAllAdminSessions\x120.platform.admin.v1.LogoutAllAdminSessionsRequest\x1a1.platform.admin.v1.LogoutAllAdminSessionsResponseBIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1b\x06proto3"
+	"\x16CompleteTotpEnrollment\x120.platform.admin.v1.CompleteTotpEnrollmentRequest\x1a1.platform.admin.v1.CompleteTotpEnrollmentResponse\x12\\\n" +
+	"\vDisableTotp\x12%.platform.admin.v1.DisableTotpRequest\x1a&.platform.admin.v1.DisableTotpResponse\x12\x8f\x01\n" +
+	"\x1cRegenerateAdminRecoveryCodes\x126.platform.admin.v1.RegenerateAdminRecoveryCodesRequest\x1a7.platform.admin.v1.RegenerateAdminRecoveryCodesResponse\x12\x86\x01\n" +
+	"\x19ConfirmAdminSecretReceipt\x123.platform.admin.v1.ConfirmAdminSecretReceiptRequest\x1a4.platform.admin.v1.ConfirmAdminSecretReceiptResponse\x12t\n" +
+	"\x13ElevateAdminSession\x12-.platform.admin.v1.ElevateAdminSessionRequest\x1a..platform.admin.v1.ElevateAdminSessionResponse\x12\x8c\x01\n" +
+	"\x1bRevokeCurrentAdminElevation\x125.platform.admin.v1.RevokeCurrentAdminElevationRequest\x1a6.platform.admin.v1.RevokeCurrentAdminElevationResponse\x12n\n" +
+	"\x11ListAdminSessions\x12+.platform.admin.v1.ListAdminSessionsRequest\x1a,.platform.admin.v1.ListAdminSessionsResponse\x12q\n" +
+	"\x12RevokeAdminSession\x12,.platform.admin.v1.RevokeAdminSessionRequest\x1a-.platform.admin.v1.RevokeAdminSessionResponse\x12\x98\x01\n" +
+	"\x1fPreviewRevokeOtherAdminSessions\x129.platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest\x1a:.platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse\x12\x83\x01\n" +
+	"\x18RevokeOtherAdminSessions\x122.platform.admin.v1.RevokeOtherAdminSessionsRequest\x1a3.platform.admin.v1.RevokeOtherAdminSessionsResponse\x12\\\n" +
+	"\vLogoutAdmin\x12%.platform.admin.v1.LogoutAdminRequest\x1a&.platform.admin.v1.LogoutAdminResponseBIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_platform_admin_v1_admin_auth_proto_rawDescOnce sync.Once
@@ -2291,123 +2718,144 @@ func file_platform_admin_v1_admin_auth_proto_rawDescGZIP() []byte {
 	return file_platform_admin_v1_admin_auth_proto_rawDescData
 }
 
-var file_platform_admin_v1_admin_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_platform_admin_v1_admin_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_platform_admin_v1_admin_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_platform_admin_v1_admin_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_platform_admin_v1_admin_auth_proto_goTypes = []any{
-	(AdminSetupState)(0),                         // 0: platform.admin.v1.AdminSetupState
-	(AdminNextStep)(0),                           // 1: platform.admin.v1.AdminNextStep
-	(AdminSessionKind)(0),                        // 2: platform.admin.v1.AdminSessionKind
-	(AdminPermission)(0),                         // 3: platform.admin.v1.AdminPermission
-	(AdminSecretOperation)(0),                    // 4: platform.admin.v1.AdminSecretOperation
-	(*AdminSessionSummary)(nil),                  // 5: platform.admin.v1.AdminSessionSummary
-	(*GetSetupStateRequest)(nil),                 // 6: platform.admin.v1.GetSetupStateRequest
-	(*GetSetupStateResponse)(nil),                // 7: platform.admin.v1.GetSetupStateResponse
-	(*GetCurrentAdminSessionRequest)(nil),        // 8: platform.admin.v1.GetCurrentAdminSessionRequest
-	(*GetCurrentAdminSessionResponse)(nil),       // 9: platform.admin.v1.GetCurrentAdminSessionResponse
-	(*GetRuntimeReadinessRequest)(nil),           // 10: platform.admin.v1.GetRuntimeReadinessRequest
-	(*RuntimeReadinessState)(nil),                // 11: platform.admin.v1.RuntimeReadinessState
-	(*GetRuntimeReadinessResponse)(nil),          // 12: platform.admin.v1.GetRuntimeReadinessResponse
-	(*BeginAdminLoginRequest)(nil),               // 13: platform.admin.v1.BeginAdminLoginRequest
-	(*BeginAdminLoginResponse)(nil),              // 14: platform.admin.v1.BeginAdminLoginResponse
-	(*LoginPasswordRequest)(nil),                 // 15: platform.admin.v1.LoginPasswordRequest
-	(*LoginPasswordResponse)(nil),                // 16: platform.admin.v1.LoginPasswordResponse
-	(*VerifyTotpRequest)(nil),                    // 17: platform.admin.v1.VerifyTotpRequest
-	(*VerifyTotpResponse)(nil),                   // 18: platform.admin.v1.VerifyTotpResponse
-	(*ChangeInitialPasswordRequest)(nil),         // 19: platform.admin.v1.ChangeInitialPasswordRequest
-	(*ChangeInitialPasswordResponse)(nil),        // 20: platform.admin.v1.ChangeInitialPasswordResponse
-	(*BeginTotpEnrollmentRequest)(nil),           // 21: platform.admin.v1.BeginTotpEnrollmentRequest
-	(*BeginTotpEnrollmentResponse)(nil),          // 22: platform.admin.v1.BeginTotpEnrollmentResponse
-	(*CompleteTotpEnrollmentRequest)(nil),        // 23: platform.admin.v1.CompleteTotpEnrollmentRequest
-	(*CompleteTotpEnrollmentResponse)(nil),       // 24: platform.admin.v1.CompleteTotpEnrollmentResponse
-	(*ConfirmAdminSecretReceiptRequest)(nil),     // 25: platform.admin.v1.ConfirmAdminSecretReceiptRequest
-	(*ConfirmAdminSecretReceiptResponse)(nil),    // 26: platform.admin.v1.ConfirmAdminSecretReceiptResponse
-	(*RecoverAdminRequest)(nil),                  // 27: platform.admin.v1.RecoverAdminRequest
-	(*RecoverAdminResponse)(nil),                 // 28: platform.admin.v1.RecoverAdminResponse
-	(*ChangeAdminPasswordRequest)(nil),           // 29: platform.admin.v1.ChangeAdminPasswordRequest
-	(*ChangeAdminPasswordResponse)(nil),          // 30: platform.admin.v1.ChangeAdminPasswordResponse
-	(*BeginTotpRebindRequest)(nil),               // 31: platform.admin.v1.BeginTotpRebindRequest
-	(*BeginTotpRebindResponse)(nil),              // 32: platform.admin.v1.BeginTotpRebindResponse
-	(*CompleteTotpRebindRequest)(nil),            // 33: platform.admin.v1.CompleteTotpRebindRequest
-	(*CompleteTotpRebindResponse)(nil),           // 34: platform.admin.v1.CompleteTotpRebindResponse
-	(*RegenerateAdminRecoveryCodesRequest)(nil),  // 35: platform.admin.v1.RegenerateAdminRecoveryCodesRequest
-	(*RegenerateAdminRecoveryCodesResponse)(nil), // 36: platform.admin.v1.RegenerateAdminRecoveryCodesResponse
-	(*LogoutAdminRequest)(nil),                   // 37: platform.admin.v1.LogoutAdminRequest
-	(*LogoutAdminResponse)(nil),                  // 38: platform.admin.v1.LogoutAdminResponse
-	(*LogoutAllAdminSessionsRequest)(nil),        // 39: platform.admin.v1.LogoutAllAdminSessionsRequest
-	(*LogoutAllAdminSessionsResponse)(nil),       // 40: platform.admin.v1.LogoutAllAdminSessionsResponse
-	nil,                                          // 41: platform.admin.v1.RuntimeReadinessState.ComponentsEntry
-	(*timestamppb.Timestamp)(nil),                // 42: google.protobuf.Timestamp
-	(*v1.AnonymousChallenge)(nil),                // 43: platform.common.v1.AnonymousChallenge
-	(*v1.OperationResult)(nil),                   // 44: platform.common.v1.OperationResult
+	(AdminSecretOperation)(0),                       // 0: platform.admin.v1.AdminSecretOperation
+	(AdminElevationSecondFactor)(0),                 // 1: platform.admin.v1.AdminElevationSecondFactor
+	(*GetSetupStateRequest)(nil),                    // 2: platform.admin.v1.GetSetupStateRequest
+	(*GetSetupStateResponse)(nil),                   // 3: platform.admin.v1.GetSetupStateResponse
+	(*GetCurrentAdminSessionRequest)(nil),           // 4: platform.admin.v1.GetCurrentAdminSessionRequest
+	(*GetCurrentAdminSessionResponse)(nil),          // 5: platform.admin.v1.GetCurrentAdminSessionResponse
+	(*GetRuntimeReadinessRequest)(nil),              // 6: platform.admin.v1.GetRuntimeReadinessRequest
+	(*RuntimeReadinessState)(nil),                   // 7: platform.admin.v1.RuntimeReadinessState
+	(*GetRuntimeReadinessResponse)(nil),             // 8: platform.admin.v1.GetRuntimeReadinessResponse
+	(*BeginAdminLoginRequest)(nil),                  // 9: platform.admin.v1.BeginAdminLoginRequest
+	(*BeginAdminLoginResponse)(nil),                 // 10: platform.admin.v1.BeginAdminLoginResponse
+	(*LoginPasswordRequest)(nil),                    // 11: platform.admin.v1.LoginPasswordRequest
+	(*LoginRequiresInitialPasswordChange)(nil),      // 12: platform.admin.v1.LoginRequiresInitialPasswordChange
+	(*LoginRequiresMfa)(nil),                        // 13: platform.admin.v1.LoginRequiresMfa
+	(*LoginPasswordResponse)(nil),                   // 14: platform.admin.v1.LoginPasswordResponse
+	(*VerifyAdminTotpRequest)(nil),                  // 15: platform.admin.v1.VerifyAdminTotpRequest
+	(*VerifyAdminTotpResponse)(nil),                 // 16: platform.admin.v1.VerifyAdminTotpResponse
+	(*VerifyAdminRecoveryCodeRequest)(nil),          // 17: platform.admin.v1.VerifyAdminRecoveryCodeRequest
+	(*VerifyAdminRecoveryCodeResponse)(nil),         // 18: platform.admin.v1.VerifyAdminRecoveryCodeResponse
+	(*ChangeInitialPasswordRequest)(nil),            // 19: platform.admin.v1.ChangeInitialPasswordRequest
+	(*ChangeInitialPasswordResponse)(nil),           // 20: platform.admin.v1.ChangeInitialPasswordResponse
+	(*ChangeAdminPasswordRequest)(nil),              // 21: platform.admin.v1.ChangeAdminPasswordRequest
+	(*ChangeAdminPasswordResponse)(nil),             // 22: platform.admin.v1.ChangeAdminPasswordResponse
+	(*BeginTotpEnrollmentRequest)(nil),              // 23: platform.admin.v1.BeginTotpEnrollmentRequest
+	(*BeginTotpEnrollmentResponse)(nil),             // 24: platform.admin.v1.BeginTotpEnrollmentResponse
+	(*CompleteTotpEnrollmentRequest)(nil),           // 25: platform.admin.v1.CompleteTotpEnrollmentRequest
+	(*CompleteTotpEnrollmentResponse)(nil),          // 26: platform.admin.v1.CompleteTotpEnrollmentResponse
+	(*DisableTotpRequest)(nil),                      // 27: platform.admin.v1.DisableTotpRequest
+	(*DisableTotpResponse)(nil),                     // 28: platform.admin.v1.DisableTotpResponse
+	(*RegenerateAdminRecoveryCodesRequest)(nil),     // 29: platform.admin.v1.RegenerateAdminRecoveryCodesRequest
+	(*RegenerateAdminRecoveryCodesResponse)(nil),    // 30: platform.admin.v1.RegenerateAdminRecoveryCodesResponse
+	(*ConfirmAdminSecretReceiptRequest)(nil),        // 31: platform.admin.v1.ConfirmAdminSecretReceiptRequest
+	(*ConfirmAdminSecretReceiptResponse)(nil),       // 32: platform.admin.v1.ConfirmAdminSecretReceiptResponse
+	(*ElevateAdminSessionRequest)(nil),              // 33: platform.admin.v1.ElevateAdminSessionRequest
+	(*ElevateAdminSessionResponse)(nil),             // 34: platform.admin.v1.ElevateAdminSessionResponse
+	(*RevokeCurrentAdminElevationRequest)(nil),      // 35: platform.admin.v1.RevokeCurrentAdminElevationRequest
+	(*RevokeCurrentAdminElevationResponse)(nil),     // 36: platform.admin.v1.RevokeCurrentAdminElevationResponse
+	(*ListAdminSessionsRequest)(nil),                // 37: platform.admin.v1.ListAdminSessionsRequest
+	(*ListAdminSessionsResponse)(nil),               // 38: platform.admin.v1.ListAdminSessionsResponse
+	(*RevokeAdminSessionRequest)(nil),               // 39: platform.admin.v1.RevokeAdminSessionRequest
+	(*RevokeAdminSessionResponse)(nil),              // 40: platform.admin.v1.RevokeAdminSessionResponse
+	(*PreviewRevokeOtherAdminSessionsRequest)(nil),  // 41: platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest
+	(*PreviewRevokeOtherAdminSessionsResponse)(nil), // 42: platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse
+	(*RevokeOtherAdminSessionsRequest)(nil),         // 43: platform.admin.v1.RevokeOtherAdminSessionsRequest
+	(*RevokeOtherAdminSessionsResponse)(nil),        // 44: platform.admin.v1.RevokeOtherAdminSessionsResponse
+	(*LogoutAdminRequest)(nil),                      // 45: platform.admin.v1.LogoutAdminRequest
+	(*LogoutAdminResponse)(nil),                     // 46: platform.admin.v1.LogoutAdminResponse
+	nil,                                             // 47: platform.admin.v1.RuntimeReadinessState.ComponentsEntry
+	(AdminAccountState)(0),                          // 48: platform.admin.v1.AdminAccountState
+	(*AdminSessionSummary)(nil),                     // 49: platform.admin.v1.AdminSessionSummary
+	(*v1.AnonymousChallenge)(nil),                   // 50: platform.common.v1.AnonymousChallenge
+	(*v1.OperationResult)(nil),                      // 51: platform.common.v1.OperationResult
+	(AdminElevationScope)(0),                        // 52: platform.admin.v1.AdminElevationScope
+	(*AdminElevationSummary)(nil),                   // 53: platform.admin.v1.AdminElevationSummary
+	(*AdminSessionInfo)(nil),                        // 54: platform.admin.v1.AdminSessionInfo
 }
 var file_platform_admin_v1_admin_auth_proto_depIdxs = []int32{
-	2,  // 0: platform.admin.v1.AdminSessionSummary.kind:type_name -> platform.admin.v1.AdminSessionKind
-	3,  // 1: platform.admin.v1.AdminSessionSummary.permissions:type_name -> platform.admin.v1.AdminPermission
-	42, // 2: platform.admin.v1.AdminSessionSummary.idle_expires_at:type_name -> google.protobuf.Timestamp
-	42, // 3: platform.admin.v1.AdminSessionSummary.absolute_expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: platform.admin.v1.GetSetupStateResponse.state:type_name -> platform.admin.v1.AdminSetupState
-	5,  // 5: platform.admin.v1.GetCurrentAdminSessionResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	1,  // 6: platform.admin.v1.GetCurrentAdminSessionResponse.next_step:type_name -> platform.admin.v1.AdminNextStep
-	41, // 7: platform.admin.v1.RuntimeReadinessState.components:type_name -> platform.admin.v1.RuntimeReadinessState.ComponentsEntry
-	11, // 8: platform.admin.v1.GetRuntimeReadinessResponse.ordinary:type_name -> platform.admin.v1.RuntimeReadinessState
-	11, // 9: platform.admin.v1.GetRuntimeReadinessResponse.sensitive:type_name -> platform.admin.v1.RuntimeReadinessState
-	43, // 10: platform.admin.v1.BeginAdminLoginResponse.challenge:type_name -> platform.common.v1.AnonymousChallenge
-	1,  // 11: platform.admin.v1.LoginPasswordResponse.next_step:type_name -> platform.admin.v1.AdminNextStep
-	42, // 12: platform.admin.v1.LoginPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
-	5,  // 13: platform.admin.v1.VerifyTotpResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	1,  // 14: platform.admin.v1.ChangeInitialPasswordResponse.next_step:type_name -> platform.admin.v1.AdminNextStep
-	42, // 15: platform.admin.v1.ChangeInitialPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
-	44, // 16: platform.admin.v1.BeginTotpEnrollmentResponse.result:type_name -> platform.common.v1.OperationResult
-	44, // 17: platform.admin.v1.CompleteTotpEnrollmentResponse.result:type_name -> platform.common.v1.OperationResult
-	5,  // 18: platform.admin.v1.CompleteTotpEnrollmentResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	4,  // 19: platform.admin.v1.ConfirmAdminSecretReceiptRequest.operation:type_name -> platform.admin.v1.AdminSecretOperation
-	1,  // 20: platform.admin.v1.RecoverAdminResponse.next_step:type_name -> platform.admin.v1.AdminNextStep
-	5,  // 21: platform.admin.v1.RecoverAdminResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	1,  // 22: platform.admin.v1.ChangeAdminPasswordResponse.next_step:type_name -> platform.admin.v1.AdminNextStep
-	5,  // 23: platform.admin.v1.ChangeAdminPasswordResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	44, // 24: platform.admin.v1.BeginTotpRebindResponse.result:type_name -> platform.common.v1.OperationResult
-	44, // 25: platform.admin.v1.CompleteTotpRebindResponse.result:type_name -> platform.common.v1.OperationResult
-	5,  // 26: platform.admin.v1.CompleteTotpRebindResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
-	44, // 27: platform.admin.v1.RegenerateAdminRecoveryCodesResponse.result:type_name -> platform.common.v1.OperationResult
-	6,  // 28: platform.admin.v1.AdminAuthService.GetSetupState:input_type -> platform.admin.v1.GetSetupStateRequest
-	8,  // 29: platform.admin.v1.AdminAuthService.GetCurrentAdminSession:input_type -> platform.admin.v1.GetCurrentAdminSessionRequest
-	10, // 30: platform.admin.v1.AdminAuthService.GetRuntimeReadiness:input_type -> platform.admin.v1.GetRuntimeReadinessRequest
-	13, // 31: platform.admin.v1.AdminAuthService.BeginAdminLogin:input_type -> platform.admin.v1.BeginAdminLoginRequest
-	15, // 32: platform.admin.v1.AdminAuthService.LoginPassword:input_type -> platform.admin.v1.LoginPasswordRequest
-	17, // 33: platform.admin.v1.AdminAuthService.VerifyTotp:input_type -> platform.admin.v1.VerifyTotpRequest
-	19, // 34: platform.admin.v1.AdminAuthService.ChangeInitialPassword:input_type -> platform.admin.v1.ChangeInitialPasswordRequest
-	21, // 35: platform.admin.v1.AdminAuthService.BeginTotpEnrollment:input_type -> platform.admin.v1.BeginTotpEnrollmentRequest
-	23, // 36: platform.admin.v1.AdminAuthService.CompleteTotpEnrollment:input_type -> platform.admin.v1.CompleteTotpEnrollmentRequest
-	25, // 37: platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt:input_type -> platform.admin.v1.ConfirmAdminSecretReceiptRequest
-	27, // 38: platform.admin.v1.AdminAuthService.RecoverAdmin:input_type -> platform.admin.v1.RecoverAdminRequest
-	29, // 39: platform.admin.v1.AdminAuthService.ChangeAdminPassword:input_type -> platform.admin.v1.ChangeAdminPasswordRequest
-	31, // 40: platform.admin.v1.AdminAuthService.BeginTotpRebind:input_type -> platform.admin.v1.BeginTotpRebindRequest
-	33, // 41: platform.admin.v1.AdminAuthService.CompleteTotpRebind:input_type -> platform.admin.v1.CompleteTotpRebindRequest
-	35, // 42: platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes:input_type -> platform.admin.v1.RegenerateAdminRecoveryCodesRequest
-	37, // 43: platform.admin.v1.AdminAuthService.LogoutAdmin:input_type -> platform.admin.v1.LogoutAdminRequest
-	39, // 44: platform.admin.v1.AdminAuthService.LogoutAllAdminSessions:input_type -> platform.admin.v1.LogoutAllAdminSessionsRequest
-	7,  // 45: platform.admin.v1.AdminAuthService.GetSetupState:output_type -> platform.admin.v1.GetSetupStateResponse
-	9,  // 46: platform.admin.v1.AdminAuthService.GetCurrentAdminSession:output_type -> platform.admin.v1.GetCurrentAdminSessionResponse
-	12, // 47: platform.admin.v1.AdminAuthService.GetRuntimeReadiness:output_type -> platform.admin.v1.GetRuntimeReadinessResponse
-	14, // 48: platform.admin.v1.AdminAuthService.BeginAdminLogin:output_type -> platform.admin.v1.BeginAdminLoginResponse
-	16, // 49: platform.admin.v1.AdminAuthService.LoginPassword:output_type -> platform.admin.v1.LoginPasswordResponse
-	18, // 50: platform.admin.v1.AdminAuthService.VerifyTotp:output_type -> platform.admin.v1.VerifyTotpResponse
-	20, // 51: platform.admin.v1.AdminAuthService.ChangeInitialPassword:output_type -> platform.admin.v1.ChangeInitialPasswordResponse
-	22, // 52: platform.admin.v1.AdminAuthService.BeginTotpEnrollment:output_type -> platform.admin.v1.BeginTotpEnrollmentResponse
-	24, // 53: platform.admin.v1.AdminAuthService.CompleteTotpEnrollment:output_type -> platform.admin.v1.CompleteTotpEnrollmentResponse
-	26, // 54: platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt:output_type -> platform.admin.v1.ConfirmAdminSecretReceiptResponse
-	28, // 55: platform.admin.v1.AdminAuthService.RecoverAdmin:output_type -> platform.admin.v1.RecoverAdminResponse
-	30, // 56: platform.admin.v1.AdminAuthService.ChangeAdminPassword:output_type -> platform.admin.v1.ChangeAdminPasswordResponse
-	32, // 57: platform.admin.v1.AdminAuthService.BeginTotpRebind:output_type -> platform.admin.v1.BeginTotpRebindResponse
-	34, // 58: platform.admin.v1.AdminAuthService.CompleteTotpRebind:output_type -> platform.admin.v1.CompleteTotpRebindResponse
-	36, // 59: platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes:output_type -> platform.admin.v1.RegenerateAdminRecoveryCodesResponse
-	38, // 60: platform.admin.v1.AdminAuthService.LogoutAdmin:output_type -> platform.admin.v1.LogoutAdminResponse
-	40, // 61: platform.admin.v1.AdminAuthService.LogoutAllAdminSessions:output_type -> platform.admin.v1.LogoutAllAdminSessionsResponse
-	45, // [45:62] is the sub-list for method output_type
-	28, // [28:45] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	48, // 0: platform.admin.v1.GetSetupStateResponse.state:type_name -> platform.admin.v1.AdminAccountState
+	49, // 1: platform.admin.v1.GetCurrentAdminSessionResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	47, // 2: platform.admin.v1.RuntimeReadinessState.components:type_name -> platform.admin.v1.RuntimeReadinessState.ComponentsEntry
+	7,  // 3: platform.admin.v1.GetRuntimeReadinessResponse.ordinary:type_name -> platform.admin.v1.RuntimeReadinessState
+	7,  // 4: platform.admin.v1.GetRuntimeReadinessResponse.sensitive:type_name -> platform.admin.v1.RuntimeReadinessState
+	50, // 5: platform.admin.v1.BeginAdminLoginResponse.challenge:type_name -> platform.common.v1.AnonymousChallenge
+	49, // 6: platform.admin.v1.LoginRequiresInitialPasswordChange.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 7: platform.admin.v1.LoginRequiresMfa.session:type_name -> platform.admin.v1.AdminSessionSummary
+	12, // 8: platform.admin.v1.LoginPasswordResponse.requires_initial_password_change:type_name -> platform.admin.v1.LoginRequiresInitialPasswordChange
+	13, // 9: platform.admin.v1.LoginPasswordResponse.requires_mfa:type_name -> platform.admin.v1.LoginRequiresMfa
+	49, // 10: platform.admin.v1.LoginPasswordResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 11: platform.admin.v1.VerifyAdminTotpResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 12: platform.admin.v1.VerifyAdminRecoveryCodeResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 13: platform.admin.v1.ChangeInitialPasswordResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 14: platform.admin.v1.ChangeAdminPasswordResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	51, // 15: platform.admin.v1.BeginTotpEnrollmentResponse.result:type_name -> platform.common.v1.OperationResult
+	51, // 16: platform.admin.v1.CompleteTotpEnrollmentResponse.result:type_name -> platform.common.v1.OperationResult
+	49, // 17: platform.admin.v1.CompleteTotpEnrollmentResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	49, // 18: platform.admin.v1.DisableTotpResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	51, // 19: platform.admin.v1.RegenerateAdminRecoveryCodesResponse.result:type_name -> platform.common.v1.OperationResult
+	49, // 20: platform.admin.v1.RegenerateAdminRecoveryCodesResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	0,  // 21: platform.admin.v1.ConfirmAdminSecretReceiptRequest.operation:type_name -> platform.admin.v1.AdminSecretOperation
+	52, // 22: platform.admin.v1.ElevateAdminSessionRequest.scope:type_name -> platform.admin.v1.AdminElevationScope
+	53, // 23: platform.admin.v1.ElevateAdminSessionResponse.elevation:type_name -> platform.admin.v1.AdminElevationSummary
+	49, // 24: platform.admin.v1.ElevateAdminSessionResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	1,  // 25: platform.admin.v1.ElevateAdminSessionResponse.second_factor:type_name -> platform.admin.v1.AdminElevationSecondFactor
+	52, // 26: platform.admin.v1.RevokeCurrentAdminElevationRequest.scope:type_name -> platform.admin.v1.AdminElevationScope
+	49, // 27: platform.admin.v1.RevokeCurrentAdminElevationResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	54, // 28: platform.admin.v1.ListAdminSessionsResponse.sessions:type_name -> platform.admin.v1.AdminSessionInfo
+	54, // 29: platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse.sessions:type_name -> platform.admin.v1.AdminSessionInfo
+	49, // 30: platform.admin.v1.RevokeOtherAdminSessionsResponse.session:type_name -> platform.admin.v1.AdminSessionSummary
+	2,  // 31: platform.admin.v1.AdminAuthService.GetSetupState:input_type -> platform.admin.v1.GetSetupStateRequest
+	4,  // 32: platform.admin.v1.AdminAuthService.GetCurrentAdminSession:input_type -> platform.admin.v1.GetCurrentAdminSessionRequest
+	6,  // 33: platform.admin.v1.AdminAuthService.GetRuntimeReadiness:input_type -> platform.admin.v1.GetRuntimeReadinessRequest
+	9,  // 34: platform.admin.v1.AdminAuthService.BeginAdminLogin:input_type -> platform.admin.v1.BeginAdminLoginRequest
+	11, // 35: platform.admin.v1.AdminAuthService.LoginPassword:input_type -> platform.admin.v1.LoginPasswordRequest
+	15, // 36: platform.admin.v1.AdminAuthService.VerifyAdminTotp:input_type -> platform.admin.v1.VerifyAdminTotpRequest
+	17, // 37: platform.admin.v1.AdminAuthService.VerifyAdminRecoveryCode:input_type -> platform.admin.v1.VerifyAdminRecoveryCodeRequest
+	19, // 38: platform.admin.v1.AdminAuthService.ChangeInitialPassword:input_type -> platform.admin.v1.ChangeInitialPasswordRequest
+	21, // 39: platform.admin.v1.AdminAuthService.ChangeAdminPassword:input_type -> platform.admin.v1.ChangeAdminPasswordRequest
+	23, // 40: platform.admin.v1.AdminAuthService.BeginTotpEnrollment:input_type -> platform.admin.v1.BeginTotpEnrollmentRequest
+	25, // 41: platform.admin.v1.AdminAuthService.CompleteTotpEnrollment:input_type -> platform.admin.v1.CompleteTotpEnrollmentRequest
+	27, // 42: platform.admin.v1.AdminAuthService.DisableTotp:input_type -> platform.admin.v1.DisableTotpRequest
+	29, // 43: platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes:input_type -> platform.admin.v1.RegenerateAdminRecoveryCodesRequest
+	31, // 44: platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt:input_type -> platform.admin.v1.ConfirmAdminSecretReceiptRequest
+	33, // 45: platform.admin.v1.AdminAuthService.ElevateAdminSession:input_type -> platform.admin.v1.ElevateAdminSessionRequest
+	35, // 46: platform.admin.v1.AdminAuthService.RevokeCurrentAdminElevation:input_type -> platform.admin.v1.RevokeCurrentAdminElevationRequest
+	37, // 47: platform.admin.v1.AdminAuthService.ListAdminSessions:input_type -> platform.admin.v1.ListAdminSessionsRequest
+	39, // 48: platform.admin.v1.AdminAuthService.RevokeAdminSession:input_type -> platform.admin.v1.RevokeAdminSessionRequest
+	41, // 49: platform.admin.v1.AdminAuthService.PreviewRevokeOtherAdminSessions:input_type -> platform.admin.v1.PreviewRevokeOtherAdminSessionsRequest
+	43, // 50: platform.admin.v1.AdminAuthService.RevokeOtherAdminSessions:input_type -> platform.admin.v1.RevokeOtherAdminSessionsRequest
+	45, // 51: platform.admin.v1.AdminAuthService.LogoutAdmin:input_type -> platform.admin.v1.LogoutAdminRequest
+	3,  // 52: platform.admin.v1.AdminAuthService.GetSetupState:output_type -> platform.admin.v1.GetSetupStateResponse
+	5,  // 53: platform.admin.v1.AdminAuthService.GetCurrentAdminSession:output_type -> platform.admin.v1.GetCurrentAdminSessionResponse
+	8,  // 54: platform.admin.v1.AdminAuthService.GetRuntimeReadiness:output_type -> platform.admin.v1.GetRuntimeReadinessResponse
+	10, // 55: platform.admin.v1.AdminAuthService.BeginAdminLogin:output_type -> platform.admin.v1.BeginAdminLoginResponse
+	14, // 56: platform.admin.v1.AdminAuthService.LoginPassword:output_type -> platform.admin.v1.LoginPasswordResponse
+	16, // 57: platform.admin.v1.AdminAuthService.VerifyAdminTotp:output_type -> platform.admin.v1.VerifyAdminTotpResponse
+	18, // 58: platform.admin.v1.AdminAuthService.VerifyAdminRecoveryCode:output_type -> platform.admin.v1.VerifyAdminRecoveryCodeResponse
+	20, // 59: platform.admin.v1.AdminAuthService.ChangeInitialPassword:output_type -> platform.admin.v1.ChangeInitialPasswordResponse
+	22, // 60: platform.admin.v1.AdminAuthService.ChangeAdminPassword:output_type -> platform.admin.v1.ChangeAdminPasswordResponse
+	24, // 61: platform.admin.v1.AdminAuthService.BeginTotpEnrollment:output_type -> platform.admin.v1.BeginTotpEnrollmentResponse
+	26, // 62: platform.admin.v1.AdminAuthService.CompleteTotpEnrollment:output_type -> platform.admin.v1.CompleteTotpEnrollmentResponse
+	28, // 63: platform.admin.v1.AdminAuthService.DisableTotp:output_type -> platform.admin.v1.DisableTotpResponse
+	30, // 64: platform.admin.v1.AdminAuthService.RegenerateAdminRecoveryCodes:output_type -> platform.admin.v1.RegenerateAdminRecoveryCodesResponse
+	32, // 65: platform.admin.v1.AdminAuthService.ConfirmAdminSecretReceipt:output_type -> platform.admin.v1.ConfirmAdminSecretReceiptResponse
+	34, // 66: platform.admin.v1.AdminAuthService.ElevateAdminSession:output_type -> platform.admin.v1.ElevateAdminSessionResponse
+	36, // 67: platform.admin.v1.AdminAuthService.RevokeCurrentAdminElevation:output_type -> platform.admin.v1.RevokeCurrentAdminElevationResponse
+	38, // 68: platform.admin.v1.AdminAuthService.ListAdminSessions:output_type -> platform.admin.v1.ListAdminSessionsResponse
+	40, // 69: platform.admin.v1.AdminAuthService.RevokeAdminSession:output_type -> platform.admin.v1.RevokeAdminSessionResponse
+	42, // 70: platform.admin.v1.AdminAuthService.PreviewRevokeOtherAdminSessions:output_type -> platform.admin.v1.PreviewRevokeOtherAdminSessionsResponse
+	44, // 71: platform.admin.v1.AdminAuthService.RevokeOtherAdminSessions:output_type -> platform.admin.v1.RevokeOtherAdminSessionsResponse
+	46, // 72: platform.admin.v1.AdminAuthService.LogoutAdmin:output_type -> platform.admin.v1.LogoutAdminResponse
+	52, // [52:73] is the sub-list for method output_type
+	31, // [31:52] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_platform_admin_v1_admin_auth_proto_init() }
@@ -2415,13 +2863,23 @@ func file_platform_admin_v1_admin_auth_proto_init() {
 	if File_platform_admin_v1_admin_auth_proto != nil {
 		return
 	}
+	file_platform_admin_v1_admin_common_proto_init()
+	file_platform_admin_v1_admin_auth_proto_msgTypes[12].OneofWrappers = []any{
+		(*LoginPasswordResponse_RequiresInitialPasswordChange)(nil),
+		(*LoginPasswordResponse_RequiresMfa)(nil),
+		(*LoginPasswordResponse_Session)(nil),
+	}
+	file_platform_admin_v1_admin_auth_proto_msgTypes[31].OneofWrappers = []any{
+		(*ElevateAdminSessionRequest_TotpCode)(nil),
+		(*ElevateAdminSessionRequest_RecoveryCode)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_admin_v1_admin_auth_proto_rawDesc), len(file_platform_admin_v1_admin_auth_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   37,
+			NumEnums:      2,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

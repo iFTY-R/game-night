@@ -180,61 +180,6 @@ func (transaction *keyRotationTransaction) RotateUserProfile(
 	return rotationCASResult(ctx, err)
 }
 
-func (transaction *keyRotationTransaction) ListProfileExportItems(
-	ctx context.Context,
-	sourceVersion uint32,
-	afterExportID uuid.UUID,
-	afterOrdinal int64,
-	batchSize uint32,
-) ([]keyrotation.ProfileExportCiphertext, error) {
-	if !validQueryBounds(sourceVersion, batchSize) ||
-		((afterExportID == uuid.Nil) != (afterOrdinal == 0)) || afterOrdinal < 0 {
-		return nil, keyrotation.ErrInvalidInput
-	}
-	rows, err := transaction.queries.ListProfileExportItemsForKeyRotation(ctx, sqlcgen.ListProfileExportItemsForKeyRotationParams{
-		SourceKeyVersion: pgtype.Int4{Int32: int32(sourceVersion), Valid: true}, AfterExportID: optionalUUID(afterExportID),
-		AfterOrdinal: optionalOrdinal(afterOrdinal), BatchSize: int32(batchSize),
-	})
-	if err != nil {
-		return nil, mapRotationQueryError(ctx, err)
-	}
-	result := make([]keyrotation.ProfileExportCiphertext, 0, len(rows))
-	for _, row := range rows {
-		if !row.ExportID.Valid || row.ExportID.Bytes == uuid.Nil || row.Ordinal <= 0 || !row.UserID.Valid ||
-			row.UserID.Bytes == uuid.Nil || !row.RealNameKeyVersion.Valid || row.RealNameKeyVersion.Int32 <= 0 {
-			return nil, keyrotation.ErrIntegrity
-		}
-		encrypted, restoreErr := profile.RestoreEncryptedValue(profile.EncryptedValue{
-			KeyVersion: uint32(row.RealNameKeyVersion.Int32), Nonce: row.RealNameNonce, Ciphertext: row.RealNameCiphertext,
-		})
-		if restoreErr != nil {
-			return nil, keyrotation.ErrIntegrity
-		}
-		result = append(result, keyrotation.ProfileExportCiphertext{
-			ExportID: row.ExportID.Bytes, Ordinal: row.Ordinal, UserID: row.UserID.Bytes, Encrypted: encrypted,
-		})
-	}
-	return result, nil
-}
-
-func (transaction *keyRotationTransaction) RotateProfileExportItem(
-	ctx context.Context,
-	row keyrotation.ProfileExportCiphertext,
-	rotated profile.EncryptedValue,
-	sourceVersion uint32,
-) (bool, error) {
-	if row.ExportID == uuid.Nil || row.Ordinal <= 0 || !validVersionForPostgres(sourceVersion) ||
-		rotated.KeyVersion == 0 || rotated.KeyVersion > math.MaxInt32 {
-		return false, keyrotation.ErrInvalidInput
-	}
-	_, err := transaction.queries.RotateProfileExportItemCiphertextCAS(ctx, sqlcgen.RotateProfileExportItemCiphertextCASParams{
-		RealNameCiphertext: rotated.Ciphertext, RealNameNonce: rotated.Nonce,
-		TargetKeyVersion: pgtype.Int4{Int32: int32(rotated.KeyVersion), Valid: true}, ExportID: uuidToPG(row.ExportID),
-		Ordinal: row.Ordinal, SourceKeyVersion: pgtype.Int4{Int32: int32(sourceVersion), Valid: true},
-	})
-	return rotationCASResult(ctx, err)
-}
-
 func (transaction *keyRotationTransaction) ListTOTPEnrollments(
 	ctx context.Context,
 	sourceVersion uint32,
@@ -420,7 +365,7 @@ func validPurposeCursor(purpose keyrotation.Purpose, cursor keyrotation.Cursor) 
 	}
 	switch purpose {
 	case keyrotation.PurposePII:
-		return cursor.Scope == keyrotation.ScopeUserProfiles || cursor.Scope == keyrotation.ScopeProfileExportItems
+		return cursor.Scope == keyrotation.ScopeUserProfiles
 	case keyrotation.PurposeTOTP:
 		return cursor.Scope == keyrotation.ScopeAdminTOTPEnrollments
 	default:
@@ -437,8 +382,6 @@ func validCursor(cursor keyrotation.Cursor) bool {
 	switch cursor.Scope {
 	case keyrotation.ScopeUserProfiles, keyrotation.ScopeAdminTOTPEnrollments:
 		return cursor.Ordinal == 0
-	case keyrotation.ScopeProfileExportItems:
-		return cursor.ID == uuid.Nil && cursor.Ordinal == 0 || cursor.ID != uuid.Nil && cursor.Ordinal > 0
 	default:
 		return false
 	}

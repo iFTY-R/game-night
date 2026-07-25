@@ -45,10 +45,18 @@ test("turn runner stays on the table rail between seats in both orientations", a
 
     const geometry = await page.getByRole("region", { name: "共同游戏桌" }).evaluate((table) => {
       const rail = table.querySelector<HTMLElement>(".gn-table__rail");
+      const order = table.querySelector<HTMLElement>(".gn-table__turn-order");
       const runner = table.querySelector<HTMLElement>(".gn-table__turn-runner");
-      if (rail === null || runner === null) return null;
+      if (rail === null || order === null || runner === null) return null;
 
       // A fixed gap between seats makes this geometry assertion deterministic without changing production motion.
+      const runnerStyle = getComputedStyle(runner);
+      const presentation = {
+        width: runnerStyle.width,
+        height: runnerStyle.height,
+        duration: runnerStyle.animationDuration,
+        path: runnerStyle.offsetPath,
+      };
       runner.style.animation = "none";
       runner.style.offsetDistance = "62.5%";
       const toBox = (element: Element) => {
@@ -58,27 +66,23 @@ test("turn runner stays on the table rail between seats in both orientations", a
       return {
         table: toBox(table),
         rail: toBox(rail),
+        order: toBox(order),
         runner: toBox(runner),
+        presentation,
         seats: Array.from(table.querySelectorAll(".gn-seat"), toBox),
       };
     });
 
     expect(geometry).not.toBeNull();
     if (geometry === null) continue;
-    const runnerCenter = {
-      x: geometry.runner.left + geometry.runner.width / 2,
-      y: geometry.runner.top + geometry.runner.height / 2,
-    };
-    const railCenter = {
-      x: geometry.rail.left + geometry.rail.width / 2,
-      y: geometry.rail.top + geometry.rail.height / 2,
-    };
-    const normalizedRailDistance =
-      ((runnerCenter.x - railCenter.x) / (geometry.rail.width / 2)) ** 2
-      + ((runnerCenter.y - railCenter.y) / (geometry.rail.height / 2)) ** 2;
-
-    expect(normalizedRailDistance).toBeGreaterThan(0.7);
-    expect(normalizedRailDistance).toBeLessThan(1.15);
+    expect(Math.abs(geometry.order.left - geometry.rail.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.order.top - geometry.rail.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.order.right - geometry.rail.right)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.order.bottom - geometry.rail.bottom)).toBeLessThanOrEqual(1);
+    expect(geometry.presentation).toMatchObject({ width: "16px", height: "16px", duration: "12s" });
+    expect(geometry.presentation.path).toBe(viewport.width > viewport.height
+      ? "inset(0px round 39% / 44%)"
+      : "inset(0px round 44% / 38%)");
     expect(geometry.runner.left).toBeGreaterThanOrEqual(geometry.table.left);
     expect(geometry.runner.top).toBeGreaterThanOrEqual(geometry.table.top);
     expect(geometry.runner.right).toBeLessThanOrEqual(geometry.table.right);
@@ -248,6 +252,7 @@ test("reduced motion disables game-state entrance animations", async ({ page }) 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(tableUrl);
   await expect(page.locator(".gn-table__turn-runner")).toHaveCSS("animation-name", "none");
+  await expect(page.locator(".gn-table__turn-runner")).toHaveCSS("offset-distance", "12.5%");
   const turnPulseAnimation = await page.locator(".gn-seat.is-turn .gn-seat__card").evaluate(
     (card) => getComputedStyle(card, "::after").animationName,
   );

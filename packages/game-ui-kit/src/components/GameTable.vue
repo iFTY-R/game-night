@@ -113,7 +113,7 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
       :class="`gn-table__turn-order--${turnDirection}`"
       aria-hidden="true"
     >
-      <span class="gn-table__turn-runner"><ChevronRight :size="18" :stroke-width="3" /></span>
+      <span class="gn-table__turn-runner"><ChevronRight :size="10" :stroke-width="3" /></span>
     </div>
     <div class="gn-table__center">
       <slot name="center" />
@@ -170,11 +170,11 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
   border: 0;
 }
 
-/* The inset keeps the runner on the felt; seat cards stay above it so the orbit passes behind players without covering names. */
+/* This box exactly matches the visible rail; seat cards stay above it so the runner passes behind players without covering names. */
 .gn-table__turn-order {
   position: absolute;
   z-index: 1;
-  inset: calc(11% + 10px) calc(10% + 10px) calc(13% + 10px);
+  inset: 11% 10% 13%;
   pointer-events: none;
 }
 
@@ -182,18 +182,18 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
   position: absolute;
   top: 0;
   left: 0;
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
   display: grid;
   place-items: center;
   color: #151b1c;
   background: var(--game-direction, var(--platform-accent, #e6b566));
   border: 1px solid color-mix(in srgb, var(--game-direction, var(--platform-accent, #e6b566)) 76%, white);
   border-radius: 50%;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--game-direction, var(--platform-accent, #e6b566)) 58%, transparent);
-  offset-path: ellipse(50% 50% at 50% 50%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--game-direction, var(--platform-accent, #e6b566)) 52%, transparent);
+  offset-path: inset(0 round 44% / 38%);
   offset-rotate: auto;
-  animation: gn-table-turn-orbit var(--game-turn-orbit-duration, 5.2s) linear infinite;
+  animation: gn-table-turn-orbit var(--game-turn-orbit-duration, 12s) linear infinite;
   will-change: offset-distance;
 }
 
@@ -239,7 +239,11 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
   }
 
   .gn-table__turn-order {
-    inset: calc(9% + 9px) calc(13% + 9px) calc(10% + 9px);
+    inset: 9% 13% 10%;
+  }
+
+  .gn-table__turn-runner {
+    offset-path: inset(0 round 39% / 44%);
   }
 
   .gn-table__center {
@@ -262,7 +266,7 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
 @media (prefers-reduced-motion: reduce) {
   .gn-table__turn-runner {
     animation: none;
-    offset-distance: 75%;
+    offset-distance: 12.5%;
     will-change: auto;
   }
 }

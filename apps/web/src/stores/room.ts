@@ -239,6 +239,33 @@ export const useRoomStore = defineStore("room", {
       }
     },
 
+    /** Commits a user-initiated rename before replacing the locally persisted identity snapshot. */
+    async changeUsername(displayName: string): Promise<void> {
+      const validation = validateUsernameInput(displayName);
+      if (!validation.isValid) {
+        throw new Error(USERNAME_RULE_MESSAGE);
+      }
+      const normalized = validation.normalized;
+      if (normalized === validateUsernameInput(this.displayName).normalized) {
+        throw new Error("新用户名需要与当前用户名不同");
+      }
+      this.busy = true;
+      this.error = "";
+      try {
+        const response = await identityClient.changeUsername(normalized);
+        if (!response.user?.userId || !response.user.username) {
+          throw new Error("修改用户名响应缺少身份状态");
+        }
+        // Only an authoritative response may replace the identity recovered from the device Cookie.
+        this.applyIdentity(response.user, normalized);
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : "修改用户名失败";
+        throw error;
+      } finally {
+        this.busy = false;
+      }
+    },
+
     /** Loads an authoritative room snapshot addressed by ID or invitation code. */
     async loadRoom(roomId?: string, roomCode?: string): Promise<RoomSnapshot | null> {
       this.busy = true;

@@ -4,7 +4,11 @@
  * generated protobuf runtime details while preserving the server contract.
  */
 
+import type { JsonValue } from "@bufbuild/protobuf";
+import { fromJson } from "@bufbuild/protobuf";
 import { SubscriptionFailure } from "@game-night/game-client";
+
+import { BusinessErrorDetailSchema } from "../../../../contracts/gen/ts/platform/common/v1/error_pb";
 
 import {
   actionRequestDigest,
@@ -21,12 +25,14 @@ import {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly businessKey: string;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, businessKey = "") {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.businessKey = businessKey;
   }
 }
 
@@ -290,8 +296,16 @@ const userCSRFName = "__Host-gn_csrf";
 const localizedErrorMessages: Record<string, string> = {
   "identity.device.invalid": "设备登录已失效，请重新设置用户名",
   "identity.device.revoked": "这台设备的登录已失效，请重新设置用户名",
+  "identity.username.invalid": "用户名需要 2-4 个汉字、英文字母或数字",
   // Room-scoped duplicate names are safe to present directly in localized form.
   "room.username.taken": "房间内已有同名玩家",
+};
+
+type ConnectErrorWire = {
+  code?: unknown;
+  message?: unknown;
+  details?: Array<{ type?: unknown; value?: unknown }>;
+  error?: ConnectErrorWire;
 };
 
 const requestID = (): string => {
@@ -376,15 +390,32 @@ const draftForGame = (room: RoomSnapshot, gameId: string): RoomGameConfigDraftWi
 
 const localizeApiMessage = (message: string): string => localizedErrorMessages[message] ?? message;
 
-const errorMessage = (body: unknown, status: number): { code: string; message: string } => {
+/** Reads the stable business key from Connect details while tolerating malformed or unrelated details. */
+const businessKeyFromDetails = (wire: ConnectErrorWire): string => {
+  for (const detail of wire.details ?? []) {
+    if (typeof detail?.type !== "string" || !detail.type.endsWith("platform.common.v1.BusinessErrorDetail")) continue;
+    if (typeof detail.value !== "object" || detail.value === null) continue;
+    try {
+      return fromJson(BusinessErrorDetailSchema, detail.value as JsonValue).messageKey;
+    } catch {
+      // A malformed optional detail must not hide the transport error or prevent compatibility fallback.
+    }
+  }
+  return "";
+};
+
+const looksLikeBusinessKey = (value: string): boolean => /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/.test(value);
+
+const errorMessage = (body: unknown, status: number): { code: string; businessKey: string; message: string } => {
   if (typeof body === "object" && body !== null) {
-    const candidate = body as { code?: unknown; message?: unknown; error?: { code?: unknown; message?: unknown } };
+    const candidate = body as ConnectErrorWire;
     const nested = candidate.error;
     const code = typeof candidate.code === "string" ? candidate.code : typeof nested?.code === "string" ? nested.code : "http_error";
-    const message = typeof candidate.message === "string" ? candidate.message : typeof nested?.message === "string" ? nested.message : `请求失败 (${status})`;
-    return { code, message: localizeApiMessage(message) };
+    const rawMessage = typeof candidate.message === "string" ? candidate.message : typeof nested?.message === "string" ? nested.message : `请求失败 (${status})`;
+    const businessKey = businessKeyFromDetails(candidate) || (nested ? businessKeyFromDetails(nested) : "") || (looksLikeBusinessKey(rawMessage) ? rawMessage : "");
+    return { code, businessKey, message: localizeApiMessage(businessKey || rawMessage) };
   }
-  return { code: "http_error", message: `请求失败 (${status})` };
+  return { code: "http_error", businessKey: "", message: `请求失败 (${status})` };
 };
 
 const replayTerminalStatus = {
@@ -473,7 +504,7 @@ async function call<T>(
   }
   if (!response.ok) {
     const error = errorMessage(payload, response.status);
-    throw new ApiError(response.status, error.code, error.message);
+    throw new ApiError(response.status, error.code, error.message, error.businessKey);
   }
   return (payload ?? {}) as T;
 }
@@ -514,6 +545,9 @@ export const identityClient = {
   },
   current(): Promise<IdentityResponse> {
     return call("platform.identity.v1.IdentityService", "GetCurrentIdentity", {});
+  },
+  changeUsername(username: string): Promise<IdentityResponse> {
+    return call("platform.identity.v1.IdentityService", "ChangeUsername", { username }, true);
   },
 };
 

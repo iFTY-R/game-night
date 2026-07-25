@@ -65,6 +65,28 @@ describe("Connect JSON mutation requests", () => {
       name: "ApiError",
       status: 409,
       code: "already_exists",
+      businessKey: "room.username.taken",
+      message: "房间内已有同名玩家",
+    } satisfies Partial<ApiError>);
+  });
+
+  it("prefers the stable business detail key over the transport message", async () => {
+    captureFailedRequest(409, {
+      code: "already_exists",
+      message: "identity.username.taken",
+      details: [{
+        type: "type.googleapis.com/platform.common.v1.BusinessErrorDetail",
+        value: {
+          code: "BUSINESS_ERROR_CODE_USERNAME_TAKEN",
+          messageKey: "room.username.taken",
+        },
+      }],
+    });
+
+    await expect(roomClient.joinRoom(room.roomCode)).rejects.toMatchObject({
+      name: "ApiError",
+      code: "already_exists",
+      businessKey: "room.username.taken",
       message: "房间内已有同名玩家",
     } satisfies Partial<ApiError>);
   });
@@ -76,6 +98,7 @@ describe("Connect JSON mutation requests", () => {
       name: "ApiError",
       status: 401,
       code: "unauthenticated",
+      businessKey: "identity.device.invalid",
       message: "设备登录已失效，请重新设置用户名",
     } satisfies Partial<ApiError>);
   });
@@ -87,8 +110,23 @@ describe("Connect JSON mutation requests", () => {
       name: "ApiError",
       status: 401,
       code: "unauthenticated",
+      businessKey: "identity.device.revoked",
       message: "这台设备的登录已失效，请重新设置用户名",
     } satisfies Partial<ApiError>);
+  });
+
+  it("changes the current device identity username through the authenticated write method", async () => {
+    const { calls } = captureRequest({
+      user: { userId: "user-1", status: "USER_STATUS_ACTIVE", username: "阿青" },
+    });
+
+    const response = await identityClient.changeUsername("阿青");
+
+    expect(calls).toEqual([{
+      url: "/platform.identity.v1.IdentityService/ChangeUsername",
+      body: { username: "阿青" },
+    }]);
+    expect(response.user?.username).toBe("阿青");
   });
 
   it("restores an omitted zero seat index before room snapshots reach the UI", async () => {

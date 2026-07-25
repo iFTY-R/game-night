@@ -179,6 +179,61 @@ describe("room context recovery", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("persists the authoritative identity after a username change", async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+      });
+      return new Response(JSON.stringify({
+        user: { userId: "user-1", status: "USER_STATUS_ACTIVE", username: "阿青" },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    const room = useRoomStore();
+    room.$patch({ userId: "user-1", displayName: "小满", identityState: "active" });
+
+    await room.changeUsername("阿青");
+
+    expect(calls).toEqual([{
+      url: "/platform.identity.v1.IdentityService/ChangeUsername",
+      body: { username: "阿青" },
+    }]);
+    expect(room.displayName).toBe("阿青");
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+      userId: "user-1",
+      displayName: "阿青",
+    });
+  });
+
+  it("rejects invalid or unchanged usernames before sending a change request", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const room = useRoomStore();
+    room.$patch({ userId: "user-1", displayName: "小满", identityState: "active" });
+
+    await expect(room.changeUsername("a")).rejects.toThrow("2-4 个汉字、英文字母或数字");
+    await expect(room.changeUsername(" 小满 ")).rejects.toThrow("新用户名需要与当前用户名不同");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps the current identity when a username change fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      code: "already_exists",
+      message: "room.username.taken",
+    }), { status: 409, headers: { "Content-Type": "application/json" } })));
+    const room = useRoomStore();
+    room.$patch({ userId: "user-1", displayName: "小满", identityState: "active" });
+    room.persist();
+
+    await expect(room.changeUsername("阿青")).rejects.toMatchObject({
+      businessKey: "room.username.taken",
+    });
+
+    expect(room.displayName).toBe("小满");
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({ displayName: "小满" });
+  });
+
   it("rejects an incomplete room creation response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", {
       status: 200,

@@ -7,6 +7,7 @@ import (
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	auditv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
+	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	identityv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1"
 	roomv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/room/v1"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -81,6 +82,11 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"BeginGameStart",
 		"CancelGameStart",
 		"StartGame",
+		"RequestRoomPause",
+		"RejectRoomPauseRequest",
+		"PauseRoomGame",
+		"ResumeRoomGame",
+		"TransferRoomHost",
 		"FinishGame",
 		"RemoveMember",
 		"CloseRoom",
@@ -136,6 +142,11 @@ func TestBusinessErrorCodesMatchApprovedContract(t *testing.T) {
 		"BUSINESS_ERROR_CODE_GAME_SUBSCRIPTION_UNAVAILABLE",
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT",
 		"BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_UNAVAILABLE",
+		"BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_EXISTS",
+		"BUSINESS_ERROR_CODE_ROOM_PAUSE_REQUEST_NOT_FOUND",
+		"BUSINESS_ERROR_CODE_ROOM_GAME_ALREADY_PAUSED",
+		"BUSINESS_ERROR_CODE_ROOM_GAME_NOT_PAUSED",
+		"BUSINESS_ERROR_CODE_ROOM_HOST_TRANSFER_TARGET_INVALID",
 	}
 	if enum.Values().Len() != len(want) {
 		t.Fatalf("expected %d business error codes, got %d", len(want), enum.Values().Len())
@@ -144,6 +155,78 @@ func TestBusinessErrorCodesMatchApprovedContract(t *testing.T) {
 		if got := string(enum.Values().Get(index).Name()); got != name {
 			t.Fatalf("business error code %d: expected %q, got %q", index, name, got)
 		}
+	}
+}
+
+func TestRoomPauseAndHostTransferContractShape(t *testing.T) {
+	t.Parallel()
+
+	roomFile := roomv1.File_platform_room_v1_room_proto
+	assertPauseEnumValues(t, roomFile.Enums().ByName("PauseSource"), []string{
+		"PAUSE_SOURCE_UNSPECIFIED",
+		"PAUSE_SOURCE_HOST",
+		"PAUSE_SOURCE_APPROVED_REQUEST",
+	})
+	assertPauseMessageFields(t, roomFile.Messages().ByName("PendingPauseRequest"),
+		"request_id", "session_id", "requested_by_user_id", "requested_at",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("ActivePause"),
+		"pause_id", "session_id", "source", "requested_by_user_id", "paused_by_user_id", "paused_at",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("RequestRoomPauseRequest"),
+		"room_id", "session_id", "expected_version",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("RejectRoomPauseRequestRequest"),
+		"room_id", "request_id", "expected_version",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("PauseRoomGameRequest"),
+		"room_id", "session_id", "request_id", "expected_version", "ownership_epoch",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("ResumeRoomGameRequest"),
+		"room_id", "session_id", "expected_version", "ownership_epoch",
+	)
+	assertPauseMessageFields(t, roomFile.Messages().ByName("TransferRoomHostRequest"),
+		"room_id", "target_user_id", "expected_version", "ownership_epoch",
+	)
+
+	roomMessage := roomFile.Messages().ByName("Room")
+	assertPauseFieldName(t, roomMessage.Fields().ByNumber(21), "pending_pause_request")
+	assertPauseFieldName(t, roomMessage.Fields().ByNumber(22), "active_pause")
+
+	session := gamev1.File_platform_game_v1_game_proto.Messages().ByName("GameSessionSummary")
+	assertPauseFieldName(t, session.Fields().ByNumber(8), "suspended_at")
+}
+
+func assertPauseEnumValues(t *testing.T, enum protoreflect.EnumDescriptor, want []string) {
+	t.Helper()
+
+	if enum == nil || enum.Values().Len() != len(want) {
+		t.Fatalf("pause enum: expected %d values, got %v", len(want), enum)
+	}
+	for index, name := range want {
+		value := enum.Values().Get(index)
+		if string(value.Name()) != name || value.Number() != protoreflect.EnumNumber(index) {
+			t.Fatalf("pause enum value %d: expected %q = %d, got %q = %d", index, name, index, value.Name(), value.Number())
+		}
+	}
+}
+
+func assertPauseMessageFields(t *testing.T, message protoreflect.MessageDescriptor, want ...string) {
+	t.Helper()
+
+	if message == nil || message.Fields().Len() != len(want) {
+		t.Fatalf("pause message: expected %d fields, got %v", len(want), message)
+	}
+	for index, name := range want {
+		assertPauseFieldName(t, message.Fields().ByNumber(protoreflect.FieldNumber(index+1)), name)
+	}
+}
+
+func assertPauseFieldName(t *testing.T, field protoreflect.FieldDescriptor, want string) {
+	t.Helper()
+
+	if field == nil || string(field.Name()) != want {
+		t.Fatalf("expected pause field %q, got %v", want, field)
 	}
 }
 

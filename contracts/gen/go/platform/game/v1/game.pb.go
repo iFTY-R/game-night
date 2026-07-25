@@ -410,6 +410,7 @@ type GameSessionSummary struct {
 	StateVersion   uint64                 `protobuf:"varint,5,opt,name=state_version,json=stateVersion,proto3" json:"state_version,omitempty"`
 	OwnershipEpoch uint64                 `protobuf:"varint,6,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
 	Status         GameSessionStatus      `protobuf:"varint,7,opt,name=status,proto3,enum=platform.game.v1.GameSessionStatus" json:"status,omitempty"`
+	SuspendedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=suspended_at,json=suspendedAt,proto3" json:"suspended_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -491,6 +492,13 @@ func (x *GameSessionSummary) GetStatus() GameSessionStatus {
 		return x.Status
 	}
 	return GameSessionStatus_GAME_SESSION_STATUS_UNSPECIFIED
+}
+
+func (x *GameSessionSummary) GetSuspendedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SuspendedAt
+	}
+	return nil
 }
 
 type StartSessionRequest struct {
@@ -2849,7 +2857,7 @@ const file_platform_game_v1_game_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x02 \x01(\rR\rschemaVersion\x12!\n" +
 	"\fmessage_type\x18\x03 \x01(\tR\vmessageType\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x128\n" +
-	"\aversion\x18\x05 \x01(\v2\x1e.platform.game.v1.VersionTupleR\aversion\"\xaa\x02\n" +
+	"\aversion\x18\x05 \x01(\v2\x1e.platform.game.v1.VersionTupleR\aversion\"\xe9\x02\n" +
 	"\x12GameSessionSummary\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x17\n" +
@@ -2858,7 +2866,8 @@ const file_platform_game_v1_game_proto_rawDesc = "" +
 	"\aversion\x18\x04 \x01(\v2\x1e.platform.game.v1.VersionTupleR\aversion\x12#\n" +
 	"\rstate_version\x18\x05 \x01(\x04R\fstateVersion\x12'\n" +
 	"\x0fownership_epoch\x18\x06 \x01(\x04R\x0eownershipEpoch\x12;\n" +
-	"\x06status\x18\a \x01(\x0e2#.platform.game.v1.GameSessionStatusR\x06status\"\xbb\x02\n" +
+	"\x06status\x18\a \x01(\x0e2#.platform.game.v1.GameSessionStatusR\x06status\x12=\n" +
+	"\fsuspended_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vsuspendedAt\"\xbb\x02\n" +
 	"\x13StartSessionRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x122\n" +
@@ -3162,73 +3171,74 @@ var file_platform_game_v1_game_proto_depIdxs = []int32{
 	3,  // 1: platform.game.v1.GameConfig.version:type_name -> platform.game.v1.VersionTuple
 	3,  // 2: platform.game.v1.GameSessionSummary.version:type_name -> platform.game.v1.VersionTuple
 	0,  // 3: platform.game.v1.GameSessionSummary.status:type_name -> platform.game.v1.GameSessionStatus
-	5,  // 4: platform.game.v1.StartSessionRequest.config:type_name -> platform.game.v1.GameConfig
-	6,  // 5: platform.game.v1.StartSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	24, // 6: platform.game.v1.StartSessionResponse.projection:type_name -> platform.game.v1.GameProjection
-	4,  // 7: platform.game.v1.GameActionRequest.command:type_name -> platform.game.v1.GameEnvelope
-	24, // 8: platform.game.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
-	38, // 9: platform.game.v1.GameActionResponse.receipt:type_name -> platform.game.v1.GameReceipt
-	1,  // 10: platform.game.v1.GetProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	24, // 11: platform.game.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
-	6,  // 12: platform.game.v1.GetProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	1,  // 13: platform.game.v1.GetReplayProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	24, // 14: platform.game.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
-	6,  // 15: platform.game.v1.GetReplayProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	15, // 16: platform.game.v1.GetReplayProjectionResponse.terminal_meta:type_name -> platform.game.v1.ReplayTerminalMeta
-	39, // 17: platform.game.v1.ReplayTerminalMeta.ended_at:type_name -> google.protobuf.Timestamp
-	2,  // 18: platform.game.v1.ReplayAccess.policy:type_name -> platform.game.v1.ReplayAccessPolicy
-	39, // 19: platform.game.v1.ReplayAccess.member_snapshot_completed_at:type_name -> google.protobuf.Timestamp
-	39, // 20: platform.game.v1.ReplayAccess.updated_at:type_name -> google.protobuf.Timestamp
-	16, // 21: platform.game.v1.GetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
-	2,  // 22: platform.game.v1.SetReplayAccessRequest.policy:type_name -> platform.game.v1.ReplayAccessPolicy
-	16, // 23: platform.game.v1.SetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
-	4,  // 24: platform.game.v1.FinishSessionRequest.command:type_name -> platform.game.v1.GameEnvelope
-	6,  // 25: platform.game.v1.FinishSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	38, // 26: platform.game.v1.FinishSessionResponse.receipt:type_name -> platform.game.v1.GameReceipt
-	24, // 27: platform.game.v1.FinishSessionResponse.projection:type_name -> platform.game.v1.GameProjection
-	1,  // 28: platform.game.v1.GameSubscribeRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	1,  // 29: platform.game.v1.GameProjection.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	4,  // 30: platform.game.v1.GameProjection.view:type_name -> platform.game.v1.GameEnvelope
-	1,  // 31: platform.game.v1.GameDelta.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	4,  // 32: platform.game.v1.GameDelta.messages:type_name -> platform.game.v1.GameEnvelope
-	1,  // 33: platform.game.v1.OpenSubscriptionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	39, // 34: platform.game.v1.OpenSubscriptionResponse.expires_at:type_name -> google.protobuf.Timestamp
-	6,  // 35: platform.game.v1.OpenSubscriptionResponse.session:type_name -> platform.game.v1.GameSessionSummary
-	24, // 36: platform.game.v1.OpenSubscriptionResponse.projection:type_name -> platform.game.v1.GameProjection
-	1,  // 37: platform.game.v1.SubscriptionGrant.viewer_kind:type_name -> platform.game.v1.ViewerKind
-	39, // 38: platform.game.v1.SubscriptionGrant.expires_at:type_name -> google.protobuf.Timestamp
-	30, // 39: platform.game.v1.ClientFrame.hello:type_name -> platform.game.v1.SubscriptionHello
-	31, // 40: platform.game.v1.ClientFrame.ping:type_name -> platform.game.v1.ClientPing
-	24, // 41: platform.game.v1.ServerFrame.projection:type_name -> platform.game.v1.GameProjection
-	25, // 42: platform.game.v1.ServerFrame.delta:type_name -> platform.game.v1.GameDelta
-	38, // 43: platform.game.v1.ServerFrame.receipt:type_name -> platform.game.v1.GameReceipt
-	33, // 44: platform.game.v1.ServerFrame.draining:type_name -> platform.game.v1.SubscriptionDraining
-	34, // 45: platform.game.v1.ServerFrame.pong:type_name -> platform.game.v1.ServerPong
-	35, // 46: platform.game.v1.ServerFrame.error:type_name -> platform.game.v1.SubscriptionError
-	39, // 47: platform.game.v1.SubscriptionDraining.reconnect_after:type_name -> google.protobuf.Timestamp
-	4,  // 48: platform.game.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
-	4,  // 49: platform.game.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
-	7,  // 50: platform.game.v1.GameService.StartSession:input_type -> platform.game.v1.StartSessionRequest
-	9,  // 51: platform.game.v1.GameService.GameAction:input_type -> platform.game.v1.GameActionRequest
-	11, // 52: platform.game.v1.GameService.GetProjection:input_type -> platform.game.v1.GetProjectionRequest
-	13, // 53: platform.game.v1.GameService.GetReplayProjection:input_type -> platform.game.v1.GetReplayProjectionRequest
-	17, // 54: platform.game.v1.GameService.GetReplayAccess:input_type -> platform.game.v1.GetReplayAccessRequest
-	19, // 55: platform.game.v1.GameService.SetReplayAccess:input_type -> platform.game.v1.SetReplayAccessRequest
-	21, // 56: platform.game.v1.GameService.FinishSession:input_type -> platform.game.v1.FinishSessionRequest
-	26, // 57: platform.game.v1.GameService.OpenSubscription:input_type -> platform.game.v1.OpenSubscriptionRequest
-	8,  // 58: platform.game.v1.GameService.StartSession:output_type -> platform.game.v1.StartSessionResponse
-	10, // 59: platform.game.v1.GameService.GameAction:output_type -> platform.game.v1.GameActionResponse
-	12, // 60: platform.game.v1.GameService.GetProjection:output_type -> platform.game.v1.GetProjectionResponse
-	14, // 61: platform.game.v1.GameService.GetReplayProjection:output_type -> platform.game.v1.GetReplayProjectionResponse
-	18, // 62: platform.game.v1.GameService.GetReplayAccess:output_type -> platform.game.v1.GetReplayAccessResponse
-	20, // 63: platform.game.v1.GameService.SetReplayAccess:output_type -> platform.game.v1.SetReplayAccessResponse
-	22, // 64: platform.game.v1.GameService.FinishSession:output_type -> platform.game.v1.FinishSessionResponse
-	27, // 65: platform.game.v1.GameService.OpenSubscription:output_type -> platform.game.v1.OpenSubscriptionResponse
-	58, // [58:66] is the sub-list for method output_type
-	50, // [50:58] is the sub-list for method input_type
-	50, // [50:50] is the sub-list for extension type_name
-	50, // [50:50] is the sub-list for extension extendee
-	0,  // [0:50] is the sub-list for field type_name
+	39, // 4: platform.game.v1.GameSessionSummary.suspended_at:type_name -> google.protobuf.Timestamp
+	5,  // 5: platform.game.v1.StartSessionRequest.config:type_name -> platform.game.v1.GameConfig
+	6,  // 6: platform.game.v1.StartSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	24, // 7: platform.game.v1.StartSessionResponse.projection:type_name -> platform.game.v1.GameProjection
+	4,  // 8: platform.game.v1.GameActionRequest.command:type_name -> platform.game.v1.GameEnvelope
+	24, // 9: platform.game.v1.GameActionResponse.projection:type_name -> platform.game.v1.GameProjection
+	38, // 10: platform.game.v1.GameActionResponse.receipt:type_name -> platform.game.v1.GameReceipt
+	1,  // 11: platform.game.v1.GetProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	24, // 12: platform.game.v1.GetProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	6,  // 13: platform.game.v1.GetProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	1,  // 14: platform.game.v1.GetReplayProjectionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	24, // 15: platform.game.v1.GetReplayProjectionResponse.projection:type_name -> platform.game.v1.GameProjection
+	6,  // 16: platform.game.v1.GetReplayProjectionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	15, // 17: platform.game.v1.GetReplayProjectionResponse.terminal_meta:type_name -> platform.game.v1.ReplayTerminalMeta
+	39, // 18: platform.game.v1.ReplayTerminalMeta.ended_at:type_name -> google.protobuf.Timestamp
+	2,  // 19: platform.game.v1.ReplayAccess.policy:type_name -> platform.game.v1.ReplayAccessPolicy
+	39, // 20: platform.game.v1.ReplayAccess.member_snapshot_completed_at:type_name -> google.protobuf.Timestamp
+	39, // 21: platform.game.v1.ReplayAccess.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 22: platform.game.v1.GetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
+	2,  // 23: platform.game.v1.SetReplayAccessRequest.policy:type_name -> platform.game.v1.ReplayAccessPolicy
+	16, // 24: platform.game.v1.SetReplayAccessResponse.access:type_name -> platform.game.v1.ReplayAccess
+	4,  // 25: platform.game.v1.FinishSessionRequest.command:type_name -> platform.game.v1.GameEnvelope
+	6,  // 26: platform.game.v1.FinishSessionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	38, // 27: platform.game.v1.FinishSessionResponse.receipt:type_name -> platform.game.v1.GameReceipt
+	24, // 28: platform.game.v1.FinishSessionResponse.projection:type_name -> platform.game.v1.GameProjection
+	1,  // 29: platform.game.v1.GameSubscribeRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	1,  // 30: platform.game.v1.GameProjection.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	4,  // 31: platform.game.v1.GameProjection.view:type_name -> platform.game.v1.GameEnvelope
+	1,  // 32: platform.game.v1.GameDelta.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	4,  // 33: platform.game.v1.GameDelta.messages:type_name -> platform.game.v1.GameEnvelope
+	1,  // 34: platform.game.v1.OpenSubscriptionRequest.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	39, // 35: platform.game.v1.OpenSubscriptionResponse.expires_at:type_name -> google.protobuf.Timestamp
+	6,  // 36: platform.game.v1.OpenSubscriptionResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	24, // 37: platform.game.v1.OpenSubscriptionResponse.projection:type_name -> platform.game.v1.GameProjection
+	1,  // 38: platform.game.v1.SubscriptionGrant.viewer_kind:type_name -> platform.game.v1.ViewerKind
+	39, // 39: platform.game.v1.SubscriptionGrant.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 40: platform.game.v1.ClientFrame.hello:type_name -> platform.game.v1.SubscriptionHello
+	31, // 41: platform.game.v1.ClientFrame.ping:type_name -> platform.game.v1.ClientPing
+	24, // 42: platform.game.v1.ServerFrame.projection:type_name -> platform.game.v1.GameProjection
+	25, // 43: platform.game.v1.ServerFrame.delta:type_name -> platform.game.v1.GameDelta
+	38, // 44: platform.game.v1.ServerFrame.receipt:type_name -> platform.game.v1.GameReceipt
+	33, // 45: platform.game.v1.ServerFrame.draining:type_name -> platform.game.v1.SubscriptionDraining
+	34, // 46: platform.game.v1.ServerFrame.pong:type_name -> platform.game.v1.ServerPong
+	35, // 47: platform.game.v1.ServerFrame.error:type_name -> platform.game.v1.SubscriptionError
+	39, // 48: platform.game.v1.SubscriptionDraining.reconnect_after:type_name -> google.protobuf.Timestamp
+	4,  // 49: platform.game.v1.GameSystemRequest.command:type_name -> platform.game.v1.GameEnvelope
+	4,  // 50: platform.game.v1.GameTimerRequest.timer:type_name -> platform.game.v1.GameEnvelope
+	7,  // 51: platform.game.v1.GameService.StartSession:input_type -> platform.game.v1.StartSessionRequest
+	9,  // 52: platform.game.v1.GameService.GameAction:input_type -> platform.game.v1.GameActionRequest
+	11, // 53: platform.game.v1.GameService.GetProjection:input_type -> platform.game.v1.GetProjectionRequest
+	13, // 54: platform.game.v1.GameService.GetReplayProjection:input_type -> platform.game.v1.GetReplayProjectionRequest
+	17, // 55: platform.game.v1.GameService.GetReplayAccess:input_type -> platform.game.v1.GetReplayAccessRequest
+	19, // 56: platform.game.v1.GameService.SetReplayAccess:input_type -> platform.game.v1.SetReplayAccessRequest
+	21, // 57: platform.game.v1.GameService.FinishSession:input_type -> platform.game.v1.FinishSessionRequest
+	26, // 58: platform.game.v1.GameService.OpenSubscription:input_type -> platform.game.v1.OpenSubscriptionRequest
+	8,  // 59: platform.game.v1.GameService.StartSession:output_type -> platform.game.v1.StartSessionResponse
+	10, // 60: platform.game.v1.GameService.GameAction:output_type -> platform.game.v1.GameActionResponse
+	12, // 61: platform.game.v1.GameService.GetProjection:output_type -> platform.game.v1.GetProjectionResponse
+	14, // 62: platform.game.v1.GameService.GetReplayProjection:output_type -> platform.game.v1.GetReplayProjectionResponse
+	18, // 63: platform.game.v1.GameService.GetReplayAccess:output_type -> platform.game.v1.GetReplayAccessResponse
+	20, // 64: platform.game.v1.GameService.SetReplayAccess:output_type -> platform.game.v1.SetReplayAccessResponse
+	22, // 65: platform.game.v1.GameService.FinishSession:output_type -> platform.game.v1.FinishSessionResponse
+	27, // 66: platform.game.v1.GameService.OpenSubscription:output_type -> platform.game.v1.OpenSubscriptionResponse
+	59, // [59:67] is the sub-list for method output_type
+	51, // [51:59] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_platform_game_v1_game_proto_init() }

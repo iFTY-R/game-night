@@ -63,6 +63,7 @@ message GameSessionSummary {
   uint64 state_version = 5;
   uint64 ownership_epoch = 6;
   GameSessionStatus status = 7;
+  google.protobuf.Timestamp suspended_at = 8;
 }
 
 message StartSessionRequest {

@@ -26,6 +26,11 @@ service RoomService {
   rpc BeginGameStart(BeginGameStartRequest) returns (BeginGameStartResponse);
   rpc CancelGameStart(CancelGameStartRequest) returns (CancelGameStartResponse);
   rpc StartGame(StartGameRequest) returns (StartGameResponse);
+  rpc RequestRoomPause(RequestRoomPauseRequest) returns (RequestRoomPauseResponse);
+  rpc RejectRoomPauseRequest(RejectRoomPauseRequestRequest) returns (RejectRoomPauseRequestResponse);
+  rpc PauseRoomGame(PauseRoomGameRequest) returns (PauseRoomGameResponse);
+  rpc ResumeRoomGame(ResumeRoomGameRequest) returns (ResumeRoomGameResponse);
+  rpc TransferRoomHost(TransferRoomHostRequest) returns (TransferRoomHostResponse);
   rpc FinishGame(FinishGameRequest) returns (FinishGameResponse);
   rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
   rpc CloseRoom(CloseRoomRequest) returns (CloseRoomResponse);
@@ -78,6 +83,13 @@ enum PublicRoomPrimaryAction {
   PUBLIC_ROOM_PRIMARY_ACTION_FULL = 8;
 }
 
+// PauseSource distinguishes a direct host pause from an approved participant request.
+enum PauseSource {
+  PAUSE_SOURCE_UNSPECIFIED = 0;
+  PAUSE_SOURCE_HOST = 1;
+  PAUSE_SOURCE_APPROVED_REQUEST = 2;
+}
+
 message RoomVersion {
   uint64 room_version = 1;
   uint64 membership_version = 2;
@@ -102,6 +114,24 @@ message PendingGameStart {
   uint64 config_revision = 5;
   RoomVersion expected_version = 6;
   uint64 ownership_epoch = 7;
+}
+
+// PendingPauseRequest is the one participant request awaiting a host decision.
+message PendingPauseRequest {
+  string request_id = 1;
+  string session_id = 2;
+  string requested_by_user_id = 3;
+  google.protobuf.Timestamp requested_at = 4;
+}
+
+// ActivePause records the host-authorized suspension of the current session.
+message ActivePause {
+  string pause_id = 1;
+  string session_id = 2;
+  PauseSource source = 3;
+  string requested_by_user_id = 4;
+  string paused_by_user_id = 5;
+  google.protobuf.Timestamp paused_at = 6;
 }
 
 message GameRulePreset {
@@ -149,6 +179,8 @@ message Room {
   repeated RoomGameConfigDraft game_config_drafts = 18;
   PendingGameStart pending_start = 19;
   uint64 ownership_epoch = 20;
+  PendingPauseRequest pending_pause_request = 21;
+  ActivePause active_pause = 22;
 }
 
 message CreateRoomRequest {
@@ -405,6 +437,63 @@ message StartGameResponse {
   repeated FrozenParticipant participants = 4;
   platform.game.v1.GameEnvelope frozen_config = 5;
   uint64 config_revision = 6;
+}
+
+message RequestRoomPauseRequest {
+  string room_id = 1;
+  string session_id = 2;
+  RoomVersion expected_version = 3;
+}
+
+message RequestRoomPauseResponse {
+  Room room = 1;
+}
+
+message RejectRoomPauseRequestRequest {
+  string room_id = 1;
+  string request_id = 2;
+  RoomVersion expected_version = 3;
+}
+
+message RejectRoomPauseRequestResponse {
+  Room room = 1;
+}
+
+// PauseRoomGame approves request_id when present, otherwise it is a direct host pause.
+message PauseRoomGameRequest {
+  string room_id = 1;
+  string session_id = 2;
+  string request_id = 3;
+  RoomVersion expected_version = 4;
+  uint64 ownership_epoch = 5;
+}
+
+message PauseRoomGameResponse {
+  Room room = 1;
+  platform.game.v1.GameSessionSummary session = 2;
+}
+
+message ResumeRoomGameRequest {
+  string room_id = 1;
+  string session_id = 2;
+  RoomVersion expected_version = 3;
+  uint64 ownership_epoch = 4;
+}
+
+message ResumeRoomGameResponse {
+  Room room = 1;
+  platform.game.v1.GameSessionSummary session = 2;
+}
+
+message TransferRoomHostRequest {
+  string room_id = 1;
+  string target_user_id = 2;
+  RoomVersion expected_version = 3;
+  uint64 ownership_epoch = 4;
+}
+
+message TransferRoomHostResponse {
+  Room room = 1;
 }
 
 message FinishGameRequest {

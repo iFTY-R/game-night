@@ -68,6 +68,8 @@ type FanoutPublisher interface {
 
 // Service keeps Cookie, Origin, CSRF, and wire mapping outside the room domain.
 type Service struct {
+	// Embedding the generated fallback keeps contract-only RPC additions buildable until their explicit handlers land.
+	roomv1connect.UnimplementedRoomServiceHandler
 	domain        *roomDomain.Service
 	catalog       roomDomain.GameCatalog
 	runtime       GameRuntime

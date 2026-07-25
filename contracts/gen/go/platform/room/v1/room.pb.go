@@ -349,6 +349,56 @@ func (PublicRoomPrimaryAction) EnumDescriptor() ([]byte, []int) {
 	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{5}
 }
 
+// PauseSource distinguishes a direct host pause from an approved participant request.
+type PauseSource int32
+
+const (
+	PauseSource_PAUSE_SOURCE_UNSPECIFIED      PauseSource = 0
+	PauseSource_PAUSE_SOURCE_HOST             PauseSource = 1
+	PauseSource_PAUSE_SOURCE_APPROVED_REQUEST PauseSource = 2
+)
+
+// Enum value maps for PauseSource.
+var (
+	PauseSource_name = map[int32]string{
+		0: "PAUSE_SOURCE_UNSPECIFIED",
+		1: "PAUSE_SOURCE_HOST",
+		2: "PAUSE_SOURCE_APPROVED_REQUEST",
+	}
+	PauseSource_value = map[string]int32{
+		"PAUSE_SOURCE_UNSPECIFIED":      0,
+		"PAUSE_SOURCE_HOST":             1,
+		"PAUSE_SOURCE_APPROVED_REQUEST": 2,
+	}
+)
+
+func (x PauseSource) Enum() *PauseSource {
+	p := new(PauseSource)
+	*p = x
+	return p
+}
+
+func (x PauseSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PauseSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_platform_room_v1_room_proto_enumTypes[6].Descriptor()
+}
+
+func (PauseSource) Type() protoreflect.EnumType {
+	return &file_platform_room_v1_room_proto_enumTypes[6]
+}
+
+func (x PauseSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PauseSource.Descriptor instead.
+func (PauseSource) EnumDescriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{6}
+}
+
 type GameRulePresetWriteMode int32
 
 const (
@@ -385,11 +435,11 @@ func (x GameRulePresetWriteMode) String() string {
 }
 
 func (GameRulePresetWriteMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_platform_room_v1_room_proto_enumTypes[6].Descriptor()
+	return file_platform_room_v1_room_proto_enumTypes[7].Descriptor()
 }
 
 func (GameRulePresetWriteMode) Type() protoreflect.EnumType {
-	return &file_platform_room_v1_room_proto_enumTypes[6]
+	return &file_platform_room_v1_room_proto_enumTypes[7]
 }
 
 func (x GameRulePresetWriteMode) Number() protoreflect.EnumNumber {
@@ -398,7 +448,7 @@ func (x GameRulePresetWriteMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GameRulePresetWriteMode.Descriptor instead.
 func (GameRulePresetWriteMode) EnumDescriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{6}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{7}
 }
 
 type RoomVersion struct {
@@ -624,6 +674,160 @@ func (x *PendingGameStart) GetOwnershipEpoch() uint64 {
 	return 0
 }
 
+// PendingPauseRequest is the one participant request awaiting a host decision.
+type PendingPauseRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RequestId         string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId         string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RequestedByUserId string                 `protobuf:"bytes,3,opt,name=requested_by_user_id,json=requestedByUserId,proto3" json:"requested_by_user_id,omitempty"`
+	RequestedAt       *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=requested_at,json=requestedAt,proto3" json:"requested_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *PendingPauseRequest) Reset() {
+	*x = PendingPauseRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingPauseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingPauseRequest) ProtoMessage() {}
+
+func (x *PendingPauseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingPauseRequest.ProtoReflect.Descriptor instead.
+func (*PendingPauseRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PendingPauseRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PendingPauseRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *PendingPauseRequest) GetRequestedByUserId() string {
+	if x != nil {
+		return x.RequestedByUserId
+	}
+	return ""
+}
+
+func (x *PendingPauseRequest) GetRequestedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RequestedAt
+	}
+	return nil
+}
+
+// ActivePause records the host-authorized suspension of the current session.
+type ActivePause struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	PauseId           string                 `protobuf:"bytes,1,opt,name=pause_id,json=pauseId,proto3" json:"pause_id,omitempty"`
+	SessionId         string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Source            PauseSource            `protobuf:"varint,3,opt,name=source,proto3,enum=platform.room.v1.PauseSource" json:"source,omitempty"`
+	RequestedByUserId string                 `protobuf:"bytes,4,opt,name=requested_by_user_id,json=requestedByUserId,proto3" json:"requested_by_user_id,omitempty"`
+	PausedByUserId    string                 `protobuf:"bytes,5,opt,name=paused_by_user_id,json=pausedByUserId,proto3" json:"paused_by_user_id,omitempty"`
+	PausedAt          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=paused_at,json=pausedAt,proto3" json:"paused_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ActivePause) Reset() {
+	*x = ActivePause{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActivePause) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActivePause) ProtoMessage() {}
+
+func (x *ActivePause) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActivePause.ProtoReflect.Descriptor instead.
+func (*ActivePause) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ActivePause) GetPauseId() string {
+	if x != nil {
+		return x.PauseId
+	}
+	return ""
+}
+
+func (x *ActivePause) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ActivePause) GetSource() PauseSource {
+	if x != nil {
+		return x.Source
+	}
+	return PauseSource_PAUSE_SOURCE_UNSPECIFIED
+}
+
+func (x *ActivePause) GetRequestedByUserId() string {
+	if x != nil {
+		return x.RequestedByUserId
+	}
+	return ""
+}
+
+func (x *ActivePause) GetPausedByUserId() string {
+	if x != nil {
+		return x.PausedByUserId
+	}
+	return ""
+}
+
+func (x *ActivePause) GetPausedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PausedAt
+	}
+	return nil
+}
+
 type GameRulePreset struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	PresetId       string                 `protobuf:"bytes,1,opt,name=preset_id,json=presetId,proto3" json:"preset_id,omitempty"`
@@ -641,7 +845,7 @@ type GameRulePreset struct {
 
 func (x *GameRulePreset) Reset() {
 	*x = GameRulePreset{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[3]
+	mi := &file_platform_room_v1_room_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -653,7 +857,7 @@ func (x *GameRulePreset) String() string {
 func (*GameRulePreset) ProtoMessage() {}
 
 func (x *GameRulePreset) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[3]
+	mi := &file_platform_room_v1_room_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -666,7 +870,7 @@ func (x *GameRulePreset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameRulePreset.ProtoReflect.Descriptor instead.
 func (*GameRulePreset) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{3}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GameRulePreset) GetPresetId() string {
@@ -747,7 +951,7 @@ type RoomMember struct {
 
 func (x *RoomMember) Reset() {
 	*x = RoomMember{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[4]
+	mi := &file_platform_room_v1_room_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +963,7 @@ func (x *RoomMember) String() string {
 func (*RoomMember) ProtoMessage() {}
 
 func (x *RoomMember) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[4]
+	mi := &file_platform_room_v1_room_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +976,7 @@ func (x *RoomMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomMember.ProtoReflect.Descriptor instead.
 func (*RoomMember) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{4}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RoomMember) GetUserId() string {
@@ -844,17 +1048,19 @@ type Room struct {
 	LastFinishedGameId    string                 `protobuf:"bytes,16,opt,name=last_finished_game_id,json=lastFinishedGameId,proto3" json:"last_finished_game_id,omitempty"`
 	// selected_game_id is the host-selected pregame table. It is independent of
 	// active_game_id so members converge before a session starts.
-	SelectedGameId   string                 `protobuf:"bytes,17,opt,name=selected_game_id,json=selectedGameId,proto3" json:"selected_game_id,omitempty"`
-	GameConfigDrafts []*RoomGameConfigDraft `protobuf:"bytes,18,rep,name=game_config_drafts,json=gameConfigDrafts,proto3" json:"game_config_drafts,omitempty"`
-	PendingStart     *PendingGameStart      `protobuf:"bytes,19,opt,name=pending_start,json=pendingStart,proto3" json:"pending_start,omitempty"`
-	OwnershipEpoch   uint64                 `protobuf:"varint,20,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	SelectedGameId      string                 `protobuf:"bytes,17,opt,name=selected_game_id,json=selectedGameId,proto3" json:"selected_game_id,omitempty"`
+	GameConfigDrafts    []*RoomGameConfigDraft `protobuf:"bytes,18,rep,name=game_config_drafts,json=gameConfigDrafts,proto3" json:"game_config_drafts,omitempty"`
+	PendingStart        *PendingGameStart      `protobuf:"bytes,19,opt,name=pending_start,json=pendingStart,proto3" json:"pending_start,omitempty"`
+	OwnershipEpoch      uint64                 `protobuf:"varint,20,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	PendingPauseRequest *PendingPauseRequest   `protobuf:"bytes,21,opt,name=pending_pause_request,json=pendingPauseRequest,proto3" json:"pending_pause_request,omitempty"`
+	ActivePause         *ActivePause           `protobuf:"bytes,22,opt,name=active_pause,json=activePause,proto3" json:"active_pause,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Room) Reset() {
 	*x = Room{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[5]
+	mi := &file_platform_room_v1_room_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -866,7 +1072,7 @@ func (x *Room) String() string {
 func (*Room) ProtoMessage() {}
 
 func (x *Room) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[5]
+	mi := &file_platform_room_v1_room_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +1085,7 @@ func (x *Room) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Room.ProtoReflect.Descriptor instead.
 func (*Room) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{5}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Room) GetRoomId() string {
@@ -1022,6 +1228,20 @@ func (x *Room) GetOwnershipEpoch() uint64 {
 	return 0
 }
 
+func (x *Room) GetPendingPauseRequest() *PendingPauseRequest {
+	if x != nil {
+		return x.PendingPauseRequest
+	}
+	return nil
+}
+
+func (x *Room) GetActivePause() *ActivePause {
+	if x != nil {
+		return x.ActivePause
+	}
+	return nil
+}
+
 type CreateRoomRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Visibility           RoomVisibility         `protobuf:"varint,1,opt,name=visibility,proto3,enum=platform.room.v1.RoomVisibility" json:"visibility,omitempty"`
@@ -1034,7 +1254,7 @@ type CreateRoomRequest struct {
 
 func (x *CreateRoomRequest) Reset() {
 	*x = CreateRoomRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[6]
+	mi := &file_platform_room_v1_room_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1046,7 +1266,7 @@ func (x *CreateRoomRequest) String() string {
 func (*CreateRoomRequest) ProtoMessage() {}
 
 func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[6]
+	mi := &file_platform_room_v1_room_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1059,7 +1279,7 @@ func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoomRequest.ProtoReflect.Descriptor instead.
 func (*CreateRoomRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{6}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateRoomRequest) GetVisibility() RoomVisibility {
@@ -1099,7 +1319,7 @@ type CreateRoomResponse struct {
 
 func (x *CreateRoomResponse) Reset() {
 	*x = CreateRoomResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[7]
+	mi := &file_platform_room_v1_room_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1331,7 @@ func (x *CreateRoomResponse) String() string {
 func (*CreateRoomResponse) ProtoMessage() {}
 
 func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[7]
+	mi := &file_platform_room_v1_room_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1344,7 @@ func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoomResponse.ProtoReflect.Descriptor instead.
 func (*CreateRoomResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{7}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateRoomResponse) GetRoom() *Room {
@@ -1144,7 +1364,7 @@ type GetRoomRequest struct {
 
 func (x *GetRoomRequest) Reset() {
 	*x = GetRoomRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[8]
+	mi := &file_platform_room_v1_room_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +1376,7 @@ func (x *GetRoomRequest) String() string {
 func (*GetRoomRequest) ProtoMessage() {}
 
 func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[8]
+	mi := &file_platform_room_v1_room_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +1389,7 @@ func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{8}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetRoomRequest) GetRoomId() string {
@@ -1195,7 +1415,7 @@ type GetRoomResponse struct {
 
 func (x *GetRoomResponse) Reset() {
 	*x = GetRoomResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[9]
+	mi := &file_platform_room_v1_room_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1207,7 +1427,7 @@ func (x *GetRoomResponse) String() string {
 func (*GetRoomResponse) ProtoMessage() {}
 
 func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[9]
+	mi := &file_platform_room_v1_room_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1220,7 +1440,7 @@ func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{9}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetRoomResponse) GetRoom() *Room {
@@ -1239,7 +1459,7 @@ type HeartbeatRoomRequest struct {
 
 func (x *HeartbeatRoomRequest) Reset() {
 	*x = HeartbeatRoomRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[10]
+	mi := &file_platform_room_v1_room_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1251,7 +1471,7 @@ func (x *HeartbeatRoomRequest) String() string {
 func (*HeartbeatRoomRequest) ProtoMessage() {}
 
 func (x *HeartbeatRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[10]
+	mi := &file_platform_room_v1_room_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1264,7 +1484,7 @@ func (x *HeartbeatRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRoomRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRoomRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{10}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HeartbeatRoomRequest) GetRoomId() string {
@@ -1283,7 +1503,7 @@ type HeartbeatRoomResponse struct {
 
 func (x *HeartbeatRoomResponse) Reset() {
 	*x = HeartbeatRoomResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[11]
+	mi := &file_platform_room_v1_room_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1295,7 +1515,7 @@ func (x *HeartbeatRoomResponse) String() string {
 func (*HeartbeatRoomResponse) ProtoMessage() {}
 
 func (x *HeartbeatRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[11]
+	mi := &file_platform_room_v1_room_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1308,7 +1528,7 @@ func (x *HeartbeatRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRoomResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatRoomResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{11}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HeartbeatRoomResponse) GetObservedAt() *timestamppb.Timestamp {
@@ -1344,7 +1564,7 @@ type MyRoomCard struct {
 
 func (x *MyRoomCard) Reset() {
 	*x = MyRoomCard{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[12]
+	mi := &file_platform_room_v1_room_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1576,7 @@ func (x *MyRoomCard) String() string {
 func (*MyRoomCard) ProtoMessage() {}
 
 func (x *MyRoomCard) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[12]
+	mi := &file_platform_room_v1_room_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1589,7 @@ func (x *MyRoomCard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MyRoomCard.ProtoReflect.Descriptor instead.
 func (*MyRoomCard) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{12}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *MyRoomCard) GetRoomId() string {
@@ -1500,7 +1720,7 @@ type ListMyRoomsRequest struct {
 
 func (x *ListMyRoomsRequest) Reset() {
 	*x = ListMyRoomsRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[13]
+	mi := &file_platform_room_v1_room_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1512,7 +1732,7 @@ func (x *ListMyRoomsRequest) String() string {
 func (*ListMyRoomsRequest) ProtoMessage() {}
 
 func (x *ListMyRoomsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[13]
+	mi := &file_platform_room_v1_room_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1525,7 +1745,7 @@ func (x *ListMyRoomsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyRoomsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyRoomsRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{13}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListMyRoomsRequest) GetPage() *v11.PageRequest {
@@ -1545,7 +1765,7 @@ type ListMyRoomsResponse struct {
 
 func (x *ListMyRoomsResponse) Reset() {
 	*x = ListMyRoomsResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[14]
+	mi := &file_platform_room_v1_room_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1557,7 +1777,7 @@ func (x *ListMyRoomsResponse) String() string {
 func (*ListMyRoomsResponse) ProtoMessage() {}
 
 func (x *ListMyRoomsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[14]
+	mi := &file_platform_room_v1_room_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1570,7 +1790,7 @@ func (x *ListMyRoomsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyRoomsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyRoomsResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{14}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListMyRoomsResponse) GetRooms() []*MyRoomCard {
@@ -1599,7 +1819,7 @@ type PublicRoomFilter struct {
 
 func (x *PublicRoomFilter) Reset() {
 	*x = PublicRoomFilter{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[15]
+	mi := &file_platform_room_v1_room_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1611,7 +1831,7 @@ func (x *PublicRoomFilter) String() string {
 func (*PublicRoomFilter) ProtoMessage() {}
 
 func (x *PublicRoomFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[15]
+	mi := &file_platform_room_v1_room_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1624,7 +1844,7 @@ func (x *PublicRoomFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicRoomFilter.ProtoReflect.Descriptor instead.
 func (*PublicRoomFilter) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{15}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PublicRoomFilter) GetStatuses() []RoomStatus {
@@ -1671,7 +1891,7 @@ type PublicRoomCard struct {
 
 func (x *PublicRoomCard) Reset() {
 	*x = PublicRoomCard{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[16]
+	mi := &file_platform_room_v1_room_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1683,7 +1903,7 @@ func (x *PublicRoomCard) String() string {
 func (*PublicRoomCard) ProtoMessage() {}
 
 func (x *PublicRoomCard) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[16]
+	mi := &file_platform_room_v1_room_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1696,7 +1916,7 @@ func (x *PublicRoomCard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicRoomCard.ProtoReflect.Descriptor instead.
 func (*PublicRoomCard) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{16}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PublicRoomCard) GetRoomId() string {
@@ -1807,7 +2027,7 @@ type ListPublicRoomsRequest struct {
 
 func (x *ListPublicRoomsRequest) Reset() {
 	*x = ListPublicRoomsRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[17]
+	mi := &file_platform_room_v1_room_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1819,7 +2039,7 @@ func (x *ListPublicRoomsRequest) String() string {
 func (*ListPublicRoomsRequest) ProtoMessage() {}
 
 func (x *ListPublicRoomsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[17]
+	mi := &file_platform_room_v1_room_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1832,7 +2052,7 @@ func (x *ListPublicRoomsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicRoomsRequest.ProtoReflect.Descriptor instead.
 func (*ListPublicRoomsRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{17}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListPublicRoomsRequest) GetFilter() *PublicRoomFilter {
@@ -1859,7 +2079,7 @@ type ListPublicRoomsResponse struct {
 
 func (x *ListPublicRoomsResponse) Reset() {
 	*x = ListPublicRoomsResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[18]
+	mi := &file_platform_room_v1_room_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1871,7 +2091,7 @@ func (x *ListPublicRoomsResponse) String() string {
 func (*ListPublicRoomsResponse) ProtoMessage() {}
 
 func (x *ListPublicRoomsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[18]
+	mi := &file_platform_room_v1_room_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1884,7 +2104,7 @@ func (x *ListPublicRoomsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicRoomsResponse.ProtoReflect.Descriptor instead.
 func (*ListPublicRoomsResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{18}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListPublicRoomsResponse) GetRooms() []*PublicRoomCard {
@@ -1913,7 +2133,7 @@ type JoinRoomRequest struct {
 
 func (x *JoinRoomRequest) Reset() {
 	*x = JoinRoomRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[19]
+	mi := &file_platform_room_v1_room_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1925,7 +2145,7 @@ func (x *JoinRoomRequest) String() string {
 func (*JoinRoomRequest) ProtoMessage() {}
 
 func (x *JoinRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[19]
+	mi := &file_platform_room_v1_room_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1938,7 +2158,7 @@ func (x *JoinRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinRoomRequest.ProtoReflect.Descriptor instead.
 func (*JoinRoomRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{19}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *JoinRoomRequest) GetRoomId() string {
@@ -1981,7 +2201,7 @@ type JoinRoomResponse struct {
 
 func (x *JoinRoomResponse) Reset() {
 	*x = JoinRoomResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[20]
+	mi := &file_platform_room_v1_room_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1993,7 +2213,7 @@ func (x *JoinRoomResponse) String() string {
 func (*JoinRoomResponse) ProtoMessage() {}
 
 func (x *JoinRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[20]
+	mi := &file_platform_room_v1_room_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2006,7 +2226,7 @@ func (x *JoinRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinRoomResponse.ProtoReflect.Descriptor instead.
 func (*JoinRoomResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{20}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *JoinRoomResponse) GetRoom() *Room {
@@ -2048,7 +2268,7 @@ type ApproveMemberRequest struct {
 
 func (x *ApproveMemberRequest) Reset() {
 	*x = ApproveMemberRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[21]
+	mi := &file_platform_room_v1_room_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2060,7 +2280,7 @@ func (x *ApproveMemberRequest) String() string {
 func (*ApproveMemberRequest) ProtoMessage() {}
 
 func (x *ApproveMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[21]
+	mi := &file_platform_room_v1_room_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2073,7 +2293,7 @@ func (x *ApproveMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveMemberRequest.ProtoReflect.Descriptor instead.
 func (*ApproveMemberRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{21}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ApproveMemberRequest) GetRoomId() string {
@@ -2107,7 +2327,7 @@ type ApproveMemberResponse struct {
 
 func (x *ApproveMemberResponse) Reset() {
 	*x = ApproveMemberResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[22]
+	mi := &file_platform_room_v1_room_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2119,7 +2339,7 @@ func (x *ApproveMemberResponse) String() string {
 func (*ApproveMemberResponse) ProtoMessage() {}
 
 func (x *ApproveMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[22]
+	mi := &file_platform_room_v1_room_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2132,7 +2352,7 @@ func (x *ApproveMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveMemberResponse.ProtoReflect.Descriptor instead.
 func (*ApproveMemberResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{22}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ApproveMemberResponse) GetRoom() *Room {
@@ -2161,7 +2381,7 @@ type SetAdmissionRequest struct {
 
 func (x *SetAdmissionRequest) Reset() {
 	*x = SetAdmissionRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[23]
+	mi := &file_platform_room_v1_room_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2173,7 +2393,7 @@ func (x *SetAdmissionRequest) String() string {
 func (*SetAdmissionRequest) ProtoMessage() {}
 
 func (x *SetAdmissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[23]
+	mi := &file_platform_room_v1_room_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2186,7 +2406,7 @@ func (x *SetAdmissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAdmissionRequest.ProtoReflect.Descriptor instead.
 func (*SetAdmissionRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{23}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SetAdmissionRequest) GetRoomId() string {
@@ -2226,7 +2446,7 @@ type SetAdmissionResponse struct {
 
 func (x *SetAdmissionResponse) Reset() {
 	*x = SetAdmissionResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[24]
+	mi := &file_platform_room_v1_room_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2238,7 +2458,7 @@ func (x *SetAdmissionResponse) String() string {
 func (*SetAdmissionResponse) ProtoMessage() {}
 
 func (x *SetAdmissionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[24]
+	mi := &file_platform_room_v1_room_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2251,7 +2471,7 @@ func (x *SetAdmissionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAdmissionResponse.ProtoReflect.Descriptor instead.
 func (*SetAdmissionResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{24}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SetAdmissionResponse) GetRoom() *Room {
@@ -2276,7 +2496,7 @@ type SelectRoomGameRequest struct {
 
 func (x *SelectRoomGameRequest) Reset() {
 	*x = SelectRoomGameRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[25]
+	mi := &file_platform_room_v1_room_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2288,7 +2508,7 @@ func (x *SelectRoomGameRequest) String() string {
 func (*SelectRoomGameRequest) ProtoMessage() {}
 
 func (x *SelectRoomGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[25]
+	mi := &file_platform_room_v1_room_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2301,7 +2521,7 @@ func (x *SelectRoomGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectRoomGameRequest.ProtoReflect.Descriptor instead.
 func (*SelectRoomGameRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{25}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SelectRoomGameRequest) GetRoomId() string {
@@ -2355,7 +2575,7 @@ type SelectRoomGameResponse struct {
 
 func (x *SelectRoomGameResponse) Reset() {
 	*x = SelectRoomGameResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[26]
+	mi := &file_platform_room_v1_room_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2367,7 +2587,7 @@ func (x *SelectRoomGameResponse) String() string {
 func (*SelectRoomGameResponse) ProtoMessage() {}
 
 func (x *SelectRoomGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[26]
+	mi := &file_platform_room_v1_room_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2380,7 +2600,7 @@ func (x *SelectRoomGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectRoomGameResponse.ProtoReflect.Descriptor instead.
 func (*SelectRoomGameResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{26}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SelectRoomGameResponse) GetRoom() *Room {
@@ -2406,7 +2626,7 @@ type UpdateGameConfigRequest struct {
 
 func (x *UpdateGameConfigRequest) Reset() {
 	*x = UpdateGameConfigRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[27]
+	mi := &file_platform_room_v1_room_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2418,7 +2638,7 @@ func (x *UpdateGameConfigRequest) String() string {
 func (*UpdateGameConfigRequest) ProtoMessage() {}
 
 func (x *UpdateGameConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[27]
+	mi := &file_platform_room_v1_room_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2431,7 +2651,7 @@ func (x *UpdateGameConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGameConfigRequest.ProtoReflect.Descriptor instead.
 func (*UpdateGameConfigRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{27}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *UpdateGameConfigRequest) GetRoomId() string {
@@ -2500,7 +2720,7 @@ type UpdateGameConfigResponse struct {
 
 func (x *UpdateGameConfigResponse) Reset() {
 	*x = UpdateGameConfigResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[28]
+	mi := &file_platform_room_v1_room_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2512,7 +2732,7 @@ func (x *UpdateGameConfigResponse) String() string {
 func (*UpdateGameConfigResponse) ProtoMessage() {}
 
 func (x *UpdateGameConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[28]
+	mi := &file_platform_room_v1_room_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2525,7 +2745,7 @@ func (x *UpdateGameConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGameConfigResponse.ProtoReflect.Descriptor instead.
 func (*UpdateGameConfigResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{28}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UpdateGameConfigResponse) GetRoom() *Room {
@@ -2551,7 +2771,7 @@ type ListGameRulePresetsRequest struct {
 
 func (x *ListGameRulePresetsRequest) Reset() {
 	*x = ListGameRulePresetsRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[29]
+	mi := &file_platform_room_v1_room_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2563,7 +2783,7 @@ func (x *ListGameRulePresetsRequest) String() string {
 func (*ListGameRulePresetsRequest) ProtoMessage() {}
 
 func (x *ListGameRulePresetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[29]
+	mi := &file_platform_room_v1_room_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2576,7 +2796,7 @@ func (x *ListGameRulePresetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGameRulePresetsRequest.ProtoReflect.Descriptor instead.
 func (*ListGameRulePresetsRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{29}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListGameRulePresetsRequest) GetGameId() string {
@@ -2595,7 +2815,7 @@ type ListGameRulePresetsResponse struct {
 
 func (x *ListGameRulePresetsResponse) Reset() {
 	*x = ListGameRulePresetsResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[30]
+	mi := &file_platform_room_v1_room_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2607,7 +2827,7 @@ func (x *ListGameRulePresetsResponse) String() string {
 func (*ListGameRulePresetsResponse) ProtoMessage() {}
 
 func (x *ListGameRulePresetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[30]
+	mi := &file_platform_room_v1_room_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2620,7 +2840,7 @@ func (x *ListGameRulePresetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGameRulePresetsResponse.ProtoReflect.Descriptor instead.
 func (*ListGameRulePresetsResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{30}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListGameRulePresetsResponse) GetPresets() []*GameRulePreset {
@@ -2646,7 +2866,7 @@ type SaveGameRulePresetRequest struct {
 
 func (x *SaveGameRulePresetRequest) Reset() {
 	*x = SaveGameRulePresetRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[31]
+	mi := &file_platform_room_v1_room_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2658,7 +2878,7 @@ func (x *SaveGameRulePresetRequest) String() string {
 func (*SaveGameRulePresetRequest) ProtoMessage() {}
 
 func (x *SaveGameRulePresetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[31]
+	mi := &file_platform_room_v1_room_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2671,7 +2891,7 @@ func (x *SaveGameRulePresetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveGameRulePresetRequest.ProtoReflect.Descriptor instead.
 func (*SaveGameRulePresetRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{31}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SaveGameRulePresetRequest) GetPresetId() string {
@@ -2739,7 +2959,7 @@ type SaveGameRulePresetResponse struct {
 
 func (x *SaveGameRulePresetResponse) Reset() {
 	*x = SaveGameRulePresetResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[32]
+	mi := &file_platform_room_v1_room_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2751,7 +2971,7 @@ func (x *SaveGameRulePresetResponse) String() string {
 func (*SaveGameRulePresetResponse) ProtoMessage() {}
 
 func (x *SaveGameRulePresetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[32]
+	mi := &file_platform_room_v1_room_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2764,7 +2984,7 @@ func (x *SaveGameRulePresetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveGameRulePresetResponse.ProtoReflect.Descriptor instead.
 func (*SaveGameRulePresetResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{32}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SaveGameRulePresetResponse) GetPreset() *GameRulePreset {
@@ -2786,7 +3006,7 @@ type DeleteGameRulePresetRequest struct {
 
 func (x *DeleteGameRulePresetRequest) Reset() {
 	*x = DeleteGameRulePresetRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[33]
+	mi := &file_platform_room_v1_room_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2798,7 +3018,7 @@ func (x *DeleteGameRulePresetRequest) String() string {
 func (*DeleteGameRulePresetRequest) ProtoMessage() {}
 
 func (x *DeleteGameRulePresetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[33]
+	mi := &file_platform_room_v1_room_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2811,7 +3031,7 @@ func (x *DeleteGameRulePresetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGameRulePresetRequest.ProtoReflect.Descriptor instead.
 func (*DeleteGameRulePresetRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{33}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *DeleteGameRulePresetRequest) GetPresetId() string {
@@ -2851,7 +3071,7 @@ type DeleteGameRulePresetResponse struct {
 
 func (x *DeleteGameRulePresetResponse) Reset() {
 	*x = DeleteGameRulePresetResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[34]
+	mi := &file_platform_room_v1_room_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2863,7 +3083,7 @@ func (x *DeleteGameRulePresetResponse) String() string {
 func (*DeleteGameRulePresetResponse) ProtoMessage() {}
 
 func (x *DeleteGameRulePresetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[34]
+	mi := &file_platform_room_v1_room_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2876,7 +3096,7 @@ func (x *DeleteGameRulePresetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGameRulePresetResponse.ProtoReflect.Descriptor instead.
 func (*DeleteGameRulePresetResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{34}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *DeleteGameRulePresetResponse) GetPresetId() string {
@@ -2901,7 +3121,7 @@ type BeginGameStartRequest struct {
 
 func (x *BeginGameStartRequest) Reset() {
 	*x = BeginGameStartRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[35]
+	mi := &file_platform_room_v1_room_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2913,7 +3133,7 @@ func (x *BeginGameStartRequest) String() string {
 func (*BeginGameStartRequest) ProtoMessage() {}
 
 func (x *BeginGameStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[35]
+	mi := &file_platform_room_v1_room_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2926,7 +3146,7 @@ func (x *BeginGameStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginGameStartRequest.ProtoReflect.Descriptor instead.
 func (*BeginGameStartRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{35}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *BeginGameStartRequest) GetRoomId() string {
@@ -2988,7 +3208,7 @@ type BeginGameStartResponse struct {
 
 func (x *BeginGameStartResponse) Reset() {
 	*x = BeginGameStartResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[36]
+	mi := &file_platform_room_v1_room_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3000,7 +3220,7 @@ func (x *BeginGameStartResponse) String() string {
 func (*BeginGameStartResponse) ProtoMessage() {}
 
 func (x *BeginGameStartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[36]
+	mi := &file_platform_room_v1_room_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3013,7 +3233,7 @@ func (x *BeginGameStartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginGameStartResponse.ProtoReflect.Descriptor instead.
 func (*BeginGameStartResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{36}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *BeginGameStartResponse) GetRoom() *Room {
@@ -3045,7 +3265,7 @@ type CancelGameStartRequest struct {
 
 func (x *CancelGameStartRequest) Reset() {
 	*x = CancelGameStartRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[37]
+	mi := &file_platform_room_v1_room_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3057,7 +3277,7 @@ func (x *CancelGameStartRequest) String() string {
 func (*CancelGameStartRequest) ProtoMessage() {}
 
 func (x *CancelGameStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[37]
+	mi := &file_platform_room_v1_room_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3070,7 +3290,7 @@ func (x *CancelGameStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelGameStartRequest.ProtoReflect.Descriptor instead.
 func (*CancelGameStartRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{37}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *CancelGameStartRequest) GetRoomId() string {
@@ -3131,7 +3351,7 @@ type CancelGameStartResponse struct {
 
 func (x *CancelGameStartResponse) Reset() {
 	*x = CancelGameStartResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[38]
+	mi := &file_platform_room_v1_room_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3143,7 +3363,7 @@ func (x *CancelGameStartResponse) String() string {
 func (*CancelGameStartResponse) ProtoMessage() {}
 
 func (x *CancelGameStartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[38]
+	mi := &file_platform_room_v1_room_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3156,7 +3376,7 @@ func (x *CancelGameStartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelGameStartResponse.ProtoReflect.Descriptor instead.
 func (*CancelGameStartResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{38}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *CancelGameStartResponse) GetRoom() *Room {
@@ -3184,7 +3404,7 @@ type StartGameRequest struct {
 
 func (x *StartGameRequest) Reset() {
 	*x = StartGameRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[39]
+	mi := &file_platform_room_v1_room_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3196,7 +3416,7 @@ func (x *StartGameRequest) String() string {
 func (*StartGameRequest) ProtoMessage() {}
 
 func (x *StartGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[39]
+	mi := &file_platform_room_v1_room_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3209,7 +3429,7 @@ func (x *StartGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartGameRequest.ProtoReflect.Descriptor instead.
 func (*StartGameRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{39}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *StartGameRequest) GetRoomId() string {
@@ -3292,7 +3512,7 @@ type FrozenParticipant struct {
 
 func (x *FrozenParticipant) Reset() {
 	*x = FrozenParticipant{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[40]
+	mi := &file_platform_room_v1_room_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3304,7 +3524,7 @@ func (x *FrozenParticipant) String() string {
 func (*FrozenParticipant) ProtoMessage() {}
 
 func (x *FrozenParticipant) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[40]
+	mi := &file_platform_room_v1_room_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3317,7 +3537,7 @@ func (x *FrozenParticipant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrozenParticipant.ProtoReflect.Descriptor instead.
 func (*FrozenParticipant) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{40}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *FrozenParticipant) GetUserId() string {
@@ -3348,7 +3568,7 @@ type StartGameResponse struct {
 
 func (x *StartGameResponse) Reset() {
 	*x = StartGameResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[41]
+	mi := &file_platform_room_v1_room_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3360,7 +3580,7 @@ func (x *StartGameResponse) String() string {
 func (*StartGameResponse) ProtoMessage() {}
 
 func (x *StartGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[41]
+	mi := &file_platform_room_v1_room_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3373,7 +3593,7 @@ func (x *StartGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartGameResponse.ProtoReflect.Descriptor instead.
 func (*StartGameResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{41}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *StartGameResponse) GetRoom() *Room {
@@ -3418,6 +3638,575 @@ func (x *StartGameResponse) GetConfigRevision() uint64 {
 	return 0
 }
 
+type RequestRoomPauseRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SessionId       string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RequestRoomPauseRequest) Reset() {
+	*x = RequestRoomPauseRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestRoomPauseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestRoomPauseRequest) ProtoMessage() {}
+
+func (x *RequestRoomPauseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestRoomPauseRequest.ProtoReflect.Descriptor instead.
+func (*RequestRoomPauseRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *RequestRoomPauseRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *RequestRoomPauseRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RequestRoomPauseRequest) GetExpectedVersion() *RoomVersion {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return nil
+}
+
+type RequestRoomPauseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestRoomPauseResponse) Reset() {
+	*x = RequestRoomPauseResponse{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestRoomPauseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestRoomPauseResponse) ProtoMessage() {}
+
+func (x *RequestRoomPauseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestRoomPauseResponse.ProtoReflect.Descriptor instead.
+func (*RequestRoomPauseResponse) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *RequestRoomPauseResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+type RejectRoomPauseRequestRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	RequestId       string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RejectRoomPauseRequestRequest) Reset() {
+	*x = RejectRoomPauseRequestRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectRoomPauseRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectRoomPauseRequestRequest) ProtoMessage() {}
+
+func (x *RejectRoomPauseRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectRoomPauseRequestRequest.ProtoReflect.Descriptor instead.
+func (*RejectRoomPauseRequestRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *RejectRoomPauseRequestRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *RejectRoomPauseRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RejectRoomPauseRequestRequest) GetExpectedVersion() *RoomVersion {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return nil
+}
+
+type RejectRoomPauseRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectRoomPauseRequestResponse) Reset() {
+	*x = RejectRoomPauseRequestResponse{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectRoomPauseRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectRoomPauseRequestResponse) ProtoMessage() {}
+
+func (x *RejectRoomPauseRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectRoomPauseRequestResponse.ProtoReflect.Descriptor instead.
+func (*RejectRoomPauseRequestResponse) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *RejectRoomPauseRequestResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+// PauseRoomGame approves request_id when present, otherwise it is a direct host pause.
+type PauseRoomGameRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SessionId       string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RequestId       string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	OwnershipEpoch  uint64                 `protobuf:"varint,5,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PauseRoomGameRequest) Reset() {
+	*x = PauseRoomGameRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PauseRoomGameRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PauseRoomGameRequest) ProtoMessage() {}
+
+func (x *PauseRoomGameRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PauseRoomGameRequest.ProtoReflect.Descriptor instead.
+func (*PauseRoomGameRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *PauseRoomGameRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *PauseRoomGameRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *PauseRoomGameRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PauseRoomGameRequest) GetExpectedVersion() *RoomVersion {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return nil
+}
+
+func (x *PauseRoomGameRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+type PauseRoomGameResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	Session       *v1.GameSessionSummary `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PauseRoomGameResponse) Reset() {
+	*x = PauseRoomGameResponse{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PauseRoomGameResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PauseRoomGameResponse) ProtoMessage() {}
+
+func (x *PauseRoomGameResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PauseRoomGameResponse.ProtoReflect.Descriptor instead.
+func (*PauseRoomGameResponse) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *PauseRoomGameResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+func (x *PauseRoomGameResponse) GetSession() *v1.GameSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type ResumeRoomGameRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SessionId       string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	OwnershipEpoch  uint64                 `protobuf:"varint,4,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ResumeRoomGameRequest) Reset() {
+	*x = ResumeRoomGameRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeRoomGameRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeRoomGameRequest) ProtoMessage() {}
+
+func (x *ResumeRoomGameRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeRoomGameRequest.ProtoReflect.Descriptor instead.
+func (*ResumeRoomGameRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ResumeRoomGameRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *ResumeRoomGameRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ResumeRoomGameRequest) GetExpectedVersion() *RoomVersion {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return nil
+}
+
+func (x *ResumeRoomGameRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+type ResumeRoomGameResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	Session       *v1.GameSessionSummary `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeRoomGameResponse) Reset() {
+	*x = ResumeRoomGameResponse{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeRoomGameResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeRoomGameResponse) ProtoMessage() {}
+
+func (x *ResumeRoomGameResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeRoomGameResponse.ProtoReflect.Descriptor instead.
+func (*ResumeRoomGameResponse) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ResumeRoomGameResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+func (x *ResumeRoomGameResponse) GetSession() *v1.GameSessionSummary {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type TransferRoomHostRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	TargetUserId    string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	ExpectedVersion *RoomVersion           `protobuf:"bytes,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	OwnershipEpoch  uint64                 `protobuf:"varint,4,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TransferRoomHostRequest) Reset() {
+	*x = TransferRoomHostRequest{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferRoomHostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferRoomHostRequest) ProtoMessage() {}
+
+func (x *TransferRoomHostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferRoomHostRequest.ProtoReflect.Descriptor instead.
+func (*TransferRoomHostRequest) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *TransferRoomHostRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *TransferRoomHostRequest) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *TransferRoomHostRequest) GetExpectedVersion() *RoomVersion {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return nil
+}
+
+func (x *TransferRoomHostRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+type TransferRoomHostResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransferRoomHostResponse) Reset() {
+	*x = TransferRoomHostResponse{}
+	mi := &file_platform_room_v1_room_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferRoomHostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferRoomHostResponse) ProtoMessage() {}
+
+func (x *TransferRoomHostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_room_v1_room_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferRoomHostResponse.ProtoReflect.Descriptor instead.
+func (*TransferRoomHostResponse) Descriptor() ([]byte, []int) {
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *TransferRoomHostResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
 type FinishGameRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	RoomId               string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
@@ -3434,7 +4223,7 @@ type FinishGameRequest struct {
 
 func (x *FinishGameRequest) Reset() {
 	*x = FinishGameRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[42]
+	mi := &file_platform_room_v1_room_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3446,7 +4235,7 @@ func (x *FinishGameRequest) String() string {
 func (*FinishGameRequest) ProtoMessage() {}
 
 func (x *FinishGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[42]
+	mi := &file_platform_room_v1_room_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3459,7 +4248,7 @@ func (x *FinishGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FinishGameRequest.ProtoReflect.Descriptor instead.
 func (*FinishGameRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{42}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *FinishGameRequest) GetRoomId() string {
@@ -3527,7 +4316,7 @@ type FinishGameResponse struct {
 
 func (x *FinishGameResponse) Reset() {
 	*x = FinishGameResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[43]
+	mi := &file_platform_room_v1_room_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3539,7 +4328,7 @@ func (x *FinishGameResponse) String() string {
 func (*FinishGameResponse) ProtoMessage() {}
 
 func (x *FinishGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[43]
+	mi := &file_platform_room_v1_room_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3552,7 +4341,7 @@ func (x *FinishGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FinishGameResponse.ProtoReflect.Descriptor instead.
 func (*FinishGameResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{43}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *FinishGameResponse) GetRoom() *Room {
@@ -3573,7 +4362,7 @@ type RemoveMemberRequest struct {
 
 func (x *RemoveMemberRequest) Reset() {
 	*x = RemoveMemberRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[44]
+	mi := &file_platform_room_v1_room_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3585,7 +4374,7 @@ func (x *RemoveMemberRequest) String() string {
 func (*RemoveMemberRequest) ProtoMessage() {}
 
 func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[44]
+	mi := &file_platform_room_v1_room_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3598,7 +4387,7 @@ func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveMemberRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{44}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *RemoveMemberRequest) GetRoomId() string {
@@ -3635,7 +4424,7 @@ type RemoveMemberResponse struct {
 
 func (x *RemoveMemberResponse) Reset() {
 	*x = RemoveMemberResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[45]
+	mi := &file_platform_room_v1_room_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3647,7 +4436,7 @@ func (x *RemoveMemberResponse) String() string {
 func (*RemoveMemberResponse) ProtoMessage() {}
 
 func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[45]
+	mi := &file_platform_room_v1_room_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3660,7 +4449,7 @@ func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveMemberResponse.ProtoReflect.Descriptor instead.
 func (*RemoveMemberResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{45}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *RemoveMemberResponse) GetRoom() *Room {
@@ -3708,7 +4497,7 @@ type CloseRoomRequest struct {
 
 func (x *CloseRoomRequest) Reset() {
 	*x = CloseRoomRequest{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[46]
+	mi := &file_platform_room_v1_room_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3720,7 +4509,7 @@ func (x *CloseRoomRequest) String() string {
 func (*CloseRoomRequest) ProtoMessage() {}
 
 func (x *CloseRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[46]
+	mi := &file_platform_room_v1_room_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3733,7 +4522,7 @@ func (x *CloseRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseRoomRequest.ProtoReflect.Descriptor instead.
 func (*CloseRoomRequest) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{46}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *CloseRoomRequest) GetRoomId() string {
@@ -3759,7 +4548,7 @@ type CloseRoomResponse struct {
 
 func (x *CloseRoomResponse) Reset() {
 	*x = CloseRoomResponse{}
-	mi := &file_platform_room_v1_room_proto_msgTypes[47]
+	mi := &file_platform_room_v1_room_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3771,7 +4560,7 @@ func (x *CloseRoomResponse) String() string {
 func (*CloseRoomResponse) ProtoMessage() {}
 
 func (x *CloseRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_platform_room_v1_room_proto_msgTypes[47]
+	mi := &file_platform_room_v1_room_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3784,7 +4573,7 @@ func (x *CloseRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseRoomResponse.ProtoReflect.Descriptor instead.
 func (*CloseRoomResponse) Descriptor() ([]byte, []int) {
-	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{47}
+	return file_platform_room_v1_room_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *CloseRoomResponse) GetRoom() *Room {
@@ -3817,7 +4606,22 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\agame_id\x18\x04 \x01(\tR\x06gameId\x12'\n" +
 	"\x0fconfig_revision\x18\x05 \x01(\x04R\x0econfigRevision\x12H\n" +
 	"\x10expected_version\x18\x06 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12'\n" +
-	"\x0fownership_epoch\x18\a \x01(\x04R\x0eownershipEpoch\"\x8f\x03\n" +
+	"\x0fownership_epoch\x18\a \x01(\x04R\x0eownershipEpoch\"\xc3\x01\n" +
+	"\x13PendingPauseRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12/\n" +
+	"\x14requested_by_user_id\x18\x03 \x01(\tR\x11requestedByUserId\x12=\n" +
+	"\frequested_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vrequestedAt\"\x93\x02\n" +
+	"\vActivePause\x12\x19\n" +
+	"\bpause_id\x18\x01 \x01(\tR\apauseId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x125\n" +
+	"\x06source\x18\x03 \x01(\x0e2\x1d.platform.room.v1.PauseSourceR\x06source\x12/\n" +
+	"\x14requested_by_user_id\x18\x04 \x01(\tR\x11requestedByUserId\x12)\n" +
+	"\x11paused_by_user_id\x18\x05 \x01(\tR\x0epausedByUserId\x127\n" +
+	"\tpaused_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bpausedAt\"\x8f\x03\n" +
 	"\x0eGameRulePreset\x12\x1b\n" +
 	"\tpreset_id\x18\x01 \x01(\tR\bpresetId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12\x12\n" +
@@ -3843,7 +4647,7 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12<\n" +
 	"\flast_seen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastSeenAt\x12\x1a\n" +
-	"\busername\x18\a \x01(\tR\busername\"\xc7\b\n" +
+	"\busername\x18\a \x01(\tR\busername\"\xe4\t\n" +
 	"\x04Room\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\troom_code\x18\x02 \x01(\tR\broomCode\x12@\n" +
@@ -3870,7 +4674,9 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x10selected_game_id\x18\x11 \x01(\tR\x0eselectedGameId\x12S\n" +
 	"\x12game_config_drafts\x18\x12 \x03(\v2%.platform.room.v1.RoomGameConfigDraftR\x10gameConfigDrafts\x12G\n" +
 	"\rpending_start\x18\x13 \x01(\v2\".platform.room.v1.PendingGameStartR\fpendingStart\x12'\n" +
-	"\x0fownership_epoch\x18\x14 \x01(\x04R\x0eownershipEpoch\"\xb0\x02\n" +
+	"\x0fownership_epoch\x18\x14 \x01(\x04R\x0eownershipEpoch\x12Y\n" +
+	"\x15pending_pause_request\x18\x15 \x01(\v2%.platform.room.v1.PendingPauseRequestR\x13pendingPauseRequest\x12@\n" +
+	"\factive_pause\x18\x16 \x01(\v2\x1d.platform.room.v1.ActivePauseR\vactivePause\"\xb0\x02\n" +
 	"\x11CreateRoomRequest\x12@\n" +
 	"\n" +
 	"visibility\x18\x01 \x01(\x0e2 .platform.room.v1.RoomVisibilityR\n" +
@@ -4058,7 +4864,48 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\agame_id\x18\x03 \x01(\tR\x06gameId\x12G\n" +
 	"\fparticipants\x18\x04 \x03(\v2#.platform.room.v1.FrozenParticipantR\fparticipants\x12C\n" +
 	"\rfrozen_config\x18\x05 \x01(\v2\x1e.platform.game.v1.GameEnvelopeR\ffrozenConfig\x12'\n" +
-	"\x0fconfig_revision\x18\x06 \x01(\x04R\x0econfigRevision\"\xf7\x02\n" +
+	"\x0fconfig_revision\x18\x06 \x01(\x04R\x0econfigRevision\"\x9b\x01\n" +
+	"\x17RequestRoomPauseRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12H\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"F\n" +
+	"\x18RequestRoomPauseResponse\x12*\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xa1\x01\n" +
+	"\x1dRejectRoomPauseRequestRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12H\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\"L\n" +
+	"\x1eRejectRoomPauseRequestResponse\x12*\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xe0\x01\n" +
+	"\x14PauseRoomGameRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12H\n" +
+	"\x10expected_version\x18\x04 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12'\n" +
+	"\x0fownership_epoch\x18\x05 \x01(\x04R\x0eownershipEpoch\"\x83\x01\n" +
+	"\x15PauseRoomGameResponse\x12*\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\x12>\n" +
+	"\asession\x18\x02 \x01(\v2$.platform.game.v1.GameSessionSummaryR\asession\"\xc2\x01\n" +
+	"\x15ResumeRoomGameRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12H\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12'\n" +
+	"\x0fownership_epoch\x18\x04 \x01(\x04R\x0eownershipEpoch\"\x84\x01\n" +
+	"\x16ResumeRoomGameResponse\x12*\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\x12>\n" +
+	"\asession\x18\x02 \x01(\v2$.platform.game.v1.GameSessionSummaryR\asession\"\xcb\x01\n" +
+	"\x17TransferRoomHostRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12$\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12H\n" +
+	"\x10expected_version\x18\x03 \x01(\v2\x1d.platform.room.v1.RoomVersionR\x0fexpectedVersion\x12'\n" +
+	"\x0fownership_epoch\x18\x04 \x01(\x04R\x0eownershipEpoch\"F\n" +
+	"\x18TransferRoomHostResponse\x12*\n" +
+	"\x04room\x18\x01 \x01(\v2\x16.platform.room.v1.RoomR\x04room\"\xf7\x02\n" +
 	"\x11FinishGameRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
@@ -4122,12 +4969,16 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"+PUBLIC_ROOM_PRIMARY_ACTION_REQUEST_SPECTATE\x10\x05\x12,\n" +
 	"(PUBLIC_ROOM_PRIMARY_ACTION_WAIT_FOR_HOST\x10\x06\x12*\n" +
 	"&PUBLIC_ROOM_PRIMARY_ACTION_IN_PROGRESS\x10\a\x12#\n" +
-	"\x1fPUBLIC_ROOM_PRIMARY_ACTION_FULL\x10\b*\xbf\x01\n" +
+	"\x1fPUBLIC_ROOM_PRIMARY_ACTION_FULL\x10\b*e\n" +
+	"\vPauseSource\x12\x1c\n" +
+	"\x18PAUSE_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11PAUSE_SOURCE_HOST\x10\x01\x12!\n" +
+	"\x1dPAUSE_SOURCE_APPROVED_REQUEST\x10\x02*\xbf\x01\n" +
 	"\x17GameRulePresetWriteMode\x12+\n" +
 	"'GAME_RULE_PRESET_WRITE_MODE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"GAME_RULE_PRESET_WRITE_MODE_CREATE\x10\x01\x12)\n" +
 	"%GAME_RULE_PRESET_WRITE_MODE_OVERWRITE\x10\x02\x12$\n" +
-	" GAME_RULE_PRESET_WRITE_MODE_COPY\x10\x032\xcd\x0e\n" +
+	" GAME_RULE_PRESET_WRITE_MODE_COPY\x10\x032\xe7\x12\n" +
 	"\vRoomService\x12W\n" +
 	"\n" +
 	"CreateRoom\x12#.platform.room.v1.CreateRoomRequest\x1a$.platform.room.v1.CreateRoomResponse\x12N\n" +
@@ -4145,7 +4996,12 @@ const file_platform_room_v1_room_proto_rawDesc = "" +
 	"\x14DeleteGameRulePreset\x12-.platform.room.v1.DeleteGameRulePresetRequest\x1a..platform.room.v1.DeleteGameRulePresetResponse\x12c\n" +
 	"\x0eBeginGameStart\x12'.platform.room.v1.BeginGameStartRequest\x1a(.platform.room.v1.BeginGameStartResponse\x12f\n" +
 	"\x0fCancelGameStart\x12(.platform.room.v1.CancelGameStartRequest\x1a).platform.room.v1.CancelGameStartResponse\x12T\n" +
-	"\tStartGame\x12\".platform.room.v1.StartGameRequest\x1a#.platform.room.v1.StartGameResponse\x12W\n" +
+	"\tStartGame\x12\".platform.room.v1.StartGameRequest\x1a#.platform.room.v1.StartGameResponse\x12i\n" +
+	"\x10RequestRoomPause\x12).platform.room.v1.RequestRoomPauseRequest\x1a*.platform.room.v1.RequestRoomPauseResponse\x12{\n" +
+	"\x16RejectRoomPauseRequest\x12/.platform.room.v1.RejectRoomPauseRequestRequest\x1a0.platform.room.v1.RejectRoomPauseRequestResponse\x12`\n" +
+	"\rPauseRoomGame\x12&.platform.room.v1.PauseRoomGameRequest\x1a'.platform.room.v1.PauseRoomGameResponse\x12c\n" +
+	"\x0eResumeRoomGame\x12'.platform.room.v1.ResumeRoomGameRequest\x1a(.platform.room.v1.ResumeRoomGameResponse\x12i\n" +
+	"\x10TransferRoomHost\x12).platform.room.v1.TransferRoomHostRequest\x1a*.platform.room.v1.TransferRoomHostResponse\x12W\n" +
 	"\n" +
 	"FinishGame\x12#.platform.room.v1.FinishGameRequest\x1a$.platform.room.v1.FinishGameResponse\x12]\n" +
 	"\fRemoveMember\x12%.platform.room.v1.RemoveMemberRequest\x1a&.platform.room.v1.RemoveMemberResponse\x12T\n" +
@@ -4163,203 +5019,244 @@ func file_platform_room_v1_room_proto_rawDescGZIP() []byte {
 	return file_platform_room_v1_room_proto_rawDescData
 }
 
-var file_platform_room_v1_room_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_platform_room_v1_room_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
+var file_platform_room_v1_room_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_platform_room_v1_room_proto_msgTypes = make([]protoimpl.MessageInfo, 60)
 var file_platform_room_v1_room_proto_goTypes = []any{
-	(RoomVisibility)(0),                  // 0: platform.room.v1.RoomVisibility
-	(RoomStatus)(0),                      // 1: platform.room.v1.RoomStatus
-	(AdmissionMode)(0),                   // 2: platform.room.v1.AdmissionMode
-	(MemberRole)(0),                      // 3: platform.room.v1.MemberRole
-	(JoinIntent)(0),                      // 4: platform.room.v1.JoinIntent
-	(PublicRoomPrimaryAction)(0),         // 5: platform.room.v1.PublicRoomPrimaryAction
-	(GameRulePresetWriteMode)(0),         // 6: platform.room.v1.GameRulePresetWriteMode
-	(*RoomVersion)(nil),                  // 7: platform.room.v1.RoomVersion
-	(*RoomGameConfigDraft)(nil),          // 8: platform.room.v1.RoomGameConfigDraft
-	(*PendingGameStart)(nil),             // 9: platform.room.v1.PendingGameStart
-	(*GameRulePreset)(nil),               // 10: platform.room.v1.GameRulePreset
-	(*RoomMember)(nil),                   // 11: platform.room.v1.RoomMember
-	(*Room)(nil),                         // 12: platform.room.v1.Room
-	(*CreateRoomRequest)(nil),            // 13: platform.room.v1.CreateRoomRequest
-	(*CreateRoomResponse)(nil),           // 14: platform.room.v1.CreateRoomResponse
-	(*GetRoomRequest)(nil),               // 15: platform.room.v1.GetRoomRequest
-	(*GetRoomResponse)(nil),              // 16: platform.room.v1.GetRoomResponse
-	(*HeartbeatRoomRequest)(nil),         // 17: platform.room.v1.HeartbeatRoomRequest
-	(*HeartbeatRoomResponse)(nil),        // 18: platform.room.v1.HeartbeatRoomResponse
-	(*MyRoomCard)(nil),                   // 19: platform.room.v1.MyRoomCard
-	(*ListMyRoomsRequest)(nil),           // 20: platform.room.v1.ListMyRoomsRequest
-	(*ListMyRoomsResponse)(nil),          // 21: platform.room.v1.ListMyRoomsResponse
-	(*PublicRoomFilter)(nil),             // 22: platform.room.v1.PublicRoomFilter
-	(*PublicRoomCard)(nil),               // 23: platform.room.v1.PublicRoomCard
-	(*ListPublicRoomsRequest)(nil),       // 24: platform.room.v1.ListPublicRoomsRequest
-	(*ListPublicRoomsResponse)(nil),      // 25: platform.room.v1.ListPublicRoomsResponse
-	(*JoinRoomRequest)(nil),              // 26: platform.room.v1.JoinRoomRequest
-	(*JoinRoomResponse)(nil),             // 27: platform.room.v1.JoinRoomResponse
-	(*ApproveMemberRequest)(nil),         // 28: platform.room.v1.ApproveMemberRequest
-	(*ApproveMemberResponse)(nil),        // 29: platform.room.v1.ApproveMemberResponse
-	(*SetAdmissionRequest)(nil),          // 30: platform.room.v1.SetAdmissionRequest
-	(*SetAdmissionResponse)(nil),         // 31: platform.room.v1.SetAdmissionResponse
-	(*SelectRoomGameRequest)(nil),        // 32: platform.room.v1.SelectRoomGameRequest
-	(*SelectRoomGameResponse)(nil),       // 33: platform.room.v1.SelectRoomGameResponse
-	(*UpdateGameConfigRequest)(nil),      // 34: platform.room.v1.UpdateGameConfigRequest
-	(*UpdateGameConfigResponse)(nil),     // 35: platform.room.v1.UpdateGameConfigResponse
-	(*ListGameRulePresetsRequest)(nil),   // 36: platform.room.v1.ListGameRulePresetsRequest
-	(*ListGameRulePresetsResponse)(nil),  // 37: platform.room.v1.ListGameRulePresetsResponse
-	(*SaveGameRulePresetRequest)(nil),    // 38: platform.room.v1.SaveGameRulePresetRequest
-	(*SaveGameRulePresetResponse)(nil),   // 39: platform.room.v1.SaveGameRulePresetResponse
-	(*DeleteGameRulePresetRequest)(nil),  // 40: platform.room.v1.DeleteGameRulePresetRequest
-	(*DeleteGameRulePresetResponse)(nil), // 41: platform.room.v1.DeleteGameRulePresetResponse
-	(*BeginGameStartRequest)(nil),        // 42: platform.room.v1.BeginGameStartRequest
-	(*BeginGameStartResponse)(nil),       // 43: platform.room.v1.BeginGameStartResponse
-	(*CancelGameStartRequest)(nil),       // 44: platform.room.v1.CancelGameStartRequest
-	(*CancelGameStartResponse)(nil),      // 45: platform.room.v1.CancelGameStartResponse
-	(*StartGameRequest)(nil),             // 46: platform.room.v1.StartGameRequest
-	(*FrozenParticipant)(nil),            // 47: platform.room.v1.FrozenParticipant
-	(*StartGameResponse)(nil),            // 48: platform.room.v1.StartGameResponse
-	(*FinishGameRequest)(nil),            // 49: platform.room.v1.FinishGameRequest
-	(*FinishGameResponse)(nil),           // 50: platform.room.v1.FinishGameResponse
-	(*RemoveMemberRequest)(nil),          // 51: platform.room.v1.RemoveMemberRequest
-	(*RemoveMemberResponse)(nil),         // 52: platform.room.v1.RemoveMemberResponse
-	(*CloseRoomRequest)(nil),             // 53: platform.room.v1.CloseRoomRequest
-	(*CloseRoomResponse)(nil),            // 54: platform.room.v1.CloseRoomResponse
-	(*v1.GameEnvelope)(nil),              // 55: platform.game.v1.GameEnvelope
-	(*timestamppb.Timestamp)(nil),        // 56: google.protobuf.Timestamp
-	(*v11.PageRequest)(nil),              // 57: platform.common.v1.PageRequest
-	(*v11.PageInfo)(nil),                 // 58: platform.common.v1.PageInfo
-	(*v1.GameConfig)(nil),                // 59: platform.game.v1.GameConfig
+	(RoomVisibility)(0),                    // 0: platform.room.v1.RoomVisibility
+	(RoomStatus)(0),                        // 1: platform.room.v1.RoomStatus
+	(AdmissionMode)(0),                     // 2: platform.room.v1.AdmissionMode
+	(MemberRole)(0),                        // 3: platform.room.v1.MemberRole
+	(JoinIntent)(0),                        // 4: platform.room.v1.JoinIntent
+	(PublicRoomPrimaryAction)(0),           // 5: platform.room.v1.PublicRoomPrimaryAction
+	(PauseSource)(0),                       // 6: platform.room.v1.PauseSource
+	(GameRulePresetWriteMode)(0),           // 7: platform.room.v1.GameRulePresetWriteMode
+	(*RoomVersion)(nil),                    // 8: platform.room.v1.RoomVersion
+	(*RoomGameConfigDraft)(nil),            // 9: platform.room.v1.RoomGameConfigDraft
+	(*PendingGameStart)(nil),               // 10: platform.room.v1.PendingGameStart
+	(*PendingPauseRequest)(nil),            // 11: platform.room.v1.PendingPauseRequest
+	(*ActivePause)(nil),                    // 12: platform.room.v1.ActivePause
+	(*GameRulePreset)(nil),                 // 13: platform.room.v1.GameRulePreset
+	(*RoomMember)(nil),                     // 14: platform.room.v1.RoomMember
+	(*Room)(nil),                           // 15: platform.room.v1.Room
+	(*CreateRoomRequest)(nil),              // 16: platform.room.v1.CreateRoomRequest
+	(*CreateRoomResponse)(nil),             // 17: platform.room.v1.CreateRoomResponse
+	(*GetRoomRequest)(nil),                 // 18: platform.room.v1.GetRoomRequest
+	(*GetRoomResponse)(nil),                // 19: platform.room.v1.GetRoomResponse
+	(*HeartbeatRoomRequest)(nil),           // 20: platform.room.v1.HeartbeatRoomRequest
+	(*HeartbeatRoomResponse)(nil),          // 21: platform.room.v1.HeartbeatRoomResponse
+	(*MyRoomCard)(nil),                     // 22: platform.room.v1.MyRoomCard
+	(*ListMyRoomsRequest)(nil),             // 23: platform.room.v1.ListMyRoomsRequest
+	(*ListMyRoomsResponse)(nil),            // 24: platform.room.v1.ListMyRoomsResponse
+	(*PublicRoomFilter)(nil),               // 25: platform.room.v1.PublicRoomFilter
+	(*PublicRoomCard)(nil),                 // 26: platform.room.v1.PublicRoomCard
+	(*ListPublicRoomsRequest)(nil),         // 27: platform.room.v1.ListPublicRoomsRequest
+	(*ListPublicRoomsResponse)(nil),        // 28: platform.room.v1.ListPublicRoomsResponse
+	(*JoinRoomRequest)(nil),                // 29: platform.room.v1.JoinRoomRequest
+	(*JoinRoomResponse)(nil),               // 30: platform.room.v1.JoinRoomResponse
+	(*ApproveMemberRequest)(nil),           // 31: platform.room.v1.ApproveMemberRequest
+	(*ApproveMemberResponse)(nil),          // 32: platform.room.v1.ApproveMemberResponse
+	(*SetAdmissionRequest)(nil),            // 33: platform.room.v1.SetAdmissionRequest
+	(*SetAdmissionResponse)(nil),           // 34: platform.room.v1.SetAdmissionResponse
+	(*SelectRoomGameRequest)(nil),          // 35: platform.room.v1.SelectRoomGameRequest
+	(*SelectRoomGameResponse)(nil),         // 36: platform.room.v1.SelectRoomGameResponse
+	(*UpdateGameConfigRequest)(nil),        // 37: platform.room.v1.UpdateGameConfigRequest
+	(*UpdateGameConfigResponse)(nil),       // 38: platform.room.v1.UpdateGameConfigResponse
+	(*ListGameRulePresetsRequest)(nil),     // 39: platform.room.v1.ListGameRulePresetsRequest
+	(*ListGameRulePresetsResponse)(nil),    // 40: platform.room.v1.ListGameRulePresetsResponse
+	(*SaveGameRulePresetRequest)(nil),      // 41: platform.room.v1.SaveGameRulePresetRequest
+	(*SaveGameRulePresetResponse)(nil),     // 42: platform.room.v1.SaveGameRulePresetResponse
+	(*DeleteGameRulePresetRequest)(nil),    // 43: platform.room.v1.DeleteGameRulePresetRequest
+	(*DeleteGameRulePresetResponse)(nil),   // 44: platform.room.v1.DeleteGameRulePresetResponse
+	(*BeginGameStartRequest)(nil),          // 45: platform.room.v1.BeginGameStartRequest
+	(*BeginGameStartResponse)(nil),         // 46: platform.room.v1.BeginGameStartResponse
+	(*CancelGameStartRequest)(nil),         // 47: platform.room.v1.CancelGameStartRequest
+	(*CancelGameStartResponse)(nil),        // 48: platform.room.v1.CancelGameStartResponse
+	(*StartGameRequest)(nil),               // 49: platform.room.v1.StartGameRequest
+	(*FrozenParticipant)(nil),              // 50: platform.room.v1.FrozenParticipant
+	(*StartGameResponse)(nil),              // 51: platform.room.v1.StartGameResponse
+	(*RequestRoomPauseRequest)(nil),        // 52: platform.room.v1.RequestRoomPauseRequest
+	(*RequestRoomPauseResponse)(nil),       // 53: platform.room.v1.RequestRoomPauseResponse
+	(*RejectRoomPauseRequestRequest)(nil),  // 54: platform.room.v1.RejectRoomPauseRequestRequest
+	(*RejectRoomPauseRequestResponse)(nil), // 55: platform.room.v1.RejectRoomPauseRequestResponse
+	(*PauseRoomGameRequest)(nil),           // 56: platform.room.v1.PauseRoomGameRequest
+	(*PauseRoomGameResponse)(nil),          // 57: platform.room.v1.PauseRoomGameResponse
+	(*ResumeRoomGameRequest)(nil),          // 58: platform.room.v1.ResumeRoomGameRequest
+	(*ResumeRoomGameResponse)(nil),         // 59: platform.room.v1.ResumeRoomGameResponse
+	(*TransferRoomHostRequest)(nil),        // 60: platform.room.v1.TransferRoomHostRequest
+	(*TransferRoomHostResponse)(nil),       // 61: platform.room.v1.TransferRoomHostResponse
+	(*FinishGameRequest)(nil),              // 62: platform.room.v1.FinishGameRequest
+	(*FinishGameResponse)(nil),             // 63: platform.room.v1.FinishGameResponse
+	(*RemoveMemberRequest)(nil),            // 64: platform.room.v1.RemoveMemberRequest
+	(*RemoveMemberResponse)(nil),           // 65: platform.room.v1.RemoveMemberResponse
+	(*CloseRoomRequest)(nil),               // 66: platform.room.v1.CloseRoomRequest
+	(*CloseRoomResponse)(nil),              // 67: platform.room.v1.CloseRoomResponse
+	(*v1.GameEnvelope)(nil),                // 68: platform.game.v1.GameEnvelope
+	(*timestamppb.Timestamp)(nil),          // 69: google.protobuf.Timestamp
+	(*v11.PageRequest)(nil),                // 70: platform.common.v1.PageRequest
+	(*v11.PageInfo)(nil),                   // 71: platform.common.v1.PageInfo
+	(*v1.GameConfig)(nil),                  // 72: platform.game.v1.GameConfig
+	(*v1.GameSessionSummary)(nil),          // 73: platform.game.v1.GameSessionSummary
 }
 var file_platform_room_v1_room_proto_depIdxs = []int32{
-	55,  // 0: platform.room.v1.RoomGameConfigDraft.config:type_name -> platform.game.v1.GameEnvelope
-	56,  // 1: platform.room.v1.RoomGameConfigDraft.updated_at:type_name -> google.protobuf.Timestamp
-	56,  // 2: platform.room.v1.PendingGameStart.deadline:type_name -> google.protobuf.Timestamp
-	7,   // 3: platform.room.v1.PendingGameStart.expected_version:type_name -> platform.room.v1.RoomVersion
-	55,  // 4: platform.room.v1.GameRulePreset.config:type_name -> platform.game.v1.GameEnvelope
-	56,  // 5: platform.room.v1.GameRulePreset.created_at:type_name -> google.protobuf.Timestamp
-	56,  // 6: platform.room.v1.GameRulePreset.updated_at:type_name -> google.protobuf.Timestamp
-	56,  // 7: platform.room.v1.GameRulePreset.last_used_at:type_name -> google.protobuf.Timestamp
-	3,   // 8: platform.room.v1.RoomMember.role:type_name -> platform.room.v1.MemberRole
-	3,   // 9: platform.room.v1.RoomMember.requested_role:type_name -> platform.room.v1.MemberRole
-	56,  // 10: platform.room.v1.RoomMember.joined_at:type_name -> google.protobuf.Timestamp
-	56,  // 11: platform.room.v1.RoomMember.last_seen_at:type_name -> google.protobuf.Timestamp
-	0,   // 12: platform.room.v1.Room.visibility:type_name -> platform.room.v1.RoomVisibility
-	1,   // 13: platform.room.v1.Room.status:type_name -> platform.room.v1.RoomStatus
-	2,   // 14: platform.room.v1.Room.participant_admission:type_name -> platform.room.v1.AdmissionMode
-	2,   // 15: platform.room.v1.Room.spectator_admission:type_name -> platform.room.v1.AdmissionMode
-	11,  // 16: platform.room.v1.Room.members:type_name -> platform.room.v1.RoomMember
-	7,   // 17: platform.room.v1.Room.version:type_name -> platform.room.v1.RoomVersion
-	56,  // 18: platform.room.v1.Room.created_at:type_name -> google.protobuf.Timestamp
-	56,  // 19: platform.room.v1.Room.updated_at:type_name -> google.protobuf.Timestamp
-	8,   // 20: platform.room.v1.Room.game_config_drafts:type_name -> platform.room.v1.RoomGameConfigDraft
-	9,   // 21: platform.room.v1.Room.pending_start:type_name -> platform.room.v1.PendingGameStart
-	0,   // 22: platform.room.v1.CreateRoomRequest.visibility:type_name -> platform.room.v1.RoomVisibility
-	2,   // 23: platform.room.v1.CreateRoomRequest.participant_admission:type_name -> platform.room.v1.AdmissionMode
-	2,   // 24: platform.room.v1.CreateRoomRequest.spectator_admission:type_name -> platform.room.v1.AdmissionMode
-	12,  // 25: platform.room.v1.CreateRoomResponse.room:type_name -> platform.room.v1.Room
-	12,  // 26: platform.room.v1.GetRoomResponse.room:type_name -> platform.room.v1.Room
-	56,  // 27: platform.room.v1.HeartbeatRoomResponse.observed_at:type_name -> google.protobuf.Timestamp
-	0,   // 28: platform.room.v1.MyRoomCard.visibility:type_name -> platform.room.v1.RoomVisibility
-	1,   // 29: platform.room.v1.MyRoomCard.status:type_name -> platform.room.v1.RoomStatus
-	2,   // 30: platform.room.v1.MyRoomCard.participant_admission:type_name -> platform.room.v1.AdmissionMode
-	2,   // 31: platform.room.v1.MyRoomCard.spectator_admission:type_name -> platform.room.v1.AdmissionMode
-	3,   // 32: platform.room.v1.MyRoomCard.viewer_role:type_name -> platform.room.v1.MemberRole
-	3,   // 33: platform.room.v1.MyRoomCard.viewer_requested_role:type_name -> platform.room.v1.MemberRole
-	56,  // 34: platform.room.v1.MyRoomCard.updated_at:type_name -> google.protobuf.Timestamp
-	57,  // 35: platform.room.v1.ListMyRoomsRequest.page:type_name -> platform.common.v1.PageRequest
-	19,  // 36: platform.room.v1.ListMyRoomsResponse.rooms:type_name -> platform.room.v1.MyRoomCard
-	58,  // 37: platform.room.v1.ListMyRoomsResponse.page:type_name -> platform.common.v1.PageInfo
-	1,   // 38: platform.room.v1.PublicRoomFilter.statuses:type_name -> platform.room.v1.RoomStatus
-	1,   // 39: platform.room.v1.PublicRoomCard.status:type_name -> platform.room.v1.RoomStatus
-	2,   // 40: platform.room.v1.PublicRoomCard.participant_admission:type_name -> platform.room.v1.AdmissionMode
-	2,   // 41: platform.room.v1.PublicRoomCard.spectator_admission:type_name -> platform.room.v1.AdmissionMode
-	3,   // 42: platform.room.v1.PublicRoomCard.viewer_role:type_name -> platform.room.v1.MemberRole
-	3,   // 43: platform.room.v1.PublicRoomCard.viewer_requested_role:type_name -> platform.room.v1.MemberRole
-	5,   // 44: platform.room.v1.PublicRoomCard.primary_action:type_name -> platform.room.v1.PublicRoomPrimaryAction
-	56,  // 45: platform.room.v1.PublicRoomCard.updated_at:type_name -> google.protobuf.Timestamp
-	22,  // 46: platform.room.v1.ListPublicRoomsRequest.filter:type_name -> platform.room.v1.PublicRoomFilter
-	57,  // 47: platform.room.v1.ListPublicRoomsRequest.page:type_name -> platform.common.v1.PageRequest
-	23,  // 48: platform.room.v1.ListPublicRoomsResponse.rooms:type_name -> platform.room.v1.PublicRoomCard
-	58,  // 49: platform.room.v1.ListPublicRoomsResponse.page:type_name -> platform.common.v1.PageInfo
-	4,   // 50: platform.room.v1.JoinRoomRequest.intent:type_name -> platform.room.v1.JoinIntent
-	7,   // 51: platform.room.v1.JoinRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 52: platform.room.v1.JoinRoomResponse.room:type_name -> platform.room.v1.Room
-	11,  // 53: platform.room.v1.JoinRoomResponse.member:type_name -> platform.room.v1.RoomMember
-	7,   // 54: platform.room.v1.ApproveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 55: platform.room.v1.ApproveMemberResponse.room:type_name -> platform.room.v1.Room
-	11,  // 56: platform.room.v1.ApproveMemberResponse.member:type_name -> platform.room.v1.RoomMember
-	2,   // 57: platform.room.v1.SetAdmissionRequest.participant_admission:type_name -> platform.room.v1.AdmissionMode
-	2,   // 58: platform.room.v1.SetAdmissionRequest.spectator_admission:type_name -> platform.room.v1.AdmissionMode
-	7,   // 59: platform.room.v1.SetAdmissionRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 60: platform.room.v1.SetAdmissionResponse.room:type_name -> platform.room.v1.Room
-	7,   // 61: platform.room.v1.SelectRoomGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 62: platform.room.v1.SelectRoomGameResponse.room:type_name -> platform.room.v1.Room
-	55,  // 63: platform.room.v1.UpdateGameConfigRequest.config:type_name -> platform.game.v1.GameEnvelope
-	7,   // 64: platform.room.v1.UpdateGameConfigRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 65: platform.room.v1.UpdateGameConfigResponse.room:type_name -> platform.room.v1.Room
-	8,   // 66: platform.room.v1.UpdateGameConfigResponse.draft:type_name -> platform.room.v1.RoomGameConfigDraft
-	10,  // 67: platform.room.v1.ListGameRulePresetsResponse.presets:type_name -> platform.room.v1.GameRulePreset
-	55,  // 68: platform.room.v1.SaveGameRulePresetRequest.config:type_name -> platform.game.v1.GameEnvelope
-	6,   // 69: platform.room.v1.SaveGameRulePresetRequest.mode:type_name -> platform.room.v1.GameRulePresetWriteMode
-	10,  // 70: platform.room.v1.SaveGameRulePresetResponse.preset:type_name -> platform.room.v1.GameRulePreset
-	7,   // 71: platform.room.v1.BeginGameStartRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 72: platform.room.v1.BeginGameStartResponse.room:type_name -> platform.room.v1.Room
-	9,   // 73: platform.room.v1.BeginGameStartResponse.pending_start:type_name -> platform.room.v1.PendingGameStart
-	7,   // 74: platform.room.v1.CancelGameStartRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 75: platform.room.v1.CancelGameStartResponse.room:type_name -> platform.room.v1.Room
-	59,  // 76: platform.room.v1.StartGameRequest.config:type_name -> platform.game.v1.GameConfig
-	7,   // 77: platform.room.v1.StartGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 78: platform.room.v1.StartGameResponse.room:type_name -> platform.room.v1.Room
-	47,  // 79: platform.room.v1.StartGameResponse.participants:type_name -> platform.room.v1.FrozenParticipant
-	55,  // 80: platform.room.v1.StartGameResponse.frozen_config:type_name -> platform.game.v1.GameEnvelope
-	7,   // 81: platform.room.v1.FinishGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	55,  // 82: platform.room.v1.FinishGameRequest.command:type_name -> platform.game.v1.GameEnvelope
-	12,  // 83: platform.room.v1.FinishGameResponse.room:type_name -> platform.room.v1.Room
-	7,   // 84: platform.room.v1.RemoveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 85: platform.room.v1.RemoveMemberResponse.room:type_name -> platform.room.v1.Room
-	11,  // 86: platform.room.v1.RemoveMemberResponse.removed:type_name -> platform.room.v1.RoomMember
-	7,   // 87: platform.room.v1.CloseRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
-	12,  // 88: platform.room.v1.CloseRoomResponse.room:type_name -> platform.room.v1.Room
-	13,  // 89: platform.room.v1.RoomService.CreateRoom:input_type -> platform.room.v1.CreateRoomRequest
-	15,  // 90: platform.room.v1.RoomService.GetRoom:input_type -> platform.room.v1.GetRoomRequest
-	17,  // 91: platform.room.v1.RoomService.HeartbeatRoom:input_type -> platform.room.v1.HeartbeatRoomRequest
-	20,  // 92: platform.room.v1.RoomService.ListMyRooms:input_type -> platform.room.v1.ListMyRoomsRequest
-	24,  // 93: platform.room.v1.RoomService.ListPublicRooms:input_type -> platform.room.v1.ListPublicRoomsRequest
-	26,  // 94: platform.room.v1.RoomService.JoinRoom:input_type -> platform.room.v1.JoinRoomRequest
-	28,  // 95: platform.room.v1.RoomService.ApproveMember:input_type -> platform.room.v1.ApproveMemberRequest
-	30,  // 96: platform.room.v1.RoomService.SetAdmission:input_type -> platform.room.v1.SetAdmissionRequest
-	32,  // 97: platform.room.v1.RoomService.SelectRoomGame:input_type -> platform.room.v1.SelectRoomGameRequest
-	34,  // 98: platform.room.v1.RoomService.UpdateGameConfig:input_type -> platform.room.v1.UpdateGameConfigRequest
-	36,  // 99: platform.room.v1.RoomService.ListGameRulePresets:input_type -> platform.room.v1.ListGameRulePresetsRequest
-	38,  // 100: platform.room.v1.RoomService.SaveGameRulePreset:input_type -> platform.room.v1.SaveGameRulePresetRequest
-	40,  // 101: platform.room.v1.RoomService.DeleteGameRulePreset:input_type -> platform.room.v1.DeleteGameRulePresetRequest
-	42,  // 102: platform.room.v1.RoomService.BeginGameStart:input_type -> platform.room.v1.BeginGameStartRequest
-	44,  // 103: platform.room.v1.RoomService.CancelGameStart:input_type -> platform.room.v1.CancelGameStartRequest
-	46,  // 104: platform.room.v1.RoomService.StartGame:input_type -> platform.room.v1.StartGameRequest
-	49,  // 105: platform.room.v1.RoomService.FinishGame:input_type -> platform.room.v1.FinishGameRequest
-	51,  // 106: platform.room.v1.RoomService.RemoveMember:input_type -> platform.room.v1.RemoveMemberRequest
-	53,  // 107: platform.room.v1.RoomService.CloseRoom:input_type -> platform.room.v1.CloseRoomRequest
-	14,  // 108: platform.room.v1.RoomService.CreateRoom:output_type -> platform.room.v1.CreateRoomResponse
-	16,  // 109: platform.room.v1.RoomService.GetRoom:output_type -> platform.room.v1.GetRoomResponse
-	18,  // 110: platform.room.v1.RoomService.HeartbeatRoom:output_type -> platform.room.v1.HeartbeatRoomResponse
-	21,  // 111: platform.room.v1.RoomService.ListMyRooms:output_type -> platform.room.v1.ListMyRoomsResponse
-	25,  // 112: platform.room.v1.RoomService.ListPublicRooms:output_type -> platform.room.v1.ListPublicRoomsResponse
-	27,  // 113: platform.room.v1.RoomService.JoinRoom:output_type -> platform.room.v1.JoinRoomResponse
-	29,  // 114: platform.room.v1.RoomService.ApproveMember:output_type -> platform.room.v1.ApproveMemberResponse
-	31,  // 115: platform.room.v1.RoomService.SetAdmission:output_type -> platform.room.v1.SetAdmissionResponse
-	33,  // 116: platform.room.v1.RoomService.SelectRoomGame:output_type -> platform.room.v1.SelectRoomGameResponse
-	35,  // 117: platform.room.v1.RoomService.UpdateGameConfig:output_type -> platform.room.v1.UpdateGameConfigResponse
-	37,  // 118: platform.room.v1.RoomService.ListGameRulePresets:output_type -> platform.room.v1.ListGameRulePresetsResponse
-	39,  // 119: platform.room.v1.RoomService.SaveGameRulePreset:output_type -> platform.room.v1.SaveGameRulePresetResponse
-	41,  // 120: platform.room.v1.RoomService.DeleteGameRulePreset:output_type -> platform.room.v1.DeleteGameRulePresetResponse
-	43,  // 121: platform.room.v1.RoomService.BeginGameStart:output_type -> platform.room.v1.BeginGameStartResponse
-	45,  // 122: platform.room.v1.RoomService.CancelGameStart:output_type -> platform.room.v1.CancelGameStartResponse
-	48,  // 123: platform.room.v1.RoomService.StartGame:output_type -> platform.room.v1.StartGameResponse
-	50,  // 124: platform.room.v1.RoomService.FinishGame:output_type -> platform.room.v1.FinishGameResponse
-	52,  // 125: platform.room.v1.RoomService.RemoveMember:output_type -> platform.room.v1.RemoveMemberResponse
-	54,  // 126: platform.room.v1.RoomService.CloseRoom:output_type -> platform.room.v1.CloseRoomResponse
-	108, // [108:127] is the sub-list for method output_type
-	89,  // [89:108] is the sub-list for method input_type
-	89,  // [89:89] is the sub-list for extension type_name
-	89,  // [89:89] is the sub-list for extension extendee
-	0,   // [0:89] is the sub-list for field type_name
+	68,  // 0: platform.room.v1.RoomGameConfigDraft.config:type_name -> platform.game.v1.GameEnvelope
+	69,  // 1: platform.room.v1.RoomGameConfigDraft.updated_at:type_name -> google.protobuf.Timestamp
+	69,  // 2: platform.room.v1.PendingGameStart.deadline:type_name -> google.protobuf.Timestamp
+	8,   // 3: platform.room.v1.PendingGameStart.expected_version:type_name -> platform.room.v1.RoomVersion
+	69,  // 4: platform.room.v1.PendingPauseRequest.requested_at:type_name -> google.protobuf.Timestamp
+	6,   // 5: platform.room.v1.ActivePause.source:type_name -> platform.room.v1.PauseSource
+	69,  // 6: platform.room.v1.ActivePause.paused_at:type_name -> google.protobuf.Timestamp
+	68,  // 7: platform.room.v1.GameRulePreset.config:type_name -> platform.game.v1.GameEnvelope
+	69,  // 8: platform.room.v1.GameRulePreset.created_at:type_name -> google.protobuf.Timestamp
+	69,  // 9: platform.room.v1.GameRulePreset.updated_at:type_name -> google.protobuf.Timestamp
+	69,  // 10: platform.room.v1.GameRulePreset.last_used_at:type_name -> google.protobuf.Timestamp
+	3,   // 11: platform.room.v1.RoomMember.role:type_name -> platform.room.v1.MemberRole
+	3,   // 12: platform.room.v1.RoomMember.requested_role:type_name -> platform.room.v1.MemberRole
+	69,  // 13: platform.room.v1.RoomMember.joined_at:type_name -> google.protobuf.Timestamp
+	69,  // 14: platform.room.v1.RoomMember.last_seen_at:type_name -> google.protobuf.Timestamp
+	0,   // 15: platform.room.v1.Room.visibility:type_name -> platform.room.v1.RoomVisibility
+	1,   // 16: platform.room.v1.Room.status:type_name -> platform.room.v1.RoomStatus
+	2,   // 17: platform.room.v1.Room.participant_admission:type_name -> platform.room.v1.AdmissionMode
+	2,   // 18: platform.room.v1.Room.spectator_admission:type_name -> platform.room.v1.AdmissionMode
+	14,  // 19: platform.room.v1.Room.members:type_name -> platform.room.v1.RoomMember
+	8,   // 20: platform.room.v1.Room.version:type_name -> platform.room.v1.RoomVersion
+	69,  // 21: platform.room.v1.Room.created_at:type_name -> google.protobuf.Timestamp
+	69,  // 22: platform.room.v1.Room.updated_at:type_name -> google.protobuf.Timestamp
+	9,   // 23: platform.room.v1.Room.game_config_drafts:type_name -> platform.room.v1.RoomGameConfigDraft
+	10,  // 24: platform.room.v1.Room.pending_start:type_name -> platform.room.v1.PendingGameStart
+	11,  // 25: platform.room.v1.Room.pending_pause_request:type_name -> platform.room.v1.PendingPauseRequest
+	12,  // 26: platform.room.v1.Room.active_pause:type_name -> platform.room.v1.ActivePause
+	0,   // 27: platform.room.v1.CreateRoomRequest.visibility:type_name -> platform.room.v1.RoomVisibility
+	2,   // 28: platform.room.v1.CreateRoomRequest.participant_admission:type_name -> platform.room.v1.AdmissionMode
+	2,   // 29: platform.room.v1.CreateRoomRequest.spectator_admission:type_name -> platform.room.v1.AdmissionMode
+	15,  // 30: platform.room.v1.CreateRoomResponse.room:type_name -> platform.room.v1.Room
+	15,  // 31: platform.room.v1.GetRoomResponse.room:type_name -> platform.room.v1.Room
+	69,  // 32: platform.room.v1.HeartbeatRoomResponse.observed_at:type_name -> google.protobuf.Timestamp
+	0,   // 33: platform.room.v1.MyRoomCard.visibility:type_name -> platform.room.v1.RoomVisibility
+	1,   // 34: platform.room.v1.MyRoomCard.status:type_name -> platform.room.v1.RoomStatus
+	2,   // 35: platform.room.v1.MyRoomCard.participant_admission:type_name -> platform.room.v1.AdmissionMode
+	2,   // 36: platform.room.v1.MyRoomCard.spectator_admission:type_name -> platform.room.v1.AdmissionMode
+	3,   // 37: platform.room.v1.MyRoomCard.viewer_role:type_name -> platform.room.v1.MemberRole
+	3,   // 38: platform.room.v1.MyRoomCard.viewer_requested_role:type_name -> platform.room.v1.MemberRole
+	69,  // 39: platform.room.v1.MyRoomCard.updated_at:type_name -> google.protobuf.Timestamp
+	70,  // 40: platform.room.v1.ListMyRoomsRequest.page:type_name -> platform.common.v1.PageRequest
+	22,  // 41: platform.room.v1.ListMyRoomsResponse.rooms:type_name -> platform.room.v1.MyRoomCard
+	71,  // 42: platform.room.v1.ListMyRoomsResponse.page:type_name -> platform.common.v1.PageInfo
+	1,   // 43: platform.room.v1.PublicRoomFilter.statuses:type_name -> platform.room.v1.RoomStatus
+	1,   // 44: platform.room.v1.PublicRoomCard.status:type_name -> platform.room.v1.RoomStatus
+	2,   // 45: platform.room.v1.PublicRoomCard.participant_admission:type_name -> platform.room.v1.AdmissionMode
+	2,   // 46: platform.room.v1.PublicRoomCard.spectator_admission:type_name -> platform.room.v1.AdmissionMode
+	3,   // 47: platform.room.v1.PublicRoomCard.viewer_role:type_name -> platform.room.v1.MemberRole
+	3,   // 48: platform.room.v1.PublicRoomCard.viewer_requested_role:type_name -> platform.room.v1.MemberRole
+	5,   // 49: platform.room.v1.PublicRoomCard.primary_action:type_name -> platform.room.v1.PublicRoomPrimaryAction
+	69,  // 50: platform.room.v1.PublicRoomCard.updated_at:type_name -> google.protobuf.Timestamp
+	25,  // 51: platform.room.v1.ListPublicRoomsRequest.filter:type_name -> platform.room.v1.PublicRoomFilter
+	70,  // 52: platform.room.v1.ListPublicRoomsRequest.page:type_name -> platform.common.v1.PageRequest
+	26,  // 53: platform.room.v1.ListPublicRoomsResponse.rooms:type_name -> platform.room.v1.PublicRoomCard
+	71,  // 54: platform.room.v1.ListPublicRoomsResponse.page:type_name -> platform.common.v1.PageInfo
+	4,   // 55: platform.room.v1.JoinRoomRequest.intent:type_name -> platform.room.v1.JoinIntent
+	8,   // 56: platform.room.v1.JoinRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 57: platform.room.v1.JoinRoomResponse.room:type_name -> platform.room.v1.Room
+	14,  // 58: platform.room.v1.JoinRoomResponse.member:type_name -> platform.room.v1.RoomMember
+	8,   // 59: platform.room.v1.ApproveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 60: platform.room.v1.ApproveMemberResponse.room:type_name -> platform.room.v1.Room
+	14,  // 61: platform.room.v1.ApproveMemberResponse.member:type_name -> platform.room.v1.RoomMember
+	2,   // 62: platform.room.v1.SetAdmissionRequest.participant_admission:type_name -> platform.room.v1.AdmissionMode
+	2,   // 63: platform.room.v1.SetAdmissionRequest.spectator_admission:type_name -> platform.room.v1.AdmissionMode
+	8,   // 64: platform.room.v1.SetAdmissionRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 65: platform.room.v1.SetAdmissionResponse.room:type_name -> platform.room.v1.Room
+	8,   // 66: platform.room.v1.SelectRoomGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 67: platform.room.v1.SelectRoomGameResponse.room:type_name -> platform.room.v1.Room
+	68,  // 68: platform.room.v1.UpdateGameConfigRequest.config:type_name -> platform.game.v1.GameEnvelope
+	8,   // 69: platform.room.v1.UpdateGameConfigRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 70: platform.room.v1.UpdateGameConfigResponse.room:type_name -> platform.room.v1.Room
+	9,   // 71: platform.room.v1.UpdateGameConfigResponse.draft:type_name -> platform.room.v1.RoomGameConfigDraft
+	13,  // 72: platform.room.v1.ListGameRulePresetsResponse.presets:type_name -> platform.room.v1.GameRulePreset
+	68,  // 73: platform.room.v1.SaveGameRulePresetRequest.config:type_name -> platform.game.v1.GameEnvelope
+	7,   // 74: platform.room.v1.SaveGameRulePresetRequest.mode:type_name -> platform.room.v1.GameRulePresetWriteMode
+	13,  // 75: platform.room.v1.SaveGameRulePresetResponse.preset:type_name -> platform.room.v1.GameRulePreset
+	8,   // 76: platform.room.v1.BeginGameStartRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 77: platform.room.v1.BeginGameStartResponse.room:type_name -> platform.room.v1.Room
+	10,  // 78: platform.room.v1.BeginGameStartResponse.pending_start:type_name -> platform.room.v1.PendingGameStart
+	8,   // 79: platform.room.v1.CancelGameStartRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 80: platform.room.v1.CancelGameStartResponse.room:type_name -> platform.room.v1.Room
+	72,  // 81: platform.room.v1.StartGameRequest.config:type_name -> platform.game.v1.GameConfig
+	8,   // 82: platform.room.v1.StartGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 83: platform.room.v1.StartGameResponse.room:type_name -> platform.room.v1.Room
+	50,  // 84: platform.room.v1.StartGameResponse.participants:type_name -> platform.room.v1.FrozenParticipant
+	68,  // 85: platform.room.v1.StartGameResponse.frozen_config:type_name -> platform.game.v1.GameEnvelope
+	8,   // 86: platform.room.v1.RequestRoomPauseRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 87: platform.room.v1.RequestRoomPauseResponse.room:type_name -> platform.room.v1.Room
+	8,   // 88: platform.room.v1.RejectRoomPauseRequestRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 89: platform.room.v1.RejectRoomPauseRequestResponse.room:type_name -> platform.room.v1.Room
+	8,   // 90: platform.room.v1.PauseRoomGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 91: platform.room.v1.PauseRoomGameResponse.room:type_name -> platform.room.v1.Room
+	73,  // 92: platform.room.v1.PauseRoomGameResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	8,   // 93: platform.room.v1.ResumeRoomGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 94: platform.room.v1.ResumeRoomGameResponse.room:type_name -> platform.room.v1.Room
+	73,  // 95: platform.room.v1.ResumeRoomGameResponse.session:type_name -> platform.game.v1.GameSessionSummary
+	8,   // 96: platform.room.v1.TransferRoomHostRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 97: platform.room.v1.TransferRoomHostResponse.room:type_name -> platform.room.v1.Room
+	8,   // 98: platform.room.v1.FinishGameRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	68,  // 99: platform.room.v1.FinishGameRequest.command:type_name -> platform.game.v1.GameEnvelope
+	15,  // 100: platform.room.v1.FinishGameResponse.room:type_name -> platform.room.v1.Room
+	8,   // 101: platform.room.v1.RemoveMemberRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 102: platform.room.v1.RemoveMemberResponse.room:type_name -> platform.room.v1.Room
+	14,  // 103: platform.room.v1.RemoveMemberResponse.removed:type_name -> platform.room.v1.RoomMember
+	8,   // 104: platform.room.v1.CloseRoomRequest.expected_version:type_name -> platform.room.v1.RoomVersion
+	15,  // 105: platform.room.v1.CloseRoomResponse.room:type_name -> platform.room.v1.Room
+	16,  // 106: platform.room.v1.RoomService.CreateRoom:input_type -> platform.room.v1.CreateRoomRequest
+	18,  // 107: platform.room.v1.RoomService.GetRoom:input_type -> platform.room.v1.GetRoomRequest
+	20,  // 108: platform.room.v1.RoomService.HeartbeatRoom:input_type -> platform.room.v1.HeartbeatRoomRequest
+	23,  // 109: platform.room.v1.RoomService.ListMyRooms:input_type -> platform.room.v1.ListMyRoomsRequest
+	27,  // 110: platform.room.v1.RoomService.ListPublicRooms:input_type -> platform.room.v1.ListPublicRoomsRequest
+	29,  // 111: platform.room.v1.RoomService.JoinRoom:input_type -> platform.room.v1.JoinRoomRequest
+	31,  // 112: platform.room.v1.RoomService.ApproveMember:input_type -> platform.room.v1.ApproveMemberRequest
+	33,  // 113: platform.room.v1.RoomService.SetAdmission:input_type -> platform.room.v1.SetAdmissionRequest
+	35,  // 114: platform.room.v1.RoomService.SelectRoomGame:input_type -> platform.room.v1.SelectRoomGameRequest
+	37,  // 115: platform.room.v1.RoomService.UpdateGameConfig:input_type -> platform.room.v1.UpdateGameConfigRequest
+	39,  // 116: platform.room.v1.RoomService.ListGameRulePresets:input_type -> platform.room.v1.ListGameRulePresetsRequest
+	41,  // 117: platform.room.v1.RoomService.SaveGameRulePreset:input_type -> platform.room.v1.SaveGameRulePresetRequest
+	43,  // 118: platform.room.v1.RoomService.DeleteGameRulePreset:input_type -> platform.room.v1.DeleteGameRulePresetRequest
+	45,  // 119: platform.room.v1.RoomService.BeginGameStart:input_type -> platform.room.v1.BeginGameStartRequest
+	47,  // 120: platform.room.v1.RoomService.CancelGameStart:input_type -> platform.room.v1.CancelGameStartRequest
+	49,  // 121: platform.room.v1.RoomService.StartGame:input_type -> platform.room.v1.StartGameRequest
+	52,  // 122: platform.room.v1.RoomService.RequestRoomPause:input_type -> platform.room.v1.RequestRoomPauseRequest
+	54,  // 123: platform.room.v1.RoomService.RejectRoomPauseRequest:input_type -> platform.room.v1.RejectRoomPauseRequestRequest
+	56,  // 124: platform.room.v1.RoomService.PauseRoomGame:input_type -> platform.room.v1.PauseRoomGameRequest
+	58,  // 125: platform.room.v1.RoomService.ResumeRoomGame:input_type -> platform.room.v1.ResumeRoomGameRequest
+	60,  // 126: platform.room.v1.RoomService.TransferRoomHost:input_type -> platform.room.v1.TransferRoomHostRequest
+	62,  // 127: platform.room.v1.RoomService.FinishGame:input_type -> platform.room.v1.FinishGameRequest
+	64,  // 128: platform.room.v1.RoomService.RemoveMember:input_type -> platform.room.v1.RemoveMemberRequest
+	66,  // 129: platform.room.v1.RoomService.CloseRoom:input_type -> platform.room.v1.CloseRoomRequest
+	17,  // 130: platform.room.v1.RoomService.CreateRoom:output_type -> platform.room.v1.CreateRoomResponse
+	19,  // 131: platform.room.v1.RoomService.GetRoom:output_type -> platform.room.v1.GetRoomResponse
+	21,  // 132: platform.room.v1.RoomService.HeartbeatRoom:output_type -> platform.room.v1.HeartbeatRoomResponse
+	24,  // 133: platform.room.v1.RoomService.ListMyRooms:output_type -> platform.room.v1.ListMyRoomsResponse
+	28,  // 134: platform.room.v1.RoomService.ListPublicRooms:output_type -> platform.room.v1.ListPublicRoomsResponse
+	30,  // 135: platform.room.v1.RoomService.JoinRoom:output_type -> platform.room.v1.JoinRoomResponse
+	32,  // 136: platform.room.v1.RoomService.ApproveMember:output_type -> platform.room.v1.ApproveMemberResponse
+	34,  // 137: platform.room.v1.RoomService.SetAdmission:output_type -> platform.room.v1.SetAdmissionResponse
+	36,  // 138: platform.room.v1.RoomService.SelectRoomGame:output_type -> platform.room.v1.SelectRoomGameResponse
+	38,  // 139: platform.room.v1.RoomService.UpdateGameConfig:output_type -> platform.room.v1.UpdateGameConfigResponse
+	40,  // 140: platform.room.v1.RoomService.ListGameRulePresets:output_type -> platform.room.v1.ListGameRulePresetsResponse
+	42,  // 141: platform.room.v1.RoomService.SaveGameRulePreset:output_type -> platform.room.v1.SaveGameRulePresetResponse
+	44,  // 142: platform.room.v1.RoomService.DeleteGameRulePreset:output_type -> platform.room.v1.DeleteGameRulePresetResponse
+	46,  // 143: platform.room.v1.RoomService.BeginGameStart:output_type -> platform.room.v1.BeginGameStartResponse
+	48,  // 144: platform.room.v1.RoomService.CancelGameStart:output_type -> platform.room.v1.CancelGameStartResponse
+	51,  // 145: platform.room.v1.RoomService.StartGame:output_type -> platform.room.v1.StartGameResponse
+	53,  // 146: platform.room.v1.RoomService.RequestRoomPause:output_type -> platform.room.v1.RequestRoomPauseResponse
+	55,  // 147: platform.room.v1.RoomService.RejectRoomPauseRequest:output_type -> platform.room.v1.RejectRoomPauseRequestResponse
+	57,  // 148: platform.room.v1.RoomService.PauseRoomGame:output_type -> platform.room.v1.PauseRoomGameResponse
+	59,  // 149: platform.room.v1.RoomService.ResumeRoomGame:output_type -> platform.room.v1.ResumeRoomGameResponse
+	61,  // 150: platform.room.v1.RoomService.TransferRoomHost:output_type -> platform.room.v1.TransferRoomHostResponse
+	63,  // 151: platform.room.v1.RoomService.FinishGame:output_type -> platform.room.v1.FinishGameResponse
+	65,  // 152: platform.room.v1.RoomService.RemoveMember:output_type -> platform.room.v1.RemoveMemberResponse
+	67,  // 153: platform.room.v1.RoomService.CloseRoom:output_type -> platform.room.v1.CloseRoomResponse
+	130, // [130:154] is the sub-list for method output_type
+	106, // [106:130] is the sub-list for method input_type
+	106, // [106:106] is the sub-list for extension type_name
+	106, // [106:106] is the sub-list for extension extendee
+	0,   // [0:106] is the sub-list for field type_name
 }
 
 func init() { file_platform_room_v1_room_proto_init() }
@@ -4372,8 +5269,8 @@ func file_platform_room_v1_room_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_room_v1_room_proto_rawDesc), len(file_platform_room_v1_room_proto_rawDesc)),
-			NumEnums:      7,
-			NumMessages:   48,
+			NumEnums:      8,
+			NumMessages:   60,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

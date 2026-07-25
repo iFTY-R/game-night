@@ -76,6 +76,21 @@ const (
 	RoomServiceCancelGameStartProcedure = "/platform.room.v1.RoomService/CancelGameStart"
 	// RoomServiceStartGameProcedure is the fully-qualified name of the RoomService's StartGame RPC.
 	RoomServiceStartGameProcedure = "/platform.room.v1.RoomService/StartGame"
+	// RoomServiceRequestRoomPauseProcedure is the fully-qualified name of the RoomService's
+	// RequestRoomPause RPC.
+	RoomServiceRequestRoomPauseProcedure = "/platform.room.v1.RoomService/RequestRoomPause"
+	// RoomServiceRejectRoomPauseRequestProcedure is the fully-qualified name of the RoomService's
+	// RejectRoomPauseRequest RPC.
+	RoomServiceRejectRoomPauseRequestProcedure = "/platform.room.v1.RoomService/RejectRoomPauseRequest"
+	// RoomServicePauseRoomGameProcedure is the fully-qualified name of the RoomService's PauseRoomGame
+	// RPC.
+	RoomServicePauseRoomGameProcedure = "/platform.room.v1.RoomService/PauseRoomGame"
+	// RoomServiceResumeRoomGameProcedure is the fully-qualified name of the RoomService's
+	// ResumeRoomGame RPC.
+	RoomServiceResumeRoomGameProcedure = "/platform.room.v1.RoomService/ResumeRoomGame"
+	// RoomServiceTransferRoomHostProcedure is the fully-qualified name of the RoomService's
+	// TransferRoomHost RPC.
+	RoomServiceTransferRoomHostProcedure = "/platform.room.v1.RoomService/TransferRoomHost"
 	// RoomServiceFinishGameProcedure is the fully-qualified name of the RoomService's FinishGame RPC.
 	RoomServiceFinishGameProcedure = "/platform.room.v1.RoomService/FinishGame"
 	// RoomServiceRemoveMemberProcedure is the fully-qualified name of the RoomService's RemoveMember
@@ -103,6 +118,11 @@ type RoomServiceClient interface {
 	BeginGameStart(context.Context, *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error)
 	CancelGameStart(context.Context, *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error)
 	StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error)
+	RequestRoomPause(context.Context, *connect.Request[v1.RequestRoomPauseRequest]) (*connect.Response[v1.RequestRoomPauseResponse], error)
+	RejectRoomPauseRequest(context.Context, *connect.Request[v1.RejectRoomPauseRequestRequest]) (*connect.Response[v1.RejectRoomPauseRequestResponse], error)
+	PauseRoomGame(context.Context, *connect.Request[v1.PauseRoomGameRequest]) (*connect.Response[v1.PauseRoomGameResponse], error)
+	ResumeRoomGame(context.Context, *connect.Request[v1.ResumeRoomGameRequest]) (*connect.Response[v1.ResumeRoomGameResponse], error)
+	TransferRoomHost(context.Context, *connect.Request[v1.TransferRoomHostRequest]) (*connect.Response[v1.TransferRoomHostResponse], error)
 	FinishGame(context.Context, *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error)
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
 	CloseRoom(context.Context, *connect.Request[v1.CloseRoomRequest]) (*connect.Response[v1.CloseRoomResponse], error)
@@ -215,6 +235,36 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roomServiceMethods.ByName("StartGame")),
 			connect.WithClientOptions(opts...),
 		),
+		requestRoomPause: connect.NewClient[v1.RequestRoomPauseRequest, v1.RequestRoomPauseResponse](
+			httpClient,
+			baseURL+RoomServiceRequestRoomPauseProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("RequestRoomPause")),
+			connect.WithClientOptions(opts...),
+		),
+		rejectRoomPauseRequest: connect.NewClient[v1.RejectRoomPauseRequestRequest, v1.RejectRoomPauseRequestResponse](
+			httpClient,
+			baseURL+RoomServiceRejectRoomPauseRequestProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("RejectRoomPauseRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		pauseRoomGame: connect.NewClient[v1.PauseRoomGameRequest, v1.PauseRoomGameResponse](
+			httpClient,
+			baseURL+RoomServicePauseRoomGameProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("PauseRoomGame")),
+			connect.WithClientOptions(opts...),
+		),
+		resumeRoomGame: connect.NewClient[v1.ResumeRoomGameRequest, v1.ResumeRoomGameResponse](
+			httpClient,
+			baseURL+RoomServiceResumeRoomGameProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("ResumeRoomGame")),
+			connect.WithClientOptions(opts...),
+		),
+		transferRoomHost: connect.NewClient[v1.TransferRoomHostRequest, v1.TransferRoomHostResponse](
+			httpClient,
+			baseURL+RoomServiceTransferRoomHostProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("TransferRoomHost")),
+			connect.WithClientOptions(opts...),
+		),
 		finishGame: connect.NewClient[v1.FinishGameRequest, v1.FinishGameResponse](
 			httpClient,
 			baseURL+RoomServiceFinishGameProcedure,
@@ -238,25 +288,30 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // roomServiceClient implements RoomServiceClient.
 type roomServiceClient struct {
-	createRoom           *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
-	getRoom              *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
-	heartbeatRoom        *connect.Client[v1.HeartbeatRoomRequest, v1.HeartbeatRoomResponse]
-	listMyRooms          *connect.Client[v1.ListMyRoomsRequest, v1.ListMyRoomsResponse]
-	listPublicRooms      *connect.Client[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse]
-	joinRoom             *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
-	approveMember        *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
-	setAdmission         *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
-	selectRoomGame       *connect.Client[v1.SelectRoomGameRequest, v1.SelectRoomGameResponse]
-	updateGameConfig     *connect.Client[v1.UpdateGameConfigRequest, v1.UpdateGameConfigResponse]
-	listGameRulePresets  *connect.Client[v1.ListGameRulePresetsRequest, v1.ListGameRulePresetsResponse]
-	saveGameRulePreset   *connect.Client[v1.SaveGameRulePresetRequest, v1.SaveGameRulePresetResponse]
-	deleteGameRulePreset *connect.Client[v1.DeleteGameRulePresetRequest, v1.DeleteGameRulePresetResponse]
-	beginGameStart       *connect.Client[v1.BeginGameStartRequest, v1.BeginGameStartResponse]
-	cancelGameStart      *connect.Client[v1.CancelGameStartRequest, v1.CancelGameStartResponse]
-	startGame            *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
-	finishGame           *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
-	removeMember         *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
-	closeRoom            *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
+	createRoom             *connect.Client[v1.CreateRoomRequest, v1.CreateRoomResponse]
+	getRoom                *connect.Client[v1.GetRoomRequest, v1.GetRoomResponse]
+	heartbeatRoom          *connect.Client[v1.HeartbeatRoomRequest, v1.HeartbeatRoomResponse]
+	listMyRooms            *connect.Client[v1.ListMyRoomsRequest, v1.ListMyRoomsResponse]
+	listPublicRooms        *connect.Client[v1.ListPublicRoomsRequest, v1.ListPublicRoomsResponse]
+	joinRoom               *connect.Client[v1.JoinRoomRequest, v1.JoinRoomResponse]
+	approveMember          *connect.Client[v1.ApproveMemberRequest, v1.ApproveMemberResponse]
+	setAdmission           *connect.Client[v1.SetAdmissionRequest, v1.SetAdmissionResponse]
+	selectRoomGame         *connect.Client[v1.SelectRoomGameRequest, v1.SelectRoomGameResponse]
+	updateGameConfig       *connect.Client[v1.UpdateGameConfigRequest, v1.UpdateGameConfigResponse]
+	listGameRulePresets    *connect.Client[v1.ListGameRulePresetsRequest, v1.ListGameRulePresetsResponse]
+	saveGameRulePreset     *connect.Client[v1.SaveGameRulePresetRequest, v1.SaveGameRulePresetResponse]
+	deleteGameRulePreset   *connect.Client[v1.DeleteGameRulePresetRequest, v1.DeleteGameRulePresetResponse]
+	beginGameStart         *connect.Client[v1.BeginGameStartRequest, v1.BeginGameStartResponse]
+	cancelGameStart        *connect.Client[v1.CancelGameStartRequest, v1.CancelGameStartResponse]
+	startGame              *connect.Client[v1.StartGameRequest, v1.StartGameResponse]
+	requestRoomPause       *connect.Client[v1.RequestRoomPauseRequest, v1.RequestRoomPauseResponse]
+	rejectRoomPauseRequest *connect.Client[v1.RejectRoomPauseRequestRequest, v1.RejectRoomPauseRequestResponse]
+	pauseRoomGame          *connect.Client[v1.PauseRoomGameRequest, v1.PauseRoomGameResponse]
+	resumeRoomGame         *connect.Client[v1.ResumeRoomGameRequest, v1.ResumeRoomGameResponse]
+	transferRoomHost       *connect.Client[v1.TransferRoomHostRequest, v1.TransferRoomHostResponse]
+	finishGame             *connect.Client[v1.FinishGameRequest, v1.FinishGameResponse]
+	removeMember           *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
+	closeRoom              *connect.Client[v1.CloseRoomRequest, v1.CloseRoomResponse]
 }
 
 // CreateRoom calls platform.room.v1.RoomService.CreateRoom.
@@ -339,6 +394,31 @@ func (c *roomServiceClient) StartGame(ctx context.Context, req *connect.Request[
 	return c.startGame.CallUnary(ctx, req)
 }
 
+// RequestRoomPause calls platform.room.v1.RoomService.RequestRoomPause.
+func (c *roomServiceClient) RequestRoomPause(ctx context.Context, req *connect.Request[v1.RequestRoomPauseRequest]) (*connect.Response[v1.RequestRoomPauseResponse], error) {
+	return c.requestRoomPause.CallUnary(ctx, req)
+}
+
+// RejectRoomPauseRequest calls platform.room.v1.RoomService.RejectRoomPauseRequest.
+func (c *roomServiceClient) RejectRoomPauseRequest(ctx context.Context, req *connect.Request[v1.RejectRoomPauseRequestRequest]) (*connect.Response[v1.RejectRoomPauseRequestResponse], error) {
+	return c.rejectRoomPauseRequest.CallUnary(ctx, req)
+}
+
+// PauseRoomGame calls platform.room.v1.RoomService.PauseRoomGame.
+func (c *roomServiceClient) PauseRoomGame(ctx context.Context, req *connect.Request[v1.PauseRoomGameRequest]) (*connect.Response[v1.PauseRoomGameResponse], error) {
+	return c.pauseRoomGame.CallUnary(ctx, req)
+}
+
+// ResumeRoomGame calls platform.room.v1.RoomService.ResumeRoomGame.
+func (c *roomServiceClient) ResumeRoomGame(ctx context.Context, req *connect.Request[v1.ResumeRoomGameRequest]) (*connect.Response[v1.ResumeRoomGameResponse], error) {
+	return c.resumeRoomGame.CallUnary(ctx, req)
+}
+
+// TransferRoomHost calls platform.room.v1.RoomService.TransferRoomHost.
+func (c *roomServiceClient) TransferRoomHost(ctx context.Context, req *connect.Request[v1.TransferRoomHostRequest]) (*connect.Response[v1.TransferRoomHostResponse], error) {
+	return c.transferRoomHost.CallUnary(ctx, req)
+}
+
 // FinishGame calls platform.room.v1.RoomService.FinishGame.
 func (c *roomServiceClient) FinishGame(ctx context.Context, req *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error) {
 	return c.finishGame.CallUnary(ctx, req)
@@ -372,6 +452,11 @@ type RoomServiceHandler interface {
 	BeginGameStart(context.Context, *connect.Request[v1.BeginGameStartRequest]) (*connect.Response[v1.BeginGameStartResponse], error)
 	CancelGameStart(context.Context, *connect.Request[v1.CancelGameStartRequest]) (*connect.Response[v1.CancelGameStartResponse], error)
 	StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error)
+	RequestRoomPause(context.Context, *connect.Request[v1.RequestRoomPauseRequest]) (*connect.Response[v1.RequestRoomPauseResponse], error)
+	RejectRoomPauseRequest(context.Context, *connect.Request[v1.RejectRoomPauseRequestRequest]) (*connect.Response[v1.RejectRoomPauseRequestResponse], error)
+	PauseRoomGame(context.Context, *connect.Request[v1.PauseRoomGameRequest]) (*connect.Response[v1.PauseRoomGameResponse], error)
+	ResumeRoomGame(context.Context, *connect.Request[v1.ResumeRoomGameRequest]) (*connect.Response[v1.ResumeRoomGameResponse], error)
+	TransferRoomHost(context.Context, *connect.Request[v1.TransferRoomHostRequest]) (*connect.Response[v1.TransferRoomHostResponse], error)
 	FinishGame(context.Context, *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error)
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
 	CloseRoom(context.Context, *connect.Request[v1.CloseRoomRequest]) (*connect.Response[v1.CloseRoomResponse], error)
@@ -480,6 +565,36 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roomServiceMethods.ByName("StartGame")),
 		connect.WithHandlerOptions(opts...),
 	)
+	roomServiceRequestRoomPauseHandler := connect.NewUnaryHandler(
+		RoomServiceRequestRoomPauseProcedure,
+		svc.RequestRoomPause,
+		connect.WithSchema(roomServiceMethods.ByName("RequestRoomPause")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceRejectRoomPauseRequestHandler := connect.NewUnaryHandler(
+		RoomServiceRejectRoomPauseRequestProcedure,
+		svc.RejectRoomPauseRequest,
+		connect.WithSchema(roomServiceMethods.ByName("RejectRoomPauseRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServicePauseRoomGameHandler := connect.NewUnaryHandler(
+		RoomServicePauseRoomGameProcedure,
+		svc.PauseRoomGame,
+		connect.WithSchema(roomServiceMethods.ByName("PauseRoomGame")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceResumeRoomGameHandler := connect.NewUnaryHandler(
+		RoomServiceResumeRoomGameProcedure,
+		svc.ResumeRoomGame,
+		connect.WithSchema(roomServiceMethods.ByName("ResumeRoomGame")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceTransferRoomHostHandler := connect.NewUnaryHandler(
+		RoomServiceTransferRoomHostProcedure,
+		svc.TransferRoomHost,
+		connect.WithSchema(roomServiceMethods.ByName("TransferRoomHost")),
+		connect.WithHandlerOptions(opts...),
+	)
 	roomServiceFinishGameHandler := connect.NewUnaryHandler(
 		RoomServiceFinishGameProcedure,
 		svc.FinishGame,
@@ -532,6 +647,16 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceCancelGameStartHandler.ServeHTTP(w, r)
 		case RoomServiceStartGameProcedure:
 			roomServiceStartGameHandler.ServeHTTP(w, r)
+		case RoomServiceRequestRoomPauseProcedure:
+			roomServiceRequestRoomPauseHandler.ServeHTTP(w, r)
+		case RoomServiceRejectRoomPauseRequestProcedure:
+			roomServiceRejectRoomPauseRequestHandler.ServeHTTP(w, r)
+		case RoomServicePauseRoomGameProcedure:
+			roomServicePauseRoomGameHandler.ServeHTTP(w, r)
+		case RoomServiceResumeRoomGameProcedure:
+			roomServiceResumeRoomGameHandler.ServeHTTP(w, r)
+		case RoomServiceTransferRoomHostProcedure:
+			roomServiceTransferRoomHostHandler.ServeHTTP(w, r)
 		case RoomServiceFinishGameProcedure:
 			roomServiceFinishGameHandler.ServeHTTP(w, r)
 		case RoomServiceRemoveMemberProcedure:
@@ -609,6 +734,26 @@ func (UnimplementedRoomServiceHandler) CancelGameStart(context.Context, *connect
 
 func (UnimplementedRoomServiceHandler) StartGame(context.Context, *connect.Request[v1.StartGameRequest]) (*connect.Response[v1.StartGameResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.StartGame is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) RequestRoomPause(context.Context, *connect.Request[v1.RequestRoomPauseRequest]) (*connect.Response[v1.RequestRoomPauseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.RequestRoomPause is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) RejectRoomPauseRequest(context.Context, *connect.Request[v1.RejectRoomPauseRequestRequest]) (*connect.Response[v1.RejectRoomPauseRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.RejectRoomPauseRequest is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) PauseRoomGame(context.Context, *connect.Request[v1.PauseRoomGameRequest]) (*connect.Response[v1.PauseRoomGameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.PauseRoomGame is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) ResumeRoomGame(context.Context, *connect.Request[v1.ResumeRoomGameRequest]) (*connect.Response[v1.ResumeRoomGameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.ResumeRoomGame is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) TransferRoomHost(context.Context, *connect.Request[v1.TransferRoomHostRequest]) (*connect.Response[v1.TransferRoomHostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("platform.room.v1.RoomService.TransferRoomHost is not implemented"))
 }
 
 func (UnimplementedRoomServiceHandler) FinishGame(context.Context, *connect.Request[v1.FinishGameRequest]) (*connect.Response[v1.FinishGameResponse], error) {

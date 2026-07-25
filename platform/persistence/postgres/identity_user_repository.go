@@ -139,7 +139,6 @@ func (repository *identityUserRepository) ChangeUsernameCAS(
 		ExpectedDisplayUsername:   pgtype.Text{String: before.Username, Valid: true},
 		ExpectedUsernameKey:       pgtype.Text{String: before.CurrentUsernameKey, Valid: true},
 		ExpectedUsernameChangedAt: timeToPG(before.UsernameChangedAt), ExpectedUpdatedAt: timeToPG(before.UpdatedAt),
-		CooldownCutoff: timeToPG(plan.ChangedAt.Add(-identityDomain.UsernameChangeCooldown)),
 	})
 	if err != nil {
 		return identityDomain.User{}, mapIdentityQueryError(ctx, err, identityDomain.ErrIdentityConcurrentTransition)
@@ -147,7 +146,7 @@ func (repository *identityUserRepository) ChangeUsernameCAS(
 	return identityUserFromRow(row)
 }
 
-// ForceChangeUsernameCAS persists a reviewed administrator plan without applying the user cooldown.
+// ForceChangeUsernameCAS persists a reviewed administrator plan for governance-driven renames.
 func (repository *identityUserRepository) ForceChangeUsernameCAS(
 	ctx context.Context,
 	current, next identityDomain.User,

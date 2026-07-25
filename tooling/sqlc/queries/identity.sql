@@ -146,7 +146,6 @@ WHERE user_id = sqlc.arg(user_id)
   AND current_username_key = sqlc.arg(expected_username_key)
   AND username_changed_at = sqlc.arg(expected_username_changed_at)
   AND updated_at = sqlc.arg(expected_updated_at)
-  AND username_changed_at <= sqlc.arg(cooldown_cutoff)
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
 
 -- name: SetCurrentUsernameCAS :one

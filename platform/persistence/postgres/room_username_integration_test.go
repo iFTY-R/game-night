@@ -86,7 +86,7 @@ func TestPostgresRoomUsernamesRejectNormalizedSameNameInsideOneRoom(t *testing.T
 func TestPostgresRoomUsernameRenameConflictRollsBackUserAndAllRoomAliases(t *testing.T) {
 	fixture, ctx, now := openRoomUsernameFixture(t)
 
-	seededAt := now.Add(-identityDomain.UsernameChangeCooldown - 5*time.Minute)
+	seededAt := now.Add(-5 * time.Minute)
 	roomCreatedAt := seededAt.Add(time.Minute)
 	renameAt := now
 	hostOneID, hostTwoID := uuid.New(), uuid.New()
@@ -121,7 +121,7 @@ func TestPostgresRoomUsernameRenameConflictRollsBackUserAndAllRoomAliases(t *tes
 func TestPostgresRoomUsernameRenameSyncsAllRoomAliases(t *testing.T) {
 	fixture, ctx, now := openRoomUsernameFixture(t)
 
-	seededAt := now.Add(-identityDomain.UsernameChangeCooldown - 5*time.Minute)
+	seededAt := now.Add(-5 * time.Minute)
 	roomCreatedAt := seededAt.Add(time.Minute)
 	renameAt := now
 	hostOneID, hostTwoID := uuid.New(), uuid.New()
@@ -150,7 +150,7 @@ func TestPostgresRoomUsernameRenameSyncsAllRoomAliases(t *testing.T) {
 func TestPostgresRoomUsernameRenameIgnoresClosedRoomConflicts(t *testing.T) {
 	fixture, ctx, now := openRoomUsernameFixture(t)
 
-	seededAt := now.Add(-identityDomain.UsernameChangeCooldown - 5*time.Minute)
+	seededAt := now.Add(-5 * time.Minute)
 	roomCreatedAt := seededAt.Add(time.Minute)
 	hostOneID, hostTwoID := uuid.New(), uuid.New()
 	targetUserID, blockerUserID := uuid.New(), uuid.New()

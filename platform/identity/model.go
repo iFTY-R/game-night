@@ -10,8 +10,6 @@ import (
 const (
 	// OnboardingTTL is the maximum lifetime of an identity without a claimed public username.
 	OnboardingTTL = 24 * time.Hour
-	// UsernameChangeCooldown limits user-initiated public identity churn.
-	UsernameChangeCooldown = 30 * 24 * time.Hour
 	// UsernameReservationTTL protects a released historical name from immediate reassignment.
 	UsernameReservationTTL = 90 * 24 * time.Hour
 )
@@ -133,7 +131,7 @@ func (user User) CompleteOnboarding(username identifier.Username, at time.Time) 
 	return RestoreUser(next)
 }
 
-// PlanUsernameChange enforces active status and cooldown while producing both sides of the claim transaction.
+// PlanUsernameChange enforces active status and monotonic timestamps while producing both sides of the claim transaction.
 func (user User) PlanUsernameChange(username identifier.Username, at time.Time) (UsernameChangePlan, error) {
 	at = canonicalUserTime(at)
 	if user.snapshot.Status != UserStatusActive {
@@ -144,9 +142,6 @@ func (user User) PlanUsernameChange(username identifier.Username, at time.Time) 
 	}
 	if username.Key() == user.snapshot.CurrentUsernameKey {
 		return UsernameChangePlan{}, ErrUsernameUnchanged
-	}
-	if at.Before(user.snapshot.UsernameChangedAt.Add(UsernameChangeCooldown)) {
-		return UsernameChangePlan{}, ErrUsernameChangeCooldown
 	}
 	if at.Before(user.snapshot.UpdatedAt) {
 		return UsernameChangePlan{}, ErrIdentityConcurrentTransition
@@ -166,8 +161,7 @@ func (user User) PlanUsernameChange(username identifier.Username, at time.Time) 
 	}, nil
 }
 
-// PlanForcedUsernameChange bypasses the user cooldown while preserving claim reservation and state invariants.
-// It is intended only for an already authorized administrator transaction.
+// PlanForcedUsernameChange permits reviewed administrator changes for suspended users while preserving claim reservation.
 func (user User) PlanForcedUsernameChange(username identifier.Username, at time.Time) (UsernameChangePlan, error) {
 	at = canonicalUserTime(at)
 	if user.snapshot.Status != UserStatusActive && user.snapshot.Status != UserStatusSuspended {

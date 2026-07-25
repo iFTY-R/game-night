@@ -11,8 +11,6 @@ var (
 	ErrUserStatus = errors.New("user status does not permit operation")
 	// ErrOnboardingExpired prevents abandoned anonymous identities from being activated after 24 hours.
 	ErrOnboardingExpired = errors.New("identity onboarding expired")
-	// ErrUsernameChangeCooldown enforces the 30-day user-initiated rename interval.
-	ErrUsernameChangeCooldown = errors.New("username change cooldown is active")
 	// ErrUsernameUnchanged prevents a claim transaction for an equivalent folded username key.
 	ErrUsernameUnchanged = errors.New("username is unchanged")
 	// ErrUsernameUnavailable collapses active, reserved, and concurrent username claim conflicts.

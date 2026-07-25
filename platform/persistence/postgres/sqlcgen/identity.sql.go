@@ -23,7 +23,6 @@ WHERE user_id = $4
   AND current_username_key = $6
   AND username_changed_at = $7
   AND updated_at = $8
-  AND username_changed_at <= $9
 RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 `
 
@@ -36,7 +35,6 @@ type ChangeCurrentUsernameCASParams struct {
 	ExpectedUsernameKey       pgtype.Text        `json:"expected_username_key"`
 	ExpectedUsernameChangedAt pgtype.Timestamptz `json:"expected_username_changed_at"`
 	ExpectedUpdatedAt         pgtype.Timestamptz `json:"expected_updated_at"`
-	CooldownCutoff            pgtype.Timestamptz `json:"cooldown_cutoff"`
 }
 
 // ChangeCurrentUsernameCAS
@@ -52,7 +50,6 @@ type ChangeCurrentUsernameCASParams struct {
 //	  AND current_username_key = $6
 //	  AND username_changed_at = $7
 //	  AND updated_at = $8
-//	  AND username_changed_at <= $9
 //	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 func (q *Queries) ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, changeCurrentUsernameCAS,
@@ -64,7 +61,6 @@ func (q *Queries) ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurren
 		arg.ExpectedUsernameKey,
 		arg.ExpectedUsernameChangedAt,
 		arg.ExpectedUpdatedAt,
-		arg.CooldownCutoff,
 	)
 	var i User
 	err := row.Scan(

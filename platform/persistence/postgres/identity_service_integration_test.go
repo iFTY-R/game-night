@@ -355,9 +355,6 @@ func TestIdentityServicePostgresChangeUsernameKeepsPerUserReservationAndAllowsSh
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runtime.clock.Advance(identityDomain.UsernameChangeCooldown); err != nil {
-		t.Fatal(err)
-	}
 	changed, err := runtime.service.ChangeUsername(ctx, identityDomain.ChangeUsernameCommand{
 		DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
 		ClientIP: "203.0.113.51", Username: "Bob9",
@@ -383,37 +380,34 @@ func TestIdentityServicePostgresChangeUsernameKeepsPerUserReservationAndAllowsSh
 	if oldStatus != "reserved" || newStatus != "active" || !oldReservedUntil.Equal(runtime.clock.Now().Add(identityDomain.UsernameReservationTTL)) {
 		t.Fatalf("claim states after rename: old=%s until=%s new=%s", oldStatus, oldReservedUntil, newStatus)
 	}
-	if _, err := runtime.service.ChangeUsername(ctx, identityDomain.ChangeUsernameCommand{
+	if _, err := runtime.clock.Advance(time.Second); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := runtime.service.ChangeUsername(ctx, identityDomain.ChangeUsernameCommand{
 		DeviceToken: first.DeviceSecrets.Token(), CSRFToken: first.DeviceSecrets.CSRFToken(),
 		ClientIP: "203.0.113.51", Username: "Car9",
-	}); !errors.Is(err, identityDomain.ErrUsernameChangeCooldown) {
+	})
+	if err != nil {
 		t.Fatalf("immediate second rename error = %v", err)
 	}
+	if latest.User.Snapshot().Username != "Car9" {
+		t.Fatalf("second changed username = %q", latest.User.Snapshot().Username)
+	}
 
-	// Each snapshot is valid alone, but the adapter must reject a caller-crafted transition inside the cooldown.
+	dana, err := identifier.ParseUsername("Da09")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stalePlan, err := changed.User.PlanUsernameChange(dana, latest.User.Snapshot().UsernameChangedAt.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = NewIdentityUnitOfWork(fixture.Pool).RunIdentity(ctx, func(ctx context.Context, transaction identityDomain.IdentityTransaction) error {
-		user, getErr := transaction.Users().GetForUpdate(ctx, changed.User.Snapshot().ID)
-		if getErr != nil {
-			return getErr
-		}
-		carol, parseErr := identifier.ParseUsername("Car9")
-		if parseErr != nil {
-			return parseErr
-		}
-		craftedAt := user.Snapshot().UsernameChangedAt.Add(24 * time.Hour)
-		crafted, restoreErr := identityDomain.RestoreUser(identityDomain.UserSnapshot{
-			ID: user.Snapshot().ID, Status: identityDomain.UserStatusActive,
-			Username: carol.Display(), CurrentUsernameKey: carol.Key(), UsernameChangedAt: craftedAt,
-			CreatedAt: user.Snapshot().CreatedAt, UpdatedAt: craftedAt,
-		})
-		if restoreErr != nil {
-			return restoreErr
-		}
-		_, transitionErr := transaction.Users().ChangeUsernameCAS(ctx, user, crafted)
+		_, transitionErr := transaction.Users().ChangeUsernameCAS(ctx, changed.User, stalePlan.Next)
 		return transitionErr
 	})
-	if !errors.Is(err, identityDomain.ErrUsernameChangeCooldown) {
-		t.Fatalf("adapter cooldown reconstruction error = %v", err)
+	if !errors.Is(err, identityDomain.ErrIdentityConcurrentTransition) {
+		t.Fatalf("stale rename CAS error = %v", err)
 	}
 
 	second := integrationBootstrapIdentity(t, ctx, runtime.service, 0x53)

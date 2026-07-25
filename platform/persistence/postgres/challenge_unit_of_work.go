@@ -122,7 +122,6 @@ var identityTransactionDomainErrors = append(append(challengeTransactionDomainEr
 	identityDomain.ErrInvalidUserInput,
 	identityDomain.ErrUserStatus,
 	identityDomain.ErrOnboardingExpired,
-	identityDomain.ErrUsernameChangeCooldown,
 	identityDomain.ErrUsernameUnchanged,
 	identityDomain.ErrUsernameUnavailable,
 	identityDomain.ErrUserNotFound,

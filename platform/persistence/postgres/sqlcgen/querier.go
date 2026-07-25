@@ -229,7 +229,6 @@ type Querier interface {
 	//    AND current_username_key = $6
 	//    AND username_changed_at = $7
 	//    AND updated_at = $8
-	//    AND username_changed_at <= $9
 	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
 	ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error)
 	//ClaimUsername

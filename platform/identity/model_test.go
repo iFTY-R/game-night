@@ -45,10 +45,7 @@ func TestUserOnboardingAndUsernameChangePlan(t *testing.T) {
 	}
 
 	second, _ := identifier.ParseUsername("Bob9")
-	if _, err := active.PlanUsernameChange(second, activeSnapshot.UsernameChangedAt.Add(UsernameChangeCooldown-time.Microsecond)); !errors.Is(err, ErrUsernameChangeCooldown) {
-		t.Fatalf("early rename error = %v", err)
-	}
-	plan, err := active.PlanUsernameChange(second, activeSnapshot.UsernameChangedAt.Add(UsernameChangeCooldown))
+	plan, err := active.PlanUsernameChange(second, activeSnapshot.UsernameChangedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +53,7 @@ func TestUserOnboardingAndUsernameChangePlan(t *testing.T) {
 		!plan.ReservePreviousUntil.Equal(plan.ChangedAt.Add(UsernameReservationTTL)) {
 		t.Fatalf("unexpected username change plan: %+v", plan)
 	}
-	if _, err := active.PlanUsernameChange(first, activeSnapshot.UsernameChangedAt.Add(UsernameChangeCooldown)); !errors.Is(err, ErrUsernameUnchanged) {
+	if _, err := active.PlanUsernameChange(first, activeSnapshot.UsernameChangedAt); !errors.Is(err, ErrUsernameUnchanged) {
 		t.Fatalf("same-key rename error = %v", err)
 	}
 }
@@ -79,7 +76,7 @@ func TestUserStatusMatrixRejectsInvalidUsernameMutations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := user.PlanUsernameChange(username, now.Add(UsernameChangeCooldown+time.Hour)); !errors.Is(err, ErrUserStatus) {
+		if _, err := user.PlanUsernameChange(username, now.Add(2*time.Hour)); !errors.Is(err, ErrUserStatus) {
 			t.Fatalf("status %s rename error = %v", status, err)
 		}
 	}
@@ -124,7 +121,7 @@ func TestUsernameChangeRejectsClockRollbackBehindLatestUserUpdate(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := updated.PlanUsernameChange(second, now.Add(31*24*time.Hour)); !errors.Is(err, ErrIdentityConcurrentTransition) {
+	if _, err := updated.PlanUsernameChange(second, snapshot.UpdatedAt.Add(-time.Microsecond)); !errors.Is(err, ErrIdentityConcurrentTransition) {
 		t.Fatalf("clock rollback rename error = %v", err)
 	}
 }

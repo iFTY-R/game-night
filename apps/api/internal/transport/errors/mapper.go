@@ -129,8 +129,6 @@ func classify(err error) descriptor {
 		return descriptor{connect.CodeInvalidArgument, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_INVALID, "identity.username.invalid"}
 	case stderrors.Is(err, identity.ErrUsernameUnavailable), stderrors.Is(err, identifier.ErrUsernameUnavailable):
 		return descriptor{connect.CodeAlreadyExists, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_TAKEN, "identity.username.taken"}
-	case stderrors.Is(err, identity.ErrUsernameChangeCooldown):
-		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_USERNAME_CHANGE_COOLDOWN, "identity.username.change_cooldown"}
 	case stderrors.Is(err, identity.ErrOnboardingExpired), stderrors.Is(err, identity.ErrUserStatus):
 		return descriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDENTITY_ONBOARDING_REQUIRED, "identity.onboarding.required"}
 	case stderrors.Is(err, identity.ErrDeviceAuthentication):

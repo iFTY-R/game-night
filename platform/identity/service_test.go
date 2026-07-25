@@ -324,7 +324,7 @@ func TestServiceRevokedCredentialStatusInstructionRequiresVerifiedSecret(t *test
 	}
 }
 
-func TestServiceChangeUsernameEnforcesCooldownAndReservesOldClaim(t *testing.T) {
+func TestServiceChangeUsernameAllowsImmediateRenameAndReservesOldClaim(t *testing.T) {
 	fixture := newIdentityServiceFixture(t)
 	ctx := context.Background()
 	bootstrap := fixture.bootstrap(t, ctx)
@@ -338,12 +338,6 @@ func TestServiceChangeUsernameEnforcesCooldownAndReservesOldClaim(t *testing.T) 
 	command := ChangeUsernameCommand{
 		DeviceToken: bootstrap.DeviceSecrets.Token(), CSRFToken: bootstrap.DeviceSecrets.CSRFToken(),
 		ClientIP: "203.0.113.13", Username: "Bob9",
-	}
-	if _, err := fixture.service.ChangeUsername(ctx, command); !errors.Is(err, ErrUsernameChangeCooldown) {
-		t.Fatalf("early rename error = %v", err)
-	}
-	if _, err := fixture.clock.Advance(UsernameChangeCooldown); err != nil {
-		t.Fatal(err)
 	}
 	changed, err := fixture.service.ChangeUsername(ctx, command)
 	if err != nil {

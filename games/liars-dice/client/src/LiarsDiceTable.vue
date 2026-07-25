@@ -14,7 +14,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import type { ActionInput } from "@game-night/game-client";
 import { ActionTray, ConnectionBadge, DangerConfirm, GameTable, PrivateZone } from "@game-night/game-ui-kit";
-import type { TableSeat, TrayState } from "@game-night/game-ui-kit";
+import type { TableSeat, TableTurnDirection, TrayState } from "@game-night/game-ui-kit";
 
 import { LIARS_DICE_BID_ACTION, LIARS_DICE_OPEN_ACTION, SESSION_FINISH_ACTION } from "./constants";
 import { validateBidDraft, suggestBid } from "./bid";
@@ -86,19 +86,22 @@ const countdown = computed(() => {
 });
 const currentActorName = computed(() => displayName(props.view.currentActorUserId));
 const isCurrentPlayer = computed(
-  () => props.context.viewerRole === "player" && props.view.currentActorUserId === props.context.selfUserId,
+  () => props.view.phase === Phase.BIDDING && props.context.viewerRole === "player" && props.view.currentActorUserId === props.context.selfUserId,
 );
 const actionLocked = computed(() => props.pendingAction !== null || props.context.connection !== "online");
 const canBid = computed(() => isCurrentPlayer.value && props.allowedActions.includes(LIARS_DICE_BID_ACTION));
 const canOpen = computed(() => isCurrentPlayer.value && props.allowedActions.includes(LIARS_DICE_OPEN_ACTION));
 const canFinish = computed(() => props.allowedActions.includes(SESSION_FINISH_ACTION));
 const bidValidation = computed(() => validateBidDraft(props.view, bidDraft.value));
+// Only bidding has one authoritative actor; rolling, reveal, settlement, and terminal phases must not imply a turn.
+const turnUserId = computed(() => props.view.phase === Phase.BIDDING ? props.view.currentActorUserId : "");
+const turnDirection = computed<TableTurnDirection | undefined>(() => turnUserId.value === "" ? undefined : "clockwise");
 const seats = computed<readonly TableSeat[]>(() =>
   props.view.players.map((player) => {
     const presentation = presentations.value.get(player.userId);
     const status = !player.active
       ? "已离桌"
-      : player.userId === props.view.currentActorUserId
+      : player.userId === turnUserId.value
         ? "正在叫骰"
         : `${config.value?.dicePerPlayer ?? 0} 颗已摇 · ${player.penaltyTicks} 罚点`;
     return {
@@ -106,7 +109,7 @@ const seats = computed<readonly TableSeat[]>(() =>
       userId: player.userId,
       displayName: presentation?.displayName ?? displayName(player.userId),
       connected: presentation?.connected ?? true,
-      active: player.userId === props.view.currentActorUserId,
+      turn: player.userId === turnUserId.value,
       status,
       ...(presentation?.avatarText === undefined ? {} : { avatarText: presentation.avatarText }),
       ...(presentation?.host === undefined ? {} : { host: presentation.host }),
@@ -186,7 +189,7 @@ const confirmFinish = (): void => {
     </header>
 
     <section class="liars-stage" aria-label="吹牛骰子共同桌面">
-      <GameTable :seats="seats" :self-seat-index="selfSeatIndex" shape="compact-oval">
+      <GameTable :seats="seats" :self-seat-index="selfSeatIndex" :turn-direction="turnDirection" shape="compact-oval">
         <template #center>
           <div class="table-focus" aria-live="polite">
             <span class="table-focus__phase">{{ phaseLabel }}</span>

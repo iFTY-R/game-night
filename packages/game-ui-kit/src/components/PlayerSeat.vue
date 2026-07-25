@@ -15,10 +15,10 @@ const props = withDefaults(defineProps<{
   edge: "bottom",
 });
 
-// The card keeps the short room-presence copy in one place, while the turn marker stays outside the body so names still fit at narrow widths.
+// The card keeps game-specific status copy visible while turn remains a separate semantic and visual state.
 const statusText = computed(() => props.seat.status ?? (props.seat.connected ? "在桌" : "离线中"));
-const turnMarkerText = computed(() => {
-  if (!props.seat.active) {
+const turnStatusText = computed(() => {
+  if (!props.seat.turn) {
     return "";
   }
   return props.self ? "轮到你" : "行动中";
@@ -26,17 +26,16 @@ const turnMarkerText = computed(() => {
 
 // The spoken label keeps one canonical player name while surfacing turn, host, and connection state that would otherwise be icon-only.
 const ariaLabel = computed(() =>
-  `${props.self ? "你的座位，" : ""}${props.seat.displayName}${props.seat.host ? "，房主" : ""}${props.seat.connected ? "" : "，已断线"}${turnMarkerText.value ? `，${turnMarkerText.value}` : ""}，状态${statusText.value}`,
+  `${props.self ? "你的座位，" : ""}${props.seat.displayName}${props.seat.host ? "，房主" : ""}${props.seat.connected ? "" : "，已断线"}${turnStatusText.value ? `，${turnStatusText.value}` : ""}，状态${statusText.value}`,
 );
 </script>
 
 <template>
   <article
     class="gn-seat"
-    :class="[`is-edge-${edge}`, { 'is-active': seat.active, 'is-self': self, 'is-offline': !seat.connected }]"
+    :class="[`is-edge-${edge}`, { 'is-active': seat.active, 'is-turn': seat.turn, 'is-self': self, 'is-offline': !seat.connected }]"
     :aria-label="ariaLabel"
   >
-    <span v-if="turnMarkerText" class="gn-seat__turn-marker">{{ turnMarkerText }}</span>
     <span class="gn-seat__connector" aria-hidden="true" />
     <div class="gn-seat__card">
       <span class="gn-seat__avatar" aria-hidden="true">{{ seat.avatarText ?? seat.displayName.slice(0, 1) }}</span>
@@ -45,13 +44,13 @@ const ariaLabel = computed(() =>
         <small class="gn-seat__status">{{ statusText }}</small>
       </span>
       <span v-if="self || seat.host || !seat.connected" class="gn-seat__indicators">
-        <span v-if="self" class="gn-seat__indicator" aria-label="你的座位">
+        <span v-if="self" class="gn-seat__indicator" role="img" aria-label="你的座位">
           <UserRound :size="11" aria-hidden="true" />
         </span>
-        <span v-if="seat.host" class="gn-seat__indicator gn-seat__indicator--host" aria-label="房主">
+        <span v-if="seat.host" class="gn-seat__indicator gn-seat__indicator--host" role="img" aria-label="房主">
           <Crown :size="11" aria-hidden="true" />
         </span>
-        <span v-if="!seat.connected" class="gn-seat__indicator gn-seat__indicator--offline" aria-label="已断线">
+        <span v-if="!seat.connected" class="gn-seat__indicator gn-seat__indicator--offline" role="img" aria-label="已断线">
           <WifiOff :size="11" aria-hidden="true" />
         </span>
       </span>
@@ -90,12 +89,35 @@ const ariaLabel = computed(() =>
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--platform-accent, #e6b566) 28%, transparent), 0 10px 26px rgb(0 0 0 / 30%);
 }
 
+.gn-seat.is-turn .gn-seat__card {
+  border-color: var(--game-turn, var(--platform-accent, #e6b566));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--game-turn, var(--platform-accent, #e6b566)) 44%, transparent), 0 12px 28px rgb(0 0 0 / 34%);
+}
+
+/* The pulse is a paint-only overlay, so the active turn never changes seat geometry or pointer hit areas. */
+.gn-seat.is-turn .gn-seat__card::after {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid color-mix(in srgb, var(--game-turn, var(--platform-accent, #e6b566)) 66%, transparent);
+  border-radius: 11px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--game-turn, var(--platform-accent, #e6b566)) 42%, transparent);
+  content: "";
+  opacity: 0.72;
+  pointer-events: none;
+  transform: scale(0.97);
+  animation: gn-seat-turn-pulse var(--game-turn-pulse-duration, 1.8s) ease-in-out infinite;
+}
+
 .gn-seat.is-self .gn-seat__card {
   background: color-mix(in srgb, var(--game-table, #173b38) 42%, var(--platform-surface-raised, #1b292d));
 }
 
 .gn-seat.is-active.is-self .gn-seat__card {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--platform-accent, #e6b566) 36%, transparent), 0 12px 28px rgb(0 0 0 / 34%);
+}
+
+.gn-seat.is-turn.is-self .gn-seat__card {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--game-turn, var(--platform-accent, #e6b566)) 52%, transparent), 0 12px 28px rgb(0 0 0 / 34%);
 }
 
 .gn-seat.is-offline .gn-seat__card {
@@ -180,27 +202,6 @@ const ariaLabel = computed(() =>
   background: color-mix(in srgb, var(--platform-accent, #e6b566) 72%, var(--platform-surface-raised, #1b292d));
 }
 
-.gn-seat__turn-marker {
-  position: absolute;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--platform-accent, #e6b566) 44%, transparent);
-  color: color-mix(in srgb, var(--platform-accent, #e6b566) 88%, white);
-  background: color-mix(in srgb, var(--platform-surface-raised, #1b292d) 92%, transparent);
-  box-shadow: 0 8px 16px rgb(0 0 0 / 20%);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
 .gn-seat.is-edge-bottom .gn-seat__connector {
   top: -10px;
   left: 50%;
@@ -211,12 +212,6 @@ const ariaLabel = computed(() =>
 
 .gn-seat.is-edge-bottom .gn-seat__connector::after {
   top: -3px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.gn-seat.is-edge-bottom .gn-seat__turn-marker {
-  bottom: calc(100% + 14px);
   left: 50%;
   transform: translateX(-50%);
 }
@@ -235,12 +230,6 @@ const ariaLabel = computed(() =>
   transform: translateX(-50%);
 }
 
-.gn-seat.is-edge-top .gn-seat__turn-marker {
-  top: calc(100% + 14px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-
 .gn-seat.is-edge-left .gn-seat__connector {
   top: 50%;
   right: -10px;
@@ -252,12 +241,6 @@ const ariaLabel = computed(() =>
 .gn-seat.is-edge-left .gn-seat__connector::after {
   top: 50%;
   right: -3px;
-  transform: translateY(-50%);
-}
-
-.gn-seat.is-edge-left .gn-seat__turn-marker {
-  top: 50%;
-  left: calc(100% + 14px);
   transform: translateY(-50%);
 }
 
@@ -275,27 +258,27 @@ const ariaLabel = computed(() =>
   transform: translateY(-50%);
 }
 
-.gn-seat.is-edge-right .gn-seat__turn-marker {
-  top: 50%;
-  right: calc(100% + 14px);
-  transform: translateY(-50%);
-}
-
-@media (max-width: 370px) {
-  .gn-seat__card {
-    padding-inline-end: 19px;
+@keyframes gn-seat-turn-pulse {
+  0%, 100% {
+    opacity: 0.54;
+    transform: scale(0.97);
   }
 
-  .gn-seat__turn-marker {
-    min-width: 40px;
-    padding-inline: 7px;
-    font-size: 9px;
+  50% {
+    opacity: 1;
+    transform: scale(1.025);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .gn-seat__card {
     transition: none;
+  }
+
+  .gn-seat.is-turn .gn-seat__card::after {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 </style>

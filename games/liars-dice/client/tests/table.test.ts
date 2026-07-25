@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import LiarsDiceTable from "../src/LiarsDiceTable.vue";
-import { liarsDiceFixtureContext, liarsDiceFixtureView } from "../src/fixture";
+import { finishLiarsDiceFixture, liarsDiceFixtureContext, liarsDiceFixtureView, liarsDiceTimeoutFixture } from "../src/fixture";
 import type { LiarsDiceActionInput } from "../src/types";
 
 beforeAll(() => {
@@ -46,5 +46,26 @@ describe("LiarsDiceTable", () => {
     await wrapper.setProps({ context: { ...context, connection: "reconnecting" } });
     expect(wrapper.get(".quantity-stepper output").text()).toBe("7");
     expect(wrapper.get('[data-testid="bid-action"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("moves the turn glow to the authoritative actor and hides order after finish", async () => {
+    const context = liarsDiceFixtureContext();
+    const wrapper = mount(LiarsDiceTable, {
+      props: { view: liarsDiceFixtureView(), context, allowedActions: ["round.bid", "round.open"] },
+    });
+
+    expect(wrapper.get(".gn-table__turn-order").classes()).toContain("gn-table__turn-order--clockwise");
+    expect(wrapper.get(".gn-seat.is-turn").text()).toContain("你");
+    expect(wrapper.find(".gn-seat__turn-marker").exists()).toBe(false);
+
+    const remoteTurn = liarsDiceTimeoutFixture();
+    await wrapper.setProps({ view: remoteTurn, allowedActions: remoteTurn.allowedActions });
+    expect(wrapper.get(".gn-seat.is-turn").text()).toContain("阿青");
+    expect(wrapper.get(".gn-seat.is-turn").attributes("aria-label")).toContain("行动中");
+
+    await wrapper.setProps({ view: finishLiarsDiceFixture(remoteTurn), allowedActions: [] });
+    expect(wrapper.find(".gn-seat.is-turn").exists()).toBe(false);
+    expect(wrapper.find(".gn-table__turn-order").exists()).toBe(false);
+    wrapper.unmount();
   });
 });

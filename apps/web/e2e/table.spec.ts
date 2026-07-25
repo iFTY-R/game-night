@@ -38,6 +38,62 @@ test("rotation preserves expanded tray and unsubmitted draft", async ({ page }) 
   await expect(page.getByText("万能 1")).toBeVisible();
 });
 
+test("turn runner stays on the table rail between seats in both orientations", async ({ page }) => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto(tableUrl);
+
+    const geometry = await page.getByRole("region", { name: "共同游戏桌" }).evaluate((table) => {
+      const rail = table.querySelector<HTMLElement>(".gn-table__rail");
+      const runner = table.querySelector<HTMLElement>(".gn-table__turn-runner");
+      if (rail === null || runner === null) return null;
+
+      // A fixed gap between seats makes this geometry assertion deterministic without changing production motion.
+      runner.style.animation = "none";
+      runner.style.offsetDistance = "62.5%";
+      const toBox = (element: Element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height };
+      };
+      return {
+        table: toBox(table),
+        rail: toBox(rail),
+        runner: toBox(runner),
+        seats: Array.from(table.querySelectorAll(".gn-seat"), toBox),
+      };
+    });
+
+    expect(geometry).not.toBeNull();
+    if (geometry === null) continue;
+    const runnerCenter = {
+      x: geometry.runner.left + geometry.runner.width / 2,
+      y: geometry.runner.top + geometry.runner.height / 2,
+    };
+    const railCenter = {
+      x: geometry.rail.left + geometry.rail.width / 2,
+      y: geometry.rail.top + geometry.rail.height / 2,
+    };
+    const normalizedRailDistance =
+      ((runnerCenter.x - railCenter.x) / (geometry.rail.width / 2)) ** 2
+      + ((runnerCenter.y - railCenter.y) / (geometry.rail.height / 2)) ** 2;
+
+    expect(normalizedRailDistance).toBeGreaterThan(0.7);
+    expect(normalizedRailDistance).toBeLessThan(1.15);
+    expect(geometry.runner.left).toBeGreaterThanOrEqual(geometry.table.left);
+    expect(geometry.runner.top).toBeGreaterThanOrEqual(geometry.table.top);
+    expect(geometry.runner.right).toBeLessThanOrEqual(geometry.table.right);
+    expect(geometry.runner.bottom).toBeLessThanOrEqual(geometry.table.bottom);
+    for (const seat of geometry.seats) {
+      const separate = geometry.runner.right <= seat.left || seat.right <= geometry.runner.left
+        || geometry.runner.bottom <= seat.top || seat.bottom <= geometry.runner.top;
+      expect(
+        separate,
+        `turn runner overlaps a seat at ${viewport.width}x${viewport.height}: ${JSON.stringify({ runner: geometry.runner, seat })}`,
+      ).toBe(true);
+    }
+  }
+});
+
 test("tray drag collapses and click expands it", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(tableUrl);
@@ -55,14 +111,24 @@ test("tray drag collapses and click expands it", async ({ page }) => {
   await expect(tray).toHaveAttribute("data-state", "compact");
 });
 
-test("pending bid locks duplicate submission until the receipt projection", async ({ page }) => {
+test("pending bid locks duplicate submission and hands the turn glow to the next player", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(tableUrl);
+  const turnSeat = page.locator(".gn-seat.is-turn");
+  await expect(turnSeat).toHaveCount(1);
+  await expect(turnSeat).toContainText("你");
+  await expect(page.locator(".gn-seat__turn-marker")).toHaveCount(0);
+  await expect(page.locator(".gn-table__turn-runner")).toHaveCount(1);
+  await expect(page.locator(".gn-table__sr-only")).toHaveCSS("clip", "rect(0px, 0px, 0px, 0px)");
+
   const action = page.getByTestId("bid-action");
   await action.click();
   await expect(action).toBeDisabled();
   await expect(page.getByText("正在提交叫骰")).toBeVisible();
   await expect(page.getByText("等待 阿青")).toBeVisible({ timeout: 2_000 });
+  await expect(turnSeat).toHaveCount(1);
+  await expect(turnSeat).toContainText("阿青");
+  await expect(page.locator(".gn-seat__turn-marker")).toHaveCount(0);
 });
 
 test("open dice requires explicit confirmation", async ({ page }) => {
@@ -105,7 +171,8 @@ test("revealed dice stay clear of player seats on narrow portraits", async ({ pa
 
     const feedbackBox = await page.locator(".bid-feedback").boundingBox();
     expect(feedbackBox).not.toBeNull();
-    expect((feedbackBox?.y ?? 0) + (feedbackBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
+    // Fractional transforms may round the final paint edge below one physical CSS pixel.
+    expect((feedbackBox?.y ?? 0) + (feedbackBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 1);
   }
 });
 
@@ -179,6 +246,13 @@ test("replay shows the complete bid chain and all revealed dice without actions"
 test("reduced motion disables game-state entrance animations", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(tableUrl);
+  await expect(page.locator(".gn-table__turn-runner")).toHaveCSS("animation-name", "none");
+  const turnPulseAnimation = await page.locator(".gn-seat.is-turn .gn-seat__card").evaluate(
+    (card) => getComputedStyle(card, "::after").animationName,
+  );
+  expect(turnPulseAnimation).toBe("none");
+
   await page.goto("/fixtures/table/revealed");
   await expect(page.locator(".revealed-grid")).toHaveCSS("animation-name", "none");
 });

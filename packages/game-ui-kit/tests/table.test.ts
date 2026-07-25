@@ -50,6 +50,35 @@ describe("GameTable", () => {
     wrapper.unmount();
   });
 
+  it("renders one accessible table-edge direction marker only for multiplayer tables", async () => {
+    installResizeObserver();
+    const wrapper = mount(GameTable, {
+      attachTo: document.body,
+      props: {
+        seats: [
+          { seatIndex: 0, userId: "u-1", displayName: "小满", connected: true, turn: true },
+          { seatIndex: 1, userId: "u-2", displayName: "阿青", connected: true },
+        ],
+        selfSeatIndex: 0,
+        turnDirection: "clockwise",
+      },
+    });
+
+    await vi.waitFor(() => expect(wrapper.find(".gn-table__turn-order").exists()).toBe(true));
+    expect(wrapper.findAll(".gn-table__turn-runner")).toHaveLength(1);
+    expect(wrapper.find(".gn-table__turn-order").classes()).toContain("gn-table__turn-order--clockwise");
+    expect(wrapper.find(".gn-table__sr-only").text()).toBe("游戏顺序：顺时针");
+
+    await wrapper.setProps({ turnDirection: "counterclockwise" });
+    expect(wrapper.find(".gn-table__turn-order").classes()).toContain("gn-table__turn-order--counterclockwise");
+    expect(wrapper.find(".gn-table__sr-only").text()).toBe("游戏顺序：逆时针");
+
+    await wrapper.setProps({ seats: [{ seatIndex: 0, userId: "u-1", displayName: "小满", connected: true, turn: true }] });
+    expect(wrapper.find(".gn-table__turn-order").exists()).toBe(false);
+    expect(wrapper.find(".gn-table__sr-only").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("publishes the portrait tray safe inset as a CSS variable for layout-sensitive pages", () => {
     installResizeObserver();
     const wrapper = mount(GameTable, {
@@ -89,7 +118,7 @@ describe("GameTable", () => {
     wrapper.unmount();
   });
 
-  it("renders rail cards with compact indicators and an external self turn marker", async () => {
+  it("renders rail cards with compact indicators and a self turn glow", async () => {
     installResizeObserver(420, 620);
     const wrapper = mount(GameTable, {
       attachTo: document.body,
@@ -102,7 +131,7 @@ describe("GameTable", () => {
             avatarText: "东",
             status: "已准备",
             connected: true,
-            active: true,
+            turn: true,
             host: true,
           },
           {
@@ -131,7 +160,9 @@ describe("GameTable", () => {
     expect(selfSeat).toBeDefined();
     expect(selfSeat?.find(".gn-seat__display-name").text()).toBe("东方未明");
     expect(selfSeat?.find(".gn-seat__status").text()).toBe("已准备");
-    expect(selfSeat?.find(".gn-seat__turn-marker").text()).toBe("轮到你");
+    expect(selfSeat?.classes()).toContain("is-turn");
+    expect(selfSeat?.attributes("aria-label")).toContain("轮到你");
+    expect(selfSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
     expect(selfSeat?.find('.gn-seat__indicator[aria-label="你的座位"]').exists()).toBe(true);
     expect(selfSeat?.find('.gn-seat__indicator[aria-label="房主"]').exists()).toBe(true);
 
@@ -142,7 +173,7 @@ describe("GameTable", () => {
     wrapper.unmount();
   });
 
-  it("shows a remote active marker without replacing the seat status copy", async () => {
+  it("keeps generic active emphasis separate from turn semantics", async () => {
     installResizeObserver();
     const wrapper = mount(GameTable, {
       attachTo: document.body,
@@ -159,9 +190,34 @@ describe("GameTable", () => {
     const activeSeat = findSeat(wrapper, "阿青");
     expect(activeSeat).toBeDefined();
     expect(activeSeat?.classes()).toContain("is-active");
-    expect(activeSeat?.find(".gn-seat__turn-marker").text()).toBe("行动中");
+    expect(activeSeat?.classes()).not.toContain("is-turn");
+    expect(activeSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
+    expect(activeSeat?.attributes("aria-label")).not.toContain("行动中");
     expect(activeSeat?.find(".gn-seat__status").text()).toBe("思考中");
     expect(wrapper.text()).not.toContain("当前行动");
+    wrapper.unmount();
+  });
+
+  it("announces a remote turn without rendering visible turn copy", async () => {
+    installResizeObserver();
+    const wrapper = mount(GameTable, {
+      attachTo: document.body,
+      props: {
+        seats: [
+          { seatIndex: 0, userId: "u-1", displayName: "小满", status: "等待中", connected: true },
+          { seatIndex: 1, userId: "u-2", displayName: "阿青", status: "思考中", connected: true, turn: true },
+        ],
+        selfSeatIndex: 0,
+      },
+    });
+
+    await vi.waitFor(() => expect(wrapper.findAll(".gn-seat")).toHaveLength(2));
+    const turnSeat = findSeat(wrapper, "阿青");
+    expect(turnSeat?.classes()).toContain("is-turn");
+    expect(turnSeat?.classes()).not.toContain("is-active");
+    expect(turnSeat?.attributes("aria-label")).toContain("行动中");
+    expect(turnSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
+    expect(turnSeat?.find(".gn-seat__status").text()).toBe("思考中");
     wrapper.unmount();
   });
 
@@ -210,14 +266,14 @@ describe("GameTable", () => {
     wrapper.unmount();
   });
 
-  it("keeps action badges separate from the business status for local and remote players", async () => {
+  it("keeps turn semantics separate from business status and role indicators", async () => {
     installResizeObserver(390, 844);
     const wrapper = mount(GameTable, {
       attachTo: document.body,
       props: {
         seats: [
           { seatIndex: 0, userId: "u-1", displayName: "观战", status: "等待中", connected: true },
-          { seatIndex: 1, userId: "u-2", displayName: "远端行动", status: "出价中", connected: true, active: true },
+          { seatIndex: 1, userId: "u-2", displayName: "远端行动", status: "出价中", connected: true, turn: true },
           { seatIndex: 2, userId: "u-3", displayName: "自房行", status: "看牌中", connected: true, active: true, host: true },
         ],
         selfSeatIndex: 2,
@@ -227,14 +283,17 @@ describe("GameTable", () => {
     await vi.waitFor(() => expect(wrapper.findAll(".gn-seat")).toHaveLength(3));
 
     const remoteActiveSeat = findSeat(wrapper, "远端行动");
-    expect(remoteActiveSeat?.classes()).toContain("is-active");
-    expect(remoteActiveSeat?.find(".gn-seat__turn-marker").text()).toBe("行动中");
+    expect(remoteActiveSeat?.classes()).toContain("is-turn");
+    expect(remoteActiveSeat?.attributes("aria-label")).toContain("行动中");
+    expect(remoteActiveSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
     expect(remoteActiveSeat?.find(".gn-seat__status").text()).toBe("出价中");
 
     const selfActiveHostSeat = findSeat(wrapper, "自房行");
     expect(selfActiveHostSeat?.classes()).toContain("is-active");
     expect(selfActiveHostSeat?.classes()).toContain("is-self");
-    expect(selfActiveHostSeat?.find(".gn-seat__turn-marker").text()).toBe("轮到你");
+    expect(selfActiveHostSeat?.classes()).not.toContain("is-turn");
+    expect(selfActiveHostSeat?.attributes("aria-label")).not.toContain("轮到你");
+    expect(selfActiveHostSeat?.find(".gn-seat__turn-marker").exists()).toBe(false);
     expect(selfActiveHostSeat?.find('.gn-seat__indicator[aria-label="你的座位"]').exists()).toBe(true);
     expect(selfActiveHostSeat?.find('.gn-seat__indicator[aria-label="房主"]').exists()).toBe(true);
     expect(selfActiveHostSeat?.find(".gn-seat__status").text()).toBe("看牌中");

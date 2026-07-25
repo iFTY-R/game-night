@@ -8,8 +8,6 @@ import {
   Palette,
   Plus,
   RefreshCw,
-  RotateCcw,
-  RotateCw,
   SkipForward,
   Volume2,
   VolumeX,
@@ -18,7 +16,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import type { ActionInput } from "@game-night/game-client";
 import { ActionTray, ConnectionBadge, DangerConfirm, GameTable } from "@game-night/game-ui-kit";
-import type { TableSeat, TrayState } from "@game-night/game-ui-kit";
+import type { TableSeat, TableTurnDirection, TrayState } from "@game-night/game-ui-kit";
 
 import {
   DICE_789_ADD_ACTION,
@@ -82,7 +80,23 @@ const displayName = (userId: string): string => presentations.value.get(userId)?
 const isOnline = computed(() => props.context.connection === "online");
 const actionLocked = computed(() => props.pendingAction !== null || !isOnline.value);
 const can = (action: string): boolean => props.allowedActions.includes(action);
-const isCurrentPlayer = computed(() => props.context.viewerRole === "player" && props.view.currentUserId === props.context.selfUserId);
+const hostUserId = computed(() => props.context.players.find((player) => player.host)?.userId ?? "");
+// The confirmation window belongs to the host; all other actionable phases remain with the projected current player.
+const turnUserId = computed(() => {
+  if (props.view.phase === Phase.RESULT_PENDING) return hostUserId.value;
+  if ([Phase.AWAITING_ROLL, Phase.AWAITING_ADD, Phase.AWAITING_TARGET, Phase.AWAITING_CONTINUE].includes(props.view.phase)) {
+    return props.view.currentUserId;
+  }
+  return "";
+});
+const turnDirection = computed<TableTurnDirection | undefined>(() => {
+  if (turnUserId.value === "") return undefined;
+  if (props.view.direction === 1) return "clockwise";
+  if (props.view.direction === 2) return "counterclockwise";
+  return undefined;
+});
+const isCurrentPlayer = computed(() => props.context.viewerRole === "player" && turnUserId.value === props.context.selfUserId);
+const turnUserName = computed(() => turnUserId.value === "" ? "" : displayName(turnUserId.value));
 const countdown = computed(() => {
   const deadline = Number(props.view.actionDeadlineUnixMillis);
   return deadline <= 0 ? null : Math.max(0, Math.ceil((deadline - now.value) / 1000));
@@ -107,8 +121,10 @@ const seats = computed<readonly TableSeat[]>(() => props.view.players.map((playe
     userId: player.userId,
     displayName: presentation?.displayName ?? displayName(player.userId),
     connected: presentation?.connected ?? true,
-    active: player.userId === props.view.currentUserId,
-    status: player.active ? (player.userId === props.view.currentUserId ? "正在操作" : `累计 ${formatTicks(player.penaltyTicks)}`) : "已离桌",
+    turn: player.userId === turnUserId.value,
+    status: player.active
+      ? (player.userId === turnUserId.value ? (props.view.phase === Phase.RESULT_PENDING ? "等待确认" : "正在操作") : `累计 ${formatTicks(player.penaltyTicks)}`)
+      : "已离桌",
     ...(presentation?.avatarText === undefined ? {} : { avatarText: presentation.avatarText }),
     ...(presentation?.host === undefined ? {} : { host: presentation.host }),
   };
@@ -190,7 +206,7 @@ const confirmDropped = (): void => {
     </header>
 
     <section class="d789-stage" aria-label="789 共同桌面">
-      <GameTable :seats="seats" :self-seat-index="selfSeat" shape="compact-oval">
+      <GameTable :seats="seats" :self-seat-index="selfSeat" :turn-direction="turnDirection" shape="compact-oval">
         <template #center>
           <div class="table-focus" aria-live="polite">
             <span>{{ phaseLabel }}</span>
@@ -201,10 +217,8 @@ const confirmDropped = (): void => {
             <div class="result-line">
               <strong>{{ view.sum > 0 ? view.sum : "--" }}</strong>
               <span>{{ effectLabel }}</span>
-              <RotateCw v-if="view.direction === 1" :size="18" aria-label="顺时针" />
-              <RotateCcw v-else :size="18" aria-label="逆时针" />
             </div>
-            <small>{{ displayName(view.currentUserId) }} · {{ countdown === null ? "不限时" : `${countdown} 秒` }}</small>
+            <small v-if="turnUserName">{{ turnUserName }} · {{ countdown === null ? "不限时" : `${countdown} 秒` }}</small>
           </div>
         </template>
         <template #private>
@@ -305,7 +319,6 @@ const confirmDropped = (): void => {
 .result-line { display: flex; align-items: center; gap: 7px; }
 .result-line strong { font-family: var(--d789-display); font-size: 29px; line-height: 1; }
 .result-line span { max-width: 140px; overflow: hidden; color: var(--platform-accent); font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.result-line svg { color: var(--game-direction, #80c7b5); }
 .table-focus small { color: var(--platform-muted); font-size: 10px; }
 .turn-summary { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .turn-summary > span { width: 8px; height: 8px; flex: 0 0 auto; background: var(--platform-muted); border-radius: 50%; }

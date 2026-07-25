@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { ChevronRight } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { computeSeatLayout } from "../layout";
-import type { TableSeat, TableShape } from "../types";
+import type { TableSeat, TableShape, TableTurnDirection } from "../types";
 import PlayerSeat from "./PlayerSeat.vue";
 
 type SeatEdge = "top" | "right" | "bottom" | "left";
@@ -16,6 +17,7 @@ const props = withDefaults(
     bottomInset?: number;
     seatWidth?: number;
     seatHeight?: number;
+    turnDirection?: TableTurnDirection | undefined;
   }>(),
   { shape: "adaptive", label: "共同游戏桌", bottomInset: 0, seatWidth: 118, seatHeight: 50 },
 );
@@ -30,6 +32,8 @@ const maxCenterShift = 96;
 let observer: ResizeObserver | undefined;
 
 const resolvedSeatWidth = computed(() => Math.max(props.seatWidth, 48));
+const showTurnDirection = computed(() => props.turnDirection !== undefined && props.seats.length > 1);
+const turnDirectionLabel = computed(() => props.turnDirection === "counterclockwise" ? "游戏顺序：逆时针" : "游戏顺序：顺时针");
 
 const safeBottomInset = computed(() => Math.max(0, Math.min(props.bottomInset, Math.max(size.value.height - resolvedSeatHeight.value - 1, 0))));
 const safeCenterShift = computed(() => {
@@ -102,6 +106,15 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
 <template>
   <section ref="root" class="gn-table" :style="tableStyle" :aria-label="label">
     <div class="gn-table__rail" aria-hidden="true" />
+    <span v-if="showTurnDirection" class="gn-table__sr-only">{{ turnDirectionLabel }}</span>
+    <div
+      v-if="showTurnDirection"
+      class="gn-table__turn-order"
+      :class="`gn-table__turn-order--${turnDirection}`"
+      aria-hidden="true"
+    >
+      <span class="gn-table__turn-runner"><ChevronRight :size="18" :stroke-width="3" /></span>
+    </div>
     <div class="gn-table__center">
       <slot name="center" />
     </div>
@@ -145,6 +158,53 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
   box-shadow: inset 0 0 0 7px rgb(0 0 0 / 14%), inset 0 18px 36px rgb(255 255 255 / 3%), 0 22px 46px rgb(0 0 0 / 24%);
 }
 
+.gn-table__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The inset keeps the runner on the felt; seat cards stay above it so the orbit passes behind players without covering names. */
+.gn-table__turn-order {
+  position: absolute;
+  z-index: 1;
+  inset: calc(11% + 10px) calc(10% + 10px) calc(13% + 10px);
+  pointer-events: none;
+}
+
+.gn-table__turn-runner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: #151b1c;
+  background: var(--game-direction, var(--platform-accent, #e6b566));
+  border: 1px solid color-mix(in srgb, var(--game-direction, var(--platform-accent, #e6b566)) 76%, white);
+  border-radius: 50%;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--game-direction, var(--platform-accent, #e6b566)) 58%, transparent);
+  offset-path: ellipse(50% 50% at 50% 50%);
+  offset-rotate: auto;
+  animation: gn-table-turn-orbit var(--game-turn-orbit-duration, 5.2s) linear infinite;
+  will-change: offset-distance;
+}
+
+.gn-table__turn-order--counterclockwise .gn-table__turn-runner {
+  animation-direction: reverse;
+}
+
+.gn-table__turn-order--counterclockwise .gn-table__turn-runner svg {
+  transform: rotate(180deg);
+}
+
 .gn-table__center {
   position: absolute;
   inset: 24% 21% calc(29% + min(var(--gn-safe-bottom), 108px)) 21%;
@@ -178,6 +238,10 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
     border-radius: 39% / 44%;
   }
 
+  .gn-table__turn-order {
+    inset: calc(9% + 9px) calc(13% + 9px) calc(10% + 9px);
+  }
+
   .gn-table__center {
     inset: 20% 27% calc(21% + min(var(--gn-safe-bottom), 72px)) 27%;
   }
@@ -187,6 +251,19 @@ const resolveSeatEdge = (angle: number): SeatEdge => {
     bottom: 1%;
     left: auto;
     transform: none;
+  }
+}
+
+@keyframes gn-table-turn-orbit {
+  from { offset-distance: 0%; }
+  to { offset-distance: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-table__turn-runner {
+    animation: none;
+    offset-distance: 75%;
+    will-change: auto;
   }
 }
 </style>

@@ -138,6 +138,24 @@ type Querier interface {
 	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
 	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 	ActivatePendingAdminTotpEnrollmentCAS(ctx context.Context, arg ActivatePendingAdminTotpEnrollmentCASParams) (ActivatePendingAdminTotpEnrollmentCASRow, error)
+	//AdvanceAdminUserErasureStepCAS
+	//
+	//  UPDATE admin_user_erasure_jobs
+	//  SET step = $1,
+	//      version = version + 1,
+	//      updated_at = $2
+	//  WHERE erasure_job_id = $3
+	//    AND state = 'running'
+	//    AND lease_owner = $4
+	//    AND version = $5
+	//    AND lease_until > $2
+	//    AND (
+	//        (step = 'revoke_credentials' AND $1 = 'erase_profile')
+	//        OR (step = 'erase_profile' AND $1 = 'enqueue_room_cleanup')
+	//        OR (step = 'enqueue_room_cleanup' AND $1 = 'complete')
+	//    )
+	//  RETURNING erasure_job_id, user_id, actor_admin_id, operation_id, request_digest, state, step, reason, attempt_count, lease_owner, lease_until, error_message_key, version, created_at, started_at, completed_at, updated_at
+	AdvanceAdminUserErasureStepCAS(ctx context.Context, arg AdvanceAdminUserErasureStepCASParams) (AdminUserErasureJob, error)
 	//AdvanceKeyRotationCursorCAS
 	//
 	//  UPDATE key_rotation_jobs
@@ -157,6 +175,16 @@ type Querier interface {
 	//  RETURNING job_id, status, cursor_scope, cursor_id, cursor_ordinal, processed_count,
 	//            conflict_count, lease_owner, lease_until, updated_at
 	AdvanceKeyRotationCursorCAS(ctx context.Context, arg AdvanceKeyRotationCursorCASParams) (AdvanceKeyRotationCursorCASRow, error)
+	//AppendAdminUserNote
+	//
+	//  INSERT INTO admin_user_notes (
+	//      note_id, user_id, author_admin_id, body, reason, version, created_at
+	//  ) VALUES (
+	//      $1, $2, $3,
+	//      $4, $5, 1, $6
+	//  )
+	//  RETURNING note_id, user_id, author_admin_id, body, reason, version, created_at
+	AppendAdminUserNote(ctx context.Context, arg AppendAdminUserNoteParams) (AdminUserNote, error)
 	//AppendAuditEvent
 	//
 	//  WITH result AS (
@@ -175,6 +203,34 @@ type Querier interface {
 	//         decode(pg_catalog.substring(result.payload ->> 'appended_hash', 3), 'hex') AS appended_hash
 	//  FROM result
 	AppendAuditEvent(ctx context.Context, arg AppendAuditEventParams) (AppendAuditEventRow, error)
+	//ApplyAdminBatchJobItemCompletion
+	//
+	//  UPDATE admin_batch_jobs
+	//  SET running_count = running_count - 1,
+	//      succeeded_count = succeeded_count + CASE WHEN $1::text = 'succeeded' THEN 1 ELSE 0 END,
+	//      failed_count = failed_count + CASE WHEN $1::text = 'failed' THEN 1 ELSE 0 END,
+	//      skipped_count = skipped_count + CASE WHEN $1::text = 'skipped' THEN 1 ELSE 0 END,
+	//      canceled_count = canceled_count + CASE WHEN $1::text = 'canceled' THEN 1 ELSE 0 END,
+	//      state = CASE
+	//          WHEN queued_count = 0 AND running_count = 1 THEN CASE
+	//              WHEN canceled_count + CASE WHEN $1::text = 'canceled' THEN 1 ELSE 0 END = target_count THEN 'canceled'
+	//              WHEN failed_count + skipped_count + canceled_count
+	//                   + CASE WHEN $1::text IN ('failed', 'skipped', 'canceled') THEN 1 ELSE 0 END = 0 THEN 'succeeded'
+	//              WHEN succeeded_count + CASE WHEN $1::text = 'succeeded' THEN 1 ELSE 0 END > 0 THEN 'partially_succeeded'
+	//              ELSE 'failed'
+	//          END
+	//          -- A running item may finish after cancellation begins; unfinished work must not reopen the parent job.
+	//          ELSE CASE WHEN state = 'canceling' THEN 'canceling' ELSE 'running' END
+	//      END,
+	//      completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN $2 ELSE NULL END,
+	//      version = version + 1,
+	//      updated_at = $2
+	//  WHERE batch_job_id = $3
+	//    AND state IN ('running', 'canceling')
+	//    AND running_count > 0
+	//    AND $1::text IN ('succeeded', 'failed', 'skipped', 'canceled')
+	//  RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+	ApplyAdminBatchJobItemCompletion(ctx context.Context, arg ApplyAdminBatchJobItemCompletionParams) (AdminBatchJob, error)
 	//BootstrapAdminPasswordCAS
 	//
 	//  UPDATE admin_accounts
@@ -227,15 +283,90 @@ type Querier interface {
 	//  SET username = $1,
 	//      current_username_key = $2,
 	//      username_changed_at = $3,
-	//      updated_at = $3
+	//      updated_at = $3,
+	//      account_version = account_version + 1
 	//  WHERE user_id = $4
 	//    AND status = 'active'
 	//    AND username = $5
 	//    AND current_username_key = $6
 	//    AND username_changed_at = $7
 	//    AND updated_at = $8
-	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error)
+	//ClaimAdminBatchJobItem
+	//
+	//  WITH candidate AS (
+	//      SELECT queued.item_id, queued.state AS previous_state
+	//      FROM admin_batch_job_items AS queued
+	//      WHERE queued.batch_job_id = $3
+	//        AND (
+	//            queued.state = 'queued'
+	//            OR (queued.state = 'running' AND queued.lease_until <= pg_catalog.clock_timestamp())
+	//        )
+	//      ORDER BY queued.created_at, queued.item_id
+	//      FOR UPDATE SKIP LOCKED
+	//      LIMIT 1
+	//  )
+	//  UPDATE admin_batch_job_items AS item
+	//  SET state = 'running',
+	//      attempt_count = item.attempt_count + 1,
+	//      lease_owner = $1,
+	//      lease_until = pg_catalog.clock_timestamp() + ($2::bigint * interval '1 second'),
+	//      started_at = COALESCE(item.started_at, pg_catalog.clock_timestamp()),
+	//      completed_at = NULL,
+	//      error_message_key = NULL,
+	//      version = item.version + 1,
+	//      updated_at = pg_catalog.clock_timestamp()
+	//  FROM candidate
+	//  WHERE item.item_id = candidate.item_id
+	//  RETURNING item.item_id, item.batch_job_id, item.user_id, item.expected_user_version, item.request_digest, item.state, item.attempt_count, item.lease_owner, item.lease_until, item.error_message_key, item.audit_event_id, item.started_at, item.completed_at, item.version, item.created_at, item.updated_at, candidate.previous_state = 'queued' AS started_now
+	ClaimAdminBatchJobItem(ctx context.Context, arg ClaimAdminBatchJobItemParams) (ClaimAdminBatchJobItemRow, error)
+	//ClaimAdminExportJob
+	//
+	//  WITH candidate AS (
+	//      SELECT export_id
+	//      FROM admin_export_jobs
+	//      WHERE state = 'queued'
+	//         OR (state = 'running' AND lease_until <= pg_catalog.clock_timestamp())
+	//      ORDER BY created_at, export_id
+	//      FOR UPDATE SKIP LOCKED
+	//      LIMIT 1
+	//  )
+	//  UPDATE admin_export_jobs AS job
+	//  SET state = 'running',
+	//      lease_owner = $1,
+	//      lease_until = pg_catalog.clock_timestamp() + ($2::bigint * interval '1 second'),
+	//      started_at = COALESCE(job.started_at, pg_catalog.clock_timestamp()),
+	//      version = job.version + 1,
+	//      updated_at = pg_catalog.clock_timestamp()
+	//  FROM candidate
+	//  WHERE job.export_id = candidate.export_id
+	//  RETURNING job.export_id, job.actor_admin_id, job.operation_id, job.request_digest, job.filter_schema_version, job.filter_snapshot, job.filter_digest, job.field_names, job.masking_policy, job.state, job.matched_users, job.exported_users, job.failed_users, job.result_object_key, job.result_digest, job.result_key_version, job.result_schema_version, job.result_expires_at, job.error_message_key, job.lease_owner, job.lease_until, job.version, job.created_at, job.started_at, job.completed_at, job.updated_at
+	ClaimAdminExportJob(ctx context.Context, arg ClaimAdminExportJobParams) (AdminExportJob, error)
+	//ClaimAdminUserErasureJob
+	//
+	//  WITH candidate AS (
+	//      SELECT queued.erasure_job_id
+	//      FROM admin_user_erasure_jobs AS queued
+	//      WHERE queued.state = 'queued'
+	//         OR (queued.state = 'running' AND queued.lease_until <= pg_catalog.clock_timestamp())
+	//      ORDER BY queued.created_at, queued.erasure_job_id
+	//      FOR UPDATE SKIP LOCKED
+	//      LIMIT 1
+	//  )
+	//  UPDATE admin_user_erasure_jobs AS job
+	//  SET state = 'running',
+	//      step = CASE WHEN job.state = 'queued' THEN 'revoke_credentials' ELSE job.step END,
+	//      attempt_count = job.attempt_count + 1,
+	//      lease_owner = $1,
+	//      lease_until = pg_catalog.clock_timestamp() + ($2::bigint * interval '1 second'),
+	//      started_at = COALESCE(job.started_at, pg_catalog.clock_timestamp()),
+	//      version = job.version + 1,
+	//      updated_at = pg_catalog.clock_timestamp()
+	//  FROM candidate
+	//  WHERE job.erasure_job_id = candidate.erasure_job_id
+	//  RETURNING job.erasure_job_id, job.user_id, job.actor_admin_id, job.operation_id, job.request_digest, job.state, job.step, job.reason, job.attempt_count, job.lease_owner, job.lease_until, job.error_message_key, job.version, job.created_at, job.started_at, job.completed_at, job.updated_at
+	ClaimAdminUserErasureJob(ctx context.Context, arg ClaimAdminUserErasureJobParams) (AdminUserErasureJob, error)
 	//ClaimUsername
 	//
 	//  INSERT INTO username_claims (
@@ -268,6 +399,68 @@ type Querier interface {
 	//
 	//  SELECT close_expired_party_rooms($1)
 	CloseExpiredPartyRooms(ctx context.Context, arg CloseExpiredPartyRoomsParams) (int64, error)
+	//CompleteAdminBatchJobItemCAS
+	//
+	//  UPDATE admin_batch_job_items
+	//  SET state = $1,
+	//      lease_owner = NULL,
+	//      lease_until = NULL,
+	//      error_message_key = $2,
+	//      audit_event_id = $3,
+	//      completed_at = $4,
+	//      version = version + 1,
+	//      updated_at = $4
+	//  WHERE item_id = $5
+	//    AND state = 'running'
+	//    AND lease_owner = $6
+	//    AND version = $7
+	//    AND lease_until > $4
+	//    AND $1 IN ('succeeded', 'failed', 'skipped', 'canceled')
+	//  RETURNING item_id, batch_job_id, user_id, expected_user_version, request_digest, state, attempt_count, lease_owner, lease_until, error_message_key, audit_event_id, started_at, completed_at, version, created_at, updated_at
+	CompleteAdminBatchJobItemCAS(ctx context.Context, arg CompleteAdminBatchJobItemCASParams) (AdminBatchJobItem, error)
+	//CompleteAdminExportJobCAS
+	//
+	//  UPDATE admin_export_jobs
+	//  SET state = $1,
+	//      matched_users = $2,
+	//      exported_users = $3,
+	//      failed_users = $4,
+	//      result_object_key = $5,
+	//      result_digest = $6,
+	//      result_key_version = $7,
+	//      lease_owner = NULL,
+	//      lease_until = NULL,
+	//      completed_at = $8,
+	//      version = version + 1,
+	//      updated_at = $8
+	//  WHERE export_id = $9
+	//    AND state = 'running'
+	//    AND lease_owner = $10
+	//    AND version = $11
+	//    AND lease_until > $8
+	//    AND result_expires_at > $8
+	//    AND $1 IN ('succeeded', 'partially_succeeded')
+	//  RETURNING export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	CompleteAdminExportJobCAS(ctx context.Context, arg CompleteAdminExportJobCASParams) (AdminExportJob, error)
+	//CompleteAdminUserErasureJobCAS
+	//
+	//  UPDATE admin_user_erasure_jobs
+	//  SET state = $1,
+	//      lease_owner = NULL,
+	//      lease_until = NULL,
+	//      error_message_key = $2,
+	//      completed_at = $3,
+	//      version = version + 1,
+	//      updated_at = $3
+	//  WHERE erasure_job_id = $4
+	//    AND state = 'running'
+	//    AND lease_owner = $5
+	//    AND version = $6
+	//    AND lease_until > $3
+	//    AND $1 IN ('succeeded', 'failed')
+	//    AND ($1 = 'failed' OR step = 'complete')
+	//  RETURNING erasure_job_id, user_id, actor_admin_id, operation_id, request_digest, state, step, reason, attempt_count, lease_owner, lease_until, error_message_key, version, created_at, started_at, completed_at, updated_at
+	CompleteAdminUserErasureJobCAS(ctx context.Context, arg CompleteAdminUserErasureJobCASParams) (AdminUserErasureJob, error)
 	//CompleteGameSessionReplayMemberSnapshot
 	//
 	//  UPDATE game_session_replay_access
@@ -327,7 +520,8 @@ type Querier interface {
 	//      username = $1,
 	//      current_username_key = $2,
 	//      username_changed_at = $3,
-	//      updated_at = $3
+	//      updated_at = $3,
+	//      account_version = account_version + 1
 	//  WHERE user_id = $4
 	//    AND status = 'onboarding'
 	//    AND username IS NULL
@@ -338,7 +532,7 @@ type Querier interface {
 	//    AND created_at <= $3
 	//    AND $3 >= $5
 	//    AND created_at > $3 - INTERVAL '86400 seconds'
-	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnboardingUserCASParams) (User, error)
 	//ConfirmSecretOperationResultCAS
 	//
@@ -375,6 +569,17 @@ type Querier interface {
 	//            attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
 	//            consumed_at, revoked_at, result_id
 	ConsumeAdminAssistedRecoveryGrantCAS(ctx context.Context, arg ConsumeAdminAssistedRecoveryGrantCASParams) (AdminAssistedRecoveryGrant, error)
+	//ConsumeAdminBatchPreviewCAS
+	//
+	//  UPDATE admin_batch_previews
+	//  SET consumed_at = $1,
+	//      version = version + 1
+	//  WHERE preview_id = $2
+	//    AND version = $3
+	//    AND consumed_at IS NULL
+	//    AND expires_at > $1
+	//  RETURNING preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
+	ConsumeAdminBatchPreviewCAS(ctx context.Context, arg ConsumeAdminBatchPreviewCASParams) (AdminBatchPreview, error)
 	//ConsumeAdminChallengeCAS
 	//
 	//  WITH current_admin AS MATERIALIZED (
@@ -405,6 +610,29 @@ type Querier interface {
 	//            challenge.replay_until, challenge.operation_id, challenge.request_digest,
 	//            challenge.result_id
 	ConsumeAdminChallengeCAS(ctx context.Context, arg ConsumeAdminChallengeCASParams) (ConsumeAdminChallengeCASRow, error)
+	//ConsumeAdminExportDownloadGrantCAS
+	//
+	//  UPDATE admin_export_download_grants AS download_grant
+	//  SET state = 'consumed',
+	//      consumed_at = pg_catalog.clock_timestamp(),
+	//      version = download_grant.version + 1
+	//  FROM admin_export_jobs AS export
+	//  WHERE download_grant.token_key_version = $1
+	//    AND download_grant.token_digest = $2
+	//    AND download_grant.state = 'active'
+	//    AND download_grant.created_at <= pg_catalog.clock_timestamp()
+	//    AND download_grant.expires_at > pg_catalog.clock_timestamp()
+	//    AND download_grant.actor_admin_id = $3
+	//    AND download_grant.session_id = $4
+	//    AND export.export_id = download_grant.export_id
+	//    AND export.version = download_grant.expected_export_version
+	//    AND export.masking_policy = download_grant.masking_policy
+	//    AND export.state IN ('succeeded', 'partially_succeeded')
+	//    AND export.result_expires_at > pg_catalog.clock_timestamp()
+	//  RETURNING download_grant.grant_id, download_grant.export_id, download_grant.actor_admin_id, download_grant.session_id, download_grant.operation_id, download_grant.request_digest, download_grant.token_digest, download_grant.token_key_version, download_grant.expected_export_version, download_grant.masking_policy, download_grant.state, download_grant.created_at, download_grant.expires_at, download_grant.consumed_at, download_grant.revoked_at, download_grant.version, export.result_object_key, export.result_digest,
+	//            export.result_key_version, export.result_schema_version, export.result_expires_at,
+	//            export.version AS export_version
+	ConsumeAdminExportDownloadGrantCAS(ctx context.Context, arg ConsumeAdminExportDownloadGrantCASParams) (ConsumeAdminExportDownloadGrantCASRow, error)
 	//ConsumeAdminRecoveryCodeCAS
 	//
 	//  UPDATE admin_recovery_codes
@@ -531,6 +759,50 @@ type Querier interface {
 	//            attempt_count, max_attempts, created_by_admin_id, created_at, expires_at,
 	//            consumed_at, revoked_at, result_id
 	CreateAdminAssistedRecoveryGrant(ctx context.Context, arg CreateAdminAssistedRecoveryGrantParams) (AdminAssistedRecoveryGrant, error)
+	//CreateAdminBatchJob
+	//
+	//  INSERT INTO admin_batch_jobs (
+	//      batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command,
+	//      selection_schema_version, selection_snapshot, selection_digest, reason, state,
+	//      target_count, queued_count, running_count, succeeded_count, failed_count,
+	//      skipped_count, canceled_count, version, created_at, updated_at
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5, $6,
+	//      $7, $8, $9, $10, 'queued',
+	//      $11, $11, 0, 0, 0, 0, 0, 1, $12, $12
+	//  )
+	//  ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+	//  SET operation_id = EXCLUDED.operation_id
+	//  WHERE admin_batch_jobs.request_digest = EXCLUDED.request_digest
+	//  RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+	CreateAdminBatchJob(ctx context.Context, arg CreateAdminBatchJobParams) (AdminBatchJob, error)
+	//CreateAdminBatchJobItem
+	//
+	//  INSERT INTO admin_batch_job_items (
+	//      item_id, batch_job_id, user_id, expected_user_version, request_digest,
+	//      state, attempt_count, version, created_at, updated_at
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5,
+	//      'queued', 0, 1, $6, $6
+	//  )
+	//  ON CONFLICT (batch_job_id, user_id) DO UPDATE
+	//  SET user_id = EXCLUDED.user_id
+	//  WHERE admin_batch_job_items.request_digest = EXCLUDED.request_digest
+	//  RETURNING item_id, batch_job_id, user_id, expected_user_version, request_digest, state, attempt_count, lease_owner, lease_until, error_message_key, audit_event_id, started_at, completed_at, version, created_at, updated_at
+	CreateAdminBatchJobItem(ctx context.Context, arg CreateAdminBatchJobItemParams) (AdminBatchJobItem, error)
+	//CreateAdminBatchPreview
+	//
+	//  INSERT INTO admin_batch_previews (
+	//      preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot,
+	//      selection_digest, preview_digest, target_count, executable_count, blocked_count,
+	//      sampled_at, expires_at, version
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5,
+	//      $6, $7, $8, $9, $10,
+	//      $11, $12, 1
+	//  )
+	//  RETURNING preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
+	CreateAdminBatchPreview(ctx context.Context, arg CreateAdminBatchPreviewParams) (AdminBatchPreview, error)
 	//CreateAdminChallenge
 	//
 	//  INSERT INTO admin_challenges (
@@ -606,6 +878,39 @@ type Querier interface {
 	//            result_admin_version, result_password_version, result_session_version,
 	//            result_enrollment_version, audit_event_id, created_at
 	CreateAdminCommandReceipt(ctx context.Context, arg CreateAdminCommandReceiptParams) (AdminCommandReceipt, error)
+	//CreateAdminExportDownloadGrant
+	//
+	//  INSERT INTO admin_export_download_grants (
+	//      grant_id, export_id, actor_admin_id, session_id, operation_id, request_digest,
+	//      token_digest, token_key_version, expected_export_version, state,
+	//      masking_policy, created_at, expires_at, version
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5, $6,
+	//      $7, $8, $9, 'active', $10,
+	//      $11, $12, 1
+	//  )
+	//  ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+	//  SET operation_id = EXCLUDED.operation_id
+	//  WHERE admin_export_download_grants.request_digest = EXCLUDED.request_digest
+	//  RETURNING grant_id, export_id, actor_admin_id, session_id, operation_id, request_digest, token_digest, token_key_version, expected_export_version, masking_policy, state, created_at, expires_at, consumed_at, revoked_at, version
+	CreateAdminExportDownloadGrant(ctx context.Context, arg CreateAdminExportDownloadGrantParams) (AdminExportDownloadGrant, error)
+	//CreateAdminExportJob
+	//
+	//  INSERT INTO admin_export_jobs (
+	//      export_id, actor_admin_id, operation_id, request_digest, filter_schema_version,
+	//      filter_snapshot, filter_digest, field_names, masking_policy, state,
+	//      matched_users, exported_users, failed_users, result_schema_version,
+	//      result_expires_at, version, created_at, updated_at
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5,
+	//      $6, $7, $8, $9, 'queued',
+	//      0, 0, 0, $10, $11, 1, $12, $12
+	//  )
+	//  ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+	//  SET operation_id = EXCLUDED.operation_id
+	//  WHERE admin_export_jobs.request_digest = EXCLUDED.request_digest
+	//  RETURNING export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	CreateAdminExportJob(ctx context.Context, arg CreateAdminExportJobParams) (AdminExportJob, error)
 	//CreateAdminRecoveryCode
 	//
 	//  INSERT INTO admin_recovery_codes (
@@ -674,6 +979,43 @@ type Querier interface {
 	//            attempt_count, max_attempts, created_at, last_seen_at, idle_expires_at,
 	//            absolute_expires_at, revoked_at, revoke_reason
 	CreateAdminSession(ctx context.Context, arg CreateAdminSessionParams) (CreateAdminSessionRow, error)
+	//CreateAdminUserErasureJob
+	//
+	//  INSERT INTO admin_user_erasure_jobs (
+	//      erasure_job_id, user_id, actor_admin_id, operation_id, request_digest,
+	//      state, step, reason, attempt_count, version, created_at, updated_at
+	//  ) VALUES (
+	//      $1, $2, $3, $4, $5,
+	//      'queued', 'queued', $6, 0, 1, $7, $7
+	//  )
+	//  ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+	//  SET operation_id = EXCLUDED.operation_id
+	//  WHERE admin_user_erasure_jobs.request_digest = EXCLUDED.request_digest
+	//  RETURNING erasure_job_id, user_id, actor_admin_id, operation_id, request_digest, state, step, reason, attempt_count, lease_owner, lease_until, error_message_key, version, created_at, started_at, completed_at, updated_at
+	CreateAdminUserErasureJob(ctx context.Context, arg CreateAdminUserErasureJobParams) (AdminUserErasureJob, error)
+	//CreateAdminUserTag
+	//
+	//  WITH advanced AS (
+	//      UPDATE admin_user_tag_catalog
+	//      SET catalog_version = catalog_version + 1,
+	//          updated_at = $1
+	//      WHERE singleton_id = 1
+	//        AND catalog_version = $2
+	//      RETURNING catalog_version
+	//  ), inserted AS (
+	//      INSERT INTO admin_user_tags (
+	//          tag_id, name, normalized_name, color, version,
+	//          created_by_admin_id, updated_by_admin_id, reason, created_at, updated_at
+	//      )
+	//      SELECT $3, $4, $5, $6, 1,
+	//             $7, $7, $8, $1, $1
+	//      FROM advanced
+	//      RETURNING tag_id, name, normalized_name, color, version, created_by_admin_id, updated_by_admin_id, reason, created_at, updated_at
+	//  )
+	//  SELECT inserted.tag_id, inserted.name, inserted.normalized_name, inserted.color, inserted.version, inserted.created_by_admin_id, inserted.updated_by_admin_id, inserted.reason, inserted.created_at, inserted.updated_at, advanced.catalog_version
+	//  FROM inserted
+	//  CROSS JOIN advanced
+	CreateAdminUserTag(ctx context.Context, arg CreateAdminUserTagParams) (CreateAdminUserTagRow, error)
 	//CreateAnonymousChallenge
 	//
 	//  INSERT INTO anonymous_challenges (
@@ -1379,7 +1721,7 @@ type Querier interface {
 	//      $2,
 	//      $2
 	//  )
-	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	//CreateUserProfile
 	//
@@ -1468,6 +1810,44 @@ type Querier interface {
 	//  RETURNING recovery_credential_id, user_id, selector, secret_hash, version, status,
 	//            created_at, consumed_at, revoked_at, revoke_reason
 	CreateUserRecoveryCredential(ctx context.Context, arg CreateUserRecoveryCredentialParams) (UserRecoveryCredential, error)
+	//DeleteAdminExportResultCAS
+	//
+	//  UPDATE admin_export_jobs
+	//  SET state = 'deleted',
+	//      result_object_key = NULL,
+	//      result_digest = NULL,
+	//      result_key_version = NULL,
+	//      version = version + 1,
+	//      updated_at = $1
+	//  WHERE export_id = $2
+	//    AND version = $3
+	//    AND state IN ('succeeded', 'partially_succeeded', 'expired')
+	//  RETURNING export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	DeleteAdminExportResultCAS(ctx context.Context, arg DeleteAdminExportResultCASParams) (AdminExportJob, error)
+	//DeleteAdminUserTagCAS
+	//
+	//  WITH removed AS (
+	//      DELETE FROM admin_user_tags
+	//      WHERE tag_id = $1
+	//        AND version = $2
+	//      RETURNING tag_id
+	//  ), advanced AS (
+	//      UPDATE admin_user_tag_catalog
+	//      SET catalog_version = catalog_version + 1,
+	//          updated_at = $3
+	//      WHERE singleton_id = 1
+	//        AND EXISTS (SELECT 1 FROM removed)
+	//      RETURNING catalog_version
+	//  )
+	//  SELECT removed.tag_id, advanced.catalog_version
+	//  FROM removed
+	//  CROSS JOIN advanced
+	DeleteAdminUserTagCAS(ctx context.Context, arg DeleteAdminUserTagCASParams) (DeleteAdminUserTagCASRow, error)
+	//DeleteAdminUserTagLinks
+	//
+	//  DELETE FROM admin_user_tag_links
+	//  WHERE user_id = $1
+	DeleteAdminUserTagLinks(ctx context.Context, arg DeleteAdminUserTagLinksParams) (int64, error)
 	//DeleteGameRulePreset
 	//
 	//  DELETE FROM game_rule_presets
@@ -1500,6 +1880,20 @@ type Querier interface {
 	//  RETURNING enrollment_id, admin_id, ciphertext, nonce, key_version, status, admin_version,
 	//            enrollment_version, replay_floor, operation_id, created_at, expires_at, activated_at, disabled_at
 	DisableActiveAdminTotpEnrollmentCAS(ctx context.Context, arg DisableActiveAdminTotpEnrollmentCASParams) (DisableActiveAdminTotpEnrollmentCASRow, error)
+	//ExpireAdminExportResults
+	//
+	//  UPDATE admin_export_jobs
+	//  SET state = 'expired',
+	//      result_object_key = NULL,
+	//      result_digest = NULL,
+	//      result_key_version = NULL,
+	//      completed_at = COALESCE(completed_at, $1),
+	//      version = version + 1,
+	//      updated_at = $1
+	//  WHERE state IN ('succeeded', 'partially_succeeded')
+	//    AND result_expires_at <= $1
+	//  RETURNING export_id
+	ExpireAdminExportResults(ctx context.Context, arg ExpireAdminExportResultsParams) ([]pgtype.UUID, error)
 	//ExpireRoomPendingStarts
 	//
 	//  UPDATE room_pending_starts
@@ -1521,6 +1915,26 @@ type Querier interface {
 	//    AND secret_expires_at <= $2
 	//  RETURNING result_id, status, tombstone_expires_at
 	ExpireSecretOperationResultCAS(ctx context.Context, arg ExpireSecretOperationResultCASParams) (ExpireSecretOperationResultCASRow, error)
+	//FailAdminExportJobCAS
+	//
+	//  UPDATE admin_export_jobs
+	//  SET state = 'failed',
+	//      matched_users = $1,
+	//      exported_users = $2,
+	//      failed_users = $3,
+	//      error_message_key = $4,
+	//      lease_owner = NULL,
+	//      lease_until = NULL,
+	//      completed_at = $5,
+	//      version = version + 1,
+	//      updated_at = $5
+	//  WHERE export_id = $6
+	//    AND state = 'running'
+	//    AND lease_owner = $7
+	//    AND version = $8
+	//    AND lease_until > $5
+	//  RETURNING export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	FailAdminExportJobCAS(ctx context.Context, arg FailAdminExportJobCASParams) (AdminExportJob, error)
 	//FailKeyRotationJobCAS
 	//
 	//  UPDATE key_rotation_jobs
@@ -1612,6 +2026,13 @@ type Querier interface {
 	//  WHERE grants.assisted_grant_id = $1
 	//  FOR UPDATE OF grants
 	GetAdminAssistedRecoveryGrantForUpdate(ctx context.Context, arg GetAdminAssistedRecoveryGrantForUpdateParams) (AdminAssistedRecoveryGrant, error)
+	//GetAdminBatchJobByOperation
+	//
+	//  SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+	//  FROM admin_batch_jobs
+	//  WHERE actor_admin_id = $1
+	//    AND operation_id = $2
+	GetAdminBatchJobByOperation(ctx context.Context, arg GetAdminBatchJobByOperationParams) (AdminBatchJob, error)
 	//GetAdminChallengeForUpdate
 	//
 	//  WITH current_admin AS MATERIALIZED (
@@ -1653,6 +2074,26 @@ type Querier interface {
 	//    AND scope = $2
 	//  FOR UPDATE
 	GetAdminElevationGrantForSessionScope(ctx context.Context, arg GetAdminElevationGrantForSessionScopeParams) (AdminElevationGrant, error)
+	//GetAdminExportJob
+	//
+	//  SELECT export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	//  FROM admin_export_jobs
+	//  WHERE export_id = $1
+	GetAdminExportJob(ctx context.Context, arg GetAdminExportJobParams) (AdminExportJob, error)
+	//GetAdminExportJobByOperation
+	//
+	//  SELECT export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	//  FROM admin_export_jobs
+	//  WHERE actor_admin_id = $1
+	//    AND operation_id = $2
+	GetAdminExportJobByOperation(ctx context.Context, arg GetAdminExportJobByOperationParams) (AdminExportJob, error)
+	//GetAdminExportJobForDownloadGrant
+	//
+	//  SELECT export_id, actor_admin_id, operation_id, request_digest, filter_schema_version, filter_snapshot, filter_digest, field_names, masking_policy, state, matched_users, exported_users, failed_users, result_object_key, result_digest, result_key_version, result_schema_version, result_expires_at, error_message_key, lease_owner, lease_until, version, created_at, started_at, completed_at, updated_at
+	//  FROM admin_export_jobs
+	//  WHERE export_id = $1
+	//  FOR SHARE
+	GetAdminExportJobForDownloadGrant(ctx context.Context, arg GetAdminExportJobForDownloadGrantParams) (AdminExportJob, error)
 	//GetAdminRecoveryCodeForUpdate
 	//
 	//  SELECT recovery_code_id, admin_id, selector, secret_hash, set_version, status,
@@ -1696,6 +2137,12 @@ type Querier interface {
 	//  WHERE selector = $1
 	//  FOR UPDATE
 	GetAdminSessionForUpdate(ctx context.Context, arg GetAdminSessionForUpdateParams) (GetAdminSessionForUpdateRow, error)
+	//GetAdminUserTagCatalog
+	//
+	//  SELECT singleton_id, catalog_version, updated_at
+	//  FROM admin_user_tag_catalog
+	//  WHERE singleton_id = 1
+	GetAdminUserTagCatalog(ctx context.Context) (AdminUserTagCatalog, error)
 	//GetAnonymousChallengeForUpdate
 	//
 	//  SELECT challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
@@ -2067,15 +2514,25 @@ type Querier interface {
 	//  WHERE singleton_id = 1
 	//  FOR UPDATE
 	GetSingletonAdminForUpdate(ctx context.Context) (AdminAccount, error)
+	//GetUsableAdminBatchPreviewForUpdate
+	//
+	//  SELECT preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
+	//  FROM admin_batch_previews
+	//  WHERE preview_id = $1
+	//    AND actor_admin_id = $2
+	//    AND consumed_at IS NULL
+	//    AND expires_at > pg_catalog.clock_timestamp()
+	//  FOR UPDATE
+	GetUsableAdminBatchPreviewForUpdate(ctx context.Context, arg GetUsableAdminBatchPreviewForUpdateParams) (AdminBatchPreview, error)
 	//GetUserByID
 	//
-	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	//  FROM users
 	//  WHERE user_id = $1
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	//GetUserForUpdate
 	//
-	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	//  FROM users
 	//  WHERE user_id = $1
 	//  FOR UPDATE
@@ -2168,6 +2625,23 @@ type Querier interface {
 	//        )
 	//  )
 	HasPendingGameSystemInbox(ctx context.Context, arg HasPendingGameSystemInboxParams) (bool, error)
+	//IncrementAdminUserVersionCAS
+	//
+	//  UPDATE users
+	//  SET account_version = account_version + 1,
+	//      updated_at = $1
+	//  WHERE user_id = $2
+	//    AND account_version = $3
+	//  RETURNING account_version
+	IncrementAdminUserVersionCAS(ctx context.Context, arg IncrementAdminUserVersionCASParams) (int64, error)
+	//InsertAdminUserTagLinks
+	//
+	//  INSERT INTO admin_user_tag_links (
+	//      user_id, tag_id, version, assigned_by_admin_id, reason, created_at, updated_at
+	//  )
+	//  SELECT $1, selected.tag_id, 1, $2, $3, $4, $4
+	//  FROM unnest($5::uuid[]) AS selected(tag_id)
+	InsertAdminUserTagLinks(ctx context.Context, arg InsertAdminUserTagLinksParams) (int64, error)
 	//InsertGameSystemOperationPending
 	//
 	//  INSERT INTO game_system_operations (
@@ -2206,6 +2680,165 @@ type Querier interface {
 	//  ORDER BY enrollment_id
 	//  LIMIT $3
 	ListAdminTotpEnrollmentsForKeyRotation(ctx context.Context, arg ListAdminTotpEnrollmentsForKeyRotationParams) ([]ListAdminTotpEnrollmentsForKeyRotationRow, error)
+	//ListAdminUserNotes
+	//
+	//  SELECT note_id, user_id, author_admin_id, body, reason, version, created_at
+	//  FROM admin_user_notes
+	//  WHERE user_id = $1
+	//    AND (
+	//        $2::timestamptz IS NULL
+	//        OR (created_at, note_id) < ($2, $3::uuid)
+	//    )
+	//  ORDER BY created_at DESC, note_id DESC
+	//  LIMIT $4
+	ListAdminUserNotes(ctx context.Context, arg ListAdminUserNotesParams) ([]AdminUserNote, error)
+	//ListAdminUserTagLinks
+	//
+	//  SELECT link.user_id, link.tag_id, link.version, link.assigned_by_admin_id, link.reason, link.created_at, link.updated_at
+	//  FROM admin_user_tag_links AS link
+	//  WHERE link.user_id = $1
+	//  ORDER BY link.tag_id
+	ListAdminUserTagLinks(ctx context.Context, arg ListAdminUserTagLinksParams) ([]AdminUserTagLink, error)
+	//ListAdminUserTags
+	//
+	//  SELECT tag_id, name, normalized_name, color, version, created_by_admin_id, updated_by_admin_id, reason, created_at, updated_at
+	//  FROM admin_user_tags
+	//  WHERE normalized_name >= $1
+	//    AND ($1 = '' OR normalized_name LIKE $1 || '%')
+	//    AND (
+	//        $2::uuid IS NULL
+	//        OR (normalized_name, tag_id) > ($3, $2::uuid)
+	//    )
+	//  ORDER BY normalized_name, tag_id
+	//  LIMIT $4
+	ListAdminUserTags(ctx context.Context, arg ListAdminUserTagsParams) ([]AdminUserTag, error)
+	//ListAdminUserTagsForUsers
+	//
+	//  SELECT link.user_id,
+	//         tag.tag_id,
+	//         tag.name,
+	//         tag.normalized_name,
+	//         tag.color,
+	//         tag.version,
+	//         tag.created_by_admin_id,
+	//         tag.updated_by_admin_id,
+	//         tag.reason,
+	//         tag.created_at,
+	//         tag.updated_at
+	//  FROM admin_user_tag_links AS link
+	//  JOIN admin_user_tags AS tag ON tag.tag_id = link.tag_id
+	//  WHERE link.user_id = ANY($1::uuid[])
+	//  ORDER BY link.user_id, tag.normalized_name, tag.tag_id
+	ListAdminUserTagsForUsers(ctx context.Context, arg ListAdminUserTagsForUsersParams) ([]ListAdminUserTagsForUsersRow, error)
+	//ListAdminUsers
+	//
+	//  WITH candidates AS (
+	//      SELECT user_row.user_id,
+	//             user_row.status,
+	//             user_row.username,
+	//             user_row.current_username_key,
+	//             user_row.username_changed_at,
+	//             user_row.account_version,
+	//             user_row.created_at,
+	//             user_row.updated_at,
+	//             COALESCE(user_row.current_username_key, '') AS username_sort_key,
+	//             GREATEST(
+	//                 CASE WHEN user_row.updated_at <= $9 THEN user_row.updated_at ELSE user_row.created_at END,
+	//                 COALESCE(device_activity.last_seen_at, user_row.created_at),
+	//                 COALESCE(room_activity.last_seen_at, user_row.created_at)
+	//             )::timestamptz AS last_activity_at
+	//      FROM users AS user_row
+	//      LEFT JOIN LATERAL (
+	//          SELECT credential.last_seen_at
+	//          FROM device_credentials AS credential
+	//          WHERE credential.user_id = user_row.user_id
+	//            AND credential.last_seen_at <= $9
+	//          ORDER BY credential.last_seen_at DESC, credential.credential_id DESC
+	//          LIMIT 1
+	//      ) AS device_activity ON true
+	//      LEFT JOIN LATERAL (
+	//          SELECT member.last_seen_at
+	//          FROM room_members AS member
+	//          WHERE member.user_id = user_row.user_id
+	//            AND member.last_seen_at <= $9
+	//          ORDER BY member.last_seen_at DESC, member.room_id DESC
+	//          LIMIT 1
+	//      ) AS room_activity ON true
+	//      WHERE user_row.created_at <= $9
+	//        AND ($10::uuid IS NULL OR user_row.user_id = $10)
+	//        AND (cardinality($11::text[]) = 0 OR user_row.status = ANY($11::text[]))
+	//        AND ($12::text = '' OR COALESCE(user_row.current_username_key, '') LIKE $12::text || '%')
+	//        AND (
+	//            cardinality($13::uuid[]) = 0
+	//            OR NOT EXISTS (
+	//                SELECT 1
+	//                FROM unnest($13::uuid[]) AS selected_tag(tag_id)
+	//                WHERE NOT EXISTS (
+	//                    SELECT 1
+	//                    FROM admin_user_tag_links AS link
+	//                    WHERE link.user_id = user_row.user_id
+	//                      AND link.tag_id = selected_tag.tag_id
+	//                )
+	//            )
+	//        )
+	//        AND ($14::timestamptz IS NULL OR user_row.created_at >= $14)
+	//        AND ($15::timestamptz IS NULL OR user_row.created_at <= $15)
+	//  )
+	//  SELECT listed_user.user_id,
+	//         listed_user.status,
+	//         listed_user.username,
+	//         listed_user.current_username_key,
+	//         listed_user.username_changed_at,
+	//         listed_user.account_version,
+	//         listed_user.created_at,
+	//         listed_user.updated_at,
+	//         listed_user.last_activity_at,
+	//         listed_user.username_sort_key
+	//  FROM candidates AS listed_user
+	//  WHERE ($1::timestamptz IS NULL OR listed_user.last_activity_at >= $1)
+	//    AND ($2::timestamptz IS NULL OR listed_user.last_activity_at <= $2)
+	//    AND (
+	//        $3::uuid IS NULL
+	//        OR ($4::text = 'created_at' AND (
+	//            ($5::text = 'ascending'
+	//                AND (listed_user.created_at > $6::timestamptz
+	//                    OR (listed_user.created_at = $6::timestamptz AND listed_user.user_id > $3::uuid)))
+	//            OR ($5::text = 'descending'
+	//                AND (listed_user.created_at < $6::timestamptz
+	//                    OR (listed_user.created_at = $6::timestamptz AND listed_user.user_id < $3::uuid)))
+	//        ))
+	//        OR ($4::text = 'last_activity_at' AND (
+	//            ($5::text = 'ascending'
+	//                AND (listed_user.last_activity_at > $6::timestamptz
+	//                    OR (listed_user.last_activity_at = $6::timestamptz AND listed_user.user_id > $3::uuid)))
+	//            OR ($5::text = 'descending'
+	//                AND (listed_user.last_activity_at < $6::timestamptz
+	//                    OR (listed_user.last_activity_at = $6::timestamptz AND listed_user.user_id < $3::uuid)))
+	//        ))
+	//        OR ($4::text = 'username' AND (
+	//            ($5::text = 'ascending'
+	//                AND (listed_user.username_sort_key > $7::text
+	//                    OR (listed_user.username_sort_key = $7::text AND listed_user.user_id > $3::uuid)))
+	//            OR ($5::text = 'descending'
+	//                AND (listed_user.username_sort_key < $7::text
+	//                    OR (listed_user.username_sort_key = $7::text AND listed_user.user_id < $3::uuid)))
+	//        ))
+	//        OR ($4::text = 'user_id' AND (
+	//            ($5::text = 'ascending' AND listed_user.user_id > $3::uuid)
+	//            OR ($5::text = 'descending' AND listed_user.user_id < $3::uuid)
+	//        ))
+	//    )
+	//  ORDER BY
+	//      CASE WHEN $4::text = 'created_at' AND $5::text = 'ascending' THEN listed_user.created_at END ASC,
+	//      CASE WHEN $4::text = 'created_at' AND $5::text = 'descending' THEN listed_user.created_at END DESC,
+	//      CASE WHEN $4::text = 'last_activity_at' AND $5::text = 'ascending' THEN listed_user.last_activity_at END ASC,
+	//      CASE WHEN $4::text = 'last_activity_at' AND $5::text = 'descending' THEN listed_user.last_activity_at END DESC,
+	//      CASE WHEN $4::text = 'username' AND $5::text = 'ascending' THEN listed_user.username_sort_key END ASC,
+	//      CASE WHEN $4::text = 'username' AND $5::text = 'descending' THEN listed_user.username_sort_key END DESC,
+	//      CASE WHEN $5::text = 'ascending' THEN listed_user.user_id END ASC,
+	//      CASE WHEN $5::text = 'descending' THEN listed_user.user_id END DESC
+	//  LIMIT $8
+	ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]ListAdminUsersRow, error)
 	//ListAuditEvents
 	//
 	//  SELECT chain_id, sequence, event_id, previous_hash, canonical_event, event_hash,
@@ -2489,7 +3122,7 @@ type Querier interface {
 	ListUserProfilesForKeyRotation(ctx context.Context, arg ListUserProfilesForKeyRotationParams) ([]UserProfile, error)
 	//ListUsersByUsernameKey
 	//
-	//  SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+	//  SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at, u.account_version
 	//  FROM username_claims AS claim
 	//  JOIN users AS u ON u.user_id = claim.owner_user_id
 	//  WHERE claim.username_key = $1
@@ -2497,6 +3130,13 @@ type Querier interface {
 	//    AND u.current_username_key = claim.username_key
 	//  ORDER BY u.user_id
 	ListUsersByUsernameKey(ctx context.Context, arg ListUsersByUsernameKeyParams) ([]User, error)
+	//LockAdminUserForTagUpdate
+	//
+	//  SELECT user_id, account_version
+	//  FROM users
+	//  WHERE user_id = $1
+	//  FOR UPDATE
+	LockAdminUserForTagUpdate(ctx context.Context, arg LockAdminUserForTagUpdateParams) (LockAdminUserForTagUpdateRow, error)
 	//LockRoomActivityLease
 	//
 	//  SELECT last_seen_at
@@ -2508,6 +3148,20 @@ type Querier interface {
 	//
 	//  SELECT pg_advisory_xact_lock(pg_catalog.hashtextextended($1::text || ':' || $2::text, 0))
 	LockRoomRuleOperationKey(ctx context.Context, arg LockRoomRuleOperationKeyParams) error
+	//MarkAdminBatchJobItemClaimed
+	//
+	//  UPDATE admin_batch_jobs
+	//  SET state = 'running',
+	//      queued_count = queued_count - 1,
+	//      running_count = running_count + 1,
+	//      started_at = COALESCE(started_at, pg_catalog.clock_timestamp()),
+	//      version = version + 1,
+	//      updated_at = pg_catalog.clock_timestamp()
+	//  WHERE batch_job_id = $1
+	//    AND state IN ('queued', 'running')
+	//    AND queued_count > 0
+	//  RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+	MarkAdminBatchJobItemClaimed(ctx context.Context, arg MarkAdminBatchJobItemClaimedParams) (AdminBatchJob, error)
 	//ReadAuditAnchor
 	//
 	//  WITH result AS (
@@ -2912,12 +3566,13 @@ type Querier interface {
 	//      username = $2,
 	//      current_username_key = $3,
 	//      username_changed_at = $4,
-	//      updated_at = $4
+	//      updated_at = $4,
+	//      account_version = account_version + 1
 	//  WHERE user_id = $5
 	//    AND status = $6
 	//    AND current_username_key IS NOT DISTINCT FROM $7::text
 	//    AND updated_at = $8
-	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsernameCASParams) (User, error)
 	//SetGameSessionReplayPolicyCAS
 	//
@@ -3002,11 +3657,12 @@ type Querier interface {
 	//  SET status = $1,
 	//      username = CASE WHEN $1::text = 'deleted' THEN NULL ELSE username END,
 	//      current_username_key = CASE WHEN $1::text = 'deleted' THEN NULL ELSE current_username_key END,
-	//      updated_at = $2
+	//      updated_at = $2,
+	//      account_version = account_version + 1
 	//  WHERE user_id = $3
 	//    AND status = $4
 	//    AND updated_at = $5
-	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+	//  RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 	TransitionUserStatusCAS(ctx context.Context, arg TransitionUserStatusCASParams) (User, error)
 	//UpdateAdminPasswordCAS
 	//
@@ -3024,6 +3680,29 @@ type Querier interface {
 	//    AND admin_version = $8
 	//  RETURNING singleton_id, admin_id, status, password_version, admin_version, updated_at
 	UpdateAdminPasswordCAS(ctx context.Context, arg UpdateAdminPasswordCASParams) (UpdateAdminPasswordCASRow, error)
+	//UpdateAdminUserTagCAS
+	//
+	//  WITH changed AS (
+	//      UPDATE admin_user_tags
+	//      SET name = $1,
+	//          normalized_name = $2,
+	//          color = $3,
+	//          updated_by_admin_id = $4,
+	//          reason = $5,
+	//          version = version + 1,
+	//          updated_at = $6
+	//      WHERE tag_id = $7
+	//        AND version = $8
+	//      RETURNING tag_id, name, normalized_name, color, version, created_by_admin_id, updated_by_admin_id, reason, created_at, updated_at
+	//  ), advanced AS (
+	//      UPDATE admin_user_tag_catalog
+	//      SET catalog_version = catalog_version + 1,
+	//          updated_at = $6
+	//      WHERE singleton_id = 1
+	//        AND EXISTS (SELECT 1 FROM changed)
+	//  )
+	//  SELECT tag_id, name, normalized_name, color, version, created_by_admin_id, updated_by_admin_id, reason, created_at, updated_at FROM changed
+	UpdateAdminUserTagCAS(ctx context.Context, arg UpdateAdminUserTagCASParams) (UpdateAdminUserTagCASRow, error)
 	//UpdateGameRulePreset
 	//
 	//  UPDATE game_rule_presets

@@ -16,7 +16,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 		t.Fatalf("collect migrations: %v", err)
 	}
 
-	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29}
+	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}
 	if len(migrations) != len(wantVersions) {
 		t.Fatalf("expected %d migrations, got %d", len(wantVersions), len(migrations))
 	}
@@ -33,6 +33,42 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 			if !strings.Contains(string(contents), marker) {
 				t.Errorf("migration %s is missing %q", filepath.Base(migration.Source), marker)
 			}
+		}
+	}
+}
+
+func TestAdminUserCenterMigrationLocksStateAndLeastPrivilegeBoundaries(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00030_admin_user_center.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(contents)
+	for _, fragment := range []string{
+		"ADD COLUMN account_version bigint NOT NULL DEFAULT 1 CHECK (account_version > 0)",
+		"CREATE TRIGGER admin_user_notes_append_only",
+		"target_count bigint NOT NULL CHECK (target_count > 0)",
+		"step IN ('queued', 'revoke_credentials', 'erase_profile', 'enqueue_room_cleanup', 'complete')",
+		"CHECK ((state IN ('failed', 'skipped')) = (error_message_key IS NOT NULL))",
+		"CHECK ((state = 'failed') = (error_message_key IS NOT NULL))",
+		"expires_at <= created_at + interval '5 minutes'",
+		"GRANT SELECT, UPDATE ON TABLE %I.admin_user_tag_catalog TO %I",
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.admin_user_tags TO %I",
+		"GRANT SELECT, INSERT, DELETE ON TABLE %I.admin_user_tag_links TO %I",
+		"GRANT SELECT, INSERT ON TABLE %I.admin_user_notes TO %I",
+		"GRANT SELECT, UPDATE ON TABLE %I.admin_batch_jobs, %I.admin_batch_job_items, %I.admin_user_erasure_jobs, %I.admin_export_jobs TO %I",
+		"REVOKE ALL ON FUNCTION %I.reject_admin_user_note_mutation() FROM PUBLIC",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Errorf("migration 00030 is missing %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO %I",
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.admin_user_notes",
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.admin_export_download_grants",
+	} {
+		if strings.Contains(migration, forbidden) {
+			t.Errorf("migration 00030 contains over-broad privilege %q", forbidden)
 		}
 	}
 }

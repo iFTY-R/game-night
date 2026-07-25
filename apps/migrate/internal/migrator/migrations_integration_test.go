@@ -1020,6 +1020,8 @@ func TestMigrationPrivileges(t *testing.T) {
 	assertQueryFails(t, ctx, workerPool, "UPDATE admin_totp_enrollments SET status = status", "permission denied")
 	assertQueryFails(t, ctx, workerPool, "SELECT count(*) FROM audit_events", "permission denied")
 	assertResetDenied(t, ctx, workerPool)
+
+	assertAdminUserCenterPrivileges(t, ctx, migrationPool, fixture)
 }
 
 func TestResetAdminAccountRejectsMissingSingleton(t *testing.T) {
@@ -1195,12 +1197,22 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 	want := []string{
 		"admin_accounts",
 		"admin_assisted_recovery_grants",
+		"admin_batch_job_items",
+		"admin_batch_jobs",
+		"admin_batch_previews",
 		"admin_challenges",
 		"admin_command_receipts",
 		"admin_elevation_grants",
+		"admin_export_download_grants",
+		"admin_export_jobs",
 		"admin_recovery_codes",
 		"admin_sessions",
 		"admin_totp_enrollments",
+		"admin_user_erasure_jobs",
+		"admin_user_notes",
+		"admin_user_tag_catalog",
+		"admin_user_tag_links",
+		"admin_user_tags",
 		"anonymous_challenges",
 		"audit_chain_head",
 		"audit_events",
@@ -1326,4 +1338,64 @@ func assertResetDenied(t testing.TB, ctx context.Context, pool *pgxpool.Pool) {
             NULL::bytea
         )
     `, "permission denied")
+}
+
+func assertAdminUserCenterPrivileges(
+	t testing.TB,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	fixture *integrationtest.PrivilegeDatabase,
+) {
+	t.Helper()
+	runtimePrivileges := map[string][]string{
+		"admin_user_tag_catalog":       {"SELECT", "UPDATE"},
+		"admin_user_tags":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
+		"admin_user_tag_links":         {"SELECT", "INSERT", "DELETE"},
+		"admin_user_notes":             {"SELECT", "INSERT"},
+		"admin_batch_previews":         {"SELECT", "INSERT", "UPDATE"},
+		"admin_batch_jobs":             {"SELECT", "INSERT", "UPDATE"},
+		"admin_batch_job_items":        {"SELECT", "INSERT", "UPDATE"},
+		"admin_user_erasure_jobs":      {"SELECT", "INSERT"},
+		"admin_export_jobs":            {"SELECT", "INSERT", "UPDATE"},
+		"admin_export_download_grants": {"SELECT", "INSERT", "UPDATE"},
+	}
+	workerPrivileges := map[string][]string{
+		"admin_batch_jobs":        {"SELECT", "UPDATE"},
+		"admin_batch_job_items":   {"SELECT", "UPDATE"},
+		"admin_user_erasure_jobs": {"SELECT", "UPDATE"},
+		"admin_export_jobs":       {"SELECT", "UPDATE"},
+	}
+	for tableName := range runtimePrivileges {
+		assertExactTablePrivileges(t, ctx, pool, fixture.Schema, fixture.RuntimeRole, tableName, runtimePrivileges[tableName])
+		assertExactTablePrivileges(t, ctx, pool, fixture.Schema, fixture.WorkerRole, tableName, workerPrivileges[tableName])
+		assertExactTablePrivileges(t, ctx, pool, fixture.Schema, "public", tableName, nil)
+	}
+}
+
+func assertExactTablePrivileges(
+	t testing.TB,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	schema,
+	role,
+	tableName string,
+	allowed []string,
+) {
+	t.Helper()
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, privilege := range allowed {
+		allowedSet[privilege] = struct{}{}
+	}
+	for _, privilege := range []string{"SELECT", "INSERT", "UPDATE", "DELETE"} {
+		var granted bool
+		if err := pool.QueryRow(ctx, `
+            SELECT has_table_privilege($1, format('%I.%I', $2, $3), $4)
+        `, role, schema, tableName, privilege).Scan(&granted); err != nil {
+			t.Fatal(err)
+		}
+		_, want := allowedSet[privilege]
+		if granted != want {
+			t.Fatalf("%s privilege %s on %s.%s = %t, want %t", role, privilege, schema, tableName, granted, want)
+		}
+	}
 }

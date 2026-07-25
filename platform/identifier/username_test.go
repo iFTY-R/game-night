@@ -53,6 +53,36 @@ func TestUsernameCaseVariantsShareClaimKey(t *testing.T) {
 	}
 }
 
+func TestNormalizeUsernamePrefixMatchesClaimKeys(t *testing.T) {
+	tests := map[string]string{
+		"":    "",
+		"  Ａ": "a",
+		"ß":   "ss",
+		"玩家":  "玩家",
+	}
+	for input, expected := range tests {
+		normalized, err := NormalizeUsernamePrefix(input)
+		if err != nil {
+			t.Fatalf("normalize %q: %v", input, err)
+		}
+		if normalized != expected {
+			t.Fatalf("normalize %q = %q, want %q", input, normalized, expected)
+		}
+		if normalized != "" && !IsCanonicalUsernameKey(normalized) {
+			t.Fatalf("normalized prefix %q is not a canonical key", normalized)
+		}
+	}
+
+	for _, input := range []string{"ABCDE", "A_", "A\u200d", string([]byte{'a', 0xff})} {
+		if _, err := NormalizeUsernamePrefix(input); err == nil {
+			t.Fatalf("invalid prefix %q was accepted", input)
+		}
+	}
+	if IsCanonicalUsernameKey("Ａ") || IsCanonicalUsernameKey("A") || IsCanonicalUsernameKey("") {
+		t.Fatal("non-canonical username key was accepted")
+	}
+}
+
 func TestParseUsernameRejectsInvalidSyntax(t *testing.T) {
 	tests := []struct {
 		name  string

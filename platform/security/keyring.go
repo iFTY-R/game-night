@@ -32,6 +32,10 @@ type (
 	UserChallengeKeyPurpose  struct{}
 	AdminChallengeKeyPurpose struct{}
 	AdminSessionKeyPurpose   struct{}
+	// AdminCursorKeyPurpose authenticates opaque management-list cursors independently from login material.
+	AdminCursorKeyPurpose struct{}
+	// AdminDownloadGrantKeyPurpose authenticates one-time export downloads independently from session cookies.
+	AdminDownloadGrantKeyPurpose struct{}
 )
 
 // AESKeyPurpose restricts encryption keyrings to the three independently encrypted data domains.
@@ -41,7 +45,8 @@ type AESKeyPurpose interface {
 
 // HMACKeyPurpose restricts digest keyrings to one authentication or indexing domain.
 type HMACKeyPurpose interface {
-	DeviceHMACKeyPurpose | RateLimitHMACKeyPurpose | UserChallengeKeyPurpose | AdminChallengeKeyPurpose | AdminSessionKeyPurpose
+	DeviceHMACKeyPurpose | RateLimitHMACKeyPurpose | UserChallengeKeyPurpose | AdminChallengeKeyPurpose | AdminSessionKeyPurpose |
+		AdminCursorKeyPurpose | AdminDownloadGrantKeyPurpose
 }
 
 type keyringDocument struct {

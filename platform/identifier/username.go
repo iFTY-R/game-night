@@ -125,6 +125,45 @@ func ParseUsername(input string) (Username, error) {
 	return defaultUsernameValidator.Parse(input)
 }
 
+// NormalizeUsernamePrefix applies the identity claim-key transform to an optional administrator search prefix.
+// Prefixes may contain one code point, unlike public usernames, but cannot exceed the public display limit.
+func NormalizeUsernamePrefix(input string) (string, error) {
+	if len(input) > maximumUsernameInputBytes {
+		return "", ErrUsernameLength
+	}
+	if !utf8.ValidString(input) {
+		return "", ErrUsernameCharacters
+	}
+	for _, character := range input {
+		if unicode.IsControl(character) || unicode.Is(unicode.Cf, character) {
+			return "", ErrUsernameCharacters
+		}
+	}
+	normalized := strings.TrimSpace(norm.NFKC.String(input))
+	if utf8.RuneCountInString(normalized) > MaximumUsernameCodePoints {
+		return "", ErrUsernameLength
+	}
+	for _, character := range normalized {
+		if !isAllowedUsernameCharacter(character) {
+			return "", ErrUsernameCharacters
+		}
+	}
+	return foldUsername(normalized), nil
+}
+
+// IsCanonicalUsernameKey reports whether a persisted claim key is already NFKC case-folded and syntactically valid.
+func IsCanonicalUsernameKey(value string) bool {
+	if value == "" || len(value) > maximumUsernamePolicyBytes || !utf8.ValidString(value) {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) || unicode.Is(unicode.Cf, character) || !isAllowedUsernameCharacter(character) {
+			return false
+		}
+	}
+	return foldUsername(value) == value
+}
+
 // Parse applies syntax normalization and policy checks, returning only validated values.
 func (validator UsernameValidator) Parse(input string) (Username, error) {
 	// A zero-value validator still enforces built-in reservations instead of silently disabling policy.

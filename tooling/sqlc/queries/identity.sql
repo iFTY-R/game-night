@@ -10,21 +10,21 @@ INSERT INTO users (
     sqlc.arg(created_at),
     sqlc.arg(created_at)
 )
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version;
 
 -- name: GetUserByID :one
-SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 FROM users
 WHERE user_id = sqlc.arg(user_id);
 
 -- name: GetUserForUpdate :one
-SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 FROM users
 WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
 -- name: ListUsersByUsernameKey :many
-SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at, u.account_version
 FROM username_claims AS claim
 JOIN users AS u ON u.user_id = claim.owner_user_id
 WHERE claim.username_key = sqlc.arg(username_key)
@@ -121,7 +121,8 @@ SET status = 'active',
     username = sqlc.arg(display_username),
     current_username_key = sqlc.arg(username_key),
     username_changed_at = sqlc.arg(changed_at),
-    updated_at = sqlc.arg(changed_at)
+    updated_at = sqlc.arg(changed_at),
+    account_version = account_version + 1
 WHERE user_id = sqlc.arg(user_id)
   AND status = 'onboarding'
   AND username IS NULL
@@ -132,21 +133,22 @@ WHERE user_id = sqlc.arg(user_id)
   AND created_at <= sqlc.arg(changed_at)
   AND sqlc.arg(changed_at) >= sqlc.arg(expected_updated_at)
   AND created_at > sqlc.arg(changed_at) - INTERVAL '86400 seconds'
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version;
 
 -- name: ChangeCurrentUsernameCAS :one
 UPDATE users
 SET username = sqlc.arg(display_username),
     current_username_key = sqlc.arg(username_key),
     username_changed_at = sqlc.arg(changed_at),
-    updated_at = sqlc.arg(changed_at)
+    updated_at = sqlc.arg(changed_at),
+    account_version = account_version + 1
 WHERE user_id = sqlc.arg(user_id)
   AND status = 'active'
   AND username = sqlc.arg(expected_display_username)
   AND current_username_key = sqlc.arg(expected_username_key)
   AND username_changed_at = sqlc.arg(expected_username_changed_at)
   AND updated_at = sqlc.arg(expected_updated_at)
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version;
 
 -- name: SetCurrentUsernameCAS :one
 UPDATE users
@@ -154,12 +156,13 @@ SET status = sqlc.arg(next_status),
     username = sqlc.arg(display_username),
     current_username_key = sqlc.arg(username_key),
     username_changed_at = sqlc.arg(changed_at),
-    updated_at = sqlc.arg(changed_at)
+    updated_at = sqlc.arg(changed_at),
+    account_version = account_version + 1
 WHERE user_id = sqlc.arg(user_id)
   AND status = sqlc.arg(expected_status)
   AND current_username_key IS NOT DISTINCT FROM sqlc.narg(expected_username_key)::text
   AND updated_at = sqlc.arg(expected_updated_at)
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version;
 
 -- name: ReserveUsernameClaimCAS :one
 UPDATE username_claims
@@ -377,8 +380,9 @@ UPDATE users
 SET status = sqlc.arg(next_status),
     username = CASE WHEN sqlc.arg(next_status)::text = 'deleted' THEN NULL ELSE username END,
     current_username_key = CASE WHEN sqlc.arg(next_status)::text = 'deleted' THEN NULL ELSE current_username_key END,
-    updated_at = sqlc.arg(changed_at)
+    updated_at = sqlc.arg(changed_at),
+    account_version = account_version + 1
 WHERE user_id = sqlc.arg(user_id)
   AND status = sqlc.arg(expected_status)
   AND updated_at = sqlc.arg(expected_updated_at)
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at;
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version;

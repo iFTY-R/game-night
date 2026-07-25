@@ -39,6 +39,69 @@ type AdminAssistedRecoveryGrant struct {
 	ResultID         pgtype.UUID        `json:"result_id"`
 }
 
+type AdminBatchJob struct {
+	BatchJobID             pgtype.UUID        `json:"batch_job_id"`
+	ActorAdminID           pgtype.UUID        `json:"actor_admin_id"`
+	OperationID            string             `json:"operation_id"`
+	RequestDigest          []byte             `json:"request_digest"`
+	PreviewID              pgtype.UUID        `json:"preview_id"`
+	Command                string             `json:"command"`
+	SelectionSchemaVersion int32              `json:"selection_schema_version"`
+	SelectionSnapshot      []byte             `json:"selection_snapshot"`
+	SelectionDigest        []byte             `json:"selection_digest"`
+	Reason                 string             `json:"reason"`
+	State                  string             `json:"state"`
+	TargetCount            int64              `json:"target_count"`
+	QueuedCount            int64              `json:"queued_count"`
+	RunningCount           int64              `json:"running_count"`
+	SucceededCount         int64              `json:"succeeded_count"`
+	FailedCount            int64              `json:"failed_count"`
+	SkippedCount           int64              `json:"skipped_count"`
+	CanceledCount          int64              `json:"canceled_count"`
+	ErrorMessageKey        pgtype.Text        `json:"error_message_key"`
+	Version                int64              `json:"version"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	StartedAt              pgtype.Timestamptz `json:"started_at"`
+	CompletedAt            pgtype.Timestamptz `json:"completed_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AdminBatchJobItem struct {
+	ItemID              pgtype.UUID        `json:"item_id"`
+	BatchJobID          pgtype.UUID        `json:"batch_job_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	ExpectedUserVersion int64              `json:"expected_user_version"`
+	RequestDigest       []byte             `json:"request_digest"`
+	State               string             `json:"state"`
+	AttemptCount        int32              `json:"attempt_count"`
+	LeaseOwner          pgtype.Text        `json:"lease_owner"`
+	LeaseUntil          pgtype.Timestamptz `json:"lease_until"`
+	ErrorMessageKey     pgtype.Text        `json:"error_message_key"`
+	AuditEventID        pgtype.UUID        `json:"audit_event_id"`
+	StartedAt           pgtype.Timestamptz `json:"started_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+	Version             int64              `json:"version"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AdminBatchPreview struct {
+	PreviewID              pgtype.UUID        `json:"preview_id"`
+	ActorAdminID           pgtype.UUID        `json:"actor_admin_id"`
+	Command                string             `json:"command"`
+	SelectionSchemaVersion int32              `json:"selection_schema_version"`
+	SelectionSnapshot      []byte             `json:"selection_snapshot"`
+	SelectionDigest        []byte             `json:"selection_digest"`
+	PreviewDigest          []byte             `json:"preview_digest"`
+	TargetCount            int64              `json:"target_count"`
+	ExecutableCount        int64              `json:"executable_count"`
+	BlockedCount           int64              `json:"blocked_count"`
+	SampledAt              pgtype.Timestamptz `json:"sampled_at"`
+	ExpiresAt              pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt             pgtype.Timestamptz `json:"consumed_at"`
+	Version                int64              `json:"version"`
+}
+
 type AdminChallenge struct {
 	ChallengeID      pgtype.UUID        `json:"challenge_id"`
 	AdminID          pgtype.UUID        `json:"admin_id"`
@@ -92,6 +155,54 @@ type AdminElevationGrant struct {
 	RevokedAt         pgtype.Timestamptz `json:"revoked_at"`
 }
 
+type AdminExportDownloadGrant struct {
+	GrantID               pgtype.UUID        `json:"grant_id"`
+	ExportID              pgtype.UUID        `json:"export_id"`
+	ActorAdminID          pgtype.UUID        `json:"actor_admin_id"`
+	SessionID             pgtype.UUID        `json:"session_id"`
+	OperationID           string             `json:"operation_id"`
+	RequestDigest         []byte             `json:"request_digest"`
+	TokenDigest           []byte             `json:"token_digest"`
+	TokenKeyVersion       int32              `json:"token_key_version"`
+	ExpectedExportVersion int64              `json:"expected_export_version"`
+	MaskingPolicy         string             `json:"masking_policy"`
+	State                 string             `json:"state"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt            pgtype.Timestamptz `json:"consumed_at"`
+	RevokedAt             pgtype.Timestamptz `json:"revoked_at"`
+	Version               int64              `json:"version"`
+}
+
+type AdminExportJob struct {
+	ExportID            pgtype.UUID        `json:"export_id"`
+	ActorAdminID        pgtype.UUID        `json:"actor_admin_id"`
+	OperationID         string             `json:"operation_id"`
+	RequestDigest       []byte             `json:"request_digest"`
+	FilterSchemaVersion int32              `json:"filter_schema_version"`
+	FilterSnapshot      []byte             `json:"filter_snapshot"`
+	FilterDigest        []byte             `json:"filter_digest"`
+	FieldNames          []string           `json:"field_names"`
+	MaskingPolicy       string             `json:"masking_policy"`
+	State               string             `json:"state"`
+	MatchedUsers        int64              `json:"matched_users"`
+	ExportedUsers       int64              `json:"exported_users"`
+	FailedUsers         int64              `json:"failed_users"`
+	ResultObjectKey     pgtype.Text        `json:"result_object_key"`
+	ResultDigest        []byte             `json:"result_digest"`
+	ResultKeyVersion    pgtype.Int4        `json:"result_key_version"`
+	ResultSchemaVersion int32              `json:"result_schema_version"`
+	ResultExpiresAt     pgtype.Timestamptz `json:"result_expires_at"`
+	ErrorMessageKey     pgtype.Text        `json:"error_message_key"`
+	LeaseOwner          pgtype.Text        `json:"lease_owner"`
+	LeaseUntil          pgtype.Timestamptz `json:"lease_until"`
+	Version             int64              `json:"version"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	StartedAt           pgtype.Timestamptz `json:"started_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AdminRecoveryCode struct {
 	RecoveryCodeID pgtype.UUID        `json:"recovery_code_id"`
 	AdminID        pgtype.UUID        `json:"admin_id"`
@@ -142,6 +253,65 @@ type AdminTotpEnrollment struct {
 	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
 	EnrollmentVersion int64              `json:"enrollment_version"`
 	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+}
+
+type AdminUserErasureJob struct {
+	ErasureJobID    pgtype.UUID        `json:"erasure_job_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	ActorAdminID    pgtype.UUID        `json:"actor_admin_id"`
+	OperationID     string             `json:"operation_id"`
+	RequestDigest   []byte             `json:"request_digest"`
+	State           string             `json:"state"`
+	Step            string             `json:"step"`
+	Reason          string             `json:"reason"`
+	AttemptCount    int32              `json:"attempt_count"`
+	LeaseOwner      pgtype.Text        `json:"lease_owner"`
+	LeaseUntil      pgtype.Timestamptz `json:"lease_until"`
+	ErrorMessageKey pgtype.Text        `json:"error_message_key"`
+	Version         int64              `json:"version"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AdminUserNote struct {
+	NoteID        pgtype.UUID        `json:"note_id"`
+	UserID        pgtype.UUID        `json:"user_id"`
+	AuthorAdminID pgtype.UUID        `json:"author_admin_id"`
+	Body          string             `json:"body"`
+	Reason        string             `json:"reason"`
+	Version       int64              `json:"version"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type AdminUserTag struct {
+	TagID            pgtype.UUID        `json:"tag_id"`
+	Name             string             `json:"name"`
+	NormalizedName   string             `json:"normalized_name"`
+	Color            string             `json:"color"`
+	Version          int64              `json:"version"`
+	CreatedByAdminID pgtype.UUID        `json:"created_by_admin_id"`
+	UpdatedByAdminID pgtype.UUID        `json:"updated_by_admin_id"`
+	Reason           string             `json:"reason"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AdminUserTagCatalog struct {
+	SingletonID    int16              `json:"singleton_id"`
+	CatalogVersion int64              `json:"catalog_version"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AdminUserTagLink struct {
+	UserID            pgtype.UUID        `json:"user_id"`
+	TagID             pgtype.UUID        `json:"tag_id"`
+	Version           int64              `json:"version"`
+	AssignedByAdminID pgtype.UUID        `json:"assigned_by_admin_id"`
+	Reason            string             `json:"reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type AnonymousChallenge struct {
@@ -566,6 +736,7 @@ type User struct {
 	UsernameChangedAt  pgtype.Timestamptz `json:"username_changed_at"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	AccountVersion     int64              `json:"account_version"`
 }
 
 type UserProfile struct {

@@ -16,14 +16,15 @@ UPDATE users
 SET username = $1,
     current_username_key = $2,
     username_changed_at = $3,
-    updated_at = $3
+    updated_at = $3,
+    account_version = account_version + 1
 WHERE user_id = $4
   AND status = 'active'
   AND username = $5
   AND current_username_key = $6
   AND username_changed_at = $7
   AND updated_at = $8
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 `
 
 type ChangeCurrentUsernameCASParams struct {
@@ -43,14 +44,15 @@ type ChangeCurrentUsernameCASParams struct {
 //	SET username = $1,
 //	    current_username_key = $2,
 //	    username_changed_at = $3,
-//	    updated_at = $3
+//	    updated_at = $3,
+//	    account_version = account_version + 1
 //	WHERE user_id = $4
 //	  AND status = 'active'
 //	  AND username = $5
 //	  AND current_username_key = $6
 //	  AND username_changed_at = $7
 //	  AND updated_at = $8
-//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 func (q *Queries) ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurrentUsernameCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, changeCurrentUsernameCAS,
 		arg.DisplayUsername,
@@ -71,6 +73,7 @@ func (q *Queries) ChangeCurrentUsernameCAS(ctx context.Context, arg ChangeCurren
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
@@ -163,7 +166,8 @@ SET status = 'active',
     username = $1,
     current_username_key = $2,
     username_changed_at = $3,
-    updated_at = $3
+    updated_at = $3,
+    account_version = account_version + 1
 WHERE user_id = $4
   AND status = 'onboarding'
   AND username IS NULL
@@ -174,7 +178,7 @@ WHERE user_id = $4
   AND created_at <= $3
   AND $3 >= $5
   AND created_at > $3 - INTERVAL '86400 seconds'
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 `
 
 type CompleteOnboardingUserCASParams struct {
@@ -193,7 +197,8 @@ type CompleteOnboardingUserCASParams struct {
 //	    username = $1,
 //	    current_username_key = $2,
 //	    username_changed_at = $3,
-//	    updated_at = $3
+//	    updated_at = $3,
+//	    account_version = account_version + 1
 //	WHERE user_id = $4
 //	  AND status = 'onboarding'
 //	  AND username IS NULL
@@ -204,7 +209,7 @@ type CompleteOnboardingUserCASParams struct {
 //	  AND created_at <= $3
 //	  AND $3 >= $5
 //	  AND created_at > $3 - INTERVAL '86400 seconds'
-//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 func (q *Queries) CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnboardingUserCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, completeOnboardingUserCAS,
 		arg.DisplayUsername,
@@ -223,6 +228,7 @@ func (q *Queries) CompleteOnboardingUserCAS(ctx context.Context, arg CompleteOnb
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
@@ -406,7 +412,7 @@ INSERT INTO users (
     $2,
     $2
 )
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 `
 
 type CreateUserParams struct {
@@ -427,7 +433,7 @@ type CreateUserParams struct {
 //	    $2,
 //	    $2
 //	)
-//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser, arg.UserID, arg.CreatedAt)
 	var i User
@@ -439,6 +445,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
@@ -768,7 +775,7 @@ func (q *Queries) GetDeviceIdentityForUpdate(ctx context.Context, arg GetDeviceI
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 FROM users
 WHERE user_id = $1
 `
@@ -779,7 +786,7 @@ type GetUserByIDParams struct {
 
 // GetUserByID
 //
-//	SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 //	FROM users
 //	WHERE user_id = $1
 func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error) {
@@ -793,12 +800,13 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User,
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
 
 const getUserForUpdate = `-- name: GetUserForUpdate :one
-SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 FROM users
 WHERE user_id = $1
 FOR UPDATE
@@ -810,7 +818,7 @@ type GetUserForUpdateParams struct {
 
 // GetUserForUpdate
 //
-//	SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	SELECT user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 //	FROM users
 //	WHERE user_id = $1
 //	FOR UPDATE
@@ -825,6 +833,7 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, arg GetUserForUpdatePara
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
@@ -1030,7 +1039,7 @@ func (q *Queries) ListUserDeviceCredentials(ctx context.Context, arg ListUserDev
 }
 
 const listUsersByUsernameKey = `-- name: ListUsersByUsernameKey :many
-SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at, u.account_version
 FROM username_claims AS claim
 JOIN users AS u ON u.user_id = claim.owner_user_id
 WHERE claim.username_key = $1
@@ -1045,7 +1054,7 @@ type ListUsersByUsernameKeyParams struct {
 
 // ListUsersByUsernameKey
 //
-//	SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at
+//	SELECT u.user_id, u.status, u.username, u.current_username_key, u.username_changed_at, u.created_at, u.updated_at, u.account_version
 //	FROM username_claims AS claim
 //	JOIN users AS u ON u.user_id = claim.owner_user_id
 //	WHERE claim.username_key = $1
@@ -1069,6 +1078,7 @@ func (q *Queries) ListUsersByUsernameKey(ctx context.Context, arg ListUsersByUse
 			&i.UsernameChangedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AccountVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -1466,12 +1476,13 @@ SET status = $1,
     username = $2,
     current_username_key = $3,
     username_changed_at = $4,
-    updated_at = $4
+    updated_at = $4,
+    account_version = account_version + 1
 WHERE user_id = $5
   AND status = $6
   AND current_username_key IS NOT DISTINCT FROM $7::text
   AND updated_at = $8
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 `
 
 type SetCurrentUsernameCASParams struct {
@@ -1492,12 +1503,13 @@ type SetCurrentUsernameCASParams struct {
 //	    username = $2,
 //	    current_username_key = $3,
 //	    username_changed_at = $4,
-//	    updated_at = $4
+//	    updated_at = $4,
+//	    account_version = account_version + 1
 //	WHERE user_id = $5
 //	  AND status = $6
 //	  AND current_username_key IS NOT DISTINCT FROM $7::text
 //	  AND updated_at = $8
-//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 func (q *Queries) SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsernameCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, setCurrentUsernameCAS,
 		arg.NextStatus,
@@ -1518,6 +1530,7 @@ func (q *Queries) SetCurrentUsernameCAS(ctx context.Context, arg SetCurrentUsern
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }
@@ -1625,11 +1638,12 @@ UPDATE users
 SET status = $1,
     username = CASE WHEN $1::text = 'deleted' THEN NULL ELSE username END,
     current_username_key = CASE WHEN $1::text = 'deleted' THEN NULL ELSE current_username_key END,
-    updated_at = $2
+    updated_at = $2,
+    account_version = account_version + 1
 WHERE user_id = $3
   AND status = $4
   AND updated_at = $5
-RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 `
 
 type TransitionUserStatusCASParams struct {
@@ -1646,11 +1660,12 @@ type TransitionUserStatusCASParams struct {
 //	SET status = $1,
 //	    username = CASE WHEN $1::text = 'deleted' THEN NULL ELSE username END,
 //	    current_username_key = CASE WHEN $1::text = 'deleted' THEN NULL ELSE current_username_key END,
-//	    updated_at = $2
+//	    updated_at = $2,
+//	    account_version = account_version + 1
 //	WHERE user_id = $3
 //	  AND status = $4
 //	  AND updated_at = $5
-//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at
+//	RETURNING user_id, status, username, current_username_key, username_changed_at, created_at, updated_at, account_version
 func (q *Queries) TransitionUserStatusCAS(ctx context.Context, arg TransitionUserStatusCASParams) (User, error) {
 	row := q.db.QueryRow(ctx, transitionUserStatusCAS,
 		arg.NextStatus,
@@ -1668,6 +1683,7 @@ func (q *Queries) TransitionUserStatusCAS(ctx context.Context, arg TransitionUse
 		&i.UsernameChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccountVersion,
 	)
 	return i, err
 }

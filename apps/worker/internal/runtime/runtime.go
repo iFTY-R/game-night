@@ -17,6 +17,10 @@ type dispatcher interface {
 	RunOnce(context.Context) (checkpoint.Result, error)
 }
 
+type checkpointScheduler interface {
+	RunOnce(context.Context) (checkpoint.ScheduleResult, error)
+}
+
 type maintenance interface {
 	RunOnce(context.Context) error
 }
@@ -27,6 +31,7 @@ type rotation interface {
 
 // Runtime executes one pass immediately and then on a fixed bounded interval until cancellation.
 type Runtime struct {
+	scheduler    checkpointScheduler
 	dispatcher   dispatcher
 	rotation     rotation
 	maintenance  maintenance
@@ -46,10 +51,25 @@ func NewWithMaintenance(dispatcher dispatcher, cleanup maintenance, pollInterval
 
 // NewWithOperations adds serial key rotation and cleanup passes without overlapping worker authorities.
 func NewWithOperations(dispatcher dispatcher, keyRotation rotation, cleanup maintenance, pollInterval time.Duration, logger *slog.Logger) (*Runtime, error) {
+	return NewWithCheckpointScheduler(dispatcher, nil, keyRotation, cleanup, pollInterval, logger)
+}
+
+// NewWithCheckpointScheduler runs due-checkpoint creation before delivery in the same serial worker pass.
+func NewWithCheckpointScheduler(
+	dispatcher dispatcher,
+	scheduler checkpointScheduler,
+	keyRotation rotation,
+	cleanup maintenance,
+	pollInterval time.Duration,
+	logger *slog.Logger,
+) (*Runtime, error) {
 	if dispatcher == nil || pollInterval <= 0 || logger == nil {
 		return nil, ErrInvalidConfig
 	}
-	return &Runtime{dispatcher: dispatcher, rotation: keyRotation, maintenance: cleanup, pollInterval: pollInterval, logger: logger}, nil
+	return &Runtime{
+		scheduler: scheduler, dispatcher: dispatcher, rotation: keyRotation, maintenance: cleanup,
+		pollInterval: pollInterval, logger: logger,
+	}, nil
 }
 
 // Run serially executes passes so one process never overlaps its own lease-bound delivery work.
@@ -64,6 +84,15 @@ func (runtime *Runtime) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
+			if runtime.scheduler != nil {
+				scheduleResult, scheduleErr := runtime.scheduler.RunOnce(ctx)
+				if scheduleErr != nil && ctx.Err() == nil {
+					runtime.logger.Warn("checkpoint scheduler pass failed", slog.String("error", scheduleErr.Error()))
+				}
+				if scheduleResult.Enqueued {
+					runtime.logger.Info("checkpoint scheduler advanced")
+				}
+			}
 			result, err := runtime.dispatcher.RunOnce(ctx)
 			if err != nil && ctx.Err() == nil {
 				// Dispatcher errors are stable categories; payloads and sink responses never enter logs.

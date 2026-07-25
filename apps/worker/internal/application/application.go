@@ -101,6 +101,12 @@ func New(ctx context.Context, config workerconfig.Config, logger *slog.Logger) (
 	if err != nil {
 		return nil, errInitializeRuntime
 	}
+	scheduler, err := checkpoint.NewScheduler(
+		postgres.NewAuditOutboxUnitOfWork(pool, auditService), auditService, checkpointPolicy, source,
+	)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
 	dispatcher, err := checkpoint.NewDispatcher(checkpoint.Config{
 		Owner: config.Runtime.InstanceID, LeaseDuration: config.Runtime.LeaseDuration, BatchSize: config.Runtime.BatchSize,
 	}, postgres.NewOutboxUnitOfWork(pool), sink, auditService, source)
@@ -114,7 +120,9 @@ func New(ctx context.Context, config workerconfig.Config, logger *slog.Logger) (
 		return nil, errInitializeRuntime
 	}
 	cleanup := postgres.NewExpiryCleanup(pool, config.Runtime.RoomIdleTimeout)
-	application.runtime, err = workerruntime.NewWithOperations(dispatcher, rotation, cleanup, config.Runtime.PollInterval, logger)
+	application.runtime, err = workerruntime.NewWithCheckpointScheduler(
+		dispatcher, scheduler, rotation, cleanup, config.Runtime.PollInterval, logger,
+	)
 	if err != nil {
 		return nil, errInitializeRuntime
 	}

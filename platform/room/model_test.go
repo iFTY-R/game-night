@@ -243,6 +243,140 @@ func TestStartSessionRejectsMoreParticipantsThanGameManifestSupports(t *testing.
 	}
 }
 
+func TestRoomPauseRequestApprovalResumeAndLifecycleCleanup(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 14, 0, 0, 0, time.UTC)
+	host, requester, other, spectator := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	room, err := New(uuid.New(), host, "PAUSE1", VisibilityPrivate, 4, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, userID := range []uuid.UUID{requester, other} {
+		room, _, err = room.Join(userID, JoinIntentParticipant, room.Version(), now.Add(time.Duration(index+1)*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	room, _, err = room.Join(spectator, JoinIntentSpectator, room.Version(), now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionID := uuid.New()
+	room, _, err = room.StartSession(host, sessionID, "dice", 2, 9, room.Version(), now.Add(4*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := room.RequestPause(host, uuid.New(), sessionID, room.Version(), now.Add(5*time.Second)); !errors.Is(err, ErrPauseParticipantRequired) {
+		t.Fatalf("host pause request error = %v", err)
+	}
+	if _, err := room.RequestPause(spectator, uuid.New(), sessionID, room.Version(), now.Add(5*time.Second)); !errors.Is(err, ErrPauseParticipantRequired) {
+		t.Fatalf("spectator pause request error = %v", err)
+	}
+
+	requestID := uuid.New()
+	requested, err := room.RequestPause(requester, requestID, sessionID, room.Version(), now.Add(5*time.Second))
+	if err != nil || requested.Snapshot().PendingPauseRequest.ID != requestID ||
+		requested.Snapshot().PendingPauseRequest.RequestedByUserID != requester {
+		t.Fatalf("requested room = %+v, err = %v", requested.Snapshot(), err)
+	}
+	if _, err := requested.RequestPause(other, uuid.New(), sessionID, requested.Version(), now.Add(6*time.Second)); !errors.Is(err, ErrPauseRequestExists) {
+		t.Fatalf("second pause request error = %v", err)
+	}
+	if _, err := requested.RejectPause(other, requestID, requested.Version(), now.Add(6*time.Second)); !errors.Is(err, ErrHostRequired) {
+		t.Fatalf("non-host reject error = %v", err)
+	}
+	if _, err := requested.RejectPause(host, uuid.New(), requested.Version(), now.Add(6*time.Second)); !errors.Is(err, ErrPauseRequestNotFound) {
+		t.Fatalf("wrong request reject error = %v", err)
+	}
+	rejected, err := requested.RejectPause(host, requestID, requested.Version(), now.Add(6*time.Second))
+	if err != nil || rejected.Snapshot().PendingPauseRequest.ID != uuid.Nil {
+		t.Fatalf("rejected room = %+v, err = %v", rejected.Snapshot(), err)
+	}
+
+	requestID = uuid.New()
+	requested, err = rejected.RequestPause(requester, requestID, sessionID, rejected.Version(), now.Add(7*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pauseID := uuid.New()
+	paused, err := requested.Pause(host, pauseID, sessionID, requestID, requested.Version(), now.Add(8*time.Second))
+	pausedSnapshot := paused.Snapshot()
+	if err != nil || pausedSnapshot.ActivePause.ID != pauseID || pausedSnapshot.ActivePause.Source != PauseSourceApprovedRequest ||
+		pausedSnapshot.ActivePause.RequestedByUserID != requester || pausedSnapshot.PendingPauseRequest.ID != uuid.Nil {
+		t.Fatalf("paused room = %+v, err = %v", pausedSnapshot, err)
+	}
+	if _, err := paused.Pause(host, uuid.New(), sessionID, uuid.Nil, paused.Version(), now.Add(9*time.Second)); !errors.Is(err, ErrGameAlreadyPaused) {
+		t.Fatalf("duplicate pause error = %v", err)
+	}
+	if _, err := paused.Resume(other, sessionID, paused.Version(), now.Add(9*time.Second)); !errors.Is(err, ErrHostRequired) {
+		t.Fatalf("non-host resume error = %v", err)
+	}
+	resumed, err := paused.Resume(host, sessionID, paused.Version(), now.Add(9*time.Second))
+	if err != nil || resumed.Snapshot().ActivePause.ID != uuid.Nil {
+		t.Fatalf("resumed room = %+v, err = %v", resumed.Snapshot(), err)
+	}
+	direct, err := resumed.Pause(host, uuid.New(), sessionID, uuid.Nil, resumed.Version(), now.Add(10*time.Second))
+	if err != nil || direct.Snapshot().ActivePause.Source != PauseSourceHost || direct.Snapshot().ActivePause.RequestedByUserID != uuid.Nil {
+		t.Fatalf("direct pause room = %+v, err = %v", direct.Snapshot(), err)
+	}
+	finished, err := direct.FinishSession(sessionID, direct.Version(), now.Add(11*time.Second))
+	if err != nil || finished.Snapshot().ActivePause.ID != uuid.Nil || finished.Snapshot().PendingPauseRequest.ID != uuid.Nil {
+		t.Fatalf("finished room = %+v, err = %v", finished.Snapshot(), err)
+	}
+}
+
+func TestTransferHostFencesOldOwnerAndClearsNewHostPauseRequest(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 14, 30, 0, 0, time.UTC)
+	host, target, spectator := uuid.New(), uuid.New(), uuid.New()
+	room, err := New(uuid.New(), host, "OWNER1", VisibilityPrivate, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(target, JoinIntentParticipant, room.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	room, _, err = room.Join(spectator, JoinIntentSpectator, room.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := room.TransferHost(host, spectator, room.Snapshot().OwnershipEpoch, room.Version(), now.Add(3*time.Second)); !errors.Is(err, ErrHostTransferTargetInvalid) {
+		t.Fatalf("spectator transfer error = %v", err)
+	}
+	if _, err := room.TransferHost(host, host, room.Snapshot().OwnershipEpoch, room.Version(), now.Add(3*time.Second)); !errors.Is(err, ErrHostTransferTargetInvalid) {
+		t.Fatalf("self transfer error = %v", err)
+	}
+	if _, err := room.TransferHost(host, target, room.Snapshot().OwnershipEpoch+1, room.Version(), now.Add(3*time.Second)); !errors.Is(err, ErrRoomVersionConflict) {
+		t.Fatalf("stale ownership error = %v", err)
+	}
+
+	oldVersion, oldMembership, oldEpoch := room.Version(), room.Version().Membership, room.Snapshot().OwnershipEpoch
+	transferred, err := room.TransferHost(host, target, oldEpoch, oldVersion, now.Add(3*time.Second))
+	if err != nil || transferred.Snapshot().HostUserID != target || transferred.Snapshot().OwnershipEpoch != oldEpoch+1 ||
+		transferred.Version().Room != oldVersion.Room+1 || transferred.Version().Membership != oldMembership {
+		t.Fatalf("transferred room = %+v, err = %v", transferred.Snapshot(), err)
+	}
+	if _, err := transferred.SetAdmission(host, AdmissionClosed, AdmissionClosed, transferred.Version(), now.Add(4*time.Second)); !errors.Is(err, ErrHostRequired) {
+		t.Fatalf("old host command error = %v", err)
+	}
+	if _, err := transferred.SetAdmission(target, AdmissionClosed, AdmissionClosed, transferred.Version(), now.Add(4*time.Second)); err != nil {
+		t.Fatalf("new host command error = %v", err)
+	}
+
+	playing, _, err := transferred.StartSession(target, uuid.New(), "dice", 2, 9, transferred.Version(), now.Add(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionID := playing.Snapshot().ActiveSessionID
+	requested, err := playing.RequestPause(host, uuid.New(), sessionID, playing.Version(), now.Add(6*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	transferredAgain, err := requested.TransferHost(target, host, requested.Snapshot().OwnershipEpoch, requested.Version(), now.Add(7*time.Second))
+	if err != nil || transferredAgain.Snapshot().PendingPauseRequest.ID != uuid.Nil || transferredAgain.Snapshot().HostUserID != host {
+		t.Fatalf("playing transfer = %+v, err = %v", transferredAgain.Snapshot(), err)
+	}
+}
+
 func TestRestoreRejectsPlayingRoomWithoutClosedParticipantAdmission(t *testing.T) {
 	now := time.Date(2026, time.July, 19, 14, 0, 0, 0, time.UTC)
 	host := uuid.New()

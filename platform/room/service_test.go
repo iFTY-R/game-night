@@ -203,6 +203,54 @@ func TestServiceCommitsDurableRevocationForPlayingParticipant(t *testing.T) {
 	}
 }
 
+func TestServicePersistsPauseRequestAndTransfersHost(t *testing.T) {
+	now := time.Date(2026, time.July, 21, 15, 0, 0, 0, time.UTC)
+	host, participant := uuid.New(), uuid.New()
+	repository := newMemoryRoomRepository()
+	playing, err := New(uuid.New(), host, "PAUSES", VisibilityPrivate, 3, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.Join(participant, JoinIntentParticipant, playing.Version(), now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err = playing.StartSession(host, uuid.New(), "liars-dice", 2, 9, playing.Version(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(t.Context(), playing); err != nil {
+		t.Fatal(err)
+	}
+	source := clock.NewFake(now.Add(3 * time.Second))
+	service, err := NewService(repository, &sequenceRoomCodeGenerator{codes: []string{"SPARE5"}}, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	requested, err := service.RequestPause(t.Context(), RequestPauseCommand{
+		ActorUserID: participant, RoomID: playing.Snapshot().ID, SessionID: playing.Snapshot().ActiveSessionID,
+		Expected: playing.Version(),
+	})
+	if err != nil || requested.Snapshot().PendingPauseRequest.ID == uuid.Nil {
+		t.Fatalf("requested room = %+v, err = %v", requested.Snapshot(), err)
+	}
+	_, _ = source.Advance(time.Second)
+	transferred, err := service.TransferHost(t.Context(), TransferHostCommand{
+		ActorUserID: host, RoomID: requested.Snapshot().ID, TargetUserID: participant,
+		OwnershipEpoch: requested.Snapshot().OwnershipEpoch, Expected: requested.Version(),
+	})
+	if err != nil || transferred.Snapshot().HostUserID != participant || transferred.Snapshot().PendingPauseRequest.ID != uuid.Nil {
+		t.Fatalf("transferred room = %+v, err = %v", transferred.Snapshot(), err)
+	}
+	if _, err := service.RejectPause(t.Context(), RejectPauseCommand{
+		ActorUserID: host, RoomID: transferred.Snapshot().ID, RequestID: requested.Snapshot().PendingPauseRequest.ID,
+		Expected: transferred.Version(),
+	}); !errors.Is(err, ErrHostRequired) {
+		t.Fatalf("old host reject error = %v", err)
+	}
+}
+
 type sequenceRoomCodeGenerator struct {
 	mu    sync.Mutex
 	codes []string

@@ -47,4 +47,16 @@ var (
 	ErrGameUnavailable = errors.New("game is unavailable")
 	// ErrGameSelectionConflict prevents a session from starting on a table different from the room selection.
 	ErrGameSelectionConflict = errors.New("selected room game does not match start game")
+	// ErrPauseParticipantRequired limits pause requests to non-host participants in the active game.
+	ErrPauseParticipantRequired = errors.New("active game participant required for pause request")
+	// ErrPauseRequestExists prevents one player from replacing another unresolved pause request.
+	ErrPauseRequestExists = errors.New("room pause request already exists")
+	// ErrPauseRequestNotFound rejects stale approval and rejection commands.
+	ErrPauseRequestNotFound = errors.New("room pause request not found")
+	// ErrGameAlreadyPaused prevents duplicate lifecycle transitions and misleading approvals.
+	ErrGameAlreadyPaused = errors.New("room game is already paused")
+	// ErrGameNotPaused prevents resume commands from changing an active session.
+	ErrGameNotPaused = errors.New("room game is not paused")
+	// ErrHostTransferTargetInvalid restricts ownership to another current participant.
+	ErrHostTransferTargetInvalid = errors.New("room host transfer target is invalid")
 )

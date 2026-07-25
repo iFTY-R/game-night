@@ -83,6 +83,31 @@ type SelectGameCommand struct {
 	Expected    Version
 }
 
+// RequestPauseCommand records one participant request for the exact active session.
+type RequestPauseCommand struct {
+	ActorUserID uuid.UUID
+	RoomID      uuid.UUID
+	SessionID   uuid.UUID
+	Expected    Version
+}
+
+// RejectPauseCommand clears one exact pending request under current host authority.
+type RejectPauseCommand struct {
+	ActorUserID uuid.UUID
+	RoomID      uuid.UUID
+	RequestID   uuid.UUID
+	Expected    Version
+}
+
+// TransferHostCommand hands room governance to another current participant under both room and ownership fences.
+type TransferHostCommand struct {
+	ActorUserID    uuid.UUID
+	RoomID         uuid.UUID
+	TargetUserID   uuid.UUID
+	OwnershipEpoch uint64
+	Expected       Version
+}
+
 // RemoveMemberCommand removes a non-host member and returns any required runtime revocation signal.
 type RemoveMemberCommand struct {
 	ActorUserID uuid.UUID
@@ -309,6 +334,74 @@ func (service *Service) SelectGame(ctx context.Context, command SelectGameComman
 	}
 	if next.Version() == current.Version() {
 		return current, nil
+	}
+	return service.repository.UpdateCAS(ctx, current, next)
+}
+
+// RequestPause persists one server-identified request without allowing a second participant to replace it.
+func (service *Service) RequestPause(ctx context.Context, command RequestPauseCommand) (Room, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || command.SessionID == uuid.Nil {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if !requiredVersion(command.Expected) {
+		return Room{}, ErrRoomVersionConflict
+	}
+	requestID, err := uuid.NewV7()
+	if err != nil {
+		return Room{}, ErrInvalidRoomInput
+	}
+	current, err := service.repository.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return Room{}, err
+	}
+	next, err := current.RequestPause(command.ActorUserID, requestID, command.SessionID, command.Expected, service.clock.Now())
+	if err != nil {
+		return Room{}, err
+	}
+	return service.repository.UpdateCAS(ctx, current, next)
+}
+
+// RejectPause removes only the request observed by the current host and client room version.
+func (service *Service) RejectPause(ctx context.Context, command RejectPauseCommand) (Room, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil || command.RequestID == uuid.Nil {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if !requiredVersion(command.Expected) {
+		return Room{}, ErrRoomVersionConflict
+	}
+	current, err := service.repository.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return Room{}, err
+	}
+	next, err := current.RejectPause(command.ActorUserID, command.RequestID, command.Expected, service.clock.Now())
+	if err != nil {
+		return Room{}, err
+	}
+	return service.repository.UpdateCAS(ctx, current, next)
+}
+
+// TransferHost advances the ownership fence so every concurrent old-host write fails after this CAS commits.
+func (service *Service) TransferHost(ctx context.Context, command TransferHostCommand) (Room, error) {
+	if service == nil || ctx == nil || command.ActorUserID == uuid.Nil || command.RoomID == uuid.Nil ||
+		command.TargetUserID == uuid.Nil || command.OwnershipEpoch == 0 {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if !requiredVersion(command.Expected) {
+		return Room{}, ErrRoomVersionConflict
+	}
+	current, err := service.repository.GetByID(ctx, command.RoomID)
+	if err != nil {
+		return Room{}, err
+	}
+	next, err := current.TransferHost(
+		command.ActorUserID,
+		command.TargetUserID,
+		command.OwnershipEpoch,
+		command.Expected,
+		service.clock.Now(),
+	)
+	if err != nil {
+		return Room{}, err
 	}
 	return service.repository.UpdateCAS(ctx, current, next)
 }

@@ -73,6 +73,34 @@ type FrozenParticipant struct {
 	SeatIndex uint32
 }
 
+// PauseSource records whether the host initiated a pause directly or approved a participant request.
+type PauseSource string
+
+const (
+	// PauseSourceHost marks a pause initiated directly by the current host.
+	PauseSourceHost PauseSource = "host"
+	// PauseSourceApprovedRequest marks a participant request approved by the current host.
+	PauseSourceApprovedRequest PauseSource = "approved_request"
+)
+
+// PendingPauseRequest is the single unresolved participant request for the current active session.
+type PendingPauseRequest struct {
+	ID                uuid.UUID
+	SessionID         uuid.UUID
+	RequestedByUserID uuid.UUID
+	RequestedAt       time.Time
+}
+
+// ActivePause explains the host-authorized suspension paired with the current runtime session.
+type ActivePause struct {
+	ID                uuid.UUID
+	SessionID         uuid.UUID
+	Source            PauseSource
+	RequestedByUserID uuid.UUID
+	PausedByUserID    uuid.UUID
+	PausedAt          time.Time
+}
+
 // RoomSnapshot is the persistence-neutral authoritative state of one continuous room.
 type RoomSnapshot struct {
 	ID                    uuid.UUID
@@ -88,6 +116,8 @@ type RoomSnapshot struct {
 	ActiveGameID          string
 	LastFinishedSessionID uuid.UUID
 	LastFinishedGameID    string
+	PendingPauseRequest   PendingPauseRequest
+	ActivePause           ActivePause
 	// SelectedGameID is the synchronized pregame table. It remains stable across
 	// post-game reopening and is distinct from the active session game.
 	SelectedGameID    string
@@ -186,6 +216,8 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 	}
 	snapshot.CreatedAt = canonicalRoomTime(snapshot.CreatedAt)
 	snapshot.UpdatedAt = canonicalRoomTime(snapshot.UpdatedAt)
+	snapshot.PendingPauseRequest.RequestedAt = canonicalRoomTime(snapshot.PendingPauseRequest.RequestedAt)
+	snapshot.ActivePause.PausedAt = canonicalRoomTime(snapshot.ActivePause.PausedAt)
 	// Ownership fencing was added after the original room schema. Treat a
 	// missing value as the first epoch so old rooms remain readable while all
 	// new commands still carry an explicit non-zero epoch.
@@ -273,6 +305,9 @@ func Restore(snapshot RoomSnapshot) (Room, error) {
 		return Room{}, ErrInvalidRoomInput
 	}
 	snapshot.Members = members
+	if err := validatePauseGovernance(snapshot); err != nil {
+		return Room{}, err
+	}
 	return Room{snapshot: snapshot}, nil
 }
 
@@ -535,6 +570,176 @@ func (room Room) StartSession(
 	return updated, SessionStart{SessionID: sessionID, GameID: next.ActiveGameID, Participants: participants, Version: updated.Version(), StartedAt: at}, nil
 }
 
+// RequestPause records one non-host participant request for the exact active session.
+func (room Room) RequestPause(
+	actorUserID, requestID, sessionID uuid.UUID,
+	expected Version,
+	at time.Time,
+) (Room, error) {
+	at = canonicalRoomTime(at)
+	if actorUserID == uuid.Nil || requestID == uuid.Nil || sessionID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.Status != RoomStatusPlaying || room.snapshot.ActiveSessionID != sessionID {
+		return Room{}, ErrSessionNotFound
+	}
+	if room.snapshot.ActivePause.ID != uuid.Nil {
+		return Room{}, ErrGameAlreadyPaused
+	}
+	if room.snapshot.PendingPauseRequest.ID != uuid.Nil {
+		return Room{}, ErrPauseRequestExists
+	}
+	member, found := room.Member(actorUserID)
+	if !found || member.Role != MemberRoleParticipant || actorUserID == room.snapshot.HostUserID {
+		return Room{}, ErrPauseParticipantRequired
+	}
+	next := room.snapshot
+	next.PendingPauseRequest = PendingPauseRequest{
+		ID: requestID, SessionID: sessionID, RequestedByUserID: actorUserID, RequestedAt: at,
+	}
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// RejectPause clears only the exact pending request under current host authority.
+func (room Room) RejectPause(hostUserID, requestID uuid.UUID, expected Version, at time.Time) (Room, error) {
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || requestID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.PendingPauseRequest.ID != requestID {
+		return Room{}, ErrPauseRequestNotFound
+	}
+	next := room.snapshot
+	next.PendingPauseRequest = PendingPauseRequest{}
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// Pause records the host-authorized governance half of one atomic runtime suspension.
+func (room Room) Pause(
+	hostUserID, pauseID, sessionID, requestID uuid.UUID,
+	expected Version,
+	at time.Time,
+) (Room, error) {
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || pauseID == uuid.Nil || sessionID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.Status != RoomStatusPlaying || room.snapshot.ActiveSessionID != sessionID {
+		return Room{}, ErrSessionNotFound
+	}
+	if room.snapshot.ActivePause.ID != uuid.Nil {
+		return Room{}, ErrGameAlreadyPaused
+	}
+	source := PauseSourceHost
+	requestedBy := uuid.Nil
+	if requestID != uuid.Nil {
+		if room.snapshot.PendingPauseRequest.ID != requestID || room.snapshot.PendingPauseRequest.SessionID != sessionID {
+			return Room{}, ErrPauseRequestNotFound
+		}
+		source = PauseSourceApprovedRequest
+		requestedBy = room.snapshot.PendingPauseRequest.RequestedByUserID
+	}
+	next := room.snapshot
+	next.PendingPauseRequest = PendingPauseRequest{}
+	next.ActivePause = ActivePause{
+		ID: pauseID, SessionID: sessionID, Source: source, RequestedByUserID: requestedBy,
+		PausedByUserID: hostUserID, PausedAt: at,
+	}
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// Resume clears the governance pause for the exact session; runtime resume must commit beside it atomically.
+func (room Room) Resume(hostUserID, sessionID uuid.UUID, expected Version, at time.Time) (Room, error) {
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || sessionID == uuid.Nil || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.Status != RoomStatusPlaying || room.snapshot.ActiveSessionID != sessionID {
+		return Room{}, ErrSessionNotFound
+	}
+	if room.snapshot.ActivePause.ID == uuid.Nil || room.snapshot.ActivePause.SessionID != sessionID {
+		return Room{}, ErrGameNotPaused
+	}
+	next := room.snapshot
+	next.ActivePause = ActivePause{}
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
+// TransferHost hands governance to another current participant and advances the host-operation fence.
+func (room Room) TransferHost(
+	hostUserID, targetUserID uuid.UUID,
+	expectedOwnershipEpoch uint64,
+	expected Version,
+	at time.Time,
+) (Room, error) {
+	at = canonicalRoomTime(at)
+	if hostUserID == uuid.Nil || targetUserID == uuid.Nil || expectedOwnershipEpoch == 0 || at.IsZero() {
+		return Room{}, ErrInvalidRoomInput
+	}
+	if err := room.checkHost(hostUserID); err != nil {
+		return Room{}, err
+	}
+	if err := room.checkVersion(expected); err != nil {
+		return Room{}, err
+	}
+	if room.snapshot.OwnershipEpoch != expectedOwnershipEpoch {
+		return Room{}, ErrRoomVersionConflict
+	}
+	if room.snapshot.Status == RoomStatusClosed {
+		return Room{}, ErrRoomClosed
+	}
+	target, found := room.Member(targetUserID)
+	if !found || target.Role != MemberRoleParticipant || targetUserID == hostUserID {
+		return Room{}, ErrHostTransferTargetInvalid
+	}
+	if room.snapshot.OwnershipEpoch == ^uint64(0) {
+		return Room{}, ErrRoomVersionOverflow
+	}
+	next := room.snapshot
+	next.HostUserID = targetUserID
+	next.OwnershipEpoch++
+	if next.PendingPauseRequest.RequestedByUserID == targetUserID {
+		next.PendingPauseRequest = PendingPauseRequest{}
+	}
+	if err := bumpVersions(&next, false, at); err != nil {
+		return Room{}, err
+	}
+	return Restore(next)
+}
+
 // FinishSession returns a room to its post-game lobby while keeping participant admission closed by default.
 func (room Room) FinishSession(sessionID uuid.UUID, expected Version, at time.Time) (Room, error) {
 	at = canonicalRoomTime(at)
@@ -553,6 +758,7 @@ func (room Room) FinishSession(sessionID uuid.UUID, expected Version, at time.Ti
 	next := room.snapshot
 	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusPostGame, uuid.Nil, "", AdmissionClosed
 	next.LastFinishedSessionID, next.LastFinishedGameID = sessionID, room.snapshot.ActiveGameID
+	next.PendingPauseRequest, next.ActivePause = PendingPauseRequest{}, ActivePause{}
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}
@@ -577,6 +783,7 @@ func (room Room) CancelSession(sessionID uuid.UUID, expected Version, at time.Ti
 	next := room.snapshot
 	next.Status, next.ActiveSessionID, next.ActiveGameID, next.ParticipantAdmission = RoomStatusLobby, uuid.Nil, "", AdmissionClosed
 	next.LastFinishedSessionID, next.LastFinishedGameID = uuid.Nil, ""
+	next.PendingPauseRequest, next.ActivePause = PendingPauseRequest{}, ActivePause{}
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}
@@ -605,6 +812,7 @@ func (room Room) CancelSessionAndClose(hostUserID, sessionID uuid.UUID, expected
 	next.Status, next.ActiveSessionID, next.ActiveGameID = RoomStatusClosed, uuid.Nil, ""
 	next.ParticipantAdmission, next.SpectatorAdmission = AdmissionClosed, AdmissionClosed
 	next.LastFinishedSessionID, next.LastFinishedGameID = uuid.Nil, ""
+	next.PendingPauseRequest, next.ActivePause = PendingPauseRequest{}, ActivePause{}
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}
@@ -639,6 +847,9 @@ func (room Room) RemoveMember(hostUserID, userID uuid.UUID, expected Version, at
 		return Room{}, RemovalResult{}, ErrMemberNotFound
 	}
 	next.Members = append(next.Members[:removedIndex], next.Members[removedIndex+1:]...)
+	if next.PendingPauseRequest.RequestedByUserID == userID {
+		next.PendingPauseRequest = PendingPauseRequest{}
+	}
 	if err := bumpVersions(&next, true, at); err != nil {
 		return Room{}, RemovalResult{}, err
 	}
@@ -672,6 +883,7 @@ func (room Room) Close(hostUserID uuid.UUID, expected Version, at time.Time) (Ro
 	}
 	next := room.snapshot
 	next.Status, next.ParticipantAdmission, next.SpectatorAdmission = RoomStatusClosed, AdmissionClosed, AdmissionClosed
+	next.PendingPauseRequest, next.ActivePause = PendingPauseRequest{}, ActivePause{}
 	if err := bumpVersions(&next, false, at); err != nil {
 		return Room{}, err
 	}
@@ -700,6 +912,11 @@ func (role MemberRole) Valid() bool {
 
 func (intent JoinIntent) Valid() bool {
 	return intent == JoinIntentParticipant || intent == JoinIntentSpectator
+}
+
+// Valid reports whether the pause source has defined governance semantics.
+func (source PauseSource) Valid() bool {
+	return source == PauseSourceHost || source == PauseSourceApprovedRequest
 }
 
 func (room Room) checkHost(userID uuid.UUID) error {
@@ -760,4 +977,57 @@ func canonicalRoomTime(value time.Time) time.Time {
 		return time.Time{}
 	}
 	return value.UTC().Truncate(time.Microsecond)
+}
+
+func validatePauseGovernance(snapshot RoomSnapshot) error {
+	pendingSet := !pendingPauseRequestZero(snapshot.PendingPauseRequest)
+	activeSet := !activePauseZero(snapshot.ActivePause)
+	if pendingSet && activeSet {
+		return ErrInvalidRoomInput
+	}
+	if (pendingSet || activeSet) && snapshot.Status != RoomStatusPlaying {
+		return ErrInvalidRoomInput
+	}
+	if pendingSet {
+		pending := snapshot.PendingPauseRequest
+		member, found := memberFromSnapshot(snapshot.Members, pending.RequestedByUserID)
+		if pending.ID == uuid.Nil || pending.SessionID != snapshot.ActiveSessionID || pending.RequestedByUserID == uuid.Nil ||
+			pending.RequestedAt.IsZero() || pending.RequestedAt.Before(snapshot.CreatedAt) || pending.RequestedAt.After(snapshot.UpdatedAt) ||
+			!found || member.Role != MemberRoleParticipant || pending.RequestedByUserID == snapshot.HostUserID {
+			return ErrInvalidRoomInput
+		}
+	}
+	if activeSet {
+		active := snapshot.ActivePause
+		if active.ID == uuid.Nil || active.SessionID != snapshot.ActiveSessionID || !active.Source.Valid() ||
+			active.PausedByUserID == uuid.Nil || active.PausedAt.IsZero() || active.PausedAt.Before(snapshot.CreatedAt) ||
+			active.PausedAt.After(snapshot.UpdatedAt) {
+			return ErrInvalidRoomInput
+		}
+		if active.Source == PauseSourceHost && active.RequestedByUserID != uuid.Nil {
+			return ErrInvalidRoomInput
+		}
+		if active.Source == PauseSourceApprovedRequest && active.RequestedByUserID == uuid.Nil {
+			return ErrInvalidRoomInput
+		}
+	}
+	return nil
+}
+
+func pendingPauseRequestZero(value PendingPauseRequest) bool {
+	return value.ID == uuid.Nil && value.SessionID == uuid.Nil && value.RequestedByUserID == uuid.Nil && value.RequestedAt.IsZero()
+}
+
+func activePauseZero(value ActivePause) bool {
+	return value.ID == uuid.Nil && value.SessionID == uuid.Nil && value.Source == "" && value.RequestedByUserID == uuid.Nil &&
+		value.PausedByUserID == uuid.Nil && value.PausedAt.IsZero()
+}
+
+func memberFromSnapshot(members []MemberSnapshot, userID uuid.UUID) (MemberSnapshot, bool) {
+	for _, member := range members {
+		if member.UserID == userID {
+			return member, true
+		}
+	}
+	return MemberSnapshot{}, false
 }

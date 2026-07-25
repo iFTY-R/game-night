@@ -258,6 +258,8 @@ func TestGameSessionStartConfigMigrationKeepsLegacyRowsAllowsRevisionZeroAndReje
             room_id, room_code, visibility, status, host_user_id, participant_capacity,
             participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
         ) VALUES ($1, 'START25', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO room_members (room_id, user_id, role, seat_index, joined_at, last_seen_at)
+			VALUES ($1, $2, 'participant', 0, now() - interval '2 hours', now())`, []any{roomID, userID}},
 		{`INSERT INTO game_sessions (
             session_id, room_id, game_id, engine_version, protocol_version, client_version,
             state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,
@@ -396,6 +398,8 @@ func TestGameSessionCancelReasonMigrationBackfillsLegacyCancelledRowsAndRejectsI
 			room_id, room_code, visibility, status, host_user_id, participant_capacity,
 			participant_admission, spectator_admission, room_version, membership_version, created_at, updated_at
 		) VALUES ($1, 'CANCEL26', 'private', 'lobby', $2, 4, 'open', 'open', 1, 1, now() - interval '2 hours', now())`, []any{roomID, userID}},
+		{`INSERT INTO room_members (room_id, user_id, role, seat_index, joined_at, last_seen_at)
+			VALUES ($1, $2, 'participant', 0, now() - interval '2 hours', now())`, []any{roomID, userID}},
 		{`INSERT INTO game_sessions (
 			session_id, room_id, game_id, engine_version, protocol_version, client_version,
 			state_version, ownership_epoch, snapshot_version, state_message_type, state_schema_version,

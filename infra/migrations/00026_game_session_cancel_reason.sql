@@ -8,6 +8,9 @@ SET cancel_reason = 'legacy_cancelled'
 WHERE status = 'cancelled'
   AND cancel_reason IS NULL;
 
+-- The backfill queues deferred session integrity checks. Flush them before changing the same table's constraints.
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE game_sessions
     ADD CONSTRAINT game_sessions_cancel_reason_shape CHECK (
         (

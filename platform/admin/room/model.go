@@ -73,6 +73,18 @@ const (
 	DefaultGameProgressWindow = 15 * time.Minute
 )
 
+// CommandOutcome is the stable service-level result for ordinary room/game control attempts.
+type CommandOutcome string
+
+const (
+	CommandOutcomeExecuted         CommandOutcome = "executed"
+	CommandOutcomeNoChange         CommandOutcome = "no_change"
+	CommandOutcomeVersionConflict  CommandOutcome = "version_conflict"
+	CommandOutcomeOwnerUnreachable CommandOutcome = "owner_unreachable"
+	CommandOutcomeRepairRequired   CommandOutcome = "repair_required"
+	CommandOutcomeRejected         CommandOutcome = "rejected"
+)
+
 // OwnerFreshness is the bounded admin-facing lease health result after PostgreSQL rows are compared with Redis.
 type OwnerFreshness string
 
@@ -223,6 +235,25 @@ type GamePage struct {
 	PageSize      uint32
 	NextPageToken string
 	SampledAt     time.Time
+}
+
+// RoomCommandResult returns the post-command room view plus conflict metadata without exposing write internals.
+type RoomCommandResult struct {
+	Outcome              CommandOutcome
+	Room                 RoomSummary
+	RevokedConnections   uint32
+	RepairRequired       bool
+	CurrentRoomVersion   uint64
+	CurrentMemberVersion uint64
+}
+
+// GameCommandResult returns the owner-routed game command outcome and the version hints needed for retry or repair.
+type GameCommandResult struct {
+	Outcome             CommandOutcome
+	Game                GameSummary
+	RepairRequired      bool
+	CurrentStateVersion uint64
+	CurrentOwnerEpoch   uint64
 }
 
 type GameParticipantSummary struct {

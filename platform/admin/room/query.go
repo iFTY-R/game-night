@@ -11,6 +11,8 @@ import (
 
 type Service struct {
 	repository QueryRepository
+	rooms      RoomStore
+	games      GameController
 	owners     OwnerReader
 	clock      clock.Clock
 }
@@ -18,6 +20,8 @@ type Service struct {
 // Config makes PostgreSQL reads, Redis owner reads, and sampled time explicit for deterministic tests.
 type Config struct {
 	Repository QueryRepository
+	Rooms      RoomStore
+	Games      GameController
 	Owners     OwnerReader
 	Clock      clock.Clock
 }
@@ -27,7 +31,7 @@ func NewService(config Config) (*Service, error) {
 	if config.Repository == nil || config.Clock == nil {
 		return nil, ErrInvalidInput
 	}
-	return &Service{repository: config.Repository, owners: config.Owners, clock: config.Clock}, nil
+	return &Service{repository: config.Repository, rooms: config.Rooms, games: config.Games, owners: config.Owners, clock: config.Clock}, nil
 }
 
 // ListRooms returns a sampled room page with Redis owner freshness merged before anomaly filtering.

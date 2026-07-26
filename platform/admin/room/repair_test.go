@@ -101,6 +101,44 @@ func TestRepairServiceExecuteRequiresEmergencyElevation(t *testing.T) {
 	}
 }
 
+func TestRepairServiceExecuteClearsStaleOwnerLeaseWithoutGenericExecutor(t *testing.T) {
+	now := time.Date(2026, 7, 26, 19, 30, 0, 0, time.UTC)
+	targetID := uuid.New()
+	owner := OwnerLeaseSummary{
+		SessionID: targetID, OwnerInstance: "realtime-a", OwnerAddress: "http://realtime-a.internal:8091",
+		OwnershipEpoch: 7, Freshness: OwnerFreshnessExpired, ObservedAt: now, ExpiresAt: now.Add(-time.Second),
+	}
+	before := stableDigest("game", targetID.String(), "active", owner.Freshness, owner.OwnerInstance, owner.OwnerAddress, owner.OwnershipEpoch)
+	preview := stableDigest("preview", targetID.String())
+	repairID := uuid.New()
+	repository := &memoryRepairRepository{
+		games: map[uuid.UUID]GameDetail{targetID: {
+			Summary: GameSummary{SessionID: targetID, Status: "active", StateVersion: 11, OwnershipEpoch: 7, Owner: owner},
+		}},
+		repairs: map[uuid.UUID]RepairOperation{repairID: {
+			RepairID: repairID, RepairType: RepairClearStaleOwnerLease, State: RepairStatePreviewed,
+			TargetID: targetID, TargetKind: RepairTargetKindGameSession, TargetDigest: before[:], PreviewDigest: preview[:],
+			CommandVersion: RepairCommandVersion, ExpectedStateVersion: 11, ExpectedOwnershipEpoch: 7,
+			Summary: "clear stale realtime owner lease", IrreversibleEffects: []string{"delete matching Redis lease"},
+			BeforeSnapshotDigest: before[:], RequestedByAdminID: uuid.New(), Reason: "preview stale lease repair",
+			Version: 1, CreatedAt: now, ExpiresAt: now.Add(DefaultRepairPreviewTTL),
+		}},
+	}
+	service := newRepairService(t, repository, nil, now)
+	actor := newElevatedRepairActor(t, now)
+
+	executed, err := service.ExecuteEmergencyRepair(context.Background(), actor, ExecuteEmergencyRepairCommand{
+		RepairID: repairID, OperationID: repairOperationID(t, 5), ExpectedRepairVersion: 1,
+		Reason: "execute stale owner lease repair",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if executed.State != RepairStateExecuted || repository.ownerClears != 1 || repository.executeCalls != 0 {
+		t.Fatalf("executed=%+v owner clears=%d generic calls=%d", executed, repository.ownerClears, repository.executeCalls)
+	}
+}
+
 func TestRepairServiceExecuteIsVersionedAndIdempotent(t *testing.T) {
 	now := time.Date(2026, 7, 26, 20, 0, 0, 0, time.UTC)
 	repairID := uuid.New()
@@ -157,6 +195,7 @@ type memoryRepairRepository struct {
 	rooms        map[uuid.UUID]RoomDetail
 	repairs      map[uuid.UUID]RepairOperation
 	executeCalls int
+	ownerClears  int
 }
 
 func (repository *memoryRepairRepository) ListRooms(context.Context, RoomListQuery) ([]RoomSummary, error) {
@@ -243,10 +282,18 @@ func (repository *memoryRepairRepository) ExecuteEmergencyRepair(context.Context
 	return digest[:], nil
 }
 
+func (repository *memoryRepairRepository) ClearStaleOwnerLease(_ context.Context, owner OwnerLeaseSummary) (bool, error) {
+	if owner.SessionID == uuid.Nil || owner.OwnerInstance == "" || owner.OwnerAddress == "" || owner.OwnershipEpoch == 0 {
+		return false, nil
+	}
+	repository.ownerClears++
+	return true, nil
+}
+
 func newRepairService(t testing.TB, repository *memoryRepairRepository, executor EmergencyRepairExecutor, now time.Time) *Service {
 	t.Helper()
 	service, err := NewService(Config{
-		Repository: repository, Repairs: repository, Executor: executor, Owners: repository, Clock: clock.NewFake(now),
+		Repository: repository, Repairs: repository, Executor: executor, Owners: repository, OwnerFixes: repository, Clock: clock.NewFake(now),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -313,3 +360,4 @@ var _ QueryRepository = (*memoryRepairRepository)(nil)
 var _ RepairRepository = (*memoryRepairRepository)(nil)
 var _ EmergencyRepairExecutor = (*memoryRepairRepository)(nil)
 var _ OwnerReader = (*memoryRepairRepository)(nil)
+var _ OwnerRepairer = (*memoryRepairRepository)(nil)

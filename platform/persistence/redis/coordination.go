@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	adminroom "github.com/iFTY-R/game-night/platform/admin/room"
 	"github.com/iFTY-R/game-night/platform/security"
 	goredis "github.com/redis/go-redis/v9"
 )
@@ -483,6 +484,17 @@ func (coordinator *GameCoordinator) ClearStaleSessionLease(ctx context.Context, 
 	return value == 1, nil
 }
 
+// ClearStaleOwnerLease adapts the admin dry-run owner summary to the token-free compare-delete repair path.
+func (coordinator *GameCoordinator) ClearStaleOwnerLease(ctx context.Context, owner adminroom.OwnerLeaseSummary) (bool, error) {
+	if owner.SessionID == uuid.Nil || owner.Freshness != adminroom.OwnerFreshnessStale && owner.Freshness != adminroom.OwnerFreshnessExpired {
+		return false, ErrInvalidCoordinationInput
+	}
+	return coordinator.ClearStaleSessionLease(ctx, SessionLease{
+		SessionID: owner.SessionID, Owner: owner.OwnerInstance, Address: owner.OwnerAddress,
+		Ready: true, OwnershipEpoch: owner.OwnershipEpoch,
+	})
+}
+
 func (coordinator *GameCoordinator) runScript(ctx context.Context, script *goredis.Script, keys []string, args ...interface{}) (interface{}, error) {
 	limited, cancel := coordinator.operationContext(ctx)
 	defer cancel()
@@ -591,3 +603,5 @@ func redisString(value interface{}) (string, bool) {
 		return "", false
 	}
 }
+
+var _ adminroom.OwnerRepairer = (*GameCoordinator)(nil)

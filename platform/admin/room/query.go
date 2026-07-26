@@ -14,6 +14,7 @@ type Service struct {
 	rooms      RoomStore
 	games      GameController
 	owners     OwnerReader
+	ownerFixes OwnerRepairer
 	repairs    RepairRepository
 	executor   EmergencyRepairExecutor
 	clock      clock.Clock
@@ -25,6 +26,7 @@ type Config struct {
 	Rooms      RoomStore
 	Games      GameController
 	Owners     OwnerReader
+	OwnerFixes OwnerRepairer
 	Repairs    RepairRepository
 	Executor   EmergencyRepairExecutor
 	Clock      clock.Clock
@@ -37,7 +39,7 @@ func NewService(config Config) (*Service, error) {
 	}
 	return &Service{
 		repository: config.Repository, rooms: config.Rooms, games: config.Games, owners: config.Owners,
-		repairs: config.Repairs, executor: config.Executor, clock: config.Clock,
+		ownerFixes: config.OwnerFixes, repairs: config.Repairs, executor: config.Executor, clock: config.Clock,
 	}, nil
 }
 

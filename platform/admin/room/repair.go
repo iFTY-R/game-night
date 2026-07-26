@@ -55,7 +55,7 @@ func (service *Service) PreviewEmergencyRepair(ctx context.Context, actor admin.
 
 // ExecuteEmergencyRepair revalidates elevation, repair version, TTL, and idempotency before side effects run.
 func (service *Service) ExecuteEmergencyRepair(ctx context.Context, actor admin.ActorContext, command ExecuteEmergencyRepairCommand) (RepairOperation, error) {
-	if service == nil || service.repairs == nil || service.executor == nil || service.clock == nil || ctx == nil ||
+	if service == nil || service.repairs == nil || service.clock == nil || ctx == nil ||
 		command.RepairID == uuid.Nil || !command.OperationID.Valid() || command.ExpectedRepairVersion == 0 || !validRepairReason(command.Reason) {
 		return RepairOperation{}, ErrInvalidInput
 	}
@@ -80,7 +80,7 @@ func (service *Service) ExecuteEmergencyRepair(ctx context.Context, actor admin.
 	if repair.State != RepairStatePreviewed || repair.Version != command.ExpectedRepairVersion || !now.Before(repair.ExpiresAt) {
 		return RepairOperation{}, ErrConflict
 	}
-	afterDigest, err := service.executor.ExecuteEmergencyRepair(ctx, repair, command)
+	afterDigest, err := service.executeRepairEffect(ctx, repair, command, now)
 	if err != nil {
 		return RepairOperation{}, err
 	}
@@ -93,6 +93,41 @@ func (service *Service) ExecuteEmergencyRepair(ctx context.Context, actor admin.
 		AuditEventID: auditEventID, AfterSnapshotDigest: afterDigest, Reason: command.Reason,
 		State: RepairStateExecuted, ExpectedVersion: command.ExpectedRepairVersion, ExecutedAt: now,
 	})
+}
+
+func (service *Service) executeRepairEffect(ctx context.Context, repair RepairOperation, command ExecuteEmergencyRepairCommand, now time.Time) ([]byte, error) {
+	if repair.RepairType == RepairClearStaleOwnerLease {
+		return service.executeClearStaleOwnerLease(ctx, repair, now)
+	}
+	if service.executor == nil {
+		return nil, ErrInvalidInput
+	}
+	return service.executor.ExecuteEmergencyRepair(ctx, repair, command)
+}
+
+func (service *Service) executeClearStaleOwnerLease(ctx context.Context, repair RepairOperation, now time.Time) ([]byte, error) {
+	if service.owners == nil || service.ownerFixes == nil || repair.TargetKind != RepairTargetKindGameSession {
+		return nil, ErrInvalidInput
+	}
+	detail, err := service.repairGameDetail(ctx, repair.TargetID, now)
+	if err != nil {
+		return nil, err
+	}
+	game := detail.Summary
+	owner := game.Owner
+	currentDigest := stableDigest("game", game.SessionID.String(), game.Status, owner.Freshness, owner.OwnerInstance, owner.OwnerAddress, owner.OwnershipEpoch)
+	if !sameBytes(currentDigest[:], repair.TargetDigest) {
+		return nil, ErrConflict
+	}
+	cleared, err := service.ownerFixes.ClearStaleOwnerLease(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	if !cleared {
+		return nil, ErrConflict
+	}
+	afterDigest := stableDigest("owner-cleared", repair.TargetID.String(), repair.ExpectedOwnershipEpoch)
+	return afterDigest[:], nil
 }
 
 // GetRepairOperation exposes the server-side repair plan without allowing the caller to mutate its after-state.

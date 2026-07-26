@@ -12,6 +12,11 @@ type OwnerReader interface {
 	ReadOwners(context.Context, []uuid.UUID, time.Time) (map[uuid.UUID]OwnerLeaseSummary, error)
 }
 
+// OwnerRepairer mutates only one reviewed realtime lease after the service revalidates the dry-run digest.
+type OwnerRepairer interface {
+	ClearStaleOwnerLease(context.Context, OwnerLeaseSummary) (bool, error)
+}
+
 // ownerMissing is used when a concrete session has no Redis lease at the sampled instant.
 func ownerMissing(sessionID uuid.UUID, observedAt time.Time) OwnerLeaseSummary {
 	return OwnerLeaseSummary{SessionID: sessionID, Freshness: OwnerFreshnessMissing, ObservedAt: observedAt}

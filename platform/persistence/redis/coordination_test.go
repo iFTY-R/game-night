@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	adminroom "github.com/iFTY-R/game-night/platform/admin/room"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -170,6 +171,27 @@ func TestGameCoordinatorFailsClosedAfterRedisClientClose(t *testing.T) {
 	}
 	if _, err := coordinator.ClearStaleSessionLease(ctx, SessionLease{SessionID: uuid.New(), Owner: "realtime-1", Address: "127.0.0.1:9090", Ready: true, OwnershipEpoch: 1}); !errors.Is(err, ErrCoordinationUnavailable) {
 		t.Fatalf("clear stale lease error = %v", err)
+	}
+	if _, err := coordinator.ClearStaleOwnerLease(ctx, adminOwnerLease(uuid.New(), "realtime-1", "127.0.0.1:9090", 1)); !errors.Is(err, ErrCoordinationUnavailable) {
+		t.Fatalf("clear stale owner lease error = %v", err)
+	}
+}
+
+func TestClearStaleOwnerLeaseRejectsFreshOwnerSummary(t *testing.T) {
+	client := goredis.NewClient(&goredis.Options{Addr: "127.0.0.1:1"})
+	t.Cleanup(func() { _ = client.Close() })
+	coordinator := testGameCoordinator(t, client)
+	owner := adminOwnerLease(uuid.New(), "realtime-1", "127.0.0.1:9090", 1)
+	owner.Freshness = adminroom.OwnerFreshnessFresh
+	if _, err := coordinator.ClearStaleOwnerLease(context.Background(), owner); !errors.Is(err, ErrInvalidCoordinationInput) {
+		t.Fatalf("fresh owner clear error = %v", err)
+	}
+}
+
+func adminOwnerLease(sessionID uuid.UUID, owner, address string, epoch uint64) adminroom.OwnerLeaseSummary {
+	return adminroom.OwnerLeaseSummary{
+		SessionID: sessionID, OwnerInstance: owner, OwnerAddress: address,
+		OwnershipEpoch: epoch, Freshness: adminroom.OwnerFreshnessExpired,
 	}
 }
 

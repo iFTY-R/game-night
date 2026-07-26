@@ -34,6 +34,7 @@ type UserSurfaceConfig struct {
 type AdminSurfaceConfig struct {
 	Auth         adminv1connect.AdminAuthServiceHandler
 	User         adminv1connect.AdminUserServiceHandler
+	Room         adminv1connect.AdminRoomServiceHandler
 	Interceptors []connect.Interceptor
 }
 
@@ -73,15 +74,17 @@ type AdminSurface struct{ handler http.Handler }
 // NewAdminSurface builds an immutable administrator mux with an interceptor
 // chain independent from the one supplied to NewUserSurface.
 func NewAdminSurface(config AdminSurfaceConfig) (*AdminSurface, error) {
-	if config.Auth == nil || config.User == nil || invalidInterceptors(config.Interceptors) {
+	if config.Auth == nil || config.User == nil || config.Room == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
 	authPath, authHandler := adminv1connect.NewAdminAuthServiceHandler(config.Auth, options...)
 	userPath, userHandler := adminv1connect.NewAdminUserServiceHandler(config.User, options...)
+	roomPath, roomHandler := adminv1connect.NewAdminRoomServiceHandler(config.Room, options...)
 	mux := http.NewServeMux()
 	mux.Handle(authPath, authHandler)
 	mux.Handle(userPath, userHandler)
+	mux.Handle(roomPath, roomHandler)
 	return &AdminSurface{handler: mux}, nil
 }
 
@@ -112,6 +115,7 @@ func NewHandler(config HandlerConfig) (http.Handler, error) {
 	mux.Handle("/"+gamev1connect.GameServiceName+"/", config.User)
 	mux.Handle("/"+adminv1connect.AdminAuthServiceName+"/", config.Admin)
 	mux.Handle("/"+adminv1connect.AdminUserServiceName+"/", config.Admin)
+	mux.Handle("/"+adminv1connect.AdminRoomServiceName+"/", config.Admin)
 	// Both immutable surfaces own the same readiness instance; routing through one avoids duplicate public paths.
 	mux.Handle(ReadinessPath, config.User)
 	mux.Handle(SensitiveReadinessPath, config.User)

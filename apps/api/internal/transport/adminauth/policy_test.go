@@ -14,10 +14,12 @@ import (
 func TestProcedurePoliciesCoverGeneratedAdminAuthServiceExactly(t *testing.T) {
 	authService := adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService")
 	userService := adminv1.File_platform_admin_v1_admin_user_proto.Services().ByName("AdminUserService")
+	roomService := adminv1.File_platform_admin_v1_admin_room_proto.Services().ByName("AdminRoomService")
 	assertServicePolicies(t, authService)
 	assertServicePolicies(t, userService)
-	if len(procedurePolicies) != authService.Methods().Len()+userService.Methods().Len() {
-		t.Fatalf("policy count = %d, want %d", len(procedurePolicies), authService.Methods().Len()+userService.Methods().Len())
+	assertServicePolicies(t, roomService)
+	if len(procedurePolicies) != authService.Methods().Len()+userService.Methods().Len()+roomService.Methods().Len() {
+		t.Fatalf("policy count = %d, want %d", len(procedurePolicies), authService.Methods().Len()+userService.Methods().Len()+roomService.Methods().Len())
 	}
 	if _, ok := policyForProcedure("/platform.admin.v1.AdminAuthService/Unknown"); ok {
 		t.Fatal("unknown procedure must not resolve to a policy")
@@ -170,6 +172,37 @@ func TestAdminUserPoliciesSeparateReadPIIAndHighRiskCommands(t *testing.T) {
 	command := requireProcedurePolicy(t, "/platform.admin.v1.AdminUserService/ExecuteUserCommand")
 	if command.permission != "" || !slices.Equal(command.permissionsAny, []admin.Permission{admin.PermissionUsersGovern, admin.PermissionRoomsControl}) {
 		t.Fatalf("payload command policy = %+v", command)
+	}
+}
+
+func TestAdminRoomPoliciesSeparateReadControlAndRepairElevation(t *testing.T) {
+	listRooms := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceListRoomsProcedure)
+	if listRooms.permission != admin.PermissionRoomsRead || listRooms.requiresRequestID || listRooms.elevation != "" {
+		t.Fatalf("list rooms policy = %+v", listRooms)
+	}
+	listGames := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceListGamesProcedure)
+	if listGames.permission != admin.PermissionGamesRead || listGames.requiresRequestID || listGames.elevation != "" {
+		t.Fatalf("list games policy = %+v", listGames)
+	}
+	setAdmission := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceSetRoomAdmissionProcedure)
+	if setAdmission.permission != admin.PermissionRoomsControl || !setAdmission.requiresRequestID || setAdmission.elevation != "" {
+		t.Fatalf("set admission policy = %+v", setAdmission)
+	}
+	forceClose := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceForceCloseRoomProcedure)
+	if forceClose.permission != admin.PermissionRoomsControl || !forceClose.requiresRequestID || forceClose.elevation != admin.ElevationScopeRoomsForceClose {
+		t.Fatalf("force close policy = %+v", forceClose)
+	}
+	terminate := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceForceTerminateGameProcedure)
+	if terminate.permission != admin.PermissionGamesControl || !terminate.requiresRequestID || terminate.elevation != admin.ElevationScopeGamesForceTerminate {
+		t.Fatalf("force terminate policy = %+v", terminate)
+	}
+	previewRepair := requireProcedurePolicy(t, adminv1connect.AdminRoomServicePreviewEmergencyRepairProcedure)
+	if previewRepair.permission != admin.PermissionGamesRepair || !previewRepair.requiresRequestID || previewRepair.elevation != "" {
+		t.Fatalf("preview repair policy = %+v", previewRepair)
+	}
+	executeRepair := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceExecuteEmergencyRepairProcedure)
+	if executeRepair.permission != admin.PermissionGamesRepair || !executeRepair.requiresRequestID || executeRepair.elevation != admin.ElevationScopeGamesEmergencyRepair {
+		t.Fatalf("execute repair policy = %+v", executeRepair)
 	}
 }
 

@@ -26,6 +26,7 @@ func TestAllGeneratedProceduresAreExplicitlyRegistered(t *testing.T) {
 		gamev1.File_platform_game_v1_game_proto.Services().ByName("GameService"),
 		adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService"),
 		adminv1.File_platform_admin_v1_admin_user_proto.Services().ByName("AdminUserService"),
+		adminv1.File_platform_admin_v1_admin_room_proto.Services().ByName("AdminRoomService"),
 	}
 	seen := make(map[string]struct{})
 	for _, service := range services {
@@ -61,6 +62,17 @@ func TestAdminAuthOperationsMatchGeneratedServiceExactly(t *testing.T) {
 	}
 	if !slices.Equal(AdminAuthOperations, expected) {
 		t.Fatalf("AdminAuthOperations mismatch\nexpected: %v\nactual:   %v", expected, AdminAuthOperations)
+	}
+}
+
+func TestAdminRoomOperationsMatchGeneratedServiceExactly(t *testing.T) {
+	service := adminv1.File_platform_admin_v1_admin_room_proto.Services().ByName("AdminRoomService")
+	expected := make([]string, 0, service.Methods().Len())
+	for index := range service.Methods().Len() {
+		expected = append(expected, "/"+string(service.FullName())+"/"+string(service.Methods().Get(index).Name()))
+	}
+	if !slices.Equal(AdminRoomOperations, expected) {
+		t.Fatalf("AdminRoomOperations mismatch\nexpected: %v\nactual:   %v", expected, AdminRoomOperations)
 	}
 }
 

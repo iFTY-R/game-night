@@ -235,6 +235,39 @@ var procedurePolicies = map[string]procedurePolicy{
 	adminv1connect.AdminUserServiceDeleteExportResultProcedure: adminUserProcedurePolicy(
 		adminv1connect.AdminUserServiceDeleteExportResultProcedure, admin.PermissionUsersExport, true, "",
 	),
+	adminv1connect.AdminRoomServiceListRoomsProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceListRoomsProcedure, admin.PermissionRoomsRead, false, "",
+	),
+	adminv1connect.AdminRoomServiceGetRoomProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceGetRoomProcedure, admin.PermissionRoomsRead, false, "",
+	),
+	adminv1connect.AdminRoomServiceListGamesProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceListGamesProcedure, admin.PermissionGamesRead, false, "",
+	),
+	adminv1connect.AdminRoomServiceGetGameProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceGetGameProcedure, admin.PermissionGamesRead, false, "",
+	),
+	adminv1connect.AdminRoomServiceSetRoomAdmissionProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceSetRoomAdmissionProcedure, admin.PermissionRoomsControl, true, "",
+	),
+	adminv1connect.AdminRoomServiceRemoveRoomMemberProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceRemoveRoomMemberProcedure, admin.PermissionRoomsControl, true, "",
+	),
+	adminv1connect.AdminRoomServiceForceCloseRoomProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceForceCloseRoomProcedure, admin.PermissionRoomsControl, true, admin.ElevationScopeRoomsForceClose,
+	),
+	adminv1connect.AdminRoomServiceForceTerminateGameProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceForceTerminateGameProcedure, admin.PermissionGamesControl, true, admin.ElevationScopeGamesForceTerminate,
+	),
+	adminv1connect.AdminRoomServicePreviewEmergencyRepairProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServicePreviewEmergencyRepairProcedure, admin.PermissionGamesRepair, true, "",
+	),
+	adminv1connect.AdminRoomServiceExecuteEmergencyRepairProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceExecuteEmergencyRepairProcedure, admin.PermissionGamesRepair, true, admin.ElevationScopeGamesEmergencyRepair,
+	),
+	adminv1connect.AdminRoomServiceGetRepairOperationProcedure: adminRoomProcedurePolicy(
+		adminv1connect.AdminRoomServiceGetRepairOperationProcedure, admin.PermissionGamesRepair, false, "",
+	),
 }
 
 // adminUserProcedurePolicy applies the invariant full-session and CSRF boundary to every user-center RPC.
@@ -257,6 +290,18 @@ func adminUserPayloadProcedurePolicy(procedure string, requiresRequestID bool, p
 		requiresCSRF:      true,
 		requiresRequestID: requiresRequestID,
 		permissionsAny:    append([]admin.Permission(nil), permissions...),
+	}
+}
+
+// adminRoomProcedurePolicy applies the full-session, CSRF, and audited-command boundary to room/game control RPCs.
+func adminRoomProcedurePolicy(procedure string, permission admin.Permission, requiresRequestID bool, elevation admin.ElevationScope) procedurePolicy {
+	return procedurePolicy{
+		procedure:         procedure,
+		session:           sessionRequirementFull,
+		requiresCSRF:      true,
+		requiresRequestID: requiresRequestID,
+		permission:        permission,
+		elevation:         elevation,
 	}
 }
 

@@ -27,6 +27,7 @@ import (
 	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/platform/admin"
 	adminuserdomain "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
@@ -548,6 +549,7 @@ func transportHandler(
 	}
 	adminOperations := append([]string(nil), sensitive.AdminAuthOperations...)
 	adminOperations = append(adminOperations, sensitive.AdminUserOperations...)
+	adminOperations = append(adminOperations, sensitive.AdminRoomOperations...)
 	adminSensitive, err := sensitive.New(adminOperations...)
 	if err != nil {
 		return nil, err
@@ -570,6 +572,7 @@ func transportHandler(
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
 		Auth:         adminAuthHandler,
 		User:         adminUserHandler,
+		Room:         &adminv1connect.UnimplementedAdminRoomServiceHandler{},
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {

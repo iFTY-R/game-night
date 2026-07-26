@@ -79,6 +79,19 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"CreateExportDownloadGrant",
 		"DeleteExportResult",
 	})
+	assertServiceMethods(t, adminv1.File_platform_admin_v1_admin_room_proto, "AdminRoomService", []string{
+		"ListRooms",
+		"GetRoom",
+		"ListGames",
+		"GetGame",
+		"SetRoomAdmission",
+		"RemoveRoomMember",
+		"ForceCloseRoom",
+		"ForceTerminateGame",
+		"PreviewEmergencyRepair",
+		"ExecuteEmergencyRepair",
+		"GetRepairOperation",
+	})
 	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
 		"CreateRoom",
 		"GetRoom",
@@ -305,6 +318,7 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		adminv1.File_platform_admin_v1_admin_common_proto,
 		adminv1.File_platform_admin_v1_admin_auth_proto,
 		adminv1.File_platform_admin_v1_admin_user_proto,
+		adminv1.File_platform_admin_v1_admin_room_proto,
 		auditv1.File_platform_audit_v1_audit_proto,
 		roomv1.File_platform_room_v1_room_proto,
 	}
@@ -430,6 +444,41 @@ func TestAdminCommonContractShape(t *testing.T) {
 		{name: "audit_event_id", kind: protoreflect.StringKind},
 		{name: "completed_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
 	})
+}
+
+func TestAdminRoomContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_room_proto
+	assertEnumValues(t, file.Enums().ByName("AdminRepairType"), []string{
+		"ADMIN_REPAIR_TYPE_UNSPECIFIED",
+		"ADMIN_REPAIR_TYPE_CLEAR_STALE_OWNER_LEASE",
+		"ADMIN_REPAIR_TYPE_TERMINATE_UNRECOVERABLE_GAME",
+		"ADMIN_REPAIR_TYPE_REPAIR_ROOM_GAME_LINK",
+	})
+	assertEnumValues(t, file.Enums().ByName("AdminRoomCommandOutcome"), []string{
+		"ADMIN_ROOM_COMMAND_OUTCOME_UNSPECIFIED",
+		"ADMIN_ROOM_COMMAND_OUTCOME_EXECUTED",
+		"ADMIN_ROOM_COMMAND_OUTCOME_NO_CHANGE",
+		"ADMIN_ROOM_COMMAND_OUTCOME_VERSION_CONFLICT",
+		"ADMIN_ROOM_COMMAND_OUTCOME_OWNER_UNREACHABLE",
+		"ADMIN_ROOM_COMMAND_OUTCOME_REPAIR_REQUIRED",
+		"ADMIN_ROOM_COMMAND_OUTCOME_REJECTED",
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("ForceTerminateGameRequest"), []fieldShape{
+		{name: "operation_id", kind: protoreflect.StringKind},
+		{name: "session_id", kind: protoreflect.StringKind},
+		{name: "reason", kind: protoreflect.StringKind},
+		{name: "expected_state_version", kind: protoreflect.Uint64Kind},
+		{name: "expected_ownership_epoch", kind: protoreflect.Uint64Kind},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("ExecuteEmergencyRepairRequest"), []fieldShape{
+		{name: "operation_id", kind: protoreflect.StringKind},
+		{name: "repair_id", kind: protoreflect.StringKind},
+		{name: "reason", kind: protoreflect.StringKind},
+		{name: "expected_repair_version", kind: protoreflect.Uint64Kind},
+	})
+	assertMessageDoesNotContainFields(t, file.Messages().ByName("AdminRepairOperation"), "patch", "json", "state_payload", "replay")
 }
 
 func TestAdminCurrentSessionContractShape(t *testing.T) {
@@ -738,6 +787,24 @@ func assertMessageFieldShapes(t *testing.T, message protoreflect.MessageDescript
 		}
 		if got != expected.typeName {
 			t.Fatalf("%s field %d: expected type %s, got %s", message.FullName(), index+1, expected.typeName, got)
+		}
+	}
+}
+
+func assertMessageDoesNotContainFields(t *testing.T, message protoreflect.MessageDescriptor, blocked ...string) {
+	t.Helper()
+
+	if message == nil {
+		t.Fatal("message descriptor is missing")
+	}
+	blockedSet := make(map[string]struct{}, len(blocked))
+	for _, name := range blocked {
+		blockedSet[name] = struct{}{}
+	}
+	for index := range message.Fields().Len() {
+		field := message.Fields().Get(index)
+		if _, exists := blockedSet[string(field.Name())]; exists {
+			t.Fatalf("%s contains blocked field %s", message.FullName(), field.Name())
 		}
 	}
 }

@@ -126,6 +126,21 @@ var AdminUserOperations = []string{
 	adminv1connect.AdminUserServiceDeleteExportResultProcedure,
 }
 
+// AdminRoomOperations contains room/game management procedures because owner, reason, and repair digests must not be cached.
+var AdminRoomOperations = []string{
+	adminv1connect.AdminRoomServiceListRoomsProcedure,
+	adminv1connect.AdminRoomServiceGetRoomProcedure,
+	adminv1connect.AdminRoomServiceListGamesProcedure,
+	adminv1connect.AdminRoomServiceGetGameProcedure,
+	adminv1connect.AdminRoomServiceSetRoomAdmissionProcedure,
+	adminv1connect.AdminRoomServiceRemoveRoomMemberProcedure,
+	adminv1connect.AdminRoomServiceForceCloseRoomProcedure,
+	adminv1connect.AdminRoomServiceForceTerminateGameProcedure,
+	adminv1connect.AdminRoomServicePreviewEmergencyRepairProcedure,
+	adminv1connect.AdminRoomServiceExecuteEmergencyRepairProcedure,
+	adminv1connect.AdminRoomServiceGetRepairOperationProcedure,
+}
+
 // Registry is immutable after construction so concurrent interceptors cannot change observation policy.
 type Registry struct{ operations map[string]struct{} }
 
@@ -149,12 +164,13 @@ func New(operations ...string) (*Registry, error) {
 
 // AllOperations returns an independent list suitable for metrics and the process-wide cache policy registry.
 func AllOperations() []string {
-	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminUserOperations))
+	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminUserOperations)+len(AdminRoomOperations))
 	operations = append(operations, IdentityOperations...)
 	operations = append(operations, RoomOperations...)
 	operations = append(operations, GameOperations...)
 	operations = append(operations, AdminAuthOperations...)
 	operations = append(operations, AdminUserOperations...)
+	operations = append(operations, AdminRoomOperations...)
 	return operations
 }
 

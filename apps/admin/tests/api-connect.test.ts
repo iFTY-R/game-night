@@ -12,8 +12,10 @@ import {
 } from "../src/api/admin-auth";
 import {
   adminUserRequestPolicies,
+  executeUserCommand,
   getUserPII,
   listUsers,
+  previewUserCommand,
   setUserTags
 } from "../src/api/admin-user";
 import {
@@ -25,7 +27,7 @@ import { installSessionInvalidHandler } from "../src/api/connect";
 import { AdminApiError } from "../src/api/errors";
 import { AdminAuthService } from "../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
 import { AdminRoomService } from "../../../contracts/gen/ts/platform/admin/v1/admin_room_pb";
-import { AdminUserPIIField, AdminUserService } from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
+import { AdminUserCommandType, AdminUserPIIField, AdminUserService } from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
 import { BusinessErrorDetailSchema } from "../../../contracts/gen/ts/platform/common/v1/error_pb";
 
 const base64BusinessError = (messageKey: string): string => {
@@ -77,7 +79,9 @@ describe("admin connect transport", () => {
       DeleteUserTag: { csrf: true, requestId: true },
       SetUserTags: { csrf: true, requestId: true },
       ListUserNotes: { csrf: true, requestId: false },
-      AppendUserNote: { csrf: true, requestId: true }
+      AppendUserNote: { csrf: true, requestId: true },
+      PreviewUserCommand: { csrf: true, requestId: true },
+      ExecuteUserCommand: { csrf: true, requestId: true }
     });
   });
 
@@ -198,7 +202,22 @@ describe("admin connect transport", () => {
 
   it.each([
     ["GetUserPII", () => getUserPII({ userId: "user-1", fields: [AdminUserPIIField.ADMIN_USER_PII_FIELD_REAL_NAME], reason: "申诉核验" })],
-    ["SetUserTags", () => setUserTags({ operationId: "op-1", userId: "user-1", tagIds: ["tag-1"], reason: "运营标注", expectedVersion: 2n })]
+    ["SetUserTags", () => setUserTags({ operationId: "op-1", userId: "user-1", tagIds: ["tag-1"], reason: "运营标注", expectedVersion: 2n })],
+    ["PreviewUserCommand", () => previewUserCommand({
+      userId: "user-1",
+      command: { type: AdminUserCommandType.SUSPEND },
+      reason: "风控处置",
+      expectedUserVersion: 2n
+    })],
+    ["ExecuteUserCommand", () => executeUserCommand({
+      operationId: "op-1",
+      userId: "user-1",
+      command: { type: AdminUserCommandType.SUSPEND },
+      previewId: "preview-1",
+      previewDigest: "digest",
+      reason: "风控处置",
+      expectedUserVersion: 2n
+    })]
   ])("assigns request ids to audited user-center procedure %s", async (procedureName, invoke) => {
     Object.defineProperty(document, "cookie", {
       configurable: true,

@@ -12,6 +12,7 @@ import {
   NForm,
   NFormItem,
   NInput,
+  NPopconfirm,
   NSelect,
   NSpace,
   NSpin,
@@ -29,22 +30,30 @@ import { AdminPermission } from "../../../../../contracts/gen/ts/platform/admin/
 import {
   AdminUserPIIField,
   AdminUserStatus,
+  AdminUserCommandBlockerType,
+  AdminUserCommandOutcome,
+  AdminUserCommandType,
   type AdminUserDetail,
   type AdminUserNote,
   type AdminUserPIIValue,
+  type AdminUserRoomSummary,
   type AdminUserSummary,
-  type AdminUserTag
+  type AdminUserTag,
+  type PreviewUserCommandResponse
 } from "../../../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
 import {
   appendUserNote,
   createUserTag,
+  executeUserCommand,
   getUser,
   getUserPII,
   listUserNotes,
   listUsers,
   listUserTags,
+  previewUserCommand,
   setUserTags
 } from "../../api/admin-user";
+import type { AdminUserCommandInput } from "../../api/admin-user";
 import { createRequestId } from "../../api/connect";
 import { AdminApiError } from "../../api/errors";
 import PermissionGate from "../../components/PermissionGate.vue";
@@ -75,12 +84,19 @@ const tagForm = reactive({
   color: "#2563eb",
   reason: ""
 });
+const governanceFormRef = ref<FormInst | null>(null);
+const governanceForm = reactive({
+  commandType: AdminUserCommandType.SUSPEND,
+  roomId: "",
+  reason: ""
+});
 
 const rules: FormRules = {
   body: { required: true, message: "请输入备注内容", trigger: ["input", "blur"] },
   reason: { required: true, message: "请输入操作原因", trigger: ["input", "blur"] },
   name: { required: true, message: "请输入标签名称", trigger: ["input", "blur"] },
-  color: { required: true, message: "请输入标签颜色", trigger: ["input", "blur"] }
+  color: { required: true, message: "请输入标签颜色", trigger: ["input", "blur"] },
+  commandType: { required: true, type: "number", message: "请选择治理动作", trigger: ["change"] }
 };
 
 const users = ref<AdminUserSummary[]>([]);
@@ -97,6 +113,9 @@ const savingTags = ref(false);
 const savingNote = ref(false);
 const loadingPii = ref(false);
 const creatingTag = ref(false);
+const previewingGovernance = ref(false);
+const executingGovernance = ref(false);
+const governancePreview = ref<PreviewUserCommandResponse | null>(null);
 const nextPageToken = ref("");
 
 // Request generation protects the detail drawer from stale writes when operators switch users quickly.
@@ -105,6 +124,7 @@ let activeController: AbortController | null = null;
 
 const canReadPii = computed(() => auth.permissions.includes(AdminPermission.USERS_READ_PII));
 const canAnnotate = computed(() => auth.permissions.includes(AdminPermission.USERS_ANNOTATE));
+const canGovern = computed(() => auth.permissions.includes(AdminPermission.USERS_GOVERN));
 const selectedSummary = computed(() => detail.value?.summary ?? users.value.find((user) => user.userId === selectedUserId.value) ?? null);
 const selectedTagIds = computed({
   get: () => selectedSummary.value?.tags.map((tag) => tag.tagId) ?? [],
@@ -114,12 +134,23 @@ const tagOptions = computed<SelectOption[]>(() => tags.value.map((tag) => ({
   label: tag.name,
   value: tag.tagId
 })));
+const roomCommandOptions = computed<SelectOption[]>(() => (detail.value?.rooms ?? []).map((room) => ({
+  label: `${room.roomCode || room.roomId} · ${formatRoomRole(room.membershipRole)}`,
+  value: room.roomId
+})));
 const statusOptions: SelectOption[] = [
   { label: "全部状态", value: 0 },
   { label: "注册中", value: AdminUserStatus.ONBOARDING },
   { label: "正常", value: AdminUserStatus.ACTIVE },
   { label: "已停权", value: AdminUserStatus.SUSPENDED },
   { label: "已删除", value: AdminUserStatus.DELETED }
+];
+const governanceCommandOptions: SelectOption[] = [
+  { label: "停权用户", value: AdminUserCommandType.SUSPEND },
+  { label: "解除停权", value: AdminUserCommandType.UNSUSPEND },
+  { label: "撤销全部设备", value: AdminUserCommandType.REVOKE_ALL_DEVICES },
+  { label: "移出当前房间", value: AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM },
+  { label: "删除用户", value: AdminUserCommandType.DELETE }
 ];
 
 const userStatusType = (status: AdminUserStatus): "default" | "success" | "warning" | "error" => {
@@ -151,6 +182,64 @@ const formatUserStatus = (status: AdminUserStatus): string => {
   }
 };
 
+const formatCommand = (command: AdminUserCommandType): string => {
+  switch (command) {
+    case AdminUserCommandType.SUSPEND:
+      return "停权用户";
+    case AdminUserCommandType.UNSUSPEND:
+      return "解除停权";
+    case AdminUserCommandType.REVOKE_ALL_DEVICES:
+      return "撤销全部设备";
+    case AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM:
+      return "移出当前房间";
+    case AdminUserCommandType.DELETE:
+      return "删除用户";
+    default:
+      return "未知治理";
+  }
+};
+
+const formatCommandOutcome = (outcome: AdminUserCommandOutcome): string => {
+  switch (outcome) {
+    case AdminUserCommandOutcome.EXECUTED:
+      return "已执行";
+    case AdminUserCommandOutcome.NO_CHANGE:
+      return "无变化";
+    case AdminUserCommandOutcome.REJECTED:
+      return "已拒绝";
+    default:
+      return "未知结果";
+  }
+};
+
+const formatCommandBlocker = (type: AdminUserCommandBlockerType): string => {
+  switch (type) {
+    case AdminUserCommandBlockerType.ACTIVE_GAME:
+      return "存在进行中牌局";
+    case AdminUserCommandBlockerType.PENDING_EXPORT:
+      return "存在待处理导出";
+    case AdminUserCommandBlockerType.VERSION_CHANGED:
+      return "用户版本已变化";
+    case AdminUserCommandBlockerType.ALREADY_DELETED:
+      return "用户已删除";
+    default:
+      return "未知阻断";
+  }
+};
+
+const formatRoomRole = (role: AdminUserRoomSummary["membershipRole"]): string => {
+  switch (role) {
+    case 1:
+      return "玩家";
+    case 2:
+      return "观众";
+    case 3:
+      return "等待";
+    default:
+      return "未知角色";
+  }
+};
+
 const errorMessage = (error: unknown, fallback: string): string =>
   error instanceof AdminApiError ? error.message : fallback;
 
@@ -168,7 +257,26 @@ const clearSensitiveDetail = (): void => {
   piiValues.value = [];
   piiAuditEventId.value = "";
   piiForm.reason = "";
+  governancePreview.value = null;
   piiFormRef.value?.restoreValidation();
+  governanceFormRef.value?.restoreValidation();
+};
+
+const buildGovernanceCommand = (): AdminUserCommandInput | null => {
+  if (governanceForm.commandType !== AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM) {
+    return { type: governanceForm.commandType };
+  }
+  const room = detail.value?.rooms.find((entry) => entry.roomId === governanceForm.roomId);
+  if (!room) {
+    message.warning("请选择要移出的房间。");
+    return null;
+  }
+  return {
+    type: governanceForm.commandType,
+    roomId: room.roomId,
+    expectedRoomVersion: room.roomVersion,
+    expectedMembershipVersion: room.membershipVersion
+  };
 };
 
 const loadTags = async (): Promise<void> => {
@@ -338,6 +446,61 @@ const handleRevealPii = async (): Promise<void> => {
     message.error(errorMessage(error, "读取 PII 失败。"));
   } finally {
     loadingPii.value = false;
+  }
+};
+
+const handlePreviewGovernance = async (): Promise<void> => {
+  await governanceFormRef.value?.validate();
+  const summary = selectedSummary.value;
+  const command = buildGovernanceCommand();
+  if (!summary || !command) {
+    return;
+  }
+  previewingGovernance.value = true;
+  governancePreview.value = null;
+  try {
+    governancePreview.value = await previewUserCommand({
+      userId: summary.userId,
+      command,
+      reason: governanceForm.reason,
+      expectedUserVersion: summary.version
+    });
+    message.success("治理预览已生成。");
+  } catch (error) {
+    message.error(errorMessage(error, "生成治理预览失败。"));
+  } finally {
+    previewingGovernance.value = false;
+  }
+};
+
+const handleExecuteGovernance = async (): Promise<void> => {
+  const summary = selectedSummary.value;
+  const preview = governancePreview.value;
+  const command = buildGovernanceCommand();
+  if (!summary || !preview || !command || preview.blockers.length) {
+    return;
+  }
+  executingGovernance.value = true;
+  try {
+    const response = await executeUserCommand({
+      operationId: createRequestId(),
+      userId: summary.userId,
+      command,
+      previewId: preview.previewId,
+      previewDigest: preview.previewDigest,
+      reason: governanceForm.reason,
+      expectedUserVersion: preview.expectedUserVersion
+    });
+    if (response.user) {
+      detail.value = detail.value ? { ...detail.value, summary: response.user } : detail.value;
+      users.value = users.value.map((user) => user.userId === response.user?.userId ? response.user : user);
+    }
+    governancePreview.value = null;
+    message.success(`治理执行完成：${formatCommandOutcome(response.outcome)}。`);
+  } catch (error) {
+    message.error(errorMessage(error, "执行治理命令失败。"));
+  } finally {
+    executingGovernance.value = false;
   }
 };
 
@@ -560,6 +723,48 @@ onBeforeUnmount(() => {
                 </PermissionGate>
                 <NEmpty v-if="!canReadPii" description="当前管理员无 PII 读取权限" />
               </NTabPane>
+              <NTabPane name="governance" tab="治理">
+                <PermissionGate :permission="AdminPermission.USERS_GOVERN">
+                  <NAlert type="warning" :bordered="false">
+                    单用户治理必须先预览影响；存在阻断项时不会执行，所有执行请求都会写入审计。
+                  </NAlert>
+                  <NForm ref="governanceFormRef" :model="governanceForm" :rules="rules" label-placement="top" class="user-center__governance-form">
+                    <NFormItem label="治理动作" path="commandType">
+                      <NSelect v-model:value="governanceForm.commandType" :options="governanceCommandOptions" @update:value="governancePreview = null" />
+                    </NFormItem>
+                    <NFormItem v-if="governanceForm.commandType === AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM" label="目标房间" path="roomId">
+                      <NSelect v-model:value="governanceForm.roomId" :options="roomCommandOptions" placeholder="选择要移出的当前房间" @update:value="governancePreview = null" />
+                    </NFormItem>
+                    <NFormItem label="原因" path="reason">
+                      <NInput v-model:value="governanceForm.reason" type="textarea" placeholder="说明治理原因，供审计和复核使用" @input="governancePreview = null" />
+                    </NFormItem>
+                    <NSpace>
+                      <NButton type="warning" :loading="previewingGovernance" @click="handlePreviewGovernance">预览治理</NButton>
+                      <NPopconfirm :disabled="!governancePreview || !!governancePreview.blockers.length" @positive-click="handleExecuteGovernance">
+                        <template #trigger>
+                          <NButton type="error" :disabled="!governancePreview || !!governancePreview.blockers.length" :loading="executingGovernance">
+                            执行治理
+                          </NButton>
+                        </template>
+                        确认执行 {{ formatCommand(governanceForm.commandType) }}？
+                      </NPopconfirm>
+                    </NSpace>
+                  </NForm>
+                  <NDescriptions v-if="governancePreview" bordered :column="1" label-placement="left" class="user-center__governance-preview">
+                    <NDescriptionsItem label="预览 ID">{{ governancePreview.previewId }}</NDescriptionsItem>
+                    <NDescriptionsItem label="影响设备">{{ governancePreview.affectedDevices }}</NDescriptionsItem>
+                    <NDescriptionsItem label="影响房间">{{ governancePreview.affectedRooms }}</NDescriptionsItem>
+                    <NDescriptionsItem label="过期时间">{{ formatDateTime(governancePreview.expiresAt) }}</NDescriptionsItem>
+                    <NDescriptionsItem label="阻断项">
+                      <NTag v-for="blocker in governancePreview.blockers" :key="`${blocker.type}-${blocker.resourceId}`" type="error" size="small">
+                        {{ formatCommandBlocker(blocker.type) }} {{ blocker.resourceId }}
+                      </NTag>
+                      <span v-if="!governancePreview.blockers.length">无阻断，可执行</span>
+                    </NDescriptionsItem>
+                  </NDescriptions>
+                </PermissionGate>
+                <NEmpty v-if="!canGovern" description="当前管理员无用户治理权限" />
+              </NTabPane>
               <NTabPane name="activity" tab="活动快照">
                 <div class="user-center__activity">
                   <NCard title="设备" size="small" :bordered="false">
@@ -725,8 +930,10 @@ onBeforeUnmount(() => {
 
 .user-center__note-form,
 .user-center__pii-form,
+.user-center__governance-form,
 .user-center__notes,
-.user-center__pii-result {
+.user-center__pii-result,
+.user-center__governance-preview {
   margin-top: 16px;
 }
 

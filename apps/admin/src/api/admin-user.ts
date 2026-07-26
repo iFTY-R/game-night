@@ -1,6 +1,8 @@
 import {
   AdminUserPIIField,
   AdminUserSortField,
+  ExecuteUserCommandRequestSchema,
+  ExecuteUserCommandResponseSchema,
   AppendUserNoteRequestSchema,
   AppendUserNoteResponseSchema,
   CreateUserTagRequestSchema,
@@ -17,6 +19,8 @@ import {
   ListUsersResponseSchema,
   ListUserTagsRequestSchema,
   ListUserTagsResponseSchema,
+  PreviewUserCommandRequestSchema,
+  PreviewUserCommandResponseSchema,
   SetUserTagsRequestSchema,
   SetUserTagsResponseSchema,
   UpdateUserTagRequestSchema,
@@ -24,14 +28,17 @@ import {
   type AppendUserNoteResponse,
   type CreateUserTagResponse,
   type DeleteUserTagResponse,
+  type ExecuteUserCommandResponse,
   type GetUserPIIResponse,
   type GetUserResponse,
   type ListUserNotesResponse,
   type ListUsersResponse,
   type ListUserTagsResponse,
+  type PreviewUserCommandResponse,
   type SetUserTagsResponse,
   type UpdateUserTagResponse
 } from "../../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
+import type { AdminUserCommandType } from "../../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
 import { AdminSortDirection } from "../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import { callUnary, procedure, type UnaryRequestPolicy } from "./connect";
 
@@ -52,7 +59,9 @@ export const adminUserRequestPolicies = {
   DeleteUserTag: auditedUserRequest,
   SetUserTags: auditedUserRequest,
   ListUserNotes: sessionReadRequest,
-  AppendUserNote: auditedUserRequest
+  AppendUserNote: auditedUserRequest,
+  PreviewUserCommand: auditedUserRequest,
+  ExecuteUserCommand: auditedUserRequest
 } as const satisfies Record<string, UnaryRequestPolicy>;
 
 const methodListUsers = procedure(userServiceName, "ListUsers", ListUsersRequestSchema, ListUsersResponseSchema, adminUserRequestPolicies.ListUsers);
@@ -65,6 +74,8 @@ const methodDeleteUserTag = procedure(userServiceName, "DeleteUserTag", DeleteUs
 const methodSetUserTags = procedure(userServiceName, "SetUserTags", SetUserTagsRequestSchema, SetUserTagsResponseSchema, adminUserRequestPolicies.SetUserTags);
 const methodListUserNotes = procedure(userServiceName, "ListUserNotes", ListUserNotesRequestSchema, ListUserNotesResponseSchema, adminUserRequestPolicies.ListUserNotes);
 const methodAppendUserNote = procedure(userServiceName, "AppendUserNote", AppendUserNoteRequestSchema, AppendUserNoteResponseSchema, adminUserRequestPolicies.AppendUserNote);
+const methodPreviewUserCommand = procedure(userServiceName, "PreviewUserCommand", PreviewUserCommandRequestSchema, PreviewUserCommandResponseSchema, adminUserRequestPolicies.PreviewUserCommand);
+const methodExecuteUserCommand = procedure(userServiceName, "ExecuteUserCommand", ExecuteUserCommandRequestSchema, ExecuteUserCommandResponseSchema, adminUserRequestPolicies.ExecuteUserCommand);
 
 export const listUsers = (input: {
   username?: string;
@@ -212,6 +223,62 @@ export const appendUserNote = (input: {
       body: input.body,
       reason: input.reason,
       expectedVersion: input.expectedVersion
+    },
+    input.signal ? { signal: input.signal } : undefined
+  );
+
+export type AdminUserCommandInput = {
+  type: AdminUserCommandType;
+  roomId?: string;
+  expectedRoomVersion?: bigint;
+  expectedMembershipVersion?: bigint;
+};
+
+const userCommandPayload = (command: AdminUserCommandInput): Record<string, unknown> => ({
+  type: command.type,
+  roomId: command.roomId ?? "",
+  expectedRoomVersion: command.expectedRoomVersion ?? 0n,
+  expectedMembershipVersion: command.expectedMembershipVersion ?? 0n
+});
+
+export const previewUserCommand = (input: {
+  userId: string;
+  command: AdminUserCommandInput;
+  reason: string;
+  expectedUserVersion: bigint;
+  signal?: AbortSignal;
+}): Promise<PreviewUserCommandResponse> =>
+  callUnary<PreviewUserCommandResponse>(
+    methodPreviewUserCommand,
+    {
+      userId: input.userId,
+      command: userCommandPayload(input.command),
+      reason: input.reason,
+      expectedUserVersion: input.expectedUserVersion
+    },
+    input.signal ? { signal: input.signal } : undefined
+  );
+
+export const executeUserCommand = (input: {
+  operationId: string;
+  userId: string;
+  command: AdminUserCommandInput;
+  previewId: string;
+  previewDigest: string;
+  reason: string;
+  expectedUserVersion: bigint;
+  signal?: AbortSignal;
+}): Promise<ExecuteUserCommandResponse> =>
+  callUnary<ExecuteUserCommandResponse>(
+    methodExecuteUserCommand,
+    {
+      operationId: input.operationId,
+      userId: input.userId,
+      command: userCommandPayload(input.command),
+      previewId: input.previewId,
+      previewDigest: input.previewDigest,
+      reason: input.reason,
+      expectedUserVersion: input.expectedUserVersion
     },
     input.signal ? { signal: input.signal } : undefined
   );

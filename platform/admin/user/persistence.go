@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iFTY-R/game-night/platform/profile"
 )
 
 var (
@@ -22,6 +23,10 @@ var (
 	ErrIntegrity = errors.New("admin user persistence integrity failure")
 	// ErrRepositoryUnavailable hides driver and schema diagnostics from callers.
 	ErrRepositoryUnavailable = errors.New("admin user repository unavailable")
+	// ErrPermissionDenied reports a missing administrator capability without revealing target state.
+	ErrPermissionDenied = errors.New("admin user permission denied")
+	// ErrAuditUnavailable blocks sensitive reads and writes when access cannot be durably audited.
+	ErrAuditUnavailable = errors.New("admin user audit unavailable")
 )
 
 // Tag is the immutable persistence view of one administrator-defined user label.
@@ -110,12 +115,13 @@ type Note struct {
 
 // AppendNoteCommand carries the controlled note body while audit writers retain only its digest and ID.
 type AppendNoteCommand struct {
-	NoteID        uuid.UUID
-	UserID        uuid.UUID
-	AuthorAdminID uuid.UUID
-	Body          string
-	Reason        string
-	CreatedAt     time.Time
+	NoteID          uuid.UUID
+	UserID          uuid.UUID
+	AuthorAdminID   uuid.UUID
+	Body            string
+	Reason          string
+	ExpectedVersion uint64
+	CreatedAt       time.Time
 }
 
 // NotePageQuery continues the descending append history at an exact timestamp/ID tuple.
@@ -137,6 +143,30 @@ type UserRecord struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	LastActivityAt     time.Time
+}
+
+// PIIAvailability describes whether a sensitive profile field can be requested through GetUserPII.
+type PIIAvailability struct {
+	Field     profile.Field
+	Available bool
+	Version   uint64
+	UpdatedAt time.Time
+}
+
+// PIIValue is plaintext returned only from the dedicated PII read path after authorization and audit.
+type PIIValue struct {
+	Field     profile.Field
+	Value     string
+	Version   uint64
+	UpdatedAt time.Time
+}
+
+// UserDetail is the current Task 3 detail aggregate; later governance tasks append devices, rooms, and command history.
+type UserDetail struct {
+	Summary         UserRecord
+	PIIAvailability []PIIAvailability
+	RecentNotes     []Note
+	SampledAt       time.Time
 }
 
 // UserSortField is the closed set of PostgreSQL-backed stable user-list sort keys.
@@ -197,4 +227,9 @@ type Repository interface {
 	AppendNote(context.Context, AppendNoteCommand) (Note, error)
 	ListNotes(context.Context, NotePageQuery) ([]Note, error)
 	ListUsers(context.Context, UserListQuery) ([]UserRecord, error)
+}
+
+// ProfileReader is intentionally narrower than profile.Repository so list/detail paths cannot mutate PII records.
+type ProfileReader interface {
+	GetByID(context.Context, uuid.UUID) (profile.UserProfile, error)
 }

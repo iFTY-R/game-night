@@ -191,16 +191,33 @@ func (repository *AdminUserRepository) SetTags(ctx context.Context, command admi
 	return uint64(nextVersion), nil
 }
 
-// AppendNote inserts evidence once; the database trigger rejects later UPDATE and DELETE attempts.
+// AppendNote inserts evidence once and advances the user CAS version; the database trigger rejects later UPDATE and DELETE attempts.
 func (repository *AdminUserRepository) AppendNote(ctx context.Context, command adminuser.AppendNoteCommand) (adminuser.Note, error) {
-	if repository == nil || repository.queries == nil || ctx == nil || command.NoteID == uuid.Nil || command.UserID == uuid.Nil ||
+	if repository == nil || repository.runner == nil || ctx == nil || command.NoteID == uuid.Nil || command.UserID == uuid.Nil ||
 		command.AuthorAdminID == uuid.Nil || command.CreatedAt.IsZero() || !validAdminReason(command.Reason) ||
-		!validAdminNoteBody(command.Body) {
+		!validAdminNoteBody(command.Body) || command.ExpectedVersion == 0 {
 		return adminuser.Note{}, adminuser.ErrInvalidInput
 	}
-	row, err := repository.queries.AppendAdminUserNote(ctx, sqlcgen.AppendAdminUserNoteParams{
-		NoteID: uuidToPG(command.NoteID), UserID: uuidToPG(command.UserID), AuthorAdminID: uuidToPG(command.AuthorAdminID),
-		Body: command.Body, Reason: strings.TrimSpace(command.Reason), CreatedAt: timeToPG(command.CreatedAt),
+	var row sqlcgen.AdminUserNote
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		locked, err := queries.LockAdminUserForTagUpdate(ctx, sqlcgen.LockAdminUserForTagUpdateParams{UserID: uuidToPG(command.UserID)})
+		if err != nil {
+			return err
+		}
+		if locked.AccountVersion != int64(command.ExpectedVersion) {
+			return adminuser.ErrConflict
+		}
+		row, err = queries.AppendAdminUserNote(ctx, sqlcgen.AppendAdminUserNoteParams{
+			NoteID: uuidToPG(command.NoteID), UserID: uuidToPG(command.UserID), AuthorAdminID: uuidToPG(command.AuthorAdminID),
+			Body: command.Body, Reason: strings.TrimSpace(command.Reason), CreatedAt: timeToPG(command.CreatedAt),
+		})
+		if err != nil {
+			return err
+		}
+		_, err = queries.IncrementAdminUserVersionCAS(ctx, sqlcgen.IncrementAdminUserVersionCASParams{
+			UpdatedAt: timeToPG(command.CreatedAt), UserID: uuidToPG(command.UserID), ExpectedVersion: int64(command.ExpectedVersion),
+		})
+		return err
 	})
 	if err != nil {
 		return adminuser.Note{}, mapAdminUserQueryError(ctx, err, adminuser.ErrConflict)

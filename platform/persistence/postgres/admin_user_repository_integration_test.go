@@ -105,14 +105,14 @@ func TestAdminUserRepositoryTagCASNotesAndStableUserCursor(t *testing.T) {
 
 	firstNote, err := repository.AppendNote(ctx, adminuser.AppendNoteCommand{
 		NoteID: uuid.New(), UserID: userIDs[0], AuthorAdminID: adminID,
-		Body: "first immutable note", Reason: "review evidence", CreatedAt: now.Add(6 * time.Second),
+		Body: "first immutable note", Reason: "review evidence", ExpectedVersion: nextVersion, CreatedAt: now.Add(6 * time.Second),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err = repository.AppendNote(ctx, adminuser.AppendNoteCommand{
 		NoteID: uuid.New(), UserID: userIDs[0], AuthorAdminID: adminID,
-		Body: "second immutable note", Reason: "follow-up evidence", CreatedAt: now.Add(7 * time.Second),
+		Body: "second immutable note", Reason: "follow-up evidence", ExpectedVersion: nextVersion + 1, CreatedAt: now.Add(7 * time.Second),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -158,14 +158,14 @@ func TestAdminUserRepositoryTagCASNotesAndStableUserCursor(t *testing.T) {
 	if err = fixture.Pool.QueryRow(ctx, "SELECT account_version FROM users WHERE user_id = $1", userIDs[0]).Scan(&versionAfterRejectedDelete); err != nil {
 		t.Fatal(err)
 	}
-	if versionAfterRejectedDelete != versionBeforeRejectedDelete || versionAfterRejectedDelete != int64(nextVersion) {
+	if versionAfterRejectedDelete != versionBeforeRejectedDelete || versionAfterRejectedDelete != int64(nextVersion+2) {
 		t.Fatalf("assigned tag deletion changed user version: before=%d after=%d", versionBeforeRejectedDelete, versionAfterRejectedDelete)
 	}
 	detachedVersion, err := repository.SetTags(ctx, adminuser.SetTagsCommand{
 		UserID: userIDs[0], ActorAdminID: adminID, Reason: "detach tag before definition deletion",
-		ExpectedVersion: nextVersion, ChangedAt: now.Add(9 * time.Second),
+		ExpectedVersion: uint64(versionAfterRejectedDelete), ChangedAt: now.Add(9 * time.Second),
 	})
-	if err != nil || detachedVersion != nextVersion+1 {
+	if err != nil || detachedVersion != uint64(versionAfterRejectedDelete)+1 {
 		t.Fatalf("detach tag: version=%d err=%v", detachedVersion, err)
 	}
 	deletedCatalogVersion, err := repository.DeleteTag(ctx, adminuser.DeleteTagCommand{

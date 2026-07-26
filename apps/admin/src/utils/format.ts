@@ -47,6 +47,16 @@ export const formatPermission = (permission: AdminPermission): string => {
       return "执行用户治理";
     case AdminPermission.USERS_EXPORT:
       return "导出用户数据";
+    case AdminPermission.ROOMS_READ:
+      return "读取房间管理";
+    case AdminPermission.ROOMS_CONTROL:
+      return "控制房间";
+    case AdminPermission.GAMES_READ:
+      return "读取牌局管理";
+    case AdminPermission.GAMES_CONTROL:
+      return "控制牌局";
+    case AdminPermission.GAMES_REPAIR:
+      return "执行牌局应急修正";
     default:
       return `权限 ${permission}`;
   }

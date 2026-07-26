@@ -16,9 +16,15 @@ import {
   listUsers,
   setUserTags
 } from "../src/api/admin-user";
+import {
+  adminRoomRequestPolicies,
+  forceCloseRoom,
+  listRooms
+} from "../src/api/admin-room";
 import { installSessionInvalidHandler } from "../src/api/connect";
 import { AdminApiError } from "../src/api/errors";
 import { AdminAuthService } from "../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
+import { AdminRoomService } from "../../../contracts/gen/ts/platform/admin/v1/admin_room_pb";
 import { AdminUserPIIField, AdminUserService } from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
 import { BusinessErrorDetailSchema } from "../../../contracts/gen/ts/platform/common/v1/error_pb";
 
@@ -75,6 +81,23 @@ describe("admin connect transport", () => {
     });
   });
 
+  it("keeps frontend request policies exhaustive against AdminRoomService", () => {
+    expect(Object.keys(adminRoomRequestPolicies)).toEqual(AdminRoomService.methods.map((method) => method.name));
+    expect(adminRoomRequestPolicies).toEqual({
+      ListRooms: { csrf: true, requestId: false },
+      GetRoom: { csrf: true, requestId: false },
+      ListGames: { csrf: true, requestId: false },
+      GetGame: { csrf: true, requestId: false },
+      SetRoomAdmission: { csrf: true, requestId: true },
+      RemoveRoomMember: { csrf: true, requestId: true },
+      ForceCloseRoom: { csrf: true, requestId: true },
+      ForceTerminateGame: { csrf: true, requestId: true },
+      PreviewEmergencyRepair: { csrf: true, requestId: true },
+      ExecuteEmergencyRepair: { csrf: true, requestId: true },
+      GetRepairOperation: { csrf: true, requestId: false }
+    });
+  });
+
   it("posts admin auth requests with relative path and flow/csrf headers", async () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
@@ -128,6 +151,49 @@ describe("admin connect transport", () => {
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toBeNull();
     expect(String(init.body)).toContain("alice");
+  });
+
+  it("posts implemented room reads and audited controls to AdminRoomService", async () => {
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      writable: true,
+      value: "__Host-gn_admin_csrf=csrf-token"
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ rooms: [], page: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await listRooms({ roomCode: "ABCD" });
+
+    const [readUrl, readInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const readHeaders = new Headers(readInit.headers);
+    expect(readUrl).toBe("/platform.admin.v1.AdminRoomService/ListRooms");
+    expect(readHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(readHeaders.get("X-Request-ID")).toBeNull();
+    expect(String(readInit.body)).toContain("ABCD");
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ outcome: "ADMIN_ROOM_COMMAND_OUTCOME_EXECUTED" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    await forceCloseRoom({
+      operationId: "op-1",
+      roomId: "room-1",
+      reason: "风控处置",
+      expectedRoomVersion: 2n
+    });
+
+    const [writeUrl, writeInit] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    const writeHeaders = new Headers(writeInit.headers);
+    expect(writeUrl).toBe("/platform.admin.v1.AdminRoomService/ForceCloseRoom");
+    expect(writeHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(writeHeaders.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
 
   it.each([

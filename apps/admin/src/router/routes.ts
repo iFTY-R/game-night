@@ -50,6 +50,19 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "rooms",
+        name: routeName.rooms,
+        component: () => import("../views/rooms/RoomGameControlView.vue"),
+        meta: {
+          title: "房间与牌局",
+          tab: true,
+          closable: true,
+          menu: true,
+          layout: "admin",
+          permission: AdminPermission.ROOMS_READ
+        }
+      },
+      {
         path: "security",
         name: routeName.security,
         component: () => import("../views/security/SessionSecurityView.vue"),

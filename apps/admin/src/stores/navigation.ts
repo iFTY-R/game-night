@@ -10,7 +10,7 @@ export type TabItem = {
   closable: boolean;
 };
 
-const layoutRouteNames = new Set<AppRouteName>([routeName.users, routeName.security]);
+const layoutRouteNames = new Set<AppRouteName>([routeName.users, routeName.rooms, routeName.security]);
 
 const routePermissions = new Map(navigationItems.map((item) => [item.name, item.permission] as const));
 

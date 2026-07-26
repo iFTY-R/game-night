@@ -14,6 +14,8 @@ type Service struct {
 	rooms      RoomStore
 	games      GameController
 	owners     OwnerReader
+	repairs    RepairRepository
+	executor   EmergencyRepairExecutor
 	clock      clock.Clock
 }
 
@@ -23,6 +25,8 @@ type Config struct {
 	Rooms      RoomStore
 	Games      GameController
 	Owners     OwnerReader
+	Repairs    RepairRepository
+	Executor   EmergencyRepairExecutor
 	Clock      clock.Clock
 }
 
@@ -31,7 +35,10 @@ func NewService(config Config) (*Service, error) {
 	if config.Repository == nil || config.Clock == nil {
 		return nil, ErrInvalidInput
 	}
-	return &Service{repository: config.Repository, rooms: config.Rooms, games: config.Games, owners: config.Owners, clock: config.Clock}, nil
+	return &Service{
+		repository: config.Repository, rooms: config.Rooms, games: config.Games, owners: config.Owners,
+		repairs: config.Repairs, executor: config.Executor, clock: config.Clock,
+	}, nil
 }
 
 // ListRooms returns a sampled room page with Redis owner freshness merged before anomaly filtering.

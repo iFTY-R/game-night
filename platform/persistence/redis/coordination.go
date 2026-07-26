@@ -109,6 +109,17 @@ end
 redis.call('DEL', KEYS[1])
 return 1
 `)
+	coordinationLeaseClearStaleScript = goredis.NewScript(`
+local stored = redis.call('GET', KEYS[1])
+if not stored then
+    return 0
+end
+if string.sub(stored, 1, string.len(ARGV[1])) ~= ARGV[1] then
+    return 0
+end
+redis.call('DEL', KEYS[1])
+return 1
+`)
 )
 
 // CoordinationClient is the smallest go-redis surface needed by game coordination.
@@ -456,6 +467,22 @@ func (coordinator *GameCoordinator) ReleaseSessionLease(ctx context.Context, lea
 	return value == 1, nil
 }
 
+// ClearStaleSessionLease deletes a routable lease only when owner, address, and epoch still match the dry-run.
+func (coordinator *GameCoordinator) ClearStaleSessionLease(ctx context.Context, expected SessionLease) (bool, error) {
+	if coordinator == nil || ctx == nil || !expected.Routable() {
+		return false, ErrInvalidCoordinationInput
+	}
+	result, err := coordinator.runScript(ctx, coordinationLeaseClearStaleScript, []string{coordinator.leaseKey(expected.SessionID)}, leaseRepairPrefix(expected))
+	if err != nil {
+		return false, err
+	}
+	value, ok := result.(int64)
+	if !ok || (value != 0 && value != 1) {
+		return false, ErrCoordinationUnavailable
+	}
+	return value == 1, nil
+}
+
 func (coordinator *GameCoordinator) runScript(ctx context.Context, script *goredis.Script, keys []string, args ...interface{}) (interface{}, error) {
 	limited, cancel := coordinator.operationContext(ctx)
 	defer cancel()
@@ -525,6 +552,10 @@ func encodeLeaseWire(owner, address, token string, ready bool, ownershipEpoch ui
 		status = "ready"
 	}
 	return "v1|" + status + "|" + owner + "|" + address + "|" + strconv.FormatUint(ownershipEpoch, 10) + "|" + token
+}
+
+func leaseRepairPrefix(expected SessionLease) string {
+	return "v1|ready|" + expected.Owner + "|" + expected.Address + "|" + strconv.FormatUint(expected.OwnershipEpoch, 10) + "|"
 }
 
 func decodeLeaseWire(sessionID uuid.UUID, value string) (SessionLease, error) {

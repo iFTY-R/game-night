@@ -19,3 +19,8 @@ type RepairRepository interface {
 	ExpireRepairOperation(context.Context, uuid.UUID, uint64) (RepairOperation, error)
 	CompleteRepairOperation(context.Context, CompleteRepairOperationCommand) (RepairOperation, error)
 }
+
+// EmergencyRepairExecutor owns the side effects for the three fixed emergency repair families.
+type EmergencyRepairExecutor interface {
+	ExecuteEmergencyRepair(context.Context, RepairOperation, ExecuteEmergencyRepairCommand) ([]byte, error)
+}

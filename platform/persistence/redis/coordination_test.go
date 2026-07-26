@@ -124,6 +124,31 @@ func TestSessionLeaseWireKeepsMutationTokenPrivateOnLookupShape(t *testing.T) {
 	}
 }
 
+func TestStaleLeaseRepairPrefixMatchesOnlyReadyOwnerAddressAndEpoch(t *testing.T) {
+	sessionID := uuid.New()
+	token := strings.Repeat("A", 43)
+	expected := SessionLease{
+		SessionID: sessionID, Owner: "realtime-1", Address: "10.0.0.2:9090", Ready: true, OwnershipEpoch: 7,
+	}
+	prefix := leaseRepairPrefix(expected)
+	if strings.Contains(prefix, token) || prefix != "v1|ready|realtime-1|10.0.0.2:9090|7|" {
+		t.Fatalf("unsafe repair prefix %q", prefix)
+	}
+	if !strings.HasPrefix(encodeLeaseWire("realtime-1", "10.0.0.2:9090", token, true, 7), prefix) {
+		t.Fatal("matching lease would not be cleared")
+	}
+	for _, stored := range []string{
+		encodeLeaseWire("realtime-2", "10.0.0.2:9090", token, true, 7),
+		encodeLeaseWire("realtime-1", "10.0.0.3:9090", token, true, 7),
+		encodeLeaseWire("realtime-1", "10.0.0.2:9090", token, true, 8),
+		encodeLeaseWire("realtime-1", "10.0.0.2:9090", token, false, 0),
+	} {
+		if strings.HasPrefix(stored, prefix) {
+			t.Fatalf("repair prefix matches wrong lease %q", stored)
+		}
+	}
+}
+
 func TestGameCoordinatorFailsClosedAfterRedisClientClose(t *testing.T) {
 	client := goredis.NewClient(&goredis.Options{Addr: "127.0.0.1:1"})
 	coordinator := testGameCoordinator(t, client)
@@ -142,6 +167,9 @@ func TestGameCoordinatorFailsClosedAfterRedisClientClose(t *testing.T) {
 	}
 	if _, err := coordinator.SubscribeSessionFanout(ctx); !errors.Is(err, ErrCoordinationUnavailable) {
 		t.Fatalf("fanout subscribe error = %v", err)
+	}
+	if _, err := coordinator.ClearStaleSessionLease(ctx, SessionLease{SessionID: uuid.New(), Owner: "realtime-1", Address: "127.0.0.1:9090", Ready: true, OwnershipEpoch: 1}); !errors.Is(err, ErrCoordinationUnavailable) {
+		t.Fatalf("clear stale lease error = %v", err)
 	}
 }
 

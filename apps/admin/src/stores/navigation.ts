@@ -10,13 +10,20 @@ export type TabItem = {
   closable: boolean;
 };
 
-const layoutRouteNames = new Set<AppRouteName>([routeName.security]);
+const layoutRouteNames = new Set<AppRouteName>([routeName.users, routeName.security]);
+
+const routePermissions = new Map(navigationItems.map((item) => [item.name, item.permission] as const));
+
+const canAccess = (name: AppRouteName, permissions: readonly unknown[]): boolean => {
+  const permission = routePermissions.get(name);
+  return !permission || permissions.includes(permission);
+};
 
 export const useNavigationStore = defineStore("admin-navigation", () => {
   const preferences = usePreferencesStore();
   const mobileOpen = ref(false);
   const tabs = ref<TabItem[]>([]);
-  const activeTab = ref<AppRouteName>(routeName.security);
+  const activeTab = ref<AppRouteName>(routeName.users);
 
   const syncPersistedTabs = (): void => {
     preferences.persistedTabs = tabs.value.map((tab) => tab.name);
@@ -24,13 +31,13 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
 
   const syncFromRoute = (
     route: RouteLocationNormalizedLoaded,
-    _permissions: readonly unknown[] = []
+    permissions: readonly unknown[] = []
   ): void => {
     if (typeof route.name !== "string") {
       return;
     }
     const routeKey = route.name as AppRouteName;
-    if (!layoutRouteNames.has(routeKey)) {
+    if (!layoutRouteNames.has(routeKey) || !canAccess(routeKey, permissions)) {
       return;
     }
     activeTab.value = routeKey;
@@ -42,26 +49,36 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
     syncPersistedTabs();
   };
 
-  const restoreTabs = (_permissions: readonly unknown[] = []): void => {
-    // Retired modules must never be revived from an older local-storage snapshot.
-    tabs.value = [{
-      name: routeName.security,
-      title: navigationItems[0]?.title ?? "安全设置",
-      closable: false
-    }];
+  const restoreTabs = (permissions: readonly unknown[] = []): void => {
+    const allowedNames = navigationItems
+      .map((item) => item.name)
+      .filter((name) => layoutRouteNames.has(name) && canAccess(name, permissions));
+    const restoredNames = preferences.persistedTabs
+      .filter((name) => allowedNames.includes(name));
+    const names = restoredNames.length ? restoredNames : allowedNames.slice(0, 1);
+    // Retired or unauthorized modules must never be revived from an older local-storage snapshot.
+    tabs.value = names.map((name, index) => {
+      const item = navigationItems.find((entry) => entry.name === name);
+      return {
+        name,
+        title: item?.title ?? name,
+        closable: index !== 0
+      };
+    });
+    activeTab.value = tabs.value[0]?.name ?? routeName.users;
     syncPersistedTabs();
   };
 
   const closeTab = (name: AppRouteName): AppRouteName => {
-    if (name === routeName.security) {
-      return routeName.security;
+    if (tabs.value.length <= 1 || tabs.value.find((tab) => tab.name === name)?.closable === false) {
+      return tabs.value[0]?.name ?? routeName.users;
     }
     const index = tabs.value.findIndex((tab) => tab.name === name);
     if (index >= 0) {
       tabs.value.splice(index, 1);
     }
     syncPersistedTabs();
-    return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.security;
+    return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.users;
   };
 
   const breadcrumbs = computed(() => tabs.value.filter((tab) => tab.name === activeTab.value));

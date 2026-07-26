@@ -37,6 +37,16 @@ export const formatPermission = (permission: AdminPermission): string => {
       return "管理多因素认证";
     case AdminPermission.SECURITY_MANAGE_SESSIONS:
       return "管理会话";
+    case AdminPermission.USERS_READ:
+      return "读取用户中心";
+    case AdminPermission.USERS_READ_PII:
+      return "读取用户 PII";
+    case AdminPermission.USERS_ANNOTATE:
+      return "维护用户标签与备注";
+    case AdminPermission.USERS_GOVERN:
+      return "执行用户治理";
+    case AdminPermission.USERS_EXPORT:
+      return "导出用户数据";
     default:
       return `权限 ${permission}`;
   }

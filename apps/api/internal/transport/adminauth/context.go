@@ -38,6 +38,15 @@ func currentRequestContext(ctx context.Context) (requestContext, bool) {
 	return value, ok
 }
 
+// ActorFromContext returns the server-built admin actor installed by the auth interceptor.
+func ActorFromContext(ctx context.Context) (admin.ActorContext, bool) {
+	current, ok := currentRequestContext(ctx)
+	if !ok || current.actor == nil {
+		return admin.ActorContext{}, false
+	}
+	return *current.actor, true
+}
+
 func actorFromView(
 	view admin.SessionView,
 	requestID string,

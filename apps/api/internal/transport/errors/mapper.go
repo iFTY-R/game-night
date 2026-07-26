@@ -12,6 +12,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminuser "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/idempotency"
@@ -138,6 +139,7 @@ func classify(err error) descriptor {
 	case stderrors.Is(err, identity.ErrRecoveryInvalid), stderrors.Is(err, secretresult.ErrReplayUnauthorized):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RECOVERY_INVALID, "identity.recovery.invalid"}
 	case stderrors.Is(err, secretresult.ErrIdempotencyConflict), stderrors.Is(err, admin.ErrIdempotencyConflict),
+		stderrors.Is(err, adminuser.ErrIdempotencyConflict),
 		stderrors.Is(err, idempotency.ErrConflict), stderrors.Is(err, room.ErrRuleOperationConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT, "operation.idempotency_conflict"}
 	case stderrors.Is(err, secretresult.ErrSecretNoLongerAvailable):
@@ -221,15 +223,15 @@ func classify(err error) descriptor {
 	case stderrors.Is(err, admin.ErrAuthentication), stderrors.Is(err, admin.ErrRecoveryInvalid),
 		stderrors.Is(err, admin.ErrSessionExpired), stderrors.Is(err, admin.ErrSessionRevoked):
 		return descriptor{connect.CodeUnauthenticated, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, "admin.auth.invalid"}
-	case stderrors.Is(err, admin.ErrPermissionDenied):
+	case stderrors.Is(err, admin.ErrPermissionDenied), stderrors.Is(err, adminuser.ErrPermissionDenied):
 		return descriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUTH_INVALID, "admin.permission.denied"}
 	case stderrors.Is(err, profile.ErrPIIKeyUnavailable):
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_PII_KEY_UNAVAILABLE, "profile.key.unavailable"}
-	case stderrors.Is(err, audit.ErrSensitiveWriteBlocked), stderrors.Is(err, audit.ErrRepositoryUnavailable):
+	case stderrors.Is(err, audit.ErrSensitiveWriteBlocked), stderrors.Is(err, audit.ErrRepositoryUnavailable), stderrors.Is(err, adminuser.ErrAuditUnavailable):
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_AUDIT_WRITE_FAILED, "audit.write.unavailable"}
-	case stderrors.Is(err, identity.ErrUserNotFound), stderrors.Is(err, profile.ErrProfileNotFound), stderrors.Is(err, admin.ErrNotFound):
+	case stderrors.Is(err, identity.ErrUserNotFound), stderrors.Is(err, profile.ErrProfileNotFound), stderrors.Is(err, admin.ErrNotFound), stderrors.Is(err, adminuser.ErrNotFound):
 		return descriptor{connectCode: connect.CodeNotFound, messageKey: "resource.not_found"}
-	case stderrors.Is(err, admin.ErrConcurrentTransition):
+	case stderrors.Is(err, admin.ErrConcurrentTransition), stderrors.Is(err, adminuser.ErrConflict):
 		return descriptor{connect.CodeAborted, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_VERSION_CONFLICT, "admin.version.conflict"}
 	case stderrors.Is(err, identity.ErrIdentityConcurrentTransition), stderrors.Is(err, identity.ErrRecoveryConcurrentTransition),
 		stderrors.Is(err, identity.ErrDeviceConcurrentTransition), stderrors.Is(err, profile.ErrProfileConcurrentTransition),
@@ -241,6 +243,7 @@ func classify(err error) descriptor {
 		stderrors.Is(err, identity.ErrInvalidRecoveryAttempt), stderrors.Is(err, identity.ErrInvalidAssistedRecoveryGrant),
 		stderrors.Is(err, profile.ErrInvalidProfileInput),
 		stderrors.Is(err, admin.ErrInvalidInput), stderrors.Is(err, admin.ErrPasswordPolicy),
+		stderrors.Is(err, adminuser.ErrInvalidInput),
 		stderrors.Is(err, secretresult.ErrInvalidInput), stderrors.Is(err, room.ErrInvalidRoomInput),
 		stderrors.Is(err, gameruntime.ErrInvalidSessionInput), stderrors.Is(err, gameruntime.ErrInvalidActionCommit),
 		stderrors.Is(err, gameruntime.ErrInvalidSystemCommit), stderrors.Is(err, gameSDK.ErrInvalidContract),
@@ -250,7 +253,7 @@ func classify(err error) descriptor {
 		return descriptor{connectCode: connect.CodeFailedPrecondition, messageKey: "operation.failed_precondition"}
 	case stderrors.Is(err, ratelimit.ErrUnavailable), stderrors.Is(err, identity.ErrIdentityRepositoryUnavailable),
 		stderrors.Is(err, profile.ErrProfileRepositoryUnavailable), stderrors.Is(err, admin.ErrRepositoryUnavailable),
-		stderrors.Is(err, secretresult.ErrRepositoryUnavailable), stderrors.Is(err, room.ErrRoomRepositoryUnavailable),
+		stderrors.Is(err, adminuser.ErrRepositoryUnavailable), stderrors.Is(err, secretresult.ErrRepositoryUnavailable), stderrors.Is(err, room.ErrRoomRepositoryUnavailable),
 		stderrors.Is(err, gameruntime.ErrGameSessionRepositoryUnavailable), stderrors.Is(err, redisstore.ErrCoordinationUnavailable):
 		return descriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}
 	default:

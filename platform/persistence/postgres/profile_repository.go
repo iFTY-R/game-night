@@ -10,6 +10,7 @@ import (
 	profileDomain "github.com/iFTY-R/game-night/platform/profile"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type profileQueries interface {
@@ -20,6 +21,11 @@ type profileQueries interface {
 }
 
 type profileRepository struct{ queries profileQueries }
+
+// NewProfileRepository exposes the profile repository behind the domain interface for read-only admin PII availability checks.
+func NewProfileRepository(pool *pgxpool.Pool) profileDomain.Repository {
+	return &profileRepository{queries: sqlcgen.New(pool)}
+}
 
 func (repository *profileRepository) GetByID(ctx context.Context, userID uuid.UUID) (profileDomain.UserProfile, error) {
 	if userID == uuid.Nil {

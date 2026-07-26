@@ -34,7 +34,20 @@ export const routes: RouteRecordRaw[] = [
     children: [
       {
         path: "",
-        redirect: { name: routeName.security }
+        redirect: { name: routeName.users }
+      },
+      {
+        path: "users",
+        name: routeName.users,
+        component: () => import("../views/users/UserCenterView.vue"),
+        meta: {
+          title: "用户中心",
+          tab: true,
+          closable: false,
+          menu: true,
+          layout: "admin",
+          permission: AdminPermission.USERS_READ
+        }
       },
       {
         path: "security",

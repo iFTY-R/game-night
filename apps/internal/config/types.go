@@ -47,6 +47,9 @@ type AdminChallengeKeyringFile string
 // AdminSessionKeyringFile identifies only the HMAC keyring for administrator session and CSRF secrets.
 type AdminSessionKeyringFile string
 
+// AdminCursorKeyringFile identifies only the HMAC keyring for opaque administrator list cursors.
+type AdminCursorKeyringFile string
+
 // AuditKeyringFile identifies only the Ed25519 keyring used to sign canonical audit events.
 type AuditKeyringFile string
 
@@ -63,6 +66,7 @@ type KeyringFiles struct {
 	UserChallenge  UserChallengeKeyringFile
 	AdminChallenge AdminChallengeKeyringFile
 	AdminSession   AdminSessionKeyringFile
+	AdminCursor    AdminCursorKeyringFile
 	Audit          AuditKeyringFile
 }
 
@@ -89,6 +93,7 @@ func (files KeyringFiles) SecurityPaths() security.KeyringPaths {
 		UserChallenge:  string(files.UserChallenge),
 		AdminChallenge: string(files.AdminChallenge),
 		AdminSession:   string(files.AdminSession),
+		AdminCursor:    string(files.AdminCursor),
 		Audit:          string(files.Audit),
 	}
 }

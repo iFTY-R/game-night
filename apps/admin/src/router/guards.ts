@@ -20,7 +20,7 @@ export const createAdminGuard = (): NavigationGuardWithThis<undefined> => {
     if (to.meta.layout === "auth") {
       // If fully authenticated, redirect to main app
       if (isAuthenticated && to.name !== routeName.notFound) {
-        return { name: routeName.security };
+        return { name: routeName.users };
       }
 
       // Route based on current session kind

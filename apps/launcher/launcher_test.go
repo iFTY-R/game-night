@@ -44,6 +44,7 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	}
 	if apiEnv[environmentPIIKeyringFile] != filepath.Join(apiSecrets, "pii.json") ||
 		apiEnv[environmentAdminSessionKeyringFile] != filepath.Join(apiSecrets, "admin-session.json") ||
+		apiEnv[environmentAdminCursorKeyringFile] != filepath.Join(apiSecrets, "admin-cursor.json") ||
 		apiEnv[environmentAuditKeyringFile] != filepath.Join(apiSecrets, "audit.json") {
 		t.Fatalf("api keyring mapping = %#v", apiEnv)
 	}
@@ -78,6 +79,9 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	}
 	if _, leaked := workerEnv[environmentResultEnvelopeKeyringFile]; leaked {
 		t.Fatal("worker received API-only keyring material")
+	}
+	if _, leaked := workerEnv[environmentAdminCursorKeyringFile]; leaked {
+		t.Fatal("worker received admin cursor keyring material")
 	}
 	if _, leaked := workerEnv[environmentMigrationDatabaseURL]; leaked {
 		t.Fatal("worker retained migration database environment")

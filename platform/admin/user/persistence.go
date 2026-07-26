@@ -110,6 +110,7 @@ type Note struct {
 	Body          string
 	Reason        string
 	Version       uint64
+	UserVersion   uint64
 	CreatedAt     time.Time
 }
 

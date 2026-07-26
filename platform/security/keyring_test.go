@@ -339,7 +339,7 @@ func TestLoadKeyringsReturnsPurposeTypedBundle(t *testing.T) {
 	}
 	if keyrings.PII == nil || keyrings.TOTP == nil || keyrings.ResultEnvelope == nil ||
 		keyrings.Device == nil || keyrings.RateLimit == nil || keyrings.UserChallenge == nil ||
-		keyrings.AdminChallenge == nil || keyrings.AdminSession == nil || keyrings.Audit == nil {
+		keyrings.AdminChallenge == nil || keyrings.AdminSession == nil || keyrings.AdminCursor == nil || keyrings.Audit == nil {
 		t.Fatal("loaded keyring bundle is incomplete")
 	}
 }
@@ -374,6 +374,7 @@ func testKeyringPaths(t testing.TB, now time.Time, piiKey, totpKey []byte) Keyri
 		UserChallenge:  writeSymmetric(randomTestBytes(t, 32)),
 		AdminChallenge: writeSymmetric(randomTestBytes(t, 32)),
 		AdminSession:   writeSymmetric(randomTestBytes(t, 32)),
+		AdminCursor:    writeSymmetric(randomTestBytes(t, 32)),
 		Audit:          auditPath,
 	}
 }

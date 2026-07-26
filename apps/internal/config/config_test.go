@@ -13,7 +13,7 @@ func TestLoadRealtimeDoesNotRequireSecurityKeyrings(t *testing.T) {
 	for _, name := range []string{
 		piiKeyringFileEnvironment, totpKeyringFileEnvironment, resultEnvelopeKeyringFileEnvironment,
 		deviceKeyringFileEnvironment, rateLimitKeyringFileEnvironment, userChallengeKeyringFileEnvironment,
-		adminChallengeKeyringFileEnvironment, adminSessionKeyringFileEnvironment, auditKeyringFileEnvironment,
+		adminChallengeKeyringFileEnvironment, adminSessionKeyringFileEnvironment, adminCursorKeyringFileEnvironment, auditKeyringFileEnvironment,
 		bootstrapSecretFileEnvironment,
 	} {
 		delete(environment, name)
@@ -273,6 +273,7 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 		UserChallenge:  UserChallengeKeyringFile("user-challenge"),
 		AdminChallenge: AdminChallengeKeyringFile("admin-challenge"),
 		AdminSession:   AdminSessionKeyringFile("admin-session"),
+		AdminCursor:    AdminCursorKeyringFile("admin-cursor"),
 		Audit:          AuditKeyringFile("audit"),
 	}
 
@@ -285,6 +286,7 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 		reflect.TypeOf(files.UserChallenge),
 		reflect.TypeOf(files.AdminChallenge),
 		reflect.TypeOf(files.AdminSession),
+		reflect.TypeOf(files.AdminCursor),
 		reflect.TypeOf(files.Audit),
 	}
 	seen := make(map[reflect.Type]struct{}, len(types))
@@ -297,7 +299,8 @@ func TestKeyringFilesUseDistinctNamedTypes(t *testing.T) {
 	paths := files.SecurityPaths()
 	if paths.PII != "pii" || paths.TOTP != "totp" || paths.ResultEnvelope != "result" ||
 		paths.Device != "device" || paths.RateLimit != "rate-limit" ||
-		paths.UserChallenge != "user-challenge" || paths.AdminChallenge != "admin-challenge" || paths.AdminSession != "admin-session" || paths.Audit != "audit" {
+		paths.UserChallenge != "user-challenge" || paths.AdminChallenge != "admin-challenge" || paths.AdminSession != "admin-session" ||
+		paths.AdminCursor != "admin-cursor" || paths.Audit != "audit" {
 		t.Fatalf("security path mapping crossed keyring purposes: %+v", paths)
 	}
 }
@@ -321,6 +324,7 @@ func validEnvironment(t *testing.T) map[string]string {
 		userChallengeKeyringFileEnvironment:  filepath.Join(secretDirectory, "user-challenge.json"),
 		adminChallengeKeyringFileEnvironment: filepath.Join(secretDirectory, "admin-challenge.json"),
 		adminSessionKeyringFileEnvironment:   filepath.Join(secretDirectory, "admin-session.json"),
+		adminCursorKeyringFileEnvironment:    filepath.Join(secretDirectory, "admin-cursor.json"),
 		auditKeyringFileEnvironment:          filepath.Join(secretDirectory, "audit.json"),
 	}
 }

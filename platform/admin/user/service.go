@@ -196,6 +196,79 @@ func (service *Service) GetUserPII(ctx context.Context, actor admin.ActorContext
 	return PIIReadResult{UserID: request.UserID, Values: values, AccessAuditEventID: auditID, AccessedAt: now}, nil
 }
 
+// ListTags reads the administrator-managed tag catalog for filter pickers and assignment dialogs.
+func (service *Service) ListTags(ctx context.Context, actor admin.ActorContext, query TagPageQuery) (TagPage, error) {
+	if service == nil || service.repository == nil || ctx == nil {
+		return TagPage{}, ErrInvalidInput
+	}
+	if err := actor.Require(admin.PermissionUsersRead); err != nil {
+		return TagPage{}, ErrPermissionDenied
+	}
+	if query.PageSize == 0 {
+		query.PageSize = DefaultUserPageSize
+	}
+	return service.repository.ListTags(ctx, query)
+}
+
+// CreateTag adds one catalog tag after an audited annotate-permission check.
+func (service *Service) CreateTag(ctx context.Context, actor admin.ActorContext, command CreateTagCommand, operationID idempotency.OperationID) (TagMutation, error) {
+	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
+		!operationID.Valid() || !validReason(command.Reason) {
+		return TagMutation{}, ErrInvalidInput
+	}
+	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {
+		return TagMutation{}, ErrPermissionDenied
+	}
+	command.ActorAdminID = actor.AdminID()
+	command.CreatedAt = service.clock.Now()
+	if _, err := service.audit.RecordAnnotationWrite(ctx, AnnotationAuditEvent{
+		ActorAdminID: actor.AdminID(), OperationID: operationID, Action: "create_user_tag", Reason: strings.TrimSpace(command.Reason),
+		DetailDigest: digestStrings(command.Name, command.Color), RequestID: actor.RequestID(), OccurredAt: command.CreatedAt,
+	}); err != nil {
+		return TagMutation{}, ErrAuditUnavailable
+	}
+	return service.repository.CreateTag(ctx, command)
+}
+
+// UpdateTag changes one exact tag version and records the reviewed operator reason before persistence.
+func (service *Service) UpdateTag(ctx context.Context, actor admin.ActorContext, command UpdateTagCommand, operationID idempotency.OperationID) (Tag, error) {
+	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
+		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(command.Reason) {
+		return Tag{}, ErrInvalidInput
+	}
+	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {
+		return Tag{}, ErrPermissionDenied
+	}
+	command.ActorAdminID = actor.AdminID()
+	command.UpdatedAt = service.clock.Now()
+	if _, err := service.audit.RecordAnnotationWrite(ctx, AnnotationAuditEvent{
+		ActorAdminID: actor.AdminID(), OperationID: operationID, Action: "update_user_tag", Reason: strings.TrimSpace(command.Reason),
+		DetailDigest: digestStrings(command.TagID.String(), command.Name, command.Color), RequestID: actor.RequestID(), OccurredAt: command.UpdatedAt,
+	}); err != nil {
+		return Tag{}, ErrAuditUnavailable
+	}
+	return service.repository.UpdateTag(ctx, command)
+}
+
+// DeleteTag removes an unused tag definition only at the exact reviewed version.
+func (service *Service) DeleteTag(ctx context.Context, actor admin.ActorContext, command DeleteTagCommand, operationID idempotency.OperationID, reason string) (uint64, error) {
+	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
+		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(reason) {
+		return 0, ErrInvalidInput
+	}
+	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {
+		return 0, ErrPermissionDenied
+	}
+	command.DeletedAt = service.clock.Now()
+	if _, err := service.audit.RecordAnnotationWrite(ctx, AnnotationAuditEvent{
+		ActorAdminID: actor.AdminID(), OperationID: operationID, Action: "delete_user_tag", Reason: strings.TrimSpace(reason),
+		DetailDigest: digestStrings(command.TagID.String()), RequestID: actor.RequestID(), OccurredAt: command.DeletedAt,
+	}); err != nil {
+		return 0, ErrAuditUnavailable
+	}
+	return service.repository.DeleteTag(ctx, command)
+}
+
 // SetUserTags replaces the complete tag assignment only after annotate permission and durable audit are available.
 func (service *Service) SetUserTags(ctx context.Context, actor admin.ActorContext, command SetUserTagsRequest) (uint64, error) {
 	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
@@ -216,6 +289,20 @@ func (service *Service) SetUserTags(ctx context.Context, actor admin.ActorContex
 		UserID: command.UserID, TagIDs: command.TagIDs, ActorAdminID: actor.AdminID(), Reason: strings.TrimSpace(command.Reason),
 		ExpectedVersion: command.ExpectedVersion, ChangedAt: now,
 	})
+}
+
+// ListUserNotes pages the append-only annotation timeline without exposing unrelated users' notes.
+func (service *Service) ListUserNotes(ctx context.Context, actor admin.ActorContext, query NotePageQuery) ([]Note, error) {
+	if service == nil || service.repository == nil || ctx == nil {
+		return nil, ErrInvalidInput
+	}
+	if err := actor.Require(admin.PermissionUsersRead); err != nil {
+		return nil, ErrPermissionDenied
+	}
+	if query.PageSize == 0 {
+		query.PageSize = DefaultDetailNoteLimit
+	}
+	return service.repository.ListNotes(ctx, query)
 }
 
 // AppendUserNote stores the original note body but audits only an irreversible digest plus the note identifier.
@@ -321,6 +408,17 @@ func digestUUIDs(values []uuid.UUID) [sha256.Size]byte {
 	hash := sha256.New()
 	for _, value := range values {
 		hash.Write([]byte(value.String()))
+		hash.Write([]byte{0})
+	}
+	var result [sha256.Size]byte
+	copy(result[:], hash.Sum(nil))
+	return result
+}
+
+func digestStrings(values ...string) [sha256.Size]byte {
+	hash := sha256.New()
+	for _, value := range values {
+		hash.Write([]byte(strings.TrimSpace(value)))
 		hash.Write([]byte{0})
 	}
 	var result [sha256.Size]byte

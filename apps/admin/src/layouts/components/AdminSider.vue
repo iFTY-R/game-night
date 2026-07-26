@@ -4,6 +4,7 @@ import { NButton, NTooltip } from "naive-ui";
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { navigationItems } from "../../constants/navigation";
+import { useAuthStore } from "../../stores/auth";
 import { usePreferencesStore } from "../../stores/preferences";
 
 const props = defineProps<{
@@ -11,11 +12,12 @@ const props = defineProps<{
 }>();
 
 const preferences = usePreferencesStore();
+const auth = useAuthStore();
 const route = useRoute();
 
 // Mobile navigation always stays expanded even when the desktop preference is collapsed.
 const collapsed = computed(() => !props.mobile && preferences.siderCollapsed);
-const visibleItems = computed(() => navigationItems);
+const visibleItems = computed(() => navigationItems.filter((item) => auth.permissions.includes(item.permission)));
 </script>
 
 <template>

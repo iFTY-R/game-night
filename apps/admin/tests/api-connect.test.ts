@@ -10,9 +10,16 @@ import {
   verifyAdminRecoveryCode,
   verifyAdminTotp
 } from "../src/api/admin-auth";
+import {
+  adminUserRequestPolicies,
+  getUserPII,
+  listUsers,
+  setUserTags
+} from "../src/api/admin-user";
 import { installSessionInvalidHandler } from "../src/api/connect";
 import { AdminApiError } from "../src/api/errors";
 import { AdminAuthService } from "../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
+import { AdminUserPIIField, AdminUserService } from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
 import { BusinessErrorDetailSchema } from "../../../contracts/gen/ts/platform/common/v1/error_pb";
 
 const base64BusinessError = (messageKey: string): string => {
@@ -49,6 +56,25 @@ describe("admin connect transport", () => {
     });
   });
 
+  it("keeps frontend request policies scoped to implemented AdminUserService procedures", () => {
+    const implementedMethods = AdminUserService.methods
+      .map((method) => method.name)
+      .filter((name) => name in adminUserRequestPolicies);
+    expect(Object.keys(adminUserRequestPolicies)).toEqual(implementedMethods);
+    expect(adminUserRequestPolicies).toEqual({
+      ListUsers: { csrf: true, requestId: false },
+      GetUser: { csrf: true, requestId: false },
+      GetUserPII: { csrf: true, requestId: true },
+      ListUserTags: { csrf: true, requestId: false },
+      CreateUserTag: { csrf: true, requestId: true },
+      UpdateUserTag: { csrf: true, requestId: true },
+      DeleteUserTag: { csrf: true, requestId: true },
+      SetUserTags: { csrf: true, requestId: true },
+      ListUserNotes: { csrf: true, requestId: false },
+      AppendUserNote: { csrf: true, requestId: true }
+    });
+  });
+
   it("posts admin auth requests with relative path and flow/csrf headers", async () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
@@ -78,6 +104,56 @@ describe("admin connect transport", () => {
     expect(headers.get("Connect-Protocol-Version")).toBe("1");
     expect(init.credentials).toBe("include");
     expect(String(init.body)).toContain("challengeProof");
+  });
+
+  it("posts implemented user-center reads and audited mutations to AdminUserService", async () => {
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      writable: true,
+      value: "__Host-gn_admin_csrf=csrf-token"
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ users: [], page: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await listUsers({ username: "alice" });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/platform.admin.v1.AdminUserService/ListUsers");
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(headers.get("X-Request-ID")).toBeNull();
+    expect(String(init.body)).toContain("alice");
+  });
+
+  it.each([
+    ["GetUserPII", () => getUserPII({ userId: "user-1", fields: [AdminUserPIIField.ADMIN_USER_PII_FIELD_REAL_NAME], reason: "申诉核验" })],
+    ["SetUserTags", () => setUserTags({ operationId: "op-1", userId: "user-1", tagIds: ["tag-1"], reason: "运营标注", expectedVersion: 2n })]
+  ])("assigns request ids to audited user-center procedure %s", async (procedureName, invoke) => {
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      writable: true,
+      value: "__Host-gn_admin_csrf=csrf-token"
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await invoke();
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe(`/platform.admin.v1.AdminUserService/${procedureName}`);
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
 
   it("assigns request ids to protected mutation procedures", async () => {

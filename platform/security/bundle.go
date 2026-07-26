@@ -15,6 +15,7 @@ type KeyringPaths struct {
 	UserChallenge  string
 	AdminChallenge string
 	AdminSession   string
+	AdminCursor    string
 	Audit          string
 }
 
@@ -28,6 +29,7 @@ type Keyrings struct {
 	UserChallenge  *HMACKeyring[UserChallengeKeyPurpose]
 	AdminChallenge *HMACKeyring[AdminChallengeKeyPurpose]
 	AdminSession   *HMACKeyring[AdminSessionKeyPurpose]
+	AdminCursor    *HMACKeyring[AdminCursorKeyPurpose]
 	Audit          *AuditKeyring
 }
 
@@ -79,6 +81,10 @@ func LoadKeyrings(paths KeyringPaths, now time.Time) (Keyrings, error) {
 	if err != nil {
 		return Keyrings{}, err
 	}
+	adminCursor, err := LoadHMACKeyring[AdminCursorKeyPurpose](paths.AdminCursor, now)
+	if err != nil {
+		return Keyrings{}, err
+	}
 	audit, err := LoadAuditKeyring(paths.Audit, now)
 	if err != nil {
 		return Keyrings{}, err
@@ -94,6 +100,7 @@ func LoadKeyrings(paths KeyringPaths, now time.Time) (Keyrings, error) {
 		userChallenge.keys.fingerprints(),
 		adminChallenge.keys.fingerprints(),
 		adminSession.keys.fingerprints(),
+		adminCursor.keys.fingerprints(),
 		audit.fingerprints(),
 	} {
 		for _, fingerprint := range fingerprints {
@@ -112,6 +119,7 @@ func LoadKeyrings(paths KeyringPaths, now time.Time) (Keyrings, error) {
 		UserChallenge:  userChallenge,
 		AdminChallenge: adminChallenge,
 		AdminSession:   adminSession,
+		AdminCursor:    adminCursor,
 		Audit:          audit,
 	}, nil
 }

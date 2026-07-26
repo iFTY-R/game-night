@@ -14,6 +14,7 @@ import (
 	apiConfig "github.com/iFTY-R/game-night/apps/api/internal/config"
 	"github.com/iFTY-R/game-night/apps/api/internal/server"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminauth"
+	adminusertransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminuser"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
 	transporterrors "github.com/iFTY-R/game-night/apps/api/internal/transport/errors"
@@ -26,8 +27,8 @@ import (
 	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
-	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminuserdomain "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
@@ -35,6 +36,7 @@ import (
 	identitydomain "github.com/iFTY-R/game-night/platform/identity"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
+	"github.com/iFTY-R/game-night/platform/profile"
 	roomdomain "github.com/iFTY-R/game-night/platform/room"
 	"github.com/iFTY-R/game-night/platform/secretresult"
 	"github.com/iFTY-R/game-night/platform/security"
@@ -201,6 +203,10 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	adminUserService, err := adminUserService(keyrings, source, pool, auditService, checkpointPolicy)
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	bootstrapCoordinator, err := bootstrap.NewCoordinator(ctx, adminService, string(config.Shared.BootstrapSecretFile))
 	if err != nil {
 		return nil, errInitializeBootstrap
@@ -220,7 +226,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	handler, err := transportHandler(
 		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameGovernance, gameSessionRepository, roomRepository,
-		ruleRepository, replayAccessRepository, gameCoordinator, adminService,
+		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminUserService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -417,6 +423,33 @@ func domainServices(
 	return identityService, adminService, nil
 }
 
+func adminUserService(
+	keyrings security.Keyrings,
+	source clock.Clock,
+	pool *pgxpool.Pool,
+	auditService *audit.Service,
+	checkpointPolicy *audit.CheckpointHealthPolicy,
+) (*adminuserdomain.Service, error) {
+	protector, err := profile.NewDefaultPIIProtector(keyrings.PII)
+	if err != nil {
+		return nil, err
+	}
+	cursor, err := adminuserdomain.NewCursorCodec(keyrings.AdminCursor)
+	if err != nil {
+		return nil, err
+	}
+	return adminuserdomain.NewService(adminuserdomain.Config{
+		Repository: postgres.NewAdminUserRepository(pool),
+		Profiles:   postgres.NewProfileRepository(pool),
+		Protector:  protector,
+		Audit: adminusertransport.NewAuditRecorder(
+			auditService, postgres.NewAuditOutboxUnitOfWork(pool, auditService), checkpointPolicy, source,
+		),
+		Cursor: cursor,
+		Clock:  source,
+	})
+}
+
 func transportHandler(
 	config sharedconfig.Config,
 	source clock.Clock,
@@ -431,6 +464,7 @@ func transportHandler(
 	replays *postgres.ReplayAccessRepository,
 	gameCoordinator *redisstore.GameCoordinator,
 	adminService *admin.Service,
+	adminUserService *adminuserdomain.Service,
 	metricRegistry *metrics.Registry,
 	readiness *server.Readiness,
 	logger *slog.Logger,
@@ -502,6 +536,10 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	adminUserHandler, err := adminusertransport.NewService(adminUserService, source)
+	if err != nil {
+		return nil, err
+	}
 	userOperations := append(append([]string(nil), sensitive.IdentityOperations...), sensitive.RoomOperations...)
 	userOperations = append(userOperations, sensitive.GameOperations...)
 	userSensitive, err := sensitive.New(userOperations...)
@@ -529,8 +567,6 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	// The contract-first route fails closed until a domain-backed user-center transport replaces this generated handler.
-	adminUserHandler := &adminv1connect.UnimplementedAdminUserServiceHandler{}
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
 		Auth:         adminAuthHandler,
 		User:         adminUserHandler,

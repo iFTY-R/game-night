@@ -533,6 +533,7 @@ func applicationIntegrationKeyrings(t testing.TB, now time.Time) sharedconfig.Ke
 		UserChallenge:  sharedconfig.UserChallengeKeyringFile(symmetric("user-challenge.json")),
 		AdminChallenge: sharedconfig.AdminChallengeKeyringFile(symmetric("admin-challenge.json")),
 		AdminSession:   sharedconfig.AdminSessionKeyringFile(symmetric("admin-session.json")),
+		AdminCursor:    sharedconfig.AdminCursorKeyringFile(symmetric("admin-cursor.json")),
 		Audit:          sharedconfig.AuditKeyringFile(writeApplicationReadOnlyFile(t, "audit.json", auditContents)),
 	}
 }

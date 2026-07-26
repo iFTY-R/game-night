@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vitest";
+import { AdminPermission } from "../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import { routeName, type AppRouteName } from "../src/constants/navigation";
 import { useNavigationStore } from "../src/stores/navigation";
 import { usePreferencesStore } from "../src/stores/preferences";
@@ -10,36 +11,47 @@ describe("navigation store", () => {
     setActivePinia(createPinia());
   });
 
-  it("restores the security tab with its administrator-facing title", () => {
+  it("restores the user center tab with its administrator-facing title", () => {
     const preferences = usePreferencesStore();
-    preferences.persistedTabs = [routeName.security];
+    preferences.persistedTabs = [routeName.users];
 
     const navigation = useNavigationStore();
-    navigation.restoreTabs();
+    navigation.restoreTabs([AdminPermission.USERS_READ, AdminPermission.SECURITY_READ]);
 
     expect(navigation.tabs.map(({ name, title }) => ({ name, title }))).toEqual([
-      { name: routeName.security, title: "安全设置" }
+      { name: routeName.users, title: "用户中心" }
     ]);
-    expect(preferences.persistedTabs).toEqual([routeName.security]);
+    expect(preferences.persistedTabs).toEqual([routeName.users]);
   });
 
-  it("drops retired persisted tabs and writes the normalized list back", () => {
+  it("drops retired persisted tabs and keeps real authorized modules", () => {
     const preferences = usePreferencesStore();
-    preferences.persistedTabs = ["overview", "users", routeName.security] as unknown as AppRouteName[];
+    preferences.persistedTabs = ["overview", routeName.users, routeName.security] as unknown as AppRouteName[];
 
     const navigation = useNavigationStore();
-    navigation.restoreTabs();
+    navigation.restoreTabs([AdminPermission.USERS_READ, AdminPermission.SECURITY_READ]);
 
-    expect(navigation.tabs.map(({ name }) => name)).toEqual([routeName.security]);
-    expect(preferences.persistedTabs).toEqual([routeName.security]);
+    expect(navigation.tabs.map(({ name }) => name)).toEqual([routeName.users, routeName.security]);
+    expect(preferences.persistedTabs).toEqual([routeName.users, routeName.security]);
   });
 
-  it("restores security when persisted tabs contain only retired modules", () => {
+  it("restores the first authorized real module when persisted tabs contain only retired modules", () => {
     const preferences = usePreferencesStore();
     preferences.persistedTabs = ["overview", "audit"] as unknown as AppRouteName[];
 
     const navigation = useNavigationStore();
-    navigation.restoreTabs();
+    navigation.restoreTabs([AdminPermission.USERS_READ, AdminPermission.SECURITY_READ]);
+
+    expect(navigation.tabs.map(({ name }) => name)).toEqual([routeName.users]);
+    expect(preferences.persistedTabs).toEqual([routeName.users]);
+  });
+
+  it("does not restore user center without its backend permission", () => {
+    const preferences = usePreferencesStore();
+    preferences.persistedTabs = [routeName.users, routeName.security];
+
+    const navigation = useNavigationStore();
+    navigation.restoreTabs([AdminPermission.SECURITY_READ]);
 
     expect(navigation.tabs.map(({ name }) => name)).toEqual([routeName.security]);
     expect(preferences.persistedTabs).toEqual([routeName.security]);

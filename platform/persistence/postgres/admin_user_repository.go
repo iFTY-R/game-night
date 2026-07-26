@@ -199,6 +199,7 @@ func (repository *AdminUserRepository) AppendNote(ctx context.Context, command a
 		return adminuser.Note{}, adminuser.ErrInvalidInput
 	}
 	var row sqlcgen.AdminUserNote
+	var nextVersion int64
 	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
 		locked, err := queries.LockAdminUserForTagUpdate(ctx, sqlcgen.LockAdminUserForTagUpdateParams{UserID: uuidToPG(command.UserID)})
 		if err != nil {
@@ -214,7 +215,7 @@ func (repository *AdminUserRepository) AppendNote(ctx context.Context, command a
 		if err != nil {
 			return err
 		}
-		_, err = queries.IncrementAdminUserVersionCAS(ctx, sqlcgen.IncrementAdminUserVersionCASParams{
+		nextVersion, err = queries.IncrementAdminUserVersionCAS(ctx, sqlcgen.IncrementAdminUserVersionCASParams{
 			UpdatedAt: timeToPG(command.CreatedAt), UserID: uuidToPG(command.UserID), ExpectedVersion: int64(command.ExpectedVersion),
 		})
 		return err
@@ -222,7 +223,15 @@ func (repository *AdminUserRepository) AppendNote(ctx context.Context, command a
 	if err != nil {
 		return adminuser.Note{}, mapAdminUserQueryError(ctx, err, adminuser.ErrConflict)
 	}
-	return adminUserNoteFromRow(row)
+	note, err := adminUserNoteFromRow(row)
+	if err != nil {
+		return adminuser.Note{}, err
+	}
+	if nextVersion <= int64(command.ExpectedVersion) {
+		return adminuser.Note{}, adminuser.ErrIntegrity
+	}
+	note.UserVersion = uint64(nextVersion)
+	return note, nil
 }
 
 // ListNotes reads the immutable note timeline with the same tuple used by its descending index.

@@ -51,6 +51,7 @@ const (
 	environmentUserChallengeKeyringFile  = "GAME_NIGHT_USER_CHALLENGE_KEYRING_FILE"
 	environmentAdminChallengeKeyringFile = "GAME_NIGHT_ADMIN_CHALLENGE_KEYRING_FILE"
 	environmentAdminSessionKeyringFile   = "GAME_NIGHT_ADMIN_SESSION_KEYRING_FILE"
+	environmentAdminCursorKeyringFile    = "GAME_NIGHT_ADMIN_CURSOR_KEYRING_FILE"
 	environmentAuditKeyringFile          = "GAME_NIGHT_AUDIT_KEYRING_FILE"
 )
 
@@ -78,6 +79,7 @@ var secretEnvironmentNames = []string{
 	environmentUserChallengeKeyringFile,
 	environmentAdminChallengeKeyringFile,
 	environmentAdminSessionKeyringFile,
+	environmentAdminCursorKeyringFile,
 	environmentAuditKeyringFile,
 }
 
@@ -408,6 +410,7 @@ func applyAPISecrets(child *environment, source environment) {
 		child.set(environmentUserChallengeKeyringFile, filepath.Join(directory, "user-challenge.json"))
 		child.set(environmentAdminChallengeKeyringFile, filepath.Join(directory, "admin-challenge.json"))
 		child.set(environmentAdminSessionKeyringFile, filepath.Join(directory, "admin-session.json"))
+		child.set(environmentAdminCursorKeyringFile, filepath.Join(directory, "admin-cursor.json"))
 		child.set(environmentAuditKeyringFile, filepath.Join(directory, "audit.json"))
 	}
 	if bootstrapSecretFile, ok := source.get(environmentAPIBootstrapSecretFile); ok && bootstrapSecretFile != "" {

@@ -2,6 +2,8 @@ package game
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"net/http"
 	"sync"
@@ -178,6 +180,10 @@ func (runtime *RemoteRuntime) Cancel(ctx context.Context, command gameruntime.Ca
 		command.ExpectedRoom.Room == 0 || command.ExpectedRoom.Membership == 0 || command.OwnershipEpoch == 0 {
 		return roomDomain.Room{}, gameruntime.Session{}, gameruntime.ErrInvalidSessionInput
 	}
+	operationID, requestDigest, err := ensureCancelBinding(command)
+	if err != nil {
+		return roomDomain.Room{}, gameruntime.Session{}, err
+	}
 	for attempt := 0; attempt < 2; attempt++ {
 		client, err := runtime.resolveOwner(ctx, command.SessionID)
 		if err != nil {
@@ -186,7 +192,7 @@ func (runtime *RemoteRuntime) Cancel(ctx context.Context, command gameruntime.Ca
 		request := connect.NewRequest(&realtimev1.CancelSessionRequest{
 			RoomId: command.RoomID.String(), SessionId: command.SessionID.String(),
 			ExpectedRoomVersion: command.ExpectedRoom.Room, ExpectedMembershipVersion: command.ExpectedRoom.Membership,
-			CloseRoom: command.CloseRoom,
+			CloseRoom: command.CloseRoom, OperationId: operationID.Value(), RequestDigest: requestDigest.Bytes(),
 		})
 		runtime.authorize(request)
 		response, callErr := client.CancelSession(ctx, request)
@@ -717,6 +723,78 @@ func remoteUnavailable(err error) error {
 		return err
 	}
 	return redisstore.ErrCoordinationUnavailable
+}
+
+func ensureCancelBinding(command gameruntime.CancelCommand) (idempotency.OperationID, idempotency.Digest, error) {
+	operationID := command.OperationID
+	if !operationID.Valid() {
+		// Public close-room callers do not expose idempotency fields, so derive a stable internal operation.
+		seed := cancelOperationSeed(command)
+		generated, err := idempotency.NewOperationID(seed[:16])
+		if err != nil {
+			return idempotency.OperationID{}, idempotency.Digest{}, gameruntime.ErrInvalidSessionInput
+		}
+		operationID = generated
+	}
+	digest := cancelRequestDigest(command, operationID)
+	if command.RequestDigest != nil && *command.RequestDigest != digest {
+		return idempotency.OperationID{}, idempotency.Digest{}, idempotency.ErrConflict
+	}
+	return operationID, digest, nil
+}
+
+// cancelOperationSeed keeps legacy public cancel retries stable without expanding the public room API.
+func cancelOperationSeed(command gameruntime.CancelCommand) [sha256.Size]byte {
+	hasher := sha256.New()
+	writeRemoteDigestField(hasher, []byte("owner-cancel-operation-v1"))
+	writeRemoteDigestField(hasher, command.RoomID[:])
+	writeRemoteDigestField(hasher, command.SessionID[:])
+	writeRemoteDigestUint64(hasher, command.ExpectedRoom.Room)
+	writeRemoteDigestUint64(hasher, command.ExpectedRoom.Membership)
+	writeRemoteDigestUint64(hasher, command.OwnershipEpoch)
+	if command.CloseRoom {
+		writeRemoteDigestField(hasher, []byte{1})
+	} else {
+		writeRemoteDigestField(hasher, []byte{0})
+	}
+	return sha256.Sum256(hasher.Sum(nil))
+}
+
+// cancelRequestDigest binds every owner-visible cancel field so route retries cannot drift silently.
+func cancelRequestDigest(command gameruntime.CancelCommand, operationID idempotency.OperationID) idempotency.Digest {
+	hasher := sha256.New()
+	writeRemoteDigestField(hasher, command.RoomID[:])
+	writeRemoteDigestField(hasher, command.SessionID[:])
+	writeRemoteDigestUint64(hasher, command.ExpectedRoom.Room)
+	writeRemoteDigestUint64(hasher, command.ExpectedRoom.Membership)
+	writeRemoteDigestUint64(hasher, command.OwnershipEpoch)
+	writeRemoteDigestField(hasher, []byte(operationID.Value()))
+	if command.CloseRoom {
+		writeRemoteDigestField(hasher, []byte{1})
+	} else {
+		writeRemoteDigestField(hasher, []byte{0})
+	}
+	writeRemoteDigestField(hasher, []byte(command.Reason))
+	digest, err := idempotency.NewDigest(hasher.Sum(nil))
+	if err != nil {
+		panic(err)
+	}
+	return digest
+}
+
+// writeRemoteDigestUint64 length-prefixes scalar fields to keep digest framing unambiguous.
+func writeRemoteDigestUint64(hasher interface{ Write([]byte) (int, error) }, value uint64) {
+	var encoded [8]byte
+	binary.BigEndian.PutUint64(encoded[:], value)
+	writeRemoteDigestField(hasher, encoded[:])
+}
+
+// writeRemoteDigestField mirrors runtime digest framing for the remote transport boundary.
+func writeRemoteDigestField(hasher interface{ Write([]byte) (int, error) }, value []byte) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	_, _ = hasher.Write(length[:])
+	_, _ = hasher.Write(value)
 }
 
 var _ Runtime = (*RemoteRuntime)(nil)

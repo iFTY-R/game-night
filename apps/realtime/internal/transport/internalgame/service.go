@@ -229,13 +229,17 @@ func (service *Service) CancelSession(ctx context.Context, request *connect.Requ
 	if err != nil {
 		return nil, err
 	}
+	operationID, requestDigest, err := operationBinding(request.Msg.GetOperationId(), request.Msg.GetRequestDigest())
+	if err != nil {
+		return nil, err
+	}
 	room, session, err := service.ownership.Cancel(ctx, gameruntime.CancelCommand{
 		RoomID: roomID, SessionID: sessionID,
 		ExpectedRoom: roomdomain.Version{
 			Room: request.Msg.GetExpectedRoomVersion(), Membership: request.Msg.GetExpectedMembershipVersion(),
 		},
-		Reason:    gameruntime.CancelReasonPlatformCancelled,
-		CloseRoom: request.Msg.GetCloseRoom(),
+		OperationID: operationID, RequestDigest: &requestDigest,
+		Reason: gameruntime.CancelReasonPlatformCancelled, CloseRoom: request.Msg.GetCloseRoom(),
 	})
 	if err != nil {
 		return nil, err

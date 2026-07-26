@@ -47,15 +47,19 @@ func TestOwnerServiceActionAcquiresOwnerAndNeverAcceptsCallerEpoch(t *testing.T)
 func TestOwnerServiceCancelUsesOwnerFencingAndReturnsTerminalSnapshots(t *testing.T) {
 	fixture := newInternalGameFixture(t)
 	roomSnapshot := fixture.room.Snapshot()
+	operationID := internalOperationID(t, 5)
+	digest := sha256.Sum256([]byte("internal-cancel"))
 	response, err := fixture.service.CancelSession(t.Context(), connect.NewRequest(&realtimev1.CancelSessionRequest{
 		RoomId: roomSnapshot.ID.String(), SessionId: fixture.session.Snapshot().ID.String(),
 		ExpectedRoomVersion: roomSnapshot.RoomVersion, ExpectedMembershipVersion: roomSnapshot.MembershipVersion,
-		CloseRoom: true,
+		CloseRoom: true, OperationId: operationID.Value(), RequestDigest: digest[:],
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if fixture.ownership.lastCancel.OwnershipEpoch != 0 || !fixture.ownership.lastCancel.CloseRoom ||
+		fixture.ownership.lastCancel.OperationID.Value() != operationID.Value() ||
+		fixture.ownership.lastCancel.RequestDigest == nil || *fixture.ownership.lastCancel.RequestDigest != idempotency.Digest(digest) ||
 		response.Msg.GetRoom().GetStatus() != string(roomdomain.RoomStatusClosed) ||
 		response.Msg.GetSession().GetStatus() != gamev1.GameSessionStatus_GAME_SESSION_STATUS_CANCELLED {
 		t.Fatalf("command=%+v response=%+v", fixture.ownership.lastCancel, response.Msg)
@@ -245,11 +249,11 @@ func newInternalGameFixture(t testing.TB) internalGameFixture {
 }
 
 type fakeInternalRuntime struct {
-	session      gameruntime.Session
-	projection   game.Projection
-	startRoom    roomdomain.Room
-	startSession gameruntime.Session
-	lastStart    gameruntime.StartCommand
+	session          gameruntime.Session
+	projection       game.Projection
+	startRoom        roomdomain.Room
+	startSession     gameruntime.Session
+	lastStart        gameruntime.StartCommand
 	lastReplayPolicy game.ReplayAccessPolicy
 }
 

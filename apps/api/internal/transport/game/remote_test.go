@@ -56,10 +56,17 @@ func TestRemoteRuntimeRoutesActionOnlyToAllowlistedReadyOwner(t *testing.T) {
 		result.Session.Snapshot().OwnershipEpoch != 7 || result.Projection.View.MessageType != "viewer.state" {
 		t.Fatalf("resolve=%d action=%d token=%t result=%+v", service.resolveCalls, service.actionCalls, service.sawToken, result)
 	}
-	closed, cancelled, err := runtime.Cancel(t.Context(), gameruntime.CancelCommand{
+	cancelOperationID := remoteOperationID(t, 5)
+	cancelCommand := gameruntime.CancelCommand{
 		RoomID: roomID, SessionID: sessionID, ExpectedRoom: roomDomain.Version{Room: 2, Membership: 1},
-		OwnershipEpoch: 7, Reason: gameruntime.CancelReasonPlatformCancelled, CloseRoom: true,
-	})
+		OwnershipEpoch: 7, OperationID: cancelOperationID,
+		Reason: gameruntime.CancelReasonPlatformCancelled, CloseRoom: true,
+	}
+	cancelDigest := cancelRequestDigest(cancelCommand, cancelOperationID)
+	cancelCommand.RequestDigest = &cancelDigest
+	service.expectedCancelOperationID = cancelOperationID
+	service.expectedCancelDigest = &cancelDigest
+	closed, cancelled, err := runtime.Cancel(t.Context(), cancelCommand)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,6 +173,8 @@ type remoteOwnerFixture struct {
 	token, routeAddress        string
 	actorID, roomID, sessionID uuid.UUID
 	operationID                idempotency.OperationID
+	expectedCancelOperationID  idempotency.OperationID
+	expectedCancelDigest       *idempotency.Digest
 	lastStartRequest           *realtimev1.StartSessionRequest
 	resolveCalls, actionCalls  int
 	startCalls                 int
@@ -252,6 +261,18 @@ func (service *remoteOwnerFixture) CancelSession(
 	if request.Msg.GetRoomId() != service.roomID.String() || request.Msg.GetSessionId() != service.sessionID.String() ||
 		request.Msg.GetExpectedRoomVersion() != 2 || request.Msg.GetExpectedMembershipVersion() != 1 || !request.Msg.GetCloseRoom() {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid cancel request"))
+	}
+	if request.Msg.GetOperationId() == "" || len(request.Msg.GetRequestDigest()) != idempotency.DigestSize {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("missing cancel binding"))
+	}
+	if service.expectedCancelOperationID.Valid() && request.Msg.GetOperationId() != service.expectedCancelOperationID.Value() {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unexpected cancel operation"))
+	}
+	if service.expectedCancelDigest != nil {
+		suppliedDigest, err := idempotency.NewDigest(request.Msg.GetRequestDigest())
+		if err != nil || suppliedDigest != *service.expectedCancelDigest {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unexpected cancel digest"))
+		}
 	}
 	now := time.Date(2026, time.July, 20, 13, 1, 0, 0, time.UTC)
 	session := remoteSessionWire(service.sessionID, service.roomID, service.actorID, now)

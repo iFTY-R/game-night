@@ -2194,6 +2194,8 @@ type CancelSessionRequest struct {
 	ExpectedRoomVersion       uint64                 `protobuf:"varint,3,opt,name=expected_room_version,json=expectedRoomVersion,proto3" json:"expected_room_version,omitempty"`
 	ExpectedMembershipVersion uint64                 `protobuf:"varint,4,opt,name=expected_membership_version,json=expectedMembershipVersion,proto3" json:"expected_membership_version,omitempty"`
 	CloseRoom                 bool                   `protobuf:"varint,5,opt,name=close_room,json=closeRoom,proto3" json:"close_room,omitempty"`
+	OperationId               string                 `protobuf:"bytes,6,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	RequestDigest             []byte                 `protobuf:"bytes,7,opt,name=request_digest,json=requestDigest,proto3" json:"request_digest,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -2261,6 +2263,20 @@ func (x *CancelSessionRequest) GetCloseRoom() bool {
 		return x.CloseRoom
 	}
 	return false
+}
+
+func (x *CancelSessionRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *CancelSessionRequest) GetRequestDigest() []byte {
+	if x != nil {
+		return x.RequestDigest
+	}
+	return nil
 }
 
 type CancelSessionResponse struct {
@@ -2533,7 +2549,7 @@ const file_platform_realtime_v1_realtime_proto_rawDesc = "" +
 	"\x14room_ownership_epoch\x18\x06 \x01(\x04R\x12roomOwnershipEpoch\"`\n" +
 	"\x11PendingStartProof\x12(\n" +
 	"\x10pending_start_id\x18\x01 \x01(\tR\x0ependingStartId\x12!\n" +
-	"\fcancel_token\x18\x02 \x01(\tR\vcancelToken\"\xe1\x01\n" +
+	"\fcancel_token\x18\x02 \x01(\tR\vcancelToken\"\xab\x02\n" +
 	"\x14CancelSessionRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
@@ -2541,7 +2557,9 @@ const file_platform_realtime_v1_realtime_proto_rawDesc = "" +
 	"\x15expected_room_version\x18\x03 \x01(\x04R\x13expectedRoomVersion\x12>\n" +
 	"\x1bexpected_membership_version\x18\x04 \x01(\x04R\x19expectedMembershipVersion\x12\x1d\n" +
 	"\n" +
-	"close_room\x18\x05 \x01(\bR\tcloseRoom\"\x90\x01\n" +
+	"close_room\x18\x05 \x01(\bR\tcloseRoom\x12!\n" +
+	"\foperation_id\x18\x06 \x01(\tR\voperationId\x12%\n" +
+	"\x0erequest_digest\x18\a \x01(\fR\rrequestDigest\"\x90\x01\n" +
 	"\x15CancelSessionResponse\x126\n" +
 	"\x04room\x18\x01 \x01(\v2\".platform.realtime.v1.RoomSnapshotR\x04room\x12?\n" +
 	"\asession\x18\x02 \x01(\v2%.platform.realtime.v1.SessionSnapshotR\asession2\xc5\a\n" +

@@ -263,6 +263,8 @@ message CancelSessionRequest {
   uint64 expected_room_version = 3;
   uint64 expected_membership_version = 4;
   bool close_room = 5;
+  string operation_id = 6;
+  bytes request_digest = 7;
 }
 
 message CancelSessionResponse {

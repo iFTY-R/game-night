@@ -637,6 +637,10 @@ type CancelCommand struct {
 	SessionID      uuid.UUID
 	ExpectedRoom   roomDomain.Version
 	OwnershipEpoch uint64
+	// OperationID scopes administrator-triggered cancellation retries when the caller provides one.
+	OperationID idempotency.OperationID
+	// RequestDigest optionally echoes the canonical cancellation binding and is rejected on mismatch.
+	RequestDigest *idempotency.Digest
 	// Reason is normalized into the durable cancelled session and replay terminal metadata.
 	Reason game.Identifier
 	// CloseRoom distinguishes permanent host dissolution from an operational cancellation that returns to the lobby.
@@ -800,6 +804,10 @@ func (service *Service) Resume(ctx context.Context, command ResumeCommand) (Sess
 func (service *Service) Cancel(ctx context.Context, command CancelCommand) (roomDomain.Room, Session, error) {
 	if service == nil || ctx == nil || command.RoomID == uuid.Nil || command.SessionID == uuid.Nil || command.OwnershipEpoch == 0 {
 		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	requestDigest := cancelDigest(command)
+	if command.RequestDigest != nil && *command.RequestDigest != requestDigest {
+		return roomDomain.Room{}, Session{}, idempotency.ErrConflict
 	}
 	room, err := service.rooms.GetByID(ctx, command.RoomID)
 	if err != nil {
@@ -1311,6 +1319,28 @@ func systemDigest(command SystemCommand) idempotency.Digest {
 		writeDigestUint64(hasher, command.ExpectedStateVersion)
 	}
 	writeMessage(hasher, command.Message)
+	return digestFromHash(hasher)
+}
+
+// cancelDigest is the runtime-side authority for validating owner-coordinated cancel bindings.
+func cancelDigest(command CancelCommand) idempotency.Digest {
+	hasher := sha256.New()
+	writeDigestField(hasher, command.RoomID[:])
+	writeDigestField(hasher, command.SessionID[:])
+	writeDigestUint64(hasher, command.ExpectedRoom.Room)
+	writeDigestUint64(hasher, command.ExpectedRoom.Membership)
+	writeDigestUint64(hasher, command.OwnershipEpoch)
+	if command.OperationID.Valid() {
+		writeDigestField(hasher, []byte(command.OperationID.Value()))
+	} else {
+		writeDigestField(hasher, nil)
+	}
+	if command.CloseRoom {
+		writeDigestField(hasher, []byte{1})
+	} else {
+		writeDigestField(hasher, []byte{0})
+	}
+	writeDigestField(hasher, []byte(command.Reason))
 	return digestFromHash(hasher)
 }
 

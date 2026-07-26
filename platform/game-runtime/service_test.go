@@ -724,6 +724,26 @@ func TestRuntimeServiceCancelReplaysAlreadyCancelledSession(t *testing.T) {
 	}
 }
 
+func TestRuntimeServiceCancelRejectsMismatchedRequestDigest(t *testing.T) {
+	fixture := newRuntimeServiceFixture(t)
+	playing, session, err := fixture.service.Start(t.Context(), StartCommand{
+		ActorUserID: fixture.hostID, RoomID: fixture.room.Snapshot().ID, GameID: fixture.module.manifest.GameID,
+		Expected: fixture.room.Version(), OperationID: runtimeServiceOperationID(t, 1), Config: runtimeServiceMessage("game.config", nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongDigest := idempotency.Digest{1}
+	_, _ = fixture.clock.Advance(time.Second)
+	if _, _, err := fixture.service.Cancel(t.Context(), CancelCommand{
+		RoomID: playing.Snapshot().ID, SessionID: session.Snapshot().ID,
+		ExpectedRoom: playing.Version(), OwnershipEpoch: session.Snapshot().OwnershipEpoch,
+		OperationID: runtimeServiceOperationID(t, 2), RequestDigest: &wrongDigest,
+	}); !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("mismatched digest error=%v", err)
+	}
+}
+
 func TestRuntimeServiceCancelCanCloseRoomIdempotently(t *testing.T) {
 	fixture := newRuntimeServiceFixture(t)
 	playing, session, err := fixture.service.Start(t.Context(), StartCommand{

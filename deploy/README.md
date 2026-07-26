@@ -1,27 +1,38 @@
 # Docker 部署
 
-`deploy` 提供两种互相独立的部署方式。两种方式都从 GHCR 拉取同一个应用镜像，并且只运行一个 `game-night` 应用容器、发布一个 `8080` 端口。
+`deploy` 提供两种互相独立的部署方式。两种方式都从 GHCR 拉取同一个应用镜像，并且只运行一个 `game-night` 应用容器。
 
-| 文件 | 应用容器 | 依赖服务 |
-| --- | --- | --- |
-| `docker-compose.yml` | 一个 `game-night` 容器 | Compose 创建 PostgreSQL、Redis、MinIO 和初始化容器 |
-| `docker-compose.standalone.yml` | 一个 `game-night` 容器 | 使用外部 PostgreSQL、Redis 和 S3 |
+| 编排文件 | 环境变量模板 | 默认发布端口 | 依赖服务 |
+| --- | --- | --- | --- |
+| `docker-compose.yml` | `.env.full.example` | `127.0.0.1:8080` | Compose 创建 PostgreSQL、Redis、MinIO 和初始化容器 |
+| `docker-compose.standalone.yml` | `.env.standalone.example` | `127.0.0.1:40891` | 使用外部 PostgreSQL、Redis 和 S3 |
+
+1Panel 上的 standalone 部署步骤见 [`1panel-standalone.md`](1panel-standalone.md)。
 
 ## 准备配置
 
-在仓库根目录执行：
+按部署方式复制对应模板，不要混用。
+
+完整部署：
 
 ```powershell
-Copy-Item deploy/.env.example deploy/.env
+Copy-Item deploy/.env.full.example deploy/.env
 ```
 
-编辑 `deploy/.env`，替换所有 `change-me` 值。默认镜像为 `ghcr.io/ifty-r/game-night:latest`；生产发布建议把 `GAME_NIGHT_IMAGE` 固定为 workflow 输出的版本标签或 digest。私有 GHCR 包需要先执行 `docker login ghcr.io`。管理员 MFA 策略不再通过环境变量控制。
+Standalone / 1Panel 部署：
+
+```powershell
+Copy-Item deploy/.env.standalone.example deploy/.env
+```
+
+`deploy/.env.example` 保留为完整部署的兼容别名。编辑 `deploy/.env`，替换所有 `change-me` 值。默认镜像为 `ghcr.io/ifty-r/game-night:latest`；生产发布建议把 `GAME_NIGHT_IMAGE` 固定为 workflow 输出的版本标签或 digest。私有 GHCR 包需要先执行 `docker login ghcr.io`。管理员 MFA 策略不再通过环境变量控制。
 
 在 `deploy/secrets` 中准备以下文件：
 
 ```text
 admin-bootstrap.txt
 admin-challenge.json
+admin-cursor.json
 admin-session.json
 audit.json
 device.json
@@ -66,7 +77,7 @@ docker compose -f docker-compose.standalone.yml ps
 
 ## 对外入口
 
-两种方式都只发布 `${GAME_NIGHT_HTTP_BIND_ADDRESS}:${GAME_NIGHT_HTTP_PUBLISHED_PORT}`，默认是 `127.0.0.1:8080`。外部 Nginx 或其他 TLS 终止层只需反代这个地址，并转发原始 Host、客户端地址以及 WebSocket Upgrade 头。
+两种方式都只发布 `${GAME_NIGHT_HTTP_BIND_ADDRESS}:${GAME_NIGHT_HTTP_PUBLISHED_PORT}`。完整部署默认是 `127.0.0.1:8080`，standalone 默认是 `127.0.0.1:40891`。外部 Nginx、1Panel OpenResty 或其他 TLS 终止层只需反代这个地址，并转发原始 Host、客户端地址以及 WebSocket Upgrade 头。
 
 ## 更新与清理
 

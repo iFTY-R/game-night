@@ -245,6 +245,7 @@ services:
       all_files="\
         admin-bootstrap.txt \
         admin-challenge.json \
+        admin-cursor.json \
         admin-session.json \
         audit.json \
         device.json \

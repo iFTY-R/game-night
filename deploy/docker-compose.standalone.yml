@@ -1,82 +1,124 @@
-# Game Night standalone deployment
-# Runs one application container. PostgreSQL, Redis, and S3 must be provided externally.
+# Game Night 单容器部署编排
+# 只运行一个应用容器，PostgreSQL、Redis 和 S3 由外部现成服务提供。
+# 该文件只负责串联边缘网关、各子进程环境变量和外部依赖，
+# 不在 compose 内创建数据库、缓存或对象存储。
 
 services:
+  # 单体拓扑：API、实时服务、worker、迁移和边缘网关由同一个镜像拉起，
+  # 适合开发环境、小型自托管环境，或先验证部署链路的场景。
   game-night:
+    # 生产环境建议显式固定 GAME_NIGHT_IMAGE，避免重新部署时意外拉取 latest。
     image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:latest}
+    # 固定容器名可以让日志、exec 和运维手册中的命令保持稳定。
     container_name: game-night
+    # serve-all 会同时托管所有服务端角色；除非拆分下面的环境变量块，
+    # 否则不要把它替换为单一角色启动命令。
     command: ["serve-all"]
+    # 自动恢复临时故障，同时仍然尊重手动执行的 docker compose stop。
     restart: unless-stopped
+    # 给 API 请求、实时会话和 worker 租约预留优雅退出时间。
     stop_grace_period: ${GAME_NIGHT_STOP_GRACE_PERIOD:-65s}
     ports:
-      - "${GAME_NIGHT_HTTP_BIND_ADDRESS:-127.0.0.1}:${GAME_NIGHT_HTTP_PUBLISHED_PORT:-8080}:8080"
+      # 只发布边缘网关端口；API、实时服务和 worker 监听都留在容器内部回环地址。
+      # 宿主机绑定默认使用 localhost，避免开发部署被意外暴露到外网。
+      - "${GAME_NIGHT_HTTP_BIND_ADDRESS:-127.0.0.1}:${GAME_NIGHT_HTTP_PUBLISHED_PORT:-40891}:8080"
     extra_hosts:
+      # 允许容器访问运行在 Docker 宿主机上的外部托管服务。
       - "host.docker.internal:host-gateway"
     volumes:
+      # API 密钥目录只读挂载，方便在镜像外轮换 keyring 和初始化密钥文件。
       - type: bind
         source: ${GAME_NIGHT_API_SECRETS_DIR:-./secrets}
         target: /run/game-night/api-secrets
         read_only: true
+      # worker 密钥目录单独挂载，生产环境可以独立控制文件归属和权限。
       - type: bind
         source: ${GAME_NIGHT_WORKER_SECRETS_DIR:-./secrets}
         target: /run/game-night/worker-secrets
         read_only: true
     environment:
+      # 下面先列部署者需要通过 .env 调整的外部环境和基础设施配置。
       GAME_NIGHT_ENVIRONMENT: ${GAME_NIGHT_ENVIRONMENT:-development}
+      # 所有角色共享同一个逻辑 schema；下面各数据库连接串仍然可以使用不同账号。
       GAME_NIGHT_DATABASE_SCHEMA: ${GAME_NIGHT_DATABASE_SCHEMA:-game_night}
+      # Redis 用于短期协调状态；每套环境都应使用独立 key 前缀，避免串数据。
       GAME_NIGHT_REDIS_URL: ${GAME_NIGHT_REDIS_URL:?GAME_NIGHT_REDIS_URL is required}
       GAME_NIGHT_REDIS_KEY_PREFIX: ${GAME_NIGHT_REDIS_KEY_PREFIX:-game-night:compose:}
+      # 协调请求需要快速失败，避免玩家操作因为基础设施等待而长时间卡住。
       GAME_NIGHT_REDIS_TIMEOUT: ${GAME_NIGHT_REDIS_TIMEOUT:-1s}
-      GAME_NIGHT_USER_ORIGINS: ${GAME_NIGHT_USER_ORIGINS:-http://localhost:8080}
-      GAME_NIGHT_ADMIN_ORIGINS: ${GAME_NIGHT_ADMIN_ORIGINS:-http://admin.localhost:8080}
+      # 浏览器可访问源必须匹配玩家端和管理端实际使用的访问地址。
+      GAME_NIGHT_USER_ORIGINS: ${GAME_NIGHT_USER_ORIGINS:-http://localhost:40891}
+      GAME_NIGHT_ADMIN_ORIGINS: ${GAME_NIGHT_ADMIN_ORIGINS:-http://admin.localhost:40891}
+      # 只信任真正负责 TLS 终止或注入客户端 IP 头的反向代理网段。
       GAME_NIGHT_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
+      # 公网 HTTPS 部署应设为 true，让浏览器会话使用 Secure Cookie。
       GAME_NIGHT_COOKIE_SECURE: ${GAME_NIGHT_COOKIE_SECURE:-false}
+      # 审计和检查点持久化写入兼容 S3 的对象存储。
       GAME_NIGHT_CHECKPOINT_SINK: s3
       GAME_NIGHT_CHECKPOINT_S3_REGION: ${GAME_NIGHT_CHECKPOINT_S3_REGION:-us-east-1}
       GAME_NIGHT_CHECKPOINT_S3_BUCKET: ${GAME_NIGHT_CHECKPOINT_S3_BUCKET:?GAME_NIGHT_CHECKPOINT_S3_BUCKET is required}
       GAME_NIGHT_CHECKPOINT_S3_ENDPOINT: ${GAME_NIGHT_CHECKPOINT_S3_ENDPOINT:?GAME_NIGHT_CHECKPOINT_S3_ENDPOINT is required}
+      # 保留时间使用 duration 格式，按需要的审计恢复窗口调整。
       GAME_NIGHT_CHECKPOINT_S3_RETENTION: ${GAME_NIGHT_CHECKPOINT_S3_RETENTION:-8760h}
+      # AWS_* 凭据由 S3 检查点客户端读取，也适用于自定义 S3 兼容端点。
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
 
-      # serve-all maps each DSN to the matching child process.
+      # serve-all 会把每个数据库连接串分发给对应的子进程。
+      # 生产环境如果需要权限隔离，应在这里给各角色配置不同 PostgreSQL 账号。
       GAME_NIGHT_API_DATABASE_URL: ${GAME_NIGHT_API_DATABASE_URL:?GAME_NIGHT_API_DATABASE_URL is required}
       GAME_NIGHT_REALTIME_DATABASE_URL: ${GAME_NIGHT_REALTIME_DATABASE_URL:?GAME_NIGHT_REALTIME_DATABASE_URL is required}
       GAME_NIGHT_WORKER_DATABASE_URL: ${GAME_NIGHT_WORKER_DATABASE_URL:?GAME_NIGHT_WORKER_DATABASE_URL is required}
+      # 迁移连接串通常需要比运行期服务账号更高的 DDL 权限。
       GAME_NIGHT_MIGRATION_DATABASE_URL: ${GAME_NIGHT_MIGRATION_DATABASE_URL:?GAME_NIGHT_MIGRATION_DATABASE_URL is required}
       GAME_NIGHT_API_KEYRING_DIRECTORY: /run/game-night/api-secrets
       GAME_NIGHT_WORKER_KEYRING_DIRECTORY: /run/game-night/worker-secrets
-      GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE: /run/game-night/api-secrets/admin-bootstrap.txt
+      # 初始化管理密钥通过文件注入，避免把初始管理员凭据写进镜像。
+      # 管理员初始化完成后可在 .env 中把 GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE 设为空并重启。
+      GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE: ${GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE-/run/game-night/api-secrets/admin-bootstrap.txt}
 
+      # 以下是容器内部固定布线，不需要在 1Panel 里配置。
+      # 这些地址只在同一个容器内互相调用，不能改成宿主机端口或公网域名。
+      # API 只绑定内部地址；浏览器流量统一从下面的边缘网关进入。
       GAME_NIGHT_API_LISTEN_ADDRESS: 127.0.0.1:8081
+      # 服务间访问实时服务时使用内部共享 token 保护。
       GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL: http://127.0.0.1:8091
       GAME_NIGHT_API_REALTIME_PEER_URLS: http://127.0.0.1:8091
       GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?GAME_NIGHT_REALTIME_INTERNAL_TOKEN is required}
+      # 审计检查点按事件数量或时间间隔触发，任一条件先满足就写入。
       GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS:-100}
       GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL: ${GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL:-5m}
 
+      # 实时服务拆分玩家 WebSocket 入口和内部控制入口，避免暴露管理通道。
       GAME_NIGHT_REALTIME_PUBLIC_LISTEN_ADDRESS: 127.0.0.1:8090
       GAME_NIGHT_REALTIME_INTERNAL_LISTEN_ADDRESS: 127.0.0.1:8091
+      # 单容器模式下所有角色在同一容器内，广播地址使用内部地址即可。
       GAME_NIGHT_REALTIME_ADVERTISED_URL: http://127.0.0.1:8091
+      # 如果将来拆成多副本部署，每个实时服务实例 ID 必须唯一。
       GAME_NIGHT_REALTIME_INSTANCE_ID: ${GAME_NIGHT_REALTIME_INSTANCE_ID:-realtime-standalone}
       GAME_NIGHT_REALTIME_INTERNAL_TOKEN: ${GAME_NIGHT_REALTIME_INTERNAL_TOKEN:?GAME_NIGHT_REALTIME_INTERNAL_TOKEN is required}
 
+      # 边缘网关是唯一对外监听点，负责静态资源、API 代理和 WebSocket 代理。
+      # 容器内固定监听 8080；宿主机发布端口由上面的 ports 映射控制。
       GAME_NIGHT_EDGE_LISTEN_ADDRESS: ":8080"
       GAME_NIGHT_EDGE_API_UPSTREAM_URL: http://127.0.0.1:8081
       GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL: http://127.0.0.1:8090
       GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY: /app/web
       GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY: /app/admin
-      GAME_NIGHT_EDGE_USER_HOSTS: ${GAME_NIGHT_EDGE_USER_HOSTS:-localhost:8080,127.0.0.1:8080}
-      GAME_NIGHT_EDGE_ADMIN_HOSTS: ${GAME_NIGHT_EDGE_ADMIN_HOSTS:-admin.localhost:8080}
+      # Host 白名单决定请求返回玩家端还是管理端前端资源。
+      GAME_NIGHT_EDGE_USER_HOSTS: ${GAME_NIGHT_EDGE_USER_HOSTS:-localhost:40891,127.0.0.1:40891}
+      GAME_NIGHT_EDGE_ADMIN_HOSTS: ${GAME_NIGHT_EDGE_ADMIN_HOSTS:-admin.localhost:40891}
       GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
 
+      # worker 配置控制异步任务归属、批处理节奏、轮询频率和房间空闲过期。
       GAME_NIGHT_WORKER_INSTANCE_ID: ${GAME_NIGHT_WORKER_INSTANCE_ID:-worker-standalone}
       GAME_NIGHT_WORKER_LEASE_DURATION: ${GAME_NIGHT_WORKER_LEASE_DURATION:-1m}
       GAME_NIGHT_WORKER_BATCH_SIZE: ${GAME_NIGHT_WORKER_BATCH_SIZE:-10}
       GAME_NIGHT_WORKER_POLL_INTERVAL: ${GAME_NIGHT_WORKER_POLL_INTERVAL:-1s}
       GAME_NIGHT_ROOM_IDLE_TIMEOUT: ${GAME_NIGHT_ROOM_IDLE_TIMEOUT:-10m}
     healthcheck:
+      # 使用程序自带的健康检查命令，而不是只判断容器进程是否还活着。
       test: ["CMD", "game-night", "healthcheck"]
       interval: 10s
       timeout: 3s

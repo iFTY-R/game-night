@@ -215,6 +215,34 @@ type AdminRecoveryCode struct {
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 }
 
+type AdminRepairOperation struct {
+	RepairID                  pgtype.UUID        `json:"repair_id"`
+	RepairType                string             `json:"repair_type"`
+	State                     string             `json:"state"`
+	TargetID                  pgtype.UUID        `json:"target_id"`
+	TargetKind                string             `json:"target_kind"`
+	TargetDigest              []byte             `json:"target_digest"`
+	PreviewDigest             []byte             `json:"preview_digest"`
+	CommandVersion            int64              `json:"command_version"`
+	ExpectedRoomVersion       pgtype.Int8        `json:"expected_room_version"`
+	ExpectedMembershipVersion pgtype.Int8        `json:"expected_membership_version"`
+	ExpectedStateVersion      pgtype.Int8        `json:"expected_state_version"`
+	ExpectedOwnershipEpoch    pgtype.Int8        `json:"expected_ownership_epoch"`
+	Summary                   string             `json:"summary"`
+	IrreversibleEffects       []string           `json:"irreversible_effects"`
+	BeforeSnapshotDigest      []byte             `json:"before_snapshot_digest"`
+	AfterSnapshotDigest       []byte             `json:"after_snapshot_digest"`
+	RequestedByAdminID        pgtype.UUID        `json:"requested_by_admin_id"`
+	OperationID               pgtype.Text        `json:"operation_id"`
+	RequestDigest             []byte             `json:"request_digest"`
+	AuditEventID              pgtype.UUID        `json:"audit_event_id"`
+	Reason                    string             `json:"reason"`
+	Version                   int64              `json:"version"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt                 pgtype.Timestamptz `json:"expires_at"`
+	ExecutedAt                pgtype.Timestamptz `json:"executed_at"`
+}
+
 type AdminSession struct {
 	SessionID         pgtype.UUID        `json:"session_id"`
 	AdminID           pgtype.UUID        `json:"admin_id"`

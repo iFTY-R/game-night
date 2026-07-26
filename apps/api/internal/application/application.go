@@ -14,6 +14,7 @@ import (
 	apiConfig "github.com/iFTY-R/game-night/apps/api/internal/config"
 	"github.com/iFTY-R/game-night/apps/api/internal/server"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminauth"
+	adminroomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminroom"
 	adminusertransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminuser"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/csrf"
@@ -27,8 +28,8 @@ import (
 	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
-	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminroomdomain "github.com/iFTY-R/game-night/platform/admin/room"
 	adminuserdomain "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
@@ -155,6 +156,12 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeRedis
 	}
+	adminRoomOwners, err := redisstore.NewAdminRoomOwnerReader(redisClient, redisstore.CoordinationConfig{
+		KeyPrefix: config.Shared.Redis.KeyPrefix, Timeout: config.Shared.Redis.Timeout,
+	})
+	if err != nil {
+		return nil, errInitializeRedis
+	}
 	userLimiter, err := ratetransport.New(redisLimiter, metricRegistry)
 	if err != nil {
 		return nil, errInitializeRedis
@@ -208,6 +215,18 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	adminRoomService, err := adminroomdomain.NewService(adminroomdomain.Config{
+		Repository: postgres.NewAdminRoomQueryRepository(pool),
+		Rooms:      roomRepository,
+		Owners:     adminRoomOwners,
+		OwnerFixes: gameCoordinator,
+		Repairs:    postgres.NewAdminRepairRepository(pool),
+		Executor:   postgres.NewAdminEmergencyRepairExecutor(pool),
+		Clock:      source,
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	bootstrapCoordinator, err := bootstrap.NewCoordinator(ctx, adminService, string(config.Shared.BootstrapSecretFile))
 	if err != nil {
 		return nil, errInitializeBootstrap
@@ -227,7 +246,7 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	}
 	handler, err := transportHandler(
 		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameGovernance, gameSessionRepository, roomRepository,
-		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminUserService,
+		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminRoomService, adminUserService,
 		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
 	)
 	if err != nil {
@@ -465,6 +484,7 @@ func transportHandler(
 	replays *postgres.ReplayAccessRepository,
 	gameCoordinator *redisstore.GameCoordinator,
 	adminService *admin.Service,
+	adminRoomService *adminroomdomain.Service,
 	adminUserService *adminuserdomain.Service,
 	metricRegistry *metrics.Registry,
 	readiness *server.Readiness,
@@ -537,6 +557,10 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	adminRoomHandler, err := adminroomtransport.NewService(adminRoomService, source)
+	if err != nil {
+		return nil, err
+	}
 	adminUserHandler, err := adminusertransport.NewService(adminUserService, source)
 	if err != nil {
 		return nil, err
@@ -572,7 +596,7 @@ func transportHandler(
 	adminSurface, err := server.NewAdminSurface(server.AdminSurfaceConfig{
 		Auth:         adminAuthHandler,
 		User:         adminUserHandler,
-		Room:         &adminv1connect.UnimplementedAdminRoomServiceHandler{},
+		Room:         adminRoomHandler,
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {

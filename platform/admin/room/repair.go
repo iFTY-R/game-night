@@ -34,6 +34,8 @@ type ExecuteEmergencyRepairCommand struct {
 	OperationID           idempotency.OperationID
 	ExpectedRepairVersion uint64
 	Reason                string
+	// ExecutedAt is stamped by Service so durable side effects share the same reviewed execution time.
+	ExecutedAt time.Time
 }
 
 // PreviewEmergencyRepair creates a persisted dry-run plan for exactly one supported repair family.
@@ -80,6 +82,7 @@ func (service *Service) ExecuteEmergencyRepair(ctx context.Context, actor admin.
 	if repair.State != RepairStatePreviewed || repair.Version != command.ExpectedRepairVersion || !now.Before(repair.ExpiresAt) {
 		return RepairOperation{}, ErrConflict
 	}
+	command.ExecutedAt = now
 	afterDigest, err := service.executeRepairEffect(ctx, repair, command, now)
 	if err != nil {
 		return RepairOperation{}, err
@@ -176,7 +179,7 @@ func (service *Service) terminateUnrecoverablePlan(ctx context.Context, adminID 
 		return RepairOperation{}, err
 	}
 	game := detail.Summary
-	if game.Status != "active" && game.Status != "suspended" {
+	if game.Status != "active" && game.Status != "suspended" || game.OwnershipEpoch == 0 {
 		return RepairOperation{}, ErrConflict
 	}
 	return newRepairOperation(adminID, command, RepairTargetKindGameSession, game.StateVersion, game.OwnershipEpoch, 0, 0,

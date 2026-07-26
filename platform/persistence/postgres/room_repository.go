@@ -278,8 +278,7 @@ func (repository *RoomRepository) CommitRemoval(
 		return roomDomain.Room{}, err
 	}
 	fact, err := roomDomain.ParseParticipantRevokedEvent(event)
-	if err != nil || fact.RoomID != before.ID || fact.SessionID != before.ActiveSessionID ||
-		fact.ActorKind != roomDomain.RemovalActorHost || fact.ActorID != before.HostUserID ||
+	if err != nil || fact.RoomID != before.ID || fact.SessionID != before.ActiveSessionID || !validRoomRemovalActor(fact, before) ||
 		fact.MembershipVersion != after.MembershipVersion || !fact.OccurredAt.Equal(after.UpdatedAt) ||
 		!removedParticipantTransition(before, after, fact.UserID) {
 		return roomDomain.Room{}, roomDomain.ErrInvalidRoomInput
@@ -307,6 +306,17 @@ func (repository *RoomRepository) CommitRemoval(
 		return roomDomain.Room{}, mapRoomRepositoryError(ctx, err, roomDomain.ErrRoomVersionConflict)
 	}
 	return stored, nil
+}
+
+func validRoomRemovalActor(fact roomDomain.ParticipantRevocationFact, before roomDomain.RoomSnapshot) bool {
+	switch fact.ActorKind {
+	case roomDomain.RemovalActorHost:
+		return fact.ActorID == before.HostUserID
+	case roomDomain.RemovalActorAdmin:
+		return fact.ActorID != uuid.Nil
+	default:
+		return false
+	}
 }
 
 // removedParticipantTransition prevents callers from using the atomic path for unrelated room mutations or non-player roles.

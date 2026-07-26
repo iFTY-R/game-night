@@ -115,6 +115,37 @@ func TestRoomRepositoryPersistsMembershipAndRejectsStaleVersions(t *testing.T) {
 	}
 }
 
+func TestRoomRepositoryCommitRemovalAcceptsAdminRevocationActor(t *testing.T) {
+	fixture, _, session, startedAt := openGameSessionFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)
+	defer cancel()
+	roomRepository := NewRoomRepository(fixture.Pool)
+	room, err := roomRepository.GetByID(ctx, session.Snapshot().RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminID, removedUserID := uuid.New(), session.Snapshot().Participants[1].UserID
+	next, result, err := room.RemoveMemberByAdmin(roomDomain.AdminActor{ID: adminID}, removedUserID, room.Version(), startedAt.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := roomDomain.NewParticipantRevokedEvent(roomDomain.ParticipantRevocationFact{
+		EventID: uuid.New(), RoomID: room.Snapshot().ID, SessionID: result.SessionID, UserID: removedUserID,
+		ActorKind: roomDomain.RemovalActorAdmin, ActorID: adminID, Reason: roomDomain.RemovalReasonHostRemoved,
+		MembershipVersion: next.Version().Membership, OccurredAt: next.Snapshot().UpdatedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := roomRepository.CommitRemoval(ctx, room, next, event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, found := stored.Member(removedUserID); found {
+		t.Fatal("admin-revoked participant remains in stored room")
+	}
+}
+
 func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), roomRepositoryIntegrationTimeout)

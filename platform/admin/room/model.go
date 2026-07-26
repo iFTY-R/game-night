@@ -52,6 +52,10 @@ const (
 type RepairType string
 
 const (
+	// DefaultRoomPageSize keeps first-load room scans bounded while still useful for operators.
+	DefaultRoomPageSize uint32 = 50
+	// DefaultGamePageSize mirrors room paging so tabs have predictable backend load.
+	DefaultGamePageSize           uint32     = 50
 	RepairClearStaleOwnerLease    RepairType = "clear_stale_owner_lease"
 	RepairTerminateUnrecoverable  RepairType = "terminate_unrecoverable_game"
 	RepairRepairRoomGameLink      RepairType = "repair_room_game_link"
@@ -65,7 +69,36 @@ const (
 	DefaultGameDetailEventLimit   uint32     = 50
 	DefaultRoomActiveGameLimit    uint32     = 8
 	DefaultRoomMemberOnlineWindow            = 2 * time.Minute
+	// DefaultGameProgressWindow marks active sessions that have not advanced recently enough for operator attention.
+	DefaultGameProgressWindow = 15 * time.Minute
 )
+
+// OwnerFreshness is the bounded admin-facing lease health result after PostgreSQL rows are compared with Redis.
+type OwnerFreshness string
+
+const (
+	// OwnerFreshnessFresh means Redis has a routable owner lease matching the PostgreSQL ownership epoch.
+	OwnerFreshnessFresh OwnerFreshness = "fresh"
+	// OwnerFreshnessStale means Redis has a lease but it is not routable or no longer matches PostgreSQL fencing.
+	OwnerFreshnessStale OwnerFreshness = "stale"
+	// OwnerFreshnessExpired means Redis returned a lease value whose TTL is already gone or non-positive.
+	OwnerFreshnessExpired OwnerFreshness = "expired"
+	// OwnerFreshnessMissing means Redis has no lease key for an active room/game session.
+	OwnerFreshnessMissing OwnerFreshness = "missing"
+	// OwnerFreshnessUnknown means the lease source could not be sampled, so commands must fail closed.
+	OwnerFreshnessUnknown OwnerFreshness = "unknown"
+)
+
+// OwnerLeaseSummary is the token-free realtime owner snapshot exposed to admin query responses.
+type OwnerLeaseSummary struct {
+	SessionID      uuid.UUID
+	OwnerInstance  string
+	OwnerAddress   string
+	OwnershipEpoch uint64
+	Freshness      OwnerFreshness
+	ObservedAt     time.Time
+	ExpiresAt      time.Time
+}
 
 type RoomCursor struct {
 	RoomID   uuid.UUID
@@ -109,6 +142,7 @@ type RoomSummary struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	LastActivityAt       time.Time
+	Owner                OwnerLeaseSummary
 	Anomalies            []RoomAnomalyFlag
 }
 
@@ -171,7 +205,24 @@ type GameSummary struct {
 	StartedAt      time.Time
 	UpdatedAt      time.Time
 	LastProgressAt time.Time
+	Owner          OwnerLeaseSummary
 	Anomalies      []GameAnomalyFlag
+}
+
+// RoomPage carries one sampled admin room page after owner leases and runtime anomalies are merged.
+type RoomPage struct {
+	Rooms         []RoomSummary
+	PageSize      uint32
+	NextPageToken string
+	SampledAt     time.Time
+}
+
+// GamePage carries one sampled admin game page after owner leases and progress anomalies are merged.
+type GamePage struct {
+	Games         []GameSummary
+	PageSize      uint32
+	NextPageToken string
+	SampledAt     time.Time
 }
 
 type GameParticipantSummary struct {

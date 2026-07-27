@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package platform.admin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/admin/v1/admin_common.proto";
+import "platform/audit/v1/audit.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1";
+
+// AdminAuditService exposes the redacted, signed administration audit chain to authorized operators.
+service AdminAuditService {
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+}
+
+// AdminAuditFilter selects redacted event metadata only. Sensitive event payloads and signatures never leave the service.
+message AdminAuditFilter {
+  string event_id = 1;
+  repeated platform.audit.v1.AuditAction actions = 2;
+  repeated platform.audit.v1.AuditActorType actor_types = 3;
+  string actor_id = 4;
+  repeated platform.audit.v1.AuditTargetType target_types = 5;
+  string target_id = 6;
+  string request_id = 7;
+  string reason_code = 8;
+  google.protobuf.Timestamp occurred_from = 9;
+  google.protobuf.Timestamp occurred_to = 10;
+}
+
+// AdminAuditEvent is the inspectable, redacted projection of one structurally valid signed audit event.
+message AdminAuditEvent {
+  string event_id = 1;
+  uint64 sequence = 2;
+  string previous_hash = 3;
+  string event_hash = 4;
+  string request_id = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+  platform.audit.v1.AuditActor actor = 7;
+  platform.audit.v1.AuditTarget target = 8;
+  platform.audit.v1.AuditAction action = 9;
+  string reason_code = 10;
+  string detail_digest = 11;
+  uint32 signing_key_version = 12;
+  // verified reports whether the stored signature validates against the current audit keyring.
+  // False marks an integrity alarm (tampering or a lost historical key); the event is still
+  // listed so operators can see the affected range instead of losing the whole audit view.
+  bool verified = 13;
+}
+
+// AdminAuditChainHead identifies the trusted head observed while reading one page.
+message AdminAuditChainHead {
+  uint64 sequence = 1;
+  string event_hash = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+message ListAuditEventsRequest {
+  AdminAuditFilter filter = 1;
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListAuditEventsResponse {
+  repeated AdminAuditEvent events = 1;
+  AdminPageInfo page = 2;
+  AdminAuditChainHead chain_head = 3;
+  // scanned_events includes non-matching rows inspected to fulfill a filtered page.
+  uint32 scanned_events = 4;
+}

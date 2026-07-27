@@ -7,13 +7,17 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/iFTY-R/game-night/apps/api/internal/bootstrap"
 	apiConfig "github.com/iFTY-R/game-night/apps/api/internal/config"
 	"github.com/iFTY-R/game-night/apps/api/internal/server"
+	adminaudittransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminaudit"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/adminauth"
+	adminoperationstransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminoperations"
+	adminoverviewtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminoverview"
 	adminroomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminroom"
 	adminusertransport "github.com/iFTY-R/game-night/apps/api/internal/transport/adminuser"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/cookies"
@@ -21,6 +25,7 @@ import (
 	transporterrors "github.com/iFTY-R/game-night/apps/api/internal/transport/errors"
 	gametransport "github.com/iFTY-R/game-night/apps/api/internal/transport/game"
 	identitytransport "github.com/iFTY-R/game-night/apps/api/internal/transport/identity"
+	maintenancetransport "github.com/iFTY-R/game-night/apps/api/internal/transport/maintenance"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/metrics"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/origin"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/proxy"
@@ -28,7 +33,11 @@ import (
 	roomtransport "github.com/iFTY-R/game-night/apps/api/internal/transport/room"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/sensitive"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/runtimeinfo"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminauditdomain "github.com/iFTY-R/game-night/platform/admin/auditlog"
+	adminoperationsdomain "github.com/iFTY-R/game-night/platform/admin/operations"
 	adminroomdomain "github.com/iFTY-R/game-night/platform/admin/room"
 	adminuserdomain "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
@@ -85,13 +94,17 @@ type Options struct {
 
 // Application owns the listener and every closeable dependency created for it.
 type Application struct {
-	runtime *server.Runtime
-	redis   *goredis.Client
-	pool    *pgxpool.Pool
-	argon2  *security.Argon2Service
+	runtime         *server.Runtime
+	redis           *goredis.Client
+	pool            *pgxpool.Pool
+	argon2          *security.Argon2Service
+	heartbeat       *serviceheartbeat.Reporter
+	heartbeatCancel context.CancelFunc
+	heartbeatDone   chan struct{}
 
-	shutdownOnce sync.Once
-	shutdownErr  error
+	heartbeatOnce sync.Once
+	shutdownOnce  sync.Once
+	shutdownErr   error
 }
 
 // New builds the complete API graph before opening the listener. Partial failures release every acquired resource.
@@ -215,6 +228,11 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeServices
 	}
+	adminAuditReader := postgres.NewAdminAuditReadRepository(pool, auditService)
+	adminAuditQueryService, err := newAdminAuditService(keyrings, source, adminAuditReader)
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	adminRoomService, err := adminroomdomain.NewService(adminroomdomain.Config{
 		Repository: postgres.NewAdminRoomQueryRepository(pool),
 		Rooms:      roomRepository,
@@ -244,10 +262,88 @@ func New(ctx context.Context, config apiConfig.Config, options Options) (_ *Appl
 	if err != nil {
 		return nil, errInitializeTransport
 	}
+	operationsRepository := postgres.NewAdminOperationsRepository(pool)
+	presenceProjection, err := redisstore.NewAdminPresenceProjection(redisClient, redisstore.AdminPresenceConfig{
+		KeyPrefix: config.Shared.Redis.KeyPrefix,
+		Timeout:   config.Shared.Redis.Timeout,
+		TTL:       redisstore.AdminPresenceTTL,
+		Clock:     source,
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	operationsService, err := adminoperationsdomain.NewService(adminoperationsdomain.ServiceConfig{
+		Repository: operationsRepository,
+		Presence:   presenceProjection,
+		Clock:      source,
+		Probes: []adminoperationsdomain.DependencyProbe{
+			{Kind: adminoperationsdomain.DependencyPostgreSQL, Check: pool.Ping},
+			{Kind: adminoperationsdomain.DependencyRedis, Check: func(ctx context.Context) error { return redisClient.Ping(ctx).Err() }},
+			{Kind: adminoperationsdomain.DependencyCheckpointProgress, Check: readinessComponentProbe(readiness, "checkpoint")},
+			{Kind: adminoperationsdomain.DependencyRealtimePresence, Check: func(ctx context.Context) error {
+				_, probeErr := presenceProjection.ReadPresenceSummary(ctx)
+				return probeErr
+			}},
+			{Kind: adminoperationsdomain.DependencyRateLimiter, Check: func(ctx context.Context) error { return redisClient.Ping(ctx).Err() }},
+		},
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	overviewService, err := adminoperationsdomain.NewOverviewService(adminoperationsdomain.OverviewServiceConfig{
+		Repository: operationsRepository,
+		Presence:   presenceProjection,
+		Operations: operationsService,
+		Audit:      adminAuditReader,
+		Clock:      source,
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	cacheImpact, err := newAdminCacheImpactReader(operationsRepository, operationsService, presenceProjection, source)
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	operationsCommandService, err := adminoperationsdomain.NewCommandService(adminoperationsdomain.CommandServiceConfig{
+		Repository: operationsRepository, UnitOfWork: postgres.NewAdminOperationsUnitOfWork(pool, auditService),
+		Audit: auditService, CheckpointHealth: checkpointPolicy, CacheImpact: cacheImpact, Clock: source,
+	})
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	maintenance, err := operationsRepository.GetMaintenanceState(ctx)
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	heartbeatHandler, err := adminoperationstransport.NewHeartbeatHandler(operationsRepository, config.Heartbeat.Token, source)
+	if err != nil {
+		return nil, errInitializeTransport
+	}
+	heartbeatSink, err := serviceheartbeat.NewRepositorySink(operationsRepository, source)
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	processInfo, err := runtimeinfo.New(adminoperationsdomain.ServiceAPI, config.InstanceID, config.Heartbeat.BuildVersion, source.Now())
+	if err != nil {
+		return nil, errInitializeServices
+	}
+	var maintenanceVersion atomic.Uint64
+	maintenanceVersion.Store(maintenance.Version)
+	application.heartbeat, err = serviceheartbeat.NewReporter(
+		heartbeatSink,
+		processInfo,
+		apiHeartbeatSnapshot(readiness, operationsRepository, &maintenanceVersion),
+		config.Heartbeat.Interval,
+		config.Heartbeat.Timeout,
+	)
+	if err != nil {
+		return nil, errInitializeServices
+	}
 	handler, err := transportHandler(
 		config.Shared, source, userService, roomService, gameCatalog, gameRuntime, gameGovernance, gameSessionRepository, roomRepository,
-		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminRoomService, adminUserService,
-		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}),
+		ruleRepository, replayAccessRepository, gameCoordinator, adminService, adminRoomService, adminUserService, adminAuditQueryService,
+		operationsService, operationsCommandService, overviewService, operationsRepository,
+		metricRegistry, readiness, options.Logger, promhttp.HandlerFor(options.Metrics, promhttp.HandlerOpts{}), heartbeatHandler,
 	)
 	if err != nil {
 		return nil, errInitializeTransport
@@ -302,9 +398,18 @@ var _ clock.Clock = databaseClock{}
 
 // ListenAndServe opens the configured API listener after the dependency graph is complete.
 func (application *Application) ListenAndServe() error {
-	if application == nil || application.runtime == nil {
+	if application == nil || application.runtime == nil || application.heartbeat == nil {
 		return errInvalidOptions
 	}
+	application.heartbeatOnce.Do(func() {
+		heartbeatContext, cancel := context.WithCancel(context.Background())
+		application.heartbeatCancel = cancel
+		application.heartbeatDone = make(chan struct{})
+		go func() {
+			defer close(application.heartbeatDone)
+			application.heartbeat.Run(heartbeatContext)
+		}()
+	})
 	return application.runtime.ListenAndServe()
 }
 
@@ -321,9 +426,21 @@ func (application *Application) Shutdown(ctx context.Context) error {
 				runtimeErr = errors.Join(runtimeErr, application.runtime.Close())
 			}
 		}
+		application.stopHeartbeat(ctx)
 		application.shutdownErr = errors.Join(runtimeErr, application.closeDependencies())
 	})
 	return application.shutdownErr
+}
+
+func (application *Application) stopHeartbeat(ctx context.Context) {
+	if application.heartbeatCancel == nil || application.heartbeatDone == nil {
+		return
+	}
+	application.heartbeatCancel()
+	select {
+	case <-application.heartbeatDone:
+	case <-ctx.Done():
+	}
 }
 
 func (application *Application) closeDependencies() error {
@@ -458,13 +575,36 @@ func adminUserService(
 	if err != nil {
 		return nil, err
 	}
+	jobRepository := postgres.NewAdminJobRepository(pool)
+	governanceRepository := postgres.NewAdminUserGovernanceRepository(pool)
 	return adminuserdomain.NewService(adminuserdomain.Config{
-		Repository: postgres.NewAdminUserRepository(pool),
-		Profiles:   postgres.NewProfileRepository(pool),
-		Protector:  protector,
+		Repository:       postgres.NewAdminUserRepository(pool),
+		Jobs:             jobRepository,
+		Governance:       governanceRepository,
+		UserCommands:     governanceRepository,
+		SingleGovernance: governanceRepository,
+		Profiles:         postgres.NewProfileRepository(pool),
+		Protector:        protector,
 		Audit: adminusertransport.NewAuditRecorder(
 			auditService, postgres.NewAuditOutboxUnitOfWork(pool, auditService), checkpointPolicy, source,
 		),
+		Cursor: cursor,
+		Clock:  source,
+	})
+}
+
+// newAdminAuditService composes the read-only, signature-verifying audit service with management cursor authentication.
+func newAdminAuditService(
+	keyrings security.Keyrings,
+	source clock.Clock,
+	reader adminauditdomain.Reader,
+) (*adminauditdomain.Service, error) {
+	cursor, err := adminauditdomain.NewCursorCodec(keyrings.AdminCursor)
+	if err != nil {
+		return nil, err
+	}
+	return adminauditdomain.NewService(adminauditdomain.Config{
+		Reader: reader,
 		Cursor: cursor,
 		Clock:  source,
 	})
@@ -486,10 +626,16 @@ func transportHandler(
 	adminService *admin.Service,
 	adminRoomService *adminroomdomain.Service,
 	adminUserService *adminuserdomain.Service,
+	adminAuditQueryService *adminauditdomain.Service,
+	adminOperationsService *adminoperationsdomain.Service,
+	adminOperationsCommandService *adminoperationsdomain.CommandService,
+	adminOverviewService *adminoperationsdomain.OverviewService,
+	adminOperationsRepository *postgres.AdminOperationsRepository,
 	metricRegistry *metrics.Registry,
 	readiness *server.Readiness,
 	logger *slog.Logger,
 	metricsHandler http.Handler,
+	heartbeatHandler http.Handler,
 ) (http.Handler, error) {
 	userCookies, err := cookies.NewManager(source)
 	if err != nil {
@@ -565,6 +711,18 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
+	adminAuditHandler, err := adminaudittransport.NewService(adminAuditQueryService, source)
+	if err != nil {
+		return nil, err
+	}
+	adminOperationsHandler, err := adminoperationstransport.NewService(adminOperationsService, adminOperationsRepository, adminOperationsCommandService)
+	if err != nil {
+		return nil, err
+	}
+	adminOverviewHandler, err := adminoverviewtransport.NewService(adminOverviewService)
+	if err != nil {
+		return nil, err
+	}
 	userOperations := append(append([]string(nil), sensitive.IdentityOperations...), sensitive.RoomOperations...)
 	userOperations = append(userOperations, sensitive.GameOperations...)
 	userSensitive, err := sensitive.New(userOperations...)
@@ -574,7 +732,14 @@ func transportHandler(
 	adminOperations := append([]string(nil), sensitive.AdminAuthOperations...)
 	adminOperations = append(adminOperations, sensitive.AdminUserOperations...)
 	adminOperations = append(adminOperations, sensitive.AdminRoomOperations...)
+	adminOperations = append(adminOperations, sensitive.AdminAuditOperations...)
+	adminOperations = append(adminOperations, sensitive.AdminOperationsOperations...)
+	adminOperations = append(adminOperations, sensitive.AdminOverviewOperations...)
 	adminSensitive, err := sensitive.New(adminOperations...)
+	if err != nil {
+		return nil, err
+	}
+	maintenanceInterceptor, err := maintenancetransport.NewInterceptor(adminOperationsRepository)
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +753,7 @@ func transportHandler(
 	}
 	userSurface, err := server.NewUserSurface(server.UserSurfaceConfig{
 		Identity: identityHandler, Room: roomHandler, Game: gameHandler, Readiness: readiness,
-		Interceptors: []connect.Interceptor{userSensitive.Interceptor(), userMetrics, transporterrors.Interceptor()},
+		Interceptors: []connect.Interceptor{userSensitive.Interceptor(), userMetrics, transporterrors.Interceptor(), maintenanceInterceptor},
 	})
 	if err != nil {
 		return nil, err
@@ -597,10 +762,54 @@ func transportHandler(
 		Auth:         adminAuthHandler,
 		User:         adminUserHandler,
 		Room:         adminRoomHandler,
+		Audit:        adminAuditHandler,
+		Operations:   adminOperationsHandler,
+		Overview:     adminOverviewHandler,
 		Interceptors: []connect.Interceptor{adminSensitive.Interceptor(), adminMetrics, transporterrors.Interceptor(), adminContext},
 	})
 	if err != nil {
 		return nil, err
 	}
-	return server.NewHandler(server.HandlerConfig{User: userSurface, Admin: adminSurface, Metrics: metricsHandler})
+	return server.NewHandler(server.HandlerConfig{User: userSurface, Admin: adminSurface, Metrics: metricsHandler, Heartbeat: heartbeatHandler})
+}
+
+func readinessComponentProbe(readiness *server.Readiness, component string) func(context.Context) error {
+	return func(ctx context.Context) error {
+		if readiness == nil || readiness.RuntimeSnapshot(ctx, true).Components[component] != "ready" {
+			return errDependencyUnavailable
+		}
+		return nil
+	}
+}
+
+func apiHeartbeatSnapshot(
+	readiness *server.Readiness,
+	repository interface {
+		GetMaintenanceState(context.Context) (adminoperationsdomain.MaintenanceState, error)
+	},
+	maintenanceVersion *atomic.Uint64,
+) serviceheartbeat.SnapshotFunc {
+	return func(ctx context.Context) serviceheartbeat.Snapshot {
+		readinessSnapshot := readiness.RuntimeSnapshot(ctx, true)
+		status := adminoperationsdomain.HealthHealthy
+		if !readinessSnapshot.Ready {
+			status = adminoperationsdomain.HealthDegraded
+		}
+		components := make(map[string]adminoperationsdomain.HealthStatus, len(readinessSnapshot.Components)+1)
+		for code, componentStatus := range readinessSnapshot.Components {
+			components[code] = adminoperationsdomain.HealthUnavailable
+			if componentStatus == "ready" {
+				components[code] = adminoperationsdomain.HealthHealthy
+			}
+		}
+		maintenance, err := repository.GetMaintenanceState(ctx)
+		if err != nil {
+			components["maintenance"] = adminoperationsdomain.HealthUnavailable
+			status = adminoperationsdomain.HealthDegraded
+		} else {
+			maintenanceVersion.Store(maintenance.Version)
+			components["maintenance"] = adminoperationsdomain.HealthHealthy
+		}
+		return serviceheartbeat.Snapshot{Status: status, Components: components, MaintenanceVersion: maintenanceVersion.Load()}
+	}
 }

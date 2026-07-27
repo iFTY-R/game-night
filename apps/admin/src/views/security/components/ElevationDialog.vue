@@ -4,7 +4,7 @@ import { NAlert, NButton, NForm, NFormItem, NInput } from "naive-ui";
 import type { FormInst, FormRules } from "naive-ui";
 import AppDialog from "../../../components/AppDialog.vue";
 import { elevateAdminSession } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { useAuthStore } from "../../../stores/auth";
 import type { AdminElevationScope, AdminElevationSummary } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
@@ -141,7 +141,7 @@ const handleSubmit = async (close: () => void): Promise<void> => {
 
   try {
     const response = await elevateAdminSession({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       scope: currentPayload.value.scope,
       currentPassword: formData.value.password,
       ...(requiresSecondFactor.value

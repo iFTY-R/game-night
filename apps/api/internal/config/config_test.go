@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
 
 func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
@@ -43,6 +44,9 @@ func TestLoadCombinesSharedAndAPIConfiguration(t *testing.T) {
 	}
 	if loaded.CheckpointStorage.LocalDirectory == "" {
 		t.Fatal("checkpoint storage configuration was not composed")
+	}
+	if loaded.InstanceID != defaultInstanceID || loaded.Heartbeat.Interval == 0 || loaded.Heartbeat.Token == "" {
+		t.Fatalf("unexpected runtime heartbeat config: instance=%q heartbeat=%+v", loaded.InstanceID, loaded.Heartbeat)
 	}
 }
 
@@ -102,6 +106,8 @@ func TestLoadRejectsInvalidAPIOptionsWithoutLeakingValues(t *testing.T) {
 		{name: "max header bytes", environment: maxHeaderBytesEnvironment, value: "secret-header-size"},
 		{name: "Argon2 workers", environment: argon2WorkersEnvironment, value: "secret-workers"},
 		{name: "Argon2 queue", environment: argon2QueueEnvironment, value: "secret-queue"},
+		{name: "instance ID", environment: instanceIDEnvironment, value: "invalid instance/value"},
+		{name: "heartbeat token", environment: serviceheartbeat.TokenEnvironment, value: "short"},
 	}
 
 	for _, test := range tests {
@@ -170,6 +176,7 @@ func validAPIEnvironment(t *testing.T) map[string]string {
 		"GAME_NIGHT_CHECKPOINT_SINK":              "local",
 		"GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY":   filepath.Join(secretDirectory, "checkpoints"),
 		realtimeInternalTokenEnvironment:          strings.Repeat("r", 32),
+		serviceheartbeat.TokenEnvironment:         strings.Repeat("h", 32),
 	}
 }
 

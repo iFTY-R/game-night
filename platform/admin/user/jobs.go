@@ -40,15 +40,16 @@ type CreateBatchPreviewCommand struct {
 
 // StartBatchJobCommand converts one live preview into an idempotent durable item set.
 type StartBatchJobCommand struct {
-	BatchJobID    uuid.UUID
-	ActorAdminID  uuid.UUID
-	OperationID   string
-	RequestDigest [32]byte
-	PreviewID     uuid.UUID
-	PreviewDigest [32]byte
-	Reason        string
-	Targets       []BatchTarget
-	CreatedAt     time.Time
+	BatchJobID             uuid.UUID
+	ActorAdminID           uuid.UUID
+	OperationID            string
+	RequestDigest          [32]byte
+	PreviewID              uuid.UUID
+	PreviewDigest          [32]byte
+	ExpectedPreviewVersion uint64
+	Reason                 string
+	Targets                []BatchTarget
+	CreatedAt              time.Time
 }
 
 // BatchJob is the aggregate progress row recovered after refresh.
@@ -130,9 +131,22 @@ type JobRepository interface {
 	CreateBatchPreview(context.Context, CreateBatchPreviewCommand) (BatchPreview, error)
 	StartBatchJob(context.Context, StartBatchJobCommand) (BatchJob, error)
 	ClaimBatchItem(context.Context, uuid.UUID, string, time.Duration) (BatchItem, error)
+	ClaimNextBatchItem(context.Context, string, time.Duration) (BatchItem, error)
 	CompleteBatchItem(context.Context, BatchItem, string, string, uuid.UUID, time.Time) (BatchItem, error)
 	CreateErasureJob(context.Context, CreateErasureJobCommand) (ErasureJob, error)
 	ClaimErasureJob(context.Context, string, time.Duration) (ErasureJob, error)
 	AdvanceErasureJob(context.Context, ErasureJob, string, time.Time) (ErasureJob, error)
 	CompleteErasureJob(context.Context, ErasureJob, string, string, time.Time) (ErasureJob, error)
+}
+
+// BatchRepository is the complete durable boundary used by both HTTP orchestration and worker execution.
+// Keeping reads and leases together prevents the domain service from relying on unchecked type assertions.
+type BatchRepository interface {
+	JobRepository
+	GetBatchPreview(context.Context, uuid.UUID, uuid.UUID) (BatchPreview, error)
+	GetBatchJob(context.Context, uuid.UUID) (BatchJob, error)
+	ListBatchJobs(context.Context, BatchJobListQuery) ([]BatchJob, error)
+	ListBatchItems(context.Context, BatchItemListQuery) ([]BatchItem, error)
+	CancelBatchJob(context.Context, uuid.UUID, uint64, time.Time) (BatchJob, error)
+	RetryBatchJob(context.Context, uuid.UUID, []uuid.UUID, uint64, time.Time) (BatchJob, int64, error)
 }

@@ -83,6 +83,80 @@ FROM users
 WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
+-- name: GetAdminCurrentRoomForUser :one
+SELECT room.room_id,
+       room.status,
+       room.room_version,
+       room.membership_version
+FROM room_members AS member
+JOIN party_rooms AS room ON room.room_id = member.room_id
+WHERE member.user_id = sqlc.arg(user_id)
+ORDER BY member.last_seen_at DESC, room.updated_at DESC, room.room_id DESC
+LIMIT 1;
+
+-- name: GetAdminUserGovernanceState :one
+SELECT user_id, status, account_version
+FROM users
+WHERE user_id = sqlc.arg(user_id);
+
+-- name: CreateAdminUserCommandPreview :one
+INSERT INTO admin_user_command_previews (
+    preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot,
+    preview_digest, affected_devices, affected_rooms, blockers, required_elevation,
+    sampled_at, expires_at, version
+) VALUES (
+    sqlc.arg(preview_id), sqlc.arg(actor_admin_id), sqlc.arg(user_id), sqlc.arg(command), sqlc.arg(snapshot_schema_version), sqlc.arg(snapshot),
+    sqlc.arg(preview_digest), sqlc.arg(affected_devices), sqlc.arg(affected_rooms), sqlc.arg(blockers), sqlc.narg(required_elevation),
+    sqlc.arg(sampled_at), sqlc.arg(expires_at), 1
+)
+RETURNING *;
+
+-- name: GetAdminUserCommandPreview :one
+SELECT *
+FROM admin_user_command_previews
+WHERE preview_id = sqlc.arg(preview_id)
+  AND actor_admin_id = sqlc.arg(actor_admin_id);
+
+-- name: ConsumeAdminUserCommandPreviewCAS :one
+UPDATE admin_user_command_previews
+SET consumed_at = sqlc.arg(consumed_at),
+    version = version + 1
+WHERE preview_id = sqlc.arg(preview_id)
+  AND actor_admin_id = sqlc.arg(actor_admin_id)
+  AND version = sqlc.arg(expected_version)
+  AND consumed_at IS NULL
+  AND expires_at > sqlc.arg(consumed_at)
+RETURNING *;
+
+-- name: CreateAdminUserCommandReceipt :one
+INSERT INTO admin_user_command_receipts (
+    actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome,
+    user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+) VALUES (
+    sqlc.arg(actor_admin_id), sqlc.arg(operation_id), sqlc.arg(request_digest), sqlc.arg(preview_id), sqlc.arg(user_id), sqlc.arg(command), sqlc.arg(outcome),
+    sqlc.arg(user_version), sqlc.arg(revoked_devices), sqlc.arg(removed_rooms), sqlc.narg(erasure_job_id), sqlc.arg(audit_event_id), sqlc.arg(completed_at)
+)
+ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+SET operation_id = EXCLUDED.operation_id
+WHERE admin_user_command_receipts.request_digest = EXCLUDED.request_digest
+RETURNING *;
+
+-- name: GetAdminUserCommandReceipt :one
+SELECT *
+FROM admin_user_command_receipts
+WHERE actor_admin_id = sqlc.arg(actor_admin_id)
+  AND operation_id = sqlc.arg(operation_id);
+
+-- name: TransitionAdminUserStatusCAS :one
+UPDATE users
+SET status = sqlc.arg(next_status),
+    account_version = account_version + 1,
+    updated_at = sqlc.arg(changed_at)
+WHERE user_id = sqlc.arg(user_id)
+  AND account_version = sqlc.arg(expected_version)
+  AND status = sqlc.arg(expected_status)
+RETURNING user_id, status, account_version;
+
 -- name: DeleteAdminUserTagLinks :execrows
 DELETE FROM admin_user_tag_links
 WHERE user_id = sqlc.arg(user_id);
@@ -101,6 +175,133 @@ SET account_version = account_version + 1,
 WHERE user_id = sqlc.arg(user_id)
   AND account_version = sqlc.arg(expected_version)
 RETURNING account_version;
+
+-- name: CountActiveAdminUserDevices :one
+SELECT count(*)::integer
+FROM device_credentials
+WHERE user_id = sqlc.arg(user_id)
+  AND revoked_at IS NULL
+  AND idle_expires_at > sqlc.arg(active_at)
+  AND absolute_expires_at > sqlc.arg(active_at);
+
+-- name: RevokeActiveAdminUserDevices :execrows
+UPDATE device_credentials
+SET revoked_at = sqlc.arg(revoked_at),
+    revoke_reason = sqlc.arg(revoke_reason),
+    generation = generation + 1
+WHERE user_id = sqlc.arg(user_id)
+  AND revoked_at IS NULL
+  AND idle_expires_at > sqlc.arg(active_at)
+  AND absolute_expires_at > sqlc.arg(active_at);
+
+-- name: HasPendingAdminExportForUser :one
+WITH candidate_user AS (
+    SELECT user_row.user_id,
+           user_row.status,
+           COALESCE(user_row.current_username_key, '') AS username_key,
+           user_row.created_at,
+           GREATEST(
+               user_row.updated_at,
+               COALESCE(device_activity.last_seen_at, user_row.created_at),
+               COALESCE(room_activity.last_seen_at, user_row.created_at)
+           )::timestamptz AS last_activity_at
+    FROM users AS user_row
+    LEFT JOIN LATERAL (
+        SELECT credential.last_seen_at
+        FROM device_credentials AS credential
+        WHERE credential.user_id = user_row.user_id
+        ORDER BY credential.last_seen_at DESC, credential.credential_id DESC
+        LIMIT 1
+    ) AS device_activity ON true
+    LEFT JOIN LATERAL (
+        SELECT member.last_seen_at
+        FROM room_members AS member
+        WHERE member.user_id = user_row.user_id
+        ORDER BY member.last_seen_at DESC, member.room_id DESC
+        LIMIT 1
+    ) AS room_activity ON true
+    WHERE user_row.user_id = sqlc.arg(user_id)
+)
+SELECT EXISTS (
+    SELECT 1
+    FROM admin_export_jobs AS export
+    JOIN candidate_user AS selected_user ON true
+    WHERE export.state IN ('queued', 'running')
+      AND (
+          NOT (export.filter_snapshot ? 'user_id')
+          OR export.filter_snapshot->>'user_id' = ''
+          OR export.filter_snapshot->>'user_id' = selected_user.user_id::text
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'statuses')
+          OR jsonb_array_length(export.filter_snapshot->'statuses') = 0
+          OR EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(export.filter_snapshot->'statuses') AS status_filter(value)
+              WHERE status_filter.value = selected_user.status
+          )
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'username_prefix')
+          OR export.filter_snapshot->>'username_prefix' = ''
+          OR selected_user.username_key LIKE export.filter_snapshot->>'username_prefix' || '%'
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'tag_ids')
+          OR jsonb_array_length(export.filter_snapshot->'tag_ids') = 0
+          OR NOT EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(export.filter_snapshot->'tag_ids') AS selected_tag(tag_id)
+              WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM admin_user_tag_links AS link
+                  WHERE link.user_id = selected_user.user_id
+                    AND link.tag_id = selected_tag.tag_id::uuid
+              )
+          )
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'created_from')
+          OR export.filter_snapshot->>'created_from' = ''
+          OR selected_user.created_at >= (export.filter_snapshot->>'created_from')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'created_to')
+          OR export.filter_snapshot->>'created_to' = ''
+          OR selected_user.created_at <= (export.filter_snapshot->>'created_to')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'last_activity_from')
+          OR export.filter_snapshot->>'last_activity_from' = ''
+          OR selected_user.last_activity_at >= (export.filter_snapshot->>'last_activity_from')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'last_activity_to')
+          OR export.filter_snapshot->>'last_activity_to' = ''
+          OR selected_user.last_activity_at <= (export.filter_snapshot->>'last_activity_to')::timestamptz
+      )
+);
+
+-- name: DeleteAdminUserCAS :one
+UPDATE users
+SET status = 'deleted',
+    username = NULL,
+    current_username_key = NULL,
+    updated_at = sqlc.arg(changed_at),
+    account_version = account_version + 1
+WHERE user_id = sqlc.arg(user_id)
+  AND account_version = sqlc.arg(expected_version)
+  AND status IN ('active', 'suspended')
+RETURNING user_id, status, account_version;
+
+-- name: DeleteAdminUsernameClaimForUser :execrows
+DELETE FROM username_claims
+WHERE username_key = sqlc.arg(username_key)
+  AND owner_user_id = sqlc.arg(owner_user_id);
+
+-- name: DeleteAdminUserProfile :execrows
+DELETE FROM user_profiles
+WHERE user_id = sqlc.arg(user_id);
 
 -- name: ListAdminUserTagLinks :many
 SELECT link.*

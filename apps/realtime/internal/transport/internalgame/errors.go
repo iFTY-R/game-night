@@ -64,6 +64,10 @@ func classifyError(err error) errorDescriptor {
 		return errorDescriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_SUSPENDED, "game.session.suspended"}
 	case errors.Is(err, gameruntime.ErrSessionTerminal):
 		return errorDescriptor{connect.CodeFailedPrecondition, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_SESSION_TERMINAL, "game.session.terminal"}
+	case errors.Is(err, gameruntime.ErrMutationBlocked):
+		return errorDescriptor{connect.CodeFailedPrecondition, 0, "service.maintenance.active"}
+	case errors.Is(err, gameruntime.ErrMutationStateUnavailable):
+		return errorDescriptor{connect.CodeUnavailable, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, "service.temporarily_unavailable"}
 	case errors.Is(err, gameruntime.ErrParticipantNotActive):
 		return errorDescriptor{connect.CodePermissionDenied, commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_PARTICIPANT_NOT_ACTIVE, "game.participant.not_active"}
 	case errors.Is(err, gameruntime.ErrModuleUnavailable):

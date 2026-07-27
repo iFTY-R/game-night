@@ -11,18 +11,71 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func TestProcedurePoliciesCoverGeneratedAdminAuthServiceExactly(t *testing.T) {
+func TestProcedurePoliciesCoverGeneratedAdminServicesExactly(t *testing.T) {
 	authService := adminv1.File_platform_admin_v1_admin_auth_proto.Services().ByName("AdminAuthService")
+	auditService := adminv1.File_platform_admin_v1_admin_audit_proto.Services().ByName("AdminAuditService")
 	userService := adminv1.File_platform_admin_v1_admin_user_proto.Services().ByName("AdminUserService")
 	roomService := adminv1.File_platform_admin_v1_admin_room_proto.Services().ByName("AdminRoomService")
+	operationsService := adminv1.File_platform_admin_v1_admin_operations_proto.Services().ByName("AdminOperationsService")
+	overviewService := adminv1.File_platform_admin_v1_admin_overview_proto.Services().ByName("AdminOverviewService")
 	assertServicePolicies(t, authService)
+	assertServicePolicies(t, auditService)
 	assertServicePolicies(t, userService)
 	assertServicePolicies(t, roomService)
-	if len(procedurePolicies) != authService.Methods().Len()+userService.Methods().Len()+roomService.Methods().Len() {
-		t.Fatalf("policy count = %d, want %d", len(procedurePolicies), authService.Methods().Len()+userService.Methods().Len()+roomService.Methods().Len())
+	assertServicePolicies(t, operationsService)
+	assertServicePolicies(t, overviewService)
+	want := authService.Methods().Len() + auditService.Methods().Len() + userService.Methods().Len() + roomService.Methods().Len() + operationsService.Methods().Len() + overviewService.Methods().Len()
+	if len(procedurePolicies) != want {
+		t.Fatalf("policy count = %d, want %d", len(procedurePolicies), want)
 	}
 	if _, ok := policyForProcedure("/platform.admin.v1.AdminAuthService/Unknown"); ok {
 		t.Fatal("unknown procedure must not resolve to a policy")
+	}
+}
+
+func TestOperationsAndOverviewPoliciesSeparateReadPreviewAndApply(t *testing.T) {
+	readProcedures := []string{
+		adminv1connect.AdminOperationsServiceGetOperationsSnapshotProcedure,
+		adminv1connect.AdminOperationsServiceGetMaintenanceStateProcedure,
+	}
+	for _, procedure := range readProcedures {
+		policy := requireProcedurePolicy(t, procedure)
+		if policy.session != sessionRequirementFull || !policy.requiresCSRF || policy.requiresRequestID || policy.permission != admin.PermissionOperationsRead || policy.elevation != "" {
+			t.Fatalf("operations read policy %s = %+v", procedure, policy)
+		}
+	}
+	overview := requireProcedurePolicy(t, adminv1connect.AdminOverviewServiceGetOverviewProcedure)
+	if overview.session != sessionRequirementFull || !overview.requiresCSRF || overview.requiresRequestID || overview.permission != admin.PermissionOverviewRead || overview.elevation != "" {
+		t.Fatalf("overview policy = %+v", overview)
+	}
+	previewProcedures := []string{
+		adminv1connect.AdminOperationsServicePreviewMaintenanceChangeProcedure,
+		adminv1connect.AdminOperationsServicePreviewCacheRefreshProcedure,
+		adminv1connect.AdminOperationsServicePreviewTaskRetryProcedure,
+	}
+	for _, procedure := range previewProcedures {
+		policy := requireProcedurePolicy(t, procedure)
+		if policy.permission != admin.PermissionOperationsMaintain || !policy.requiresCSRF || !policy.requiresRequestID || policy.elevation != "" {
+			t.Fatalf("operations preview policy %s = %+v", procedure, policy)
+		}
+	}
+	applyProcedures := []string{
+		adminv1connect.AdminOperationsServiceApplyMaintenanceChangeProcedure,
+		adminv1connect.AdminOperationsServiceApplyCacheRefreshProcedure,
+		adminv1connect.AdminOperationsServiceApplyTaskRetryProcedure,
+	}
+	for _, procedure := range applyProcedures {
+		policy := requireProcedurePolicy(t, procedure)
+		if policy.permission != admin.PermissionOperationsMaintain || !policy.requiresCSRF || !policy.requiresRequestID || policy.elevation != admin.ElevationScopeOperationsMaintenance {
+			t.Fatalf("operations apply policy %s = %+v", procedure, policy)
+		}
+	}
+}
+
+func TestAdminAuditPolicyRequiresFullAuditRead(t *testing.T) {
+	policy := requireProcedurePolicy(t, adminv1connect.AdminAuditServiceListAuditEventsProcedure)
+	if policy.session != sessionRequirementFull || !policy.requiresCSRF || policy.requiresRequestID || policy.permission != admin.PermissionAuditRead || policy.elevation != "" {
+		t.Fatalf("audit policy = %+v", policy)
 	}
 }
 

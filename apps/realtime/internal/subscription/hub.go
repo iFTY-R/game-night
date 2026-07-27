@@ -40,6 +40,8 @@ type Sink interface {
 type HubConfig struct {
 	ReconcileInterval time.Duration
 	ProjectionTimeout time.Duration
+	PresenceSink      redisstore.AdminPresenceSink
+	PresenceTimeout   time.Duration
 }
 
 // Update contains only viewer-safe module output and public session metadata required by the wire adapter.
@@ -90,6 +92,8 @@ type subscriber struct {
 	wake          chan struct{}
 }
 
+const defaultPresenceTimeout = 250 * time.Millisecond
+
 // Handle permits the transport to remove one connection without exposing hub internals.
 type Handle struct {
 	once   sync.Once
@@ -102,6 +106,14 @@ func NewHub(authorizer AuthorizationRefresher, runtime ProjectionRuntime, config
 		config.ReconcileInterval > 5*time.Minute || config.ProjectionTimeout < 100*time.Millisecond ||
 		config.ProjectionTimeout > time.Minute {
 		return nil, ErrInvalidHubConfig
+	}
+	if config.PresenceSink != nil {
+		if config.PresenceTimeout == 0 {
+			config.PresenceTimeout = defaultPresenceTimeout
+		}
+		if config.PresenceTimeout < time.Millisecond || config.PresenceTimeout > time.Minute {
+			return nil, ErrInvalidHubConfig
+		}
 	}
 	lifecycleCtx, cancelHub := context.WithCancelCause(context.Background())
 	return &Hub{
@@ -134,6 +146,7 @@ func (hub *Hub) Register(authorization Authorization, sink Sink) (*Handle, error
 	hub.waitGroup.Add(1)
 	hub.mu.Unlock()
 	go subscription.run()
+	subscription.touchPresence()
 	subscription.notify()
 	return &Handle{cancel: cancel}, nil
 }
@@ -269,6 +282,7 @@ func (subscription *subscriber) notify() {
 func (subscription *subscriber) run() {
 	defer subscription.hub.waitGroup.Done()
 	defer subscription.hub.remove(subscription)
+	defer subscription.removePresence()
 	defer func() { subscription.sink.Close(context.Cause(subscription.ctx)) }()
 	for {
 		select {
@@ -306,6 +320,7 @@ func (subscription *subscriber) reconcile() error {
 			return projectErr
 		}
 		if session.Snapshot().State.StateVersion == current.Cursor {
+			subscription.touchPresence()
 			subscription.authorization = current
 			return nil
 		}
@@ -321,10 +336,36 @@ func (subscription *subscriber) reconcile() error {
 	if err := subscription.sink.Send(ctx, update); err != nil {
 		return err
 	}
+	subscription.touchPresence()
 	current.Cursor = update.StateVersion
 	current.CurrentVersion = update.StateVersion
 	subscription.authorization = current
 	return nil
+}
+
+func (subscription *subscriber) touchPresence() {
+	if subscription == nil || subscription.hub == nil || subscription.hub.config.PresenceSink == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), subscription.hub.config.PresenceTimeout)
+	defer cancel()
+	// Presence is rebuildable operator metadata, so Redis failures never block or cancel viewer traffic.
+	_ = subscription.hub.config.PresenceSink.UpsertConnection(ctx, redisstore.AdminPresenceConnection{
+		ConnectionID: subscription.id,
+		UserID:       subscription.authorization.UserID,
+		RoomID:       subscription.authorization.RoomID,
+		SessionID:    subscription.authorization.SessionID,
+	})
+}
+
+func (subscription *subscriber) removePresence() {
+	if subscription == nil || subscription.hub == nil || subscription.hub.config.PresenceSink == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), subscription.hub.config.PresenceTimeout)
+	defer cancel()
+	// Explicit disconnect repairs the projection immediately; crash recovery still falls back to TTL expiry.
+	_ = subscription.hub.config.PresenceSink.RemoveConnection(ctx, subscription.id)
 }
 
 func snapshotUpdate(session gameruntime.Session, host bool, projection game.Projection) Update {

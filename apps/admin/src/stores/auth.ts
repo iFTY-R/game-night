@@ -12,7 +12,7 @@ import {
   verifyAdminRecoveryCode,
   verifyAdminTotp
 } from "../api/admin-auth";
-import { createRequestId, installSessionInvalidHandler } from "../api/connect";
+import { createRequestId } from "../api/connect";
 import { AdminApiError } from "../api/errors";
 
 export const useAuthStore = defineStore("admin-auth", () => {
@@ -89,16 +89,19 @@ export const useAuthStore = defineStore("admin-auth", () => {
   };
 
   /**
-   * Handles session invalidation from backend (401 with admin.auth.invalid).
-   * Clears session state but preserves setup state.
+   * Invalidates the local session after the transport reports that server-side credentials are gone.
+   * Advancing the generation prevents a slower request that started before the invalidation from
+   * restoring stale session data after the router has sent the operator back to authentication.
    */
-  const handleSessionLoss = (): void => {
+  const invalidateSession = (): void => {
+    generation.value += 1;
+    const controller = activeController.value;
+    activeController.value = null;
+    controller?.abort();
     clearSensitive();
     session.value = null;
+    errorMessage.value = "";
   };
-
-  // Install session invalid handler for connect layer
-  installSessionInvalidHandler(handleSessionLoss);
 
   /**
    * Restores session state on page load.
@@ -326,7 +329,7 @@ export const useAuthStore = defineStore("admin-auth", () => {
     try {
       await logoutAdmin({ signal });
     } finally {
-      handleSessionLoss();
+      invalidateSession();
     }
   };
 
@@ -355,6 +358,7 @@ export const useAuthStore = defineStore("admin-auth", () => {
     submitRecoveryCode,
     logoutCurrentSession,
     clearSensitive,
-    applySession
+    applySession,
+    invalidateSession
   };
 });

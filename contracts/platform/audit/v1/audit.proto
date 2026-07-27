@@ -63,6 +63,10 @@ enum AuditAction {
   AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED = 36;
   AUDIT_ACTION_ADMIN_ELEVATION_DENIED = 37;
   AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED = 38;
+  // Operations commands use dedicated append-only actions so signed history preserves command intent.
+  AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED = 39;
+  AUDIT_ACTION_ADMIN_CACHE_REFRESHED = 40;
+  AUDIT_ACTION_ADMIN_TASK_RETRIED = 41;
 }
 
 message AuditActor {

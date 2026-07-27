@@ -33,7 +33,7 @@ vi.mock("../src/api/admin-auth", async (importOriginal) => ({
 }));
 vi.mock("../src/api/connect", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/api/connect")>()),
-  createRequestId: () => "operation-1"
+  createOperationId: () => "1WlKf0-pNZ2XEf9BzWw1QBDlLHbV_B8z"
 }));
 
 import { useAuthStore } from "../src/stores/auth";
@@ -181,7 +181,7 @@ describe("security settings", () => {
     await flushPromises();
 
     expect(api.elevateAdminSession).toHaveBeenCalledWith({
-      operationId: "operation-1",
+      operationId: "1WlKf0-pNZ2XEf9BzWw1QBDlLHbV_B8z",
       scope: AdminElevationScope.SECURITY_REVOKE_SESSIONS,
       currentPassword: "correct horse battery staple",
       signal: expect.any(AbortSignal)
@@ -215,7 +215,7 @@ describe("security settings", () => {
     await flushPromises();
 
     expect(api.elevateAdminSession).toHaveBeenCalledWith({
-      operationId: "operation-1",
+      operationId: "1WlKf0-pNZ2XEf9BzWw1QBDlLHbV_B8z",
       scope: AdminElevationScope.SECURITY_REVOKE_SESSIONS,
       currentPassword: "correct horse battery staple",
       totpCode: "123456",
@@ -297,7 +297,7 @@ describe("security settings", () => {
       ]
     });
     api.revokeOtherAdminSessions.mockResolvedValue({
-      operationId: "operation-1",
+      operationId: "1WlKf0-pNZ2XEf9BzWw1QBDlLHbV_B8z",
       revokedSessions: 1,
       session: buildSession(true)
     });
@@ -330,7 +330,7 @@ describe("security settings", () => {
     await flushPromises();
 
     expect(api.revokeOtherAdminSessions).toHaveBeenCalledWith({
-      operationId: "operation-1",
+      operationId: "1WlKf0-pNZ2XEf9BzWw1QBDlLHbV_B8z",
       previewVersion: "preview-v1",
       expectedAdminVersion: 8n,
       expectedCurrentSessionVersion: 6n,

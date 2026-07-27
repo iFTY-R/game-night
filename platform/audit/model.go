@@ -250,6 +250,10 @@ const (
 	ActionAdminSecretResultConfirmed    Action = 36
 	ActionAdminElevationDenied          Action = 37
 	ActionAdminElevationExpired         Action = 38
+	// Operations actions remain distinct in signed history so a cache rebuild cannot be confused with a maintenance gate change.
+	ActionAdminMaintenanceChanged Action = 39
+	ActionAdminCacheRefreshed     Action = 40
+	ActionAdminTaskRetried        Action = 41
 )
 
 // Valid prevents unspecified or future wire values from entering the current canonical schema.
@@ -266,7 +270,8 @@ func (action Action) Valid() bool {
 		ActionAdminMFAEnabled, ActionAdminMFADisabled, ActionAdminRecoveryCodesRegenerated,
 		ActionAdminSessionElevated, ActionAdminElevationRevoked, ActionAdminLoginSucceeded,
 		ActionAdminLoginFailed, ActionAdminSecretResultOpened, ActionAdminSecretResultConfirmed,
-		ActionAdminElevationDenied, ActionAdminElevationExpired:
+		ActionAdminElevationDenied, ActionAdminElevationExpired, ActionAdminMaintenanceChanged,
+		ActionAdminCacheRefreshed, ActionAdminTaskRetried:
 		return true
 	default:
 		return false

@@ -81,6 +81,8 @@ const (
 	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED   AdminElevationSecondFactor = 0
 	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_TOTP          AdminElevationSecondFactor = 1
 	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE AdminElevationSecondFactor = 2
+	// PASSWORD means the account had no active MFA enrollment, so password verification alone authorized the step-up.
+	AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD AdminElevationSecondFactor = 3
 )
 
 // Enum value maps for AdminElevationSecondFactor.
@@ -89,11 +91,13 @@ var (
 		0: "ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED",
 		1: "ADMIN_ELEVATION_SECOND_FACTOR_TOTP",
 		2: "ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE",
+		3: "ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD",
 	}
 	AdminElevationSecondFactor_value = map[string]int32{
 		"ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED":   0,
 		"ADMIN_ELEVATION_SECOND_FACTOR_TOTP":          1,
 		"ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE": 2,
+		"ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD":      3,
 	}
 )
 
@@ -2678,11 +2682,12 @@ const file_platform_admin_v1_admin_auth_proto_rawDesc = "" +
 	"\"ADMIN_SECRET_OPERATION_UNSPECIFIED\x10\x00\x12*\n" +
 	"&ADMIN_SECRET_OPERATION_TOTP_ENROLLMENT\x10\x01\x121\n" +
 	"-ADMIN_SECRET_OPERATION_INITIAL_RECOVERY_CODES\x10\x02\x125\n" +
-	"1ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES\x10\x03*\xa4\x01\n" +
+	"1ADMIN_SECRET_OPERATION_REGENERATED_RECOVERY_CODES\x10\x03*\xd0\x01\n" +
 	"\x1aAdminElevationSecondFactor\x12-\n" +
 	")ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"ADMIN_ELEVATION_SECOND_FACTOR_TOTP\x10\x01\x12/\n" +
-	"+ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE\x10\x022\xed\x13\n" +
+	"+ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE\x10\x02\x12*\n" +
+	"&ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD\x10\x032\xed\x13\n" +
 	"\x10AdminAuthService\x12b\n" +
 	"\rGetSetupState\x12'.platform.admin.v1.GetSetupStateRequest\x1a(.platform.admin.v1.GetSetupStateResponse\x12}\n" +
 	"\x16GetCurrentAdminSession\x120.platform.admin.v1.GetCurrentAdminSessionRequest\x1a1.platform.admin.v1.GetCurrentAdminSessionResponse\x12t\n" +

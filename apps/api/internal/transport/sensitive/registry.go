@@ -141,6 +141,28 @@ var AdminRoomOperations = []string{
 	adminv1connect.AdminRoomServiceGetRepairOperationProcedure,
 }
 
+// AdminAuditOperations contains audit-chain reads because redacted identifiers and reasons are still administrator-only data.
+var AdminAuditOperations = []string{
+	adminv1connect.AdminAuditServiceListAuditEventsProcedure,
+}
+
+// AdminOperationsOperations contains runtime evidence and every maintenance command because instance IDs and reasons remain privileged.
+var AdminOperationsOperations = []string{
+	adminv1connect.AdminOperationsServiceGetOperationsSnapshotProcedure,
+	adminv1connect.AdminOperationsServiceGetMaintenanceStateProcedure,
+	adminv1connect.AdminOperationsServicePreviewMaintenanceChangeProcedure,
+	adminv1connect.AdminOperationsServiceApplyMaintenanceChangeProcedure,
+	adminv1connect.AdminOperationsServicePreviewCacheRefreshProcedure,
+	adminv1connect.AdminOperationsServiceApplyCacheRefreshProcedure,
+	adminv1connect.AdminOperationsServicePreviewTaskRetryProcedure,
+	adminv1connect.AdminOperationsServiceApplyTaskRetryProcedure,
+}
+
+// AdminOverviewOperations contains aggregate operational evidence that is still restricted to authenticated administrators.
+var AdminOverviewOperations = []string{
+	adminv1connect.AdminOverviewServiceGetOverviewProcedure,
+}
+
 // Registry is immutable after construction so concurrent interceptors cannot change observation policy.
 type Registry struct{ operations map[string]struct{} }
 
@@ -164,13 +186,16 @@ func New(operations ...string) (*Registry, error) {
 
 // AllOperations returns an independent list suitable for metrics and the process-wide cache policy registry.
 func AllOperations() []string {
-	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminUserOperations)+len(AdminRoomOperations))
+	operations := make([]string, 0, len(IdentityOperations)+len(RoomOperations)+len(GameOperations)+len(AdminAuthOperations)+len(AdminUserOperations)+len(AdminRoomOperations)+len(AdminAuditOperations)+len(AdminOperationsOperations)+len(AdminOverviewOperations))
 	operations = append(operations, IdentityOperations...)
 	operations = append(operations, RoomOperations...)
 	operations = append(operations, GameOperations...)
 	operations = append(operations, AdminAuthOperations...)
 	operations = append(operations, AdminUserOperations...)
 	operations = append(operations, AdminRoomOperations...)
+	operations = append(operations, AdminAuditOperations...)
+	operations = append(operations, AdminOperationsOperations...)
+	operations = append(operations, AdminOverviewOperations...)
 	return operations
 }
 

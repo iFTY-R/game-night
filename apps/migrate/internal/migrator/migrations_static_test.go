@@ -16,7 +16,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 		t.Fatalf("collect migrations: %v", err)
 	}
 
-	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}
+	wantVersions := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33}
 	if len(migrations) != len(wantVersions) {
 		t.Fatalf("expected %d migrations, got %d", len(wantVersions), len(migrations))
 	}
@@ -38,7 +38,7 @@ func TestMigrationFilesAreContiguousAndReversible(t *testing.T) {
 }
 
 func TestAdminUserCenterMigrationLocksStateAndLeastPrivilegeBoundaries(t *testing.T) {
-	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00030_admin_user_center.sql"))
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00031_admin_user_center.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestAdminUserCenterMigrationLocksStateAndLeastPrivilegeBoundaries(t *testin
 		"REVOKE ALL ON FUNCTION %I.reject_admin_user_note_mutation() FROM PUBLIC",
 	} {
 		if !strings.Contains(migration, fragment) {
-			t.Errorf("migration 00030 is missing %q", fragment)
+			t.Errorf("migration 00031 is missing %q", fragment)
 		}
 	}
 	for _, forbidden := range []string{
@@ -68,7 +68,33 @@ func TestAdminUserCenterMigrationLocksStateAndLeastPrivilegeBoundaries(t *testin
 		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.admin_export_download_grants",
 	} {
 		if strings.Contains(migration, forbidden) {
-			t.Errorf("migration 00030 contains over-broad privilege %q", forbidden)
+			t.Errorf("migration 00031 contains over-broad privilege %q", forbidden)
+		}
+	}
+}
+
+func TestAdminOperationsMigrationUsesClosedCommandsAndLeastPrivilege(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join(migrationDirectory(t), "00033_admin_operations.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(contents)
+	for _, fragment := range []string{
+		"singleton_id smallint PRIMARY KEY DEFAULT 1 CHECK (singleton_id = 1)",
+		"scope text NOT NULL CHECK (scope = 'user_mutations')",
+		"service_kind IN ('api', 'edge', 'realtime', 'worker')",
+		"namespace IN (",
+		"task_kind IN ('user_batch', 'user_erasure')",
+		"GRANT SELECT, UPDATE ON TABLE %I.admin_maintenance_state TO %I",
+		"GRANT SELECT, INSERT ON TABLE %I.admin_operations_retry_receipts TO %I",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Errorf("migration 00033 is missing %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{"user_export", "audit_export", "shell", "redis_key", "GRANT ALL"} {
+		if strings.Contains(strings.ToLower(migration), forbidden) {
+			t.Errorf("migration 00033 contains forbidden capability %q", forbidden)
 		}
 	}
 }

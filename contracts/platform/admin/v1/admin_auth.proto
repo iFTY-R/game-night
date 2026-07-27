@@ -44,6 +44,8 @@ enum AdminElevationSecondFactor {
   ADMIN_ELEVATION_SECOND_FACTOR_UNSPECIFIED = 0;
   ADMIN_ELEVATION_SECOND_FACTOR_TOTP = 1;
   ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE = 2;
+  // PASSWORD means the account had no active MFA enrollment, so password verification alone authorized the step-up.
+  ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD = 3;
 }
 
 message GetSetupStateRequest {}

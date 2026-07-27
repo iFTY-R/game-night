@@ -13,7 +13,13 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4174,
     proxy: {
-      "/platform.admin.v1.AdminAuthService": { ...adminEdgeProxy }
+      // Keep every mounted administrator RPC on the same browser origin during local development.
+      "/platform.admin.v1.AdminAuthService": { ...adminEdgeProxy },
+      "/platform.admin.v1.AdminUserService": { ...adminEdgeProxy },
+      "/platform.admin.v1.AdminRoomService": { ...adminEdgeProxy },
+      "/platform.admin.v1.AdminAuditService": { ...adminEdgeProxy },
+      "/platform.admin.v1.AdminOperationsService": { ...adminEdgeProxy },
+      "/platform.admin.v1.AdminOverviewService": { ...adminEdgeProxy }
     }
   },
   build: {

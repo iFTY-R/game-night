@@ -87,6 +87,7 @@ type Service struct {
 	roomSessions RoomSessionStore
 	clock        clock.Clock
 	generator    Generator
+	mutationGate MutationGate
 }
 
 // NewService requires every authority used by creation, transition, projection, and finish flows.
@@ -98,10 +99,42 @@ func NewService(
 	source clock.Clock,
 	generator Generator,
 ) (*Service, error) {
+	return newService(registry, sessions, rooms, roomSessions, source, generator, nil)
+}
+
+// NewServiceWithMutationGate requires a fresh authority decision for user starts and player actions.
+// System transitions, timers, cancellations, and projections intentionally bypass this admission boundary.
+func NewServiceWithMutationGate(
+	registry Registry,
+	sessions Store,
+	rooms roomDomain.Repository,
+	roomSessions RoomSessionStore,
+	source clock.Clock,
+	generator Generator,
+	mutationGate MutationGate,
+) (*Service, error) {
+	if mutationGate == nil {
+		return nil, ErrInvalidSessionInput
+	}
+	return newService(registry, sessions, rooms, roomSessions, source, generator, mutationGate)
+}
+
+func newService(
+	registry Registry,
+	sessions Store,
+	rooms roomDomain.Repository,
+	roomSessions RoomSessionStore,
+	source clock.Clock,
+	generator Generator,
+	mutationGate MutationGate,
+) (*Service, error) {
 	if registry == nil || sessions == nil || rooms == nil || roomSessions == nil || source == nil || generator == nil {
 		return nil, ErrInvalidSessionInput
 	}
-	return &Service{registry: registry, sessions: sessions, rooms: rooms, roomSessions: roomSessions, clock: source, generator: generator}, nil
+	return &Service{
+		registry: registry, sessions: sessions, rooms: rooms, roomSessions: roomSessions,
+		clock: source, generator: generator, mutationGate: mutationGate,
+	}, nil
 }
 
 // StartCommand contains untrusted game configuration and the authenticated room-host CAS input.
@@ -131,6 +164,12 @@ func (service *Service) Start(ctx context.Context, command StartCommand) (roomDo
 	}
 	if _, err := game.ParseGameID(string(command.GameID)); err != nil {
 		return roomDomain.Room{}, Session{}, ErrInvalidSessionInput
+	}
+	// Maintenance admission precedes receipt replay so a user RPC cannot bypass an active write freeze.
+	if service.mutationGate != nil {
+		if err := service.mutationGate.CheckUserMutation(ctx); err != nil {
+			return roomDomain.Room{}, Session{}, err
+		}
 	}
 	requestDigest := startDigest(command)
 	if command.RequestDigest != nil && *command.RequestDigest != requestDigest {
@@ -298,6 +337,12 @@ func (service *Service) HandleAction(ctx context.Context, command ActionCommand)
 		!command.ActionID.Valid() || command.ExpectedStateVersion == 0 || command.OwnershipEpoch == 0 ||
 		!command.VersionKey.Valid() || !command.Command.Valid() {
 		return ActionResult{}, ErrInvalidSessionInput
+	}
+	// Every player action re-reads the authority; no process-local maintenance cache can admit a stale write.
+	if service.mutationGate != nil {
+		if err := service.mutationGate.CheckUserMutation(ctx); err != nil {
+			return ActionResult{}, err
+		}
 	}
 	requestDigest := actionDigest(command)
 	if command.RequestDigest != nil && *command.RequestDigest != requestDigest {

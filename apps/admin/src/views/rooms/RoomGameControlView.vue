@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import {
   NAlert,
   NButton,
@@ -55,7 +55,7 @@ import {
   removeRoomMember,
   setRoomAdmission
 } from "../../api/admin-room";
-import { createRequestId } from "../../api/connect";
+import { createOperationId } from "../../api/connect";
 import { AdminApiError } from "../../api/errors";
 import PermissionGate from "../../components/PermissionGate.vue";
 import { useAuthStore } from "../../stores/auth";
@@ -151,6 +151,45 @@ const canControlGames = computed(() => auth.permissions.includes(AdminPermission
 const canRepairGames = computed(() => auth.permissions.includes(AdminPermission.GAMES_REPAIR));
 const selectedRoomSummary = computed(() => selectedRoom.value?.summary ?? null);
 const selectedGameSummary = computed(() => selectedGame.value?.summary ?? null);
+// Admission and direct room closure are aggregate-safe only when no child game is active.
+const canUpdateRoomAdmission = computed(() => {
+  const status = selectedRoomSummary.value?.status;
+  return status === RoomStatus.LOBBY || status === RoomStatus.POST_GAME;
+});
+const canForceCloseSelectedRoom = computed(() => canUpdateRoomAdmission.value);
+const roomControlRestriction = computed(() => {
+  switch (selectedRoomSummary.value?.status) {
+    case RoomStatus.PLAYING:
+      return "牌局进行中，请先在牌局页终止活跃牌局。";
+    case RoomStatus.CLOSED:
+      return "房间已关闭，无需再次调整入场策略或关房。";
+    default:
+      return "";
+  }
+});
+
+// The room aggregate never permits an administrator to remove the host through member removal.
+const canRemoveRoomMember = (member: AdminRoomMemberSummary): boolean =>
+  member.userId !== selectedRoomSummary.value?.hostUserId;
+
+// Owner-routed termination is meaningful only while the game aggregate can still transition to a terminal state.
+const canForceTerminateSelectedGame = computed(() => {
+  const status = selectedGameSummary.value?.status;
+  return status === GameSessionStatus.ACTIVE || status === GameSessionStatus.SUSPENDED;
+});
+const gameControlRestriction = computed(() => {
+  switch (selectedGameSummary.value?.status) {
+    case GameSessionStatus.FINISHED:
+      return "牌局已完成，无需再次终止。";
+    case GameSessionStatus.CANCELLED:
+      return "牌局已取消，无需再次终止。";
+    case GameSessionStatus.ACTIVE:
+    case GameSessionStatus.SUSPENDED:
+      return "";
+    default:
+      return "当前牌局状态未确认，无法强制终止。";
+  }
+});
 
 const roomStatusOptions: SelectOption[] = [
   { label: "全部状态", value: 0 },
@@ -176,6 +215,48 @@ const repairTypeOptions: SelectOption[] = [
   { label: "清理过期 Owner 租约", value: AdminRepairType.CLEAR_STALE_OWNER_LEASE },
   { label: "修复房间牌局链接", value: AdminRepairType.REPAIR_ROOM_GAME_LINK }
 ];
+const repairTargetPlaceholder = computed(() =>
+  repairForm.repairType === AdminRepairType.REPAIR_ROOM_GAME_LINK ? "房间 ID" : "牌局 sessionId"
+);
+const canPreviewSelectedRepair = computed(() => {
+  const summary = selectedGameSummary.value;
+  if (!summary) {
+    return false;
+  }
+  switch (repairForm.repairType) {
+    case AdminRepairType.TERMINATE_UNRECOVERABLE_GAME:
+      return canForceTerminateSelectedGame.value;
+    case AdminRepairType.CLEAR_STALE_OWNER_LEASE:
+      return summary.anomalies.includes(AdminGameAnomalyFlag.OWNER_STALE);
+    case AdminRepairType.REPAIR_ROOM_GAME_LINK:
+      return summary.anomalies.includes(AdminGameAnomalyFlag.ROOM_LINK_MISMATCH);
+    default:
+      return false;
+  }
+});
+const repairPreviewRestriction = computed(() => {
+  if (canPreviewSelectedRepair.value) {
+    return "";
+  }
+  switch (repairForm.repairType) {
+    case AdminRepairType.TERMINATE_UNRECOVERABLE_GAME:
+      return gameControlRestriction.value || "当前牌局不能进入终止修正流程。";
+    case AdminRepairType.CLEAR_STALE_OWNER_LEASE:
+      return "当前牌局没有过期 Owner 租约异常。";
+    case AdminRepairType.REPAIR_ROOM_GAME_LINK:
+      return "当前牌局没有房间链接不一致异常。";
+    default:
+      return "请选择受支持的修正类型。";
+  }
+});
+
+// A preview is bound to the exact target, repair type, and reason reviewed by the server.
+watch(
+  () => [repairForm.targetId, repairForm.repairType, repairForm.reason] as const,
+  () => {
+    selectedRepair.value = null;
+  }
+);
 
 const errorMessage = (error: unknown, fallback: string): string =>
   error instanceof AdminApiError ? error.message : fallback;
@@ -426,7 +507,10 @@ const loadGameDetail = async (sessionId: string): Promise<void> => {
       return;
     }
     selectedGame.value = response.game ?? null;
-    repairForm.targetId = response.game?.summary?.sessionId ?? "";
+    const summary = response.game?.summary;
+    repairForm.targetId = repairForm.repairType === AdminRepairType.REPAIR_ROOM_GAME_LINK
+      ? summary?.roomId ?? ""
+      : summary?.sessionId ?? "";
   } catch (error) {
     if (!signal.aborted) {
       message.error(errorMessage(error, "加载牌局详情失败。"));
@@ -452,6 +536,8 @@ const openGame = (game: AdminGameSummary): void => {
   selectedGame.value = null;
   selectedRepair.value = null;
   gameActionForm.reason = "";
+  repairForm.repairType = AdminRepairType.TERMINATE_UNRECOVERABLE_GAME;
+  repairForm.reason = "";
   repairForm.targetId = game.sessionId;
   void loadGameDetail(game.sessionId);
 };
@@ -497,6 +583,10 @@ const upsertGameSummary = (game?: AdminGameSummary): void => {
 };
 
 const handleSaveAdmission = async (): Promise<void> => {
+  if (!canUpdateRoomAdmission.value) {
+    message.warning(roomControlRestriction.value || "当前房间状态不允许调整入场策略。");
+    return;
+  }
   await admissionFormRef.value?.validate();
   const summary = selectedRoomSummary.value;
   if (!summary) {
@@ -505,7 +595,7 @@ const handleSaveAdmission = async (): Promise<void> => {
   savingAdmission.value = true;
   try {
     const response = await setRoomAdmission({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       roomId: summary.roomId,
       participantAdmission: admissionForm.participantAdmission,
       spectatorAdmission: admissionForm.spectatorAdmission,
@@ -528,6 +618,10 @@ const handleRemoveMember = async (member: AdminRoomMemberSummary): Promise<void>
   if (!summary) {
     return;
   }
+  if (!canRemoveRoomMember(member)) {
+    message.warning("房主不能通过成员移除操作离开房间。");
+    return;
+  }
   if (!roomActionForm.reason.trim()) {
     message.warning("请先填写房间操作原因。");
     return;
@@ -535,7 +629,7 @@ const handleRemoveMember = async (member: AdminRoomMemberSummary): Promise<void>
   removingMemberId.value = member.userId;
   try {
     const response = await removeRoomMember({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       roomId: summary.roomId,
       userId: member.userId,
       reason: roomActionForm.reason,
@@ -555,6 +649,10 @@ const handleRemoveMember = async (member: AdminRoomMemberSummary): Promise<void>
 };
 
 const handleForceCloseRoom = async (): Promise<void> => {
+  if (!canForceCloseSelectedRoom.value) {
+    message.warning(roomControlRestriction.value || "当前房间状态不允许直接关闭。");
+    return;
+  }
   await roomActionFormRef.value?.validate();
   const summary = selectedRoomSummary.value;
   if (!summary) {
@@ -563,7 +661,7 @@ const handleForceCloseRoom = async (): Promise<void> => {
   closingRoom.value = true;
   try {
     const response = await forceCloseRoom({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       roomId: summary.roomId,
       reason: roomActionForm.reason,
       expectedRoomVersion: summary.roomVersion
@@ -578,6 +676,10 @@ const handleForceCloseRoom = async (): Promise<void> => {
 };
 
 const handleForceTerminateGame = async (): Promise<void> => {
+  if (!canForceTerminateSelectedGame.value) {
+    message.warning(gameControlRestriction.value || "当前牌局状态不允许强制终止。");
+    return;
+  }
   await gameActionFormRef.value?.validate();
   const summary = selectedGameSummary.value;
   if (!summary) {
@@ -586,7 +688,7 @@ const handleForceTerminateGame = async (): Promise<void> => {
   terminatingGame.value = true;
   try {
     const response = await forceTerminateGame({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       sessionId: summary.sessionId,
       reason: gameActionForm.reason,
       expectedStateVersion: summary.stateVersion,
@@ -601,7 +703,23 @@ const handleForceTerminateGame = async (): Promise<void> => {
   }
 };
 
+// Repair targets are derived from the selected aggregate so the operator cannot preview one entity and execute another.
+const handleRepairTypeChange = (value: string | number | null): void => {
+  if (typeof value !== "number") {
+    return;
+  }
+  repairForm.repairType = value as AdminRepairType;
+  const summary = selectedGameSummary.value;
+  repairForm.targetId = repairForm.repairType === AdminRepairType.REPAIR_ROOM_GAME_LINK
+    ? summary?.roomId ?? ""
+    : summary?.sessionId ?? "";
+};
+
 const handlePreviewRepair = async (): Promise<void> => {
+  if (!canPreviewSelectedRepair.value) {
+    message.warning(repairPreviewRestriction.value || "当前状态不允许生成此修正预览。");
+    return;
+  }
   await repairFormRef.value?.validate();
   previewingRepair.value = true;
   selectedRepair.value = null;
@@ -628,7 +746,7 @@ const handleExecuteRepair = async (): Promise<void> => {
   executingRepair.value = true;
   try {
     const response = await executeEmergencyRepair({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       repairId: repair.repairId,
       reason: repairForm.reason,
       expectedRepairVersion: repair.repairVersion
@@ -660,11 +778,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-view room-control">
-    <header class="admin-view__header room-control__hero">
-      <div>
-        <p class="room-control__eyebrow">运营后台 / Rooms & Games</p>
-        <h1 class="admin-view__title">房间与牌局</h1>
-        <p class="admin-view__subtitle">查询线上房间与牌局状态，执行受审计的房间控制和固定应急修正。</p>
+    <div class="admin-toolbar room-control__toolbar">
+      <div class="admin-page-title">
+        <h1>房间与牌局</h1>
       </div>
       <NButton secondary :loading="loadingRooms || loadingGames" @click="activeTab === 'rooms' ? loadRooms() : loadGames()">
         <template #icon>
@@ -672,7 +788,7 @@ onBeforeUnmount(() => {
         </template>
         刷新当前
       </NButton>
-    </header>
+    </div>
 
     <NTabs v-model:value="activeTab" type="segment" animated class="room-control__tabs">
       <NTabPane name="rooms" tab="房间">
@@ -839,17 +955,20 @@ onBeforeUnmount(() => {
             <PermissionGate :permission="AdminPermission.ROOMS_CONTROL">
               <NCard title="房间控制" size="small" :bordered="false">
                 <NSpace vertical>
+                  <NAlert v-if="roomControlRestriction" type="warning" :bordered="false">
+                    {{ roomControlRestriction }}
+                  </NAlert>
                   <NForm ref="admissionFormRef" :model="admissionForm" :rules="rules" label-placement="top">
                     <NFormItem label="玩家入场" path="participantAdmission">
-                      <NSelect v-model:value="admissionForm.participantAdmission" :options="admissionOptions" />
+                      <NSelect v-model:value="admissionForm.participantAdmission" :options="admissionOptions" :disabled="!canUpdateRoomAdmission" />
                     </NFormItem>
                     <NFormItem label="观战入场" path="spectatorAdmission">
-                      <NSelect v-model:value="admissionForm.spectatorAdmission" :options="admissionOptions" />
+                      <NSelect v-model:value="admissionForm.spectatorAdmission" :options="admissionOptions" :disabled="!canUpdateRoomAdmission" />
                     </NFormItem>
                     <NFormItem label="操作原因" path="reason">
-                      <NInput v-model:value="admissionForm.reason" type="textarea" placeholder="说明调整入场策略的原因" />
+                      <NInput v-model:value="admissionForm.reason" type="textarea" placeholder="说明调整入场策略的原因" :disabled="!canUpdateRoomAdmission" />
                     </NFormItem>
-                    <NButton type="primary" :loading="savingAdmission" @click="handleSaveAdmission">保存入场策略</NButton>
+                    <NButton type="primary" :loading="savingAdmission" :disabled="!canUpdateRoomAdmission" @click="handleSaveAdmission">保存入场策略</NButton>
                   </NForm>
 
                   <NForm ref="roomActionFormRef" :model="roomActionForm" :rules="rules" label-placement="top">
@@ -858,7 +977,7 @@ onBeforeUnmount(() => {
                     </NFormItem>
                     <NPopconfirm @positive-click="handleForceCloseRoom">
                       <template #trigger>
-                        <NButton type="error" secondary :loading="closingRoom">强制关闭房间</NButton>
+                        <NButton type="error" secondary :loading="closingRoom" :disabled="!canForceCloseSelectedRoom">强制关闭房间</NButton>
                       </template>
                       该操作会关闭房间并写入审计记录，确认继续？
                     </NPopconfirm>
@@ -879,7 +998,7 @@ onBeforeUnmount(() => {
                     <PermissionGate :permission="AdminPermission.ROOMS_CONTROL">
                       <NPopconfirm @positive-click="handleRemoveMember(member)">
                         <template #trigger>
-                          <NButton size="small" type="error" ghost :loading="removingMemberId === member.userId">移除</NButton>
+                          <NButton size="small" type="error" ghost :loading="removingMemberId === member.userId" :disabled="!canRemoveRoomMember(member)">移除</NButton>
                         </template>
                         将按当前成员版本移除该成员，确认继续？
                       </NPopconfirm>
@@ -926,13 +1045,16 @@ onBeforeUnmount(() => {
 
             <PermissionGate :permission="AdminPermission.GAMES_CONTROL">
               <NCard title="牌局控制" size="small" :bordered="false">
+                <NAlert v-if="gameControlRestriction" type="warning" :bordered="false">
+                  {{ gameControlRestriction }}
+                </NAlert>
                 <NForm ref="gameActionFormRef" :model="gameActionForm" :rules="rules" label-placement="top">
                   <NFormItem label="操作原因" path="reason">
-                    <NInput v-model:value="gameActionForm.reason" type="textarea" placeholder="说明强制终止牌局的原因" />
+                    <NInput v-model:value="gameActionForm.reason" type="textarea" placeholder="说明强制终止牌局的原因" :disabled="!canForceTerminateSelectedGame" />
                   </NFormItem>
                   <NPopconfirm @positive-click="handleForceTerminateGame">
                     <template #trigger>
-                      <NButton type="error" secondary :loading="terminatingGame">强制终止牌局</NButton>
+                      <NButton type="error" secondary :loading="terminatingGame" :disabled="!canForceTerminateSelectedGame">强制终止牌局</NButton>
                     </template>
                     将按当前状态版本和 Owner Epoch 尝试终止牌局，确认继续？
                   </NPopconfirm>
@@ -945,18 +1067,21 @@ onBeforeUnmount(() => {
                 <NAlert type="warning" :bordered="false" class="room-control__repair-alert">
                   应急修正只支持后端白名单命令，不允许任意数据库补丁；执行前必须先生成预览。
                 </NAlert>
+                <NAlert v-if="repairPreviewRestriction" type="info" :bordered="false" class="room-control__repair-alert">
+                  {{ repairPreviewRestriction }}
+                </NAlert>
                 <NForm ref="repairFormRef" :model="repairForm" :rules="rules" label-placement="top">
                   <NFormItem label="目标 ID" path="targetId">
-                    <NInput v-model:value="repairForm.targetId" placeholder="通常为牌局 sessionId" />
+                    <NInput v-model:value="repairForm.targetId" :placeholder="repairTargetPlaceholder" readonly />
                   </NFormItem>
                   <NFormItem label="修正类型" path="repairType">
-                    <NSelect v-model:value="repairForm.repairType" :options="repairTypeOptions" />
+                    <NSelect v-model:value="repairForm.repairType" :options="repairTypeOptions" @update:value="handleRepairTypeChange" />
                   </NFormItem>
                   <NFormItem label="原因" path="reason">
                     <NInput v-model:value="repairForm.reason" type="textarea" placeholder="说明为什么进入应急修正流程" />
                   </NFormItem>
                   <NSpace>
-                    <NButton type="warning" :loading="previewingRepair" @click="handlePreviewRepair">预览修正</NButton>
+                    <NButton type="warning" :loading="previewingRepair" :disabled="!canPreviewSelectedRepair" @click="handlePreviewRepair">预览修正</NButton>
                     <NPopconfirm :disabled="!selectedRepair" @positive-click="handleExecuteRepair">
                       <template #trigger>
                         <NButton type="error" :disabled="!selectedRepair" :loading="executingRepair">执行预览</NButton>
@@ -1006,38 +1131,19 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .room-control {
-  --room-card: rgba(255, 255, 255, 0.88);
-  --room-ink: #152235;
-  --room-line: rgba(30, 41, 59, 0.12);
-  --room-muted: #64748b;
-}
-
-.room-control__hero {
-  align-items: flex-end;
-  background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.2), transparent 30rem),
-    linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(20, 184, 166, 0.12));
-  border: 1px solid var(--room-line);
-  border-radius: 28px;
-  display: flex;
-  justify-content: space-between;
-  padding: 24px;
-}
-
-.room-control__eyebrow {
-  color: #0f766e;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  margin: 0 0 8px;
-  text-transform: uppercase;
+  --room-card: var(--admin-surface);
+  --room-ink: var(--admin-ink);
+  --room-line: var(--admin-line);
+  --room-muted: var(--admin-muted);
 }
 
 .room-control__tabs {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .room-control__grid {
+  /* Keep each operational panel content-sized instead of stretching the list to the filter form height. */
+  align-items: start;
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
@@ -1046,8 +1152,9 @@ onBeforeUnmount(() => {
 .room-control__panel,
 .room-control__list {
   background: var(--room-card);
-  border-radius: 22px;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--room-line);
+  border-radius: 8px;
+  box-shadow: var(--admin-shadow);
 }
 
 .room-control__panel-title {
@@ -1068,9 +1175,9 @@ onBeforeUnmount(() => {
 
 .entity-list__item {
   align-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  background: var(--admin-surface-muted);
   border: 1px solid var(--room-line);
-  border-radius: 18px;
+  border-radius: 6px;
   color: inherit;
   cursor: pointer;
   display: grid;
@@ -1078,14 +1185,13 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
   padding: 14px;
   text-align: left;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
   width: 100%;
 }
 
 .entity-list__item:hover {
-  border-color: rgba(20, 184, 166, 0.48);
-  box-shadow: 0 14px 34px rgba(20, 184, 166, 0.12);
-  transform: translateY(-1px);
+  background: var(--admin-brand-soft);
+  border-color: var(--admin-brand);
 }
 
 .entity-list__main {
@@ -1137,8 +1243,9 @@ onBeforeUnmount(() => {
 
 .room-control__member {
   align-items: center;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--room-line);
-  border-radius: 14px;
+  border-radius: 6px;
   display: flex;
   justify-content: space-between;
   padding: 12px;
@@ -1151,14 +1258,13 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .room-control__hero {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 16px;
-  }
-
   .room-control__grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Keep the real room or game state ahead of secondary filters on narrow screens. */
+  .room-control__list {
+    order: -1;
   }
 
   .entity-list__item {

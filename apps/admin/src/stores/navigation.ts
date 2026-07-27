@@ -10,7 +10,14 @@ export type TabItem = {
   closable: boolean;
 };
 
-const layoutRouteNames = new Set<AppRouteName>([routeName.users, routeName.rooms, routeName.security]);
+const layoutRouteNames = new Set<AppRouteName>([
+	routeName.overview,
+	routeName.users,
+	routeName.rooms,
+	routeName.audit,
+	routeName.security,
+	routeName.operations
+]);
 
 const routePermissions = new Map(navigationItems.map((item) => [item.name, item.permission] as const));
 
@@ -23,7 +30,7 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
   const preferences = usePreferencesStore();
   const mobileOpen = ref(false);
   const tabs = ref<TabItem[]>([]);
-  const activeTab = ref<AppRouteName>(routeName.users);
+	const activeTab = ref<AppRouteName>(routeName.overview);
 
   const syncPersistedTabs = (): void => {
     preferences.persistedTabs = tabs.value.map((tab) => tab.name);
@@ -65,20 +72,20 @@ export const useNavigationStore = defineStore("admin-navigation", () => {
         closable: index !== 0
       };
     });
-    activeTab.value = tabs.value[0]?.name ?? routeName.users;
+	activeTab.value = tabs.value[0]?.name ?? routeName.overview;
     syncPersistedTabs();
   };
 
   const closeTab = (name: AppRouteName): AppRouteName => {
     if (tabs.value.length <= 1 || tabs.value.find((tab) => tab.name === name)?.closable === false) {
-      return tabs.value[0]?.name ?? routeName.users;
+		return tabs.value[0]?.name ?? routeName.overview;
     }
     const index = tabs.value.findIndex((tab) => tab.name === name);
     if (index >= 0) {
       tabs.value.splice(index, 1);
     }
     syncPersistedTabs();
-    return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.users;
+	return tabs.value[Math.max(index - 1, 0)]?.name ?? routeName.overview;
   };
 
   const breadcrumbs = computed(() => tabs.value.filter((tab) => tab.name === activeTab.value));

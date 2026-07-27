@@ -102,6 +102,13 @@ type AdminBatchPreview struct {
 	Version                int64              `json:"version"`
 }
 
+type AdminCacheGeneration struct {
+	Namespace        string             `json:"namespace"`
+	Generation       int64              `json:"generation"`
+	UpdatedByAdminID pgtype.UUID        `json:"updated_by_admin_id"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AdminChallenge struct {
 	ChallengeID      pgtype.UUID        `json:"challenge_id"`
 	AdminID          pgtype.UUID        `json:"admin_id"`
@@ -203,6 +210,77 @@ type AdminExportJob struct {
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AdminMaintenanceState struct {
+	SingletonID      int16              `json:"singleton_id"`
+	Enabled          bool               `json:"enabled"`
+	Scope            string             `json:"scope"`
+	Reason           string             `json:"reason"`
+	PlannedEndAt     pgtype.Timestamptz `json:"planned_end_at"`
+	Version          int64              `json:"version"`
+	ChangedByAdminID pgtype.UUID        `json:"changed_by_admin_id"`
+	ChangedAt        pgtype.Timestamptz `json:"changed_at"`
+}
+
+type AdminMetricBucket struct {
+	MetricName      string             `json:"metric_name"`
+	BucketWidth     string             `json:"bucket_width"`
+	BucketStart     pgtype.Timestamptz `json:"bucket_start"`
+	Value           int64              `json:"value"`
+	SampledAt       pgtype.Timestamptz `json:"sampled_at"`
+	SourceWatermark int64              `json:"source_watermark"`
+}
+
+type AdminOperationsCommandReceipt struct {
+	ActorAdminID                pgtype.UUID        `json:"actor_admin_id"`
+	OperationID                 string             `json:"operation_id"`
+	RequestDigest               []byte             `json:"request_digest"`
+	CommandKind                 string             `json:"command_kind"`
+	Target                      string             `json:"target"`
+	Outcome                     string             `json:"outcome"`
+	PreviousVersion             int64              `json:"previous_version"`
+	CurrentVersion              int64              `json:"current_version"`
+	MaintenanceEnabled          pgtype.Bool        `json:"maintenance_enabled"`
+	MaintenanceReason           string             `json:"maintenance_reason"`
+	MaintenancePlannedEndAt     pgtype.Timestamptz `json:"maintenance_planned_end_at"`
+	MaintenanceChangedByAdminID pgtype.UUID        `json:"maintenance_changed_by_admin_id"`
+	MaintenanceChangedAt        pgtype.Timestamptz `json:"maintenance_changed_at"`
+	AuditEventID                pgtype.UUID        `json:"audit_event_id"`
+	CompletedAt                 pgtype.Timestamptz `json:"completed_at"`
+}
+
+type AdminOperationsPreview struct {
+	PreviewDigest           []byte             `json:"preview_digest"`
+	ActorAdminID            pgtype.UUID        `json:"actor_admin_id"`
+	CommandKind             string             `json:"command_kind"`
+	ReasonDigest            []byte             `json:"reason_digest"`
+	ExpectedVersion         int64              `json:"expected_version"`
+	MaintenanceEnabled      pgtype.Bool        `json:"maintenance_enabled"`
+	MaintenancePlannedEndAt pgtype.Timestamptz `json:"maintenance_planned_end_at"`
+	CacheNamespace          pgtype.Text        `json:"cache_namespace"`
+	TaskKind                pgtype.Text        `json:"task_kind"`
+	TaskID                  pgtype.UUID        `json:"task_id"`
+	SampledAt               pgtype.Timestamptz `json:"sampled_at"`
+	ExpiresAt               pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt              pgtype.Timestamptz `json:"consumed_at"`
+	Version                 int64              `json:"version"`
+}
+
+type AdminOperationsRetryReceipt struct {
+	ActorAdminID        pgtype.UUID        `json:"actor_admin_id"`
+	OperationID         string             `json:"operation_id"`
+	RequestDigest       []byte             `json:"request_digest"`
+	TaskKind            string             `json:"task_kind"`
+	TaskID              pgtype.UUID        `json:"task_id"`
+	ExpectedTaskVersion int64              `json:"expected_task_version"`
+	Outcome             string             `json:"outcome"`
+	TaskVersion         int64              `json:"task_version"`
+	ManualRetryCount    int32              `json:"manual_retry_count"`
+	TaskState           string             `json:"task_state"`
+	OriginalErrorCode   string             `json:"original_error_code"`
+	AuditEventID        pgtype.UUID        `json:"audit_event_id"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+}
+
 type AdminRecoveryCode struct {
 	RecoveryCodeID pgtype.UUID        `json:"recovery_code_id"`
 	AdminID        pgtype.UUID        `json:"admin_id"`
@@ -243,6 +321,17 @@ type AdminRepairOperation struct {
 	ExecutedAt                pgtype.Timestamptz `json:"executed_at"`
 }
 
+type AdminServiceInstance struct {
+	ServiceKind        string             `json:"service_kind"`
+	InstanceID         string             `json:"instance_id"`
+	BuildVersion       string             `json:"build_version"`
+	StartedAt          pgtype.Timestamptz `json:"started_at"`
+	LastHeartbeatAt    pgtype.Timestamptz `json:"last_heartbeat_at"`
+	Status             string             `json:"status"`
+	Components         []byte             `json:"components"`
+	MaintenanceVersion int64              `json:"maintenance_version"`
+}
+
 type AdminSession struct {
 	SessionID         pgtype.UUID        `json:"session_id"`
 	AdminID           pgtype.UUID        `json:"admin_id"`
@@ -281,6 +370,40 @@ type AdminTotpEnrollment struct {
 	DisabledAt        pgtype.Timestamptz `json:"disabled_at"`
 	EnrollmentVersion int64              `json:"enrollment_version"`
 	ReplayFloor       pgtype.Int8        `json:"replay_floor"`
+}
+
+type AdminUserCommandPreview struct {
+	PreviewID             pgtype.UUID        `json:"preview_id"`
+	ActorAdminID          pgtype.UUID        `json:"actor_admin_id"`
+	UserID                pgtype.UUID        `json:"user_id"`
+	Command               string             `json:"command"`
+	SnapshotSchemaVersion int32              `json:"snapshot_schema_version"`
+	Snapshot              []byte             `json:"snapshot"`
+	PreviewDigest         []byte             `json:"preview_digest"`
+	AffectedDevices       int32              `json:"affected_devices"`
+	AffectedRooms         int32              `json:"affected_rooms"`
+	Blockers              []byte             `json:"blockers"`
+	RequiredElevation     pgtype.Text        `json:"required_elevation"`
+	SampledAt             pgtype.Timestamptz `json:"sampled_at"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt            pgtype.Timestamptz `json:"consumed_at"`
+	Version               int64              `json:"version"`
+}
+
+type AdminUserCommandReceipt struct {
+	ActorAdminID   pgtype.UUID        `json:"actor_admin_id"`
+	OperationID    string             `json:"operation_id"`
+	RequestDigest  []byte             `json:"request_digest"`
+	PreviewID      pgtype.UUID        `json:"preview_id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Command        string             `json:"command"`
+	Outcome        string             `json:"outcome"`
+	UserVersion    int64              `json:"user_version"`
+	RevokedDevices int32              `json:"revoked_devices"`
+	RemovedRooms   int32              `json:"removed_rooms"`
+	ErasureJobID   pgtype.UUID        `json:"erasure_job_id"`
+	AuditEventID   pgtype.UUID        `json:"audit_event_id"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }
 
 type AdminUserErasureJob struct {

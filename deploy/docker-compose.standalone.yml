@@ -82,6 +82,9 @@ services:
       # 这些地址只在同一个容器内互相调用，不能改成宿主机端口或公网域名。
       # API 只绑定内部地址；浏览器流量统一从下面的边缘网关进入。
       GAME_NIGHT_API_LISTEN_ADDRESS: 127.0.0.1:8081
+      GAME_NIGHT_API_INSTANCE_ID: ${GAME_NIGHT_API_INSTANCE_ID:-api-standalone}
+      GAME_NIGHT_ADMIN_HEARTBEAT_URL: http://127.0.0.1:8081/internal/admin/operations/heartbeat
+      GAME_NIGHT_ADMIN_HEARTBEAT_TOKEN: ${GAME_NIGHT_ADMIN_HEARTBEAT_TOKEN:?GAME_NIGHT_ADMIN_HEARTBEAT_TOKEN is required}
       # 服务间访问实时服务时使用内部共享 token 保护。
       GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL: http://127.0.0.1:8091
       GAME_NIGHT_API_REALTIME_PEER_URLS: http://127.0.0.1:8091

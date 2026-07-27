@@ -5,14 +5,21 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/runtimeinfo"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
+	"github.com/iFTY-R/game-night/apps/worker/internal/adminjobs"
 	"github.com/iFTY-R/game-night/apps/worker/internal/checkpoint"
 	workerconfig "github.com/iFTY-R/game-night/apps/worker/internal/config"
 	workerruntime "github.com/iFTY-R/game-night/apps/worker/internal/runtime"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminoperations "github.com/iFTY-R/game-night/platform/admin/operations"
+	adminuser "github.com/iFTY-R/game-night/platform/admin/user"
 	"github.com/iFTY-R/game-night/platform/audit"
 	"github.com/iFTY-R/game-night/platform/clock"
 	"github.com/iFTY-R/game-night/platform/keyrotation"
@@ -37,8 +44,10 @@ var (
 
 // Application owns the polling runtime and the worker-role database pool.
 type Application struct {
-	runtime *workerruntime.Runtime
-	pool    *pgxpool.Pool
+	runtime          *workerruntime.Runtime
+	pool             *pgxpool.Pool
+	heartbeat        *serviceheartbeat.Reporter
+	heartbeatTimeout time.Duration
 }
 
 // New builds the complete worker graph and checks sink readiness before any consumer lease can be claimed.
@@ -120,21 +129,85 @@ func New(ctx context.Context, config workerconfig.Config, logger *slog.Logger) (
 		return nil, errInitializeRuntime
 	}
 	cleanup := postgres.NewExpiryCleanup(pool, config.Runtime.RoomIdleTimeout)
-	application.runtime, err = workerruntime.NewWithCheckpointScheduler(
-		dispatcher, scheduler, rotation, cleanup, config.Runtime.PollInterval, logger,
+	governance := postgres.NewAdminUserGovernanceRepository(pool)
+	batchService, err := adminuser.NewService(adminuser.Config{
+		Repository: postgres.NewAdminUserRepository(pool),
+		Jobs:       postgres.NewAdminJobRepository(pool),
+		Governance: governance,
+		// The worker only needs the asynchronous erasure primitive, so it composes a narrow adapter instead of reopening HTTP-only command paths.
+		SingleGovernance: newWorkerErasureGovernance(governance, postgres.NewProfileRepository(pool), piiProtector, source),
+		Audit:            postgres.NewAdminUserAuditRecorder(pool, auditService, checkpointPolicy, source),
+		Clock:            source,
+	})
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	batchDispatcher, err := adminjobs.New(batchService, adminjobs.Config{
+		Owner: string(config.Runtime.InstanceID), BatchSize: config.Runtime.BatchSize,
+	})
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	application.runtime, err = workerruntime.NewWithAdminJobs(
+		dispatcher, scheduler, rotation, cleanup, batchDispatcher, config.Runtime.PollInterval, logger,
 	)
 	if err != nil {
 		return nil, errInitializeRuntime
 	}
+	operationsRepository := postgres.NewAdminOperationsRepository(pool)
+	maintenance, err := operationsRepository.GetMaintenanceState(ctx)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	heartbeatClient, err := serviceheartbeat.NewHTTPClient(
+		&http.Client{Timeout: config.Heartbeat.Timeout},
+		config.Heartbeat.TargetURL,
+		config.Heartbeat.Token,
+		config.Shared.Environment == sharedconfig.EnvironmentProduction,
+	)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	processInfo, err := runtimeinfo.New(adminoperations.ServiceWorker, string(config.Runtime.InstanceID), config.Heartbeat.BuildVersion, source.Now())
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	var maintenanceVersion atomic.Uint64
+	maintenanceVersion.Store(maintenance.Version)
+	application.heartbeat, err = serviceheartbeat.NewReporter(
+		heartbeatClient,
+		processInfo,
+		workerHeartbeatSnapshot(pool, readiness, application.runtime, operationsRepository, &maintenanceVersion),
+		config.Heartbeat.Interval,
+		config.Heartbeat.Timeout,
+	)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	application.heartbeatTimeout = config.Runtime.ShutdownTimeout
 	return application, nil
 }
 
 // Run blocks until the process context is canceled while keeping all passes serial.
 func (application *Application) Run(ctx context.Context) error {
-	if application == nil || application.runtime == nil {
+	if application == nil || application.runtime == nil || application.heartbeat == nil {
 		return errInvalidOptions
 	}
-	return application.runtime.Run(ctx)
+	heartbeatContext, cancelHeartbeat := context.WithCancel(context.Background())
+	heartbeatDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatDone)
+		application.heartbeat.Run(heartbeatContext)
+	}()
+	runtimeErr := application.runtime.Run(ctx)
+	cancelHeartbeat()
+	timer := time.NewTimer(application.heartbeatTimeout)
+	defer timer.Stop()
+	select {
+	case <-heartbeatDone:
+	case <-timer.C:
+	}
+	return runtimeErr
 }
 
 // Close releases the worker database pool after the runtime has stopped claiming new work.
@@ -142,5 +215,46 @@ func (application *Application) Close() {
 	if application != nil && application.pool != nil {
 		application.pool.Close()
 		application.pool = nil
+	}
+}
+
+func workerHeartbeatSnapshot(
+	pool *pgxpool.Pool,
+	checkpointReadiness *checkpointstorage.Readiness,
+	runtime *workerruntime.Runtime,
+	repository interface {
+		GetMaintenanceState(context.Context) (adminoperations.MaintenanceState, error)
+	},
+	maintenanceVersion *atomic.Uint64,
+) serviceheartbeat.SnapshotFunc {
+	return func(ctx context.Context) serviceheartbeat.Snapshot {
+		components := runtime.HealthComponents()
+		components["postgresql"] = adminoperations.HealthUnavailable
+		if pool != nil && pool.Ping(ctx) == nil {
+			components["postgresql"] = adminoperations.HealthHealthy
+		}
+		components["checkpoint"] = adminoperations.HealthUnavailable
+		if checkpointReadiness != nil && checkpointReadiness.Ready(ctx) {
+			components["checkpoint"] = adminoperations.HealthHealthy
+		}
+		maintenance, err := repository.GetMaintenanceState(ctx)
+		components["maintenance"] = adminoperations.HealthUnavailable
+		if err == nil {
+			maintenanceVersion.Store(maintenance.Version)
+			components["maintenance"] = adminoperations.HealthHealthy
+		}
+		healthy := 0
+		for _, component := range components {
+			if component == adminoperations.HealthHealthy {
+				healthy++
+			}
+		}
+		status := adminoperations.HealthUnavailable
+		if healthy == len(components) {
+			status = adminoperations.HealthHealthy
+		} else if healthy > 0 {
+			status = adminoperations.HealthDegraded
+		}
+		return serviceheartbeat.Snapshot{Status: status, Components: components, MaintenanceVersion: maintenanceVersion.Load()}
 	}
 }

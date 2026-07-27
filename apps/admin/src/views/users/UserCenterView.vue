@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import {
   NAlert,
   NButton,
   NCard,
+  NCheckbox,
   NDescriptions,
   NDescriptionsItem,
   NDrawer,
@@ -20,13 +21,14 @@ import {
   NTabs,
   NTag,
   NThing,
+  NTooltip,
   useMessage,
   type FormInst,
   type FormRules,
   type SelectOption
 } from "naive-ui";
-import { Eye, RefreshCw, Search, Tag, UserRound } from "lucide-vue-next";
-import { AdminPermission } from "../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
+import { Eye, Pencil, RefreshCw, Search, Tag, Trash2, UserRound } from "lucide-vue-next";
+import { AdminElevationScope, AdminPermission } from "../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import {
   AdminUserPIIField,
   AdminUserStatus,
@@ -47,18 +49,23 @@ import {
   executeUserCommand,
   getUser,
   getUserPII,
+  isValidTagColorInput,
   listUserNotes,
   listUsers,
   listUserTags,
+  normalizeTagColor,
   previewUserCommand,
   setUserTags
 } from "../../api/admin-user";
 import type { AdminUserCommandInput } from "../../api/admin-user";
-import { createRequestId } from "../../api/connect";
+import { createOperationId } from "../../api/connect";
 import { AdminApiError } from "../../api/errors";
 import PermissionGate from "../../components/PermissionGate.vue";
 import { useAuthStore } from "../../stores/auth";
 import { formatDateTime } from "../../utils/format";
+import BatchGovernancePanel from "./components/BatchGovernancePanel.vue";
+import UserTagMutationDialog, { type UserTagMutationDialogPayload } from "./components/UserTagMutationDialog.vue";
+import ElevationDialog, { type ElevationDialogPayload } from "../security/components/ElevationDialog.vue";
 
 const message = useMessage();
 const auth = useAuthStore();
@@ -81,9 +88,11 @@ const piiForm = reactive({
 const tagFormRef = ref<FormInst | null>(null);
 const tagForm = reactive({
   name: "",
-  color: "#2563eb",
+  color: "#2563EB",
   reason: ""
 });
+const tagMutationDialogRef = ref<InstanceType<typeof UserTagMutationDialog> | null>(null);
+const elevationDialogRef = ref<InstanceType<typeof ElevationDialog> | null>(null);
 const governanceFormRef = ref<FormInst | null>(null);
 const governanceForm = reactive({
   commandType: AdminUserCommandType.SUSPEND,
@@ -95,12 +104,24 @@ const rules: FormRules = {
   body: { required: true, message: "请输入备注内容", trigger: ["input", "blur"] },
   reason: { required: true, message: "请输入操作原因", trigger: ["input", "blur"] },
   name: { required: true, message: "请输入标签名称", trigger: ["input", "blur"] },
-  color: { required: true, message: "请输入标签颜色", trigger: ["input", "blur"] },
+  // The format rule mirrors the backend #RRGGBB contract so operators get inline feedback
+  // instead of a server-side invalid_argument after submitting.
+  color: [
+    { required: true, message: "请输入标签颜色", trigger: ["input", "blur"] },
+    {
+      validator: (_rule, value: string) => !value || isValidTagColorInput(value),
+      message: "颜色格式应为 #RRGGBB，例如 #2563EB",
+      trigger: ["input", "blur"]
+    }
+  ],
   commandType: { required: true, type: "number", message: "请选择治理动作", trigger: ["change"] }
 };
 
 const users = ref<AdminUserSummary[]>([]);
 const tags = ref<AdminUserTag[]>([]);
+// Server-side catalog CAS version; tag creation must present it, and every catalog mutation
+// refreshes it so a stale value cannot silently target an outdated catalog state.
+const tagCatalogVersion = ref(0n);
 const detail = ref<AdminUserDetail | null>(null);
 const notes = ref<AdminUserNote[]>([]);
 const piiValues = ref<AdminUserPIIValue[]>([]);
@@ -117,6 +138,10 @@ const previewingGovernance = ref(false);
 const executingGovernance = ref(false);
 const governancePreview = ref<PreviewUserCommandResponse | null>(null);
 const nextPageToken = ref("");
+// Batch selection tracks explicit targets by current list membership so version-bound batch tasks stay accurate.
+const selectedBatchUserIds = ref<string[]>([]);
+// Governance execution tokens prevent a late elevation callback from mutating a different user drawer state.
+let governanceExecutionGeneration = 0;
 
 // Request generation protects the detail drawer from stale writes when operators switch users quickly.
 let requestGeneration = 0;
@@ -125,11 +150,25 @@ let activeController: AbortController | null = null;
 const canReadPii = computed(() => auth.permissions.includes(AdminPermission.USERS_READ_PII));
 const canAnnotate = computed(() => auth.permissions.includes(AdminPermission.USERS_ANNOTATE));
 const canGovern = computed(() => auth.permissions.includes(AdminPermission.USERS_GOVERN));
+const canControlRooms = computed(() => auth.permissions.includes(AdminPermission.ROOMS_CONTROL));
+const canAccessGovernance = computed(() => canGovern.value || canControlRooms.value);
 const selectedSummary = computed(() => detail.value?.summary ?? users.value.find((user) => user.userId === selectedUserId.value) ?? null);
 const selectedTagIds = computed({
   get: () => selectedSummary.value?.tags.map((tag) => tag.tagId) ?? [],
   set: () => undefined
 });
+const selectedBatchUsers = computed(() => users.value
+  .filter((user) => selectedBatchUserIds.value.includes(user.userId))
+  .map((user) => ({
+    userId: user.userId,
+    username: user.username,
+    expectedUserVersion: user.version
+  })));
+const batchFilterInput = computed(() => ({
+  username: searchForm.username,
+  status: Number(searchForm.status),
+  tagIds: searchForm.tagIds
+}));
 const tagOptions = computed<SelectOption[]>(() => tags.value.map((tag) => ({
   label: tag.name,
   value: tag.tagId
@@ -145,7 +184,7 @@ const statusOptions: SelectOption[] = [
   { label: "已停权", value: AdminUserStatus.SUSPENDED },
   { label: "已删除", value: AdminUserStatus.DELETED }
 ];
-const governanceCommandOptions: SelectOption[] = [
+const governanceCommandCatalog: Array<{ label: string; value: AdminUserCommandType }> = [
   { label: "停权用户", value: AdminUserCommandType.SUSPEND },
   { label: "解除停权", value: AdminUserCommandType.UNSUSPEND },
   { label: "撤销全部设备", value: AdminUserCommandType.REVOKE_ALL_DEVICES },
@@ -243,6 +282,21 @@ const formatRoomRole = (role: AdminUserRoomSummary["membershipRole"]): string =>
 const errorMessage = (error: unknown, fallback: string): string =>
   error instanceof AdminApiError ? error.message : fallback;
 
+const permissionForGovernanceCommand = (commandType: AdminUserCommandType): AdminPermission =>
+  commandType === AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM
+    ? AdminPermission.ROOMS_CONTROL
+    : AdminPermission.USERS_GOVERN;
+
+const hasGovernancePermission = (commandType: AdminUserCommandType): boolean =>
+  auth.permissions.includes(permissionForGovernanceCommand(commandType));
+
+const governanceCommandOptions = computed<SelectOption[]>(() => governanceCommandCatalog
+  .filter((option) => hasGovernancePermission(option.value))
+  .map((option) => ({
+    label: option.label,
+    value: option.value
+  })));
+
 const beginRequest = (): { token: number; signal: AbortSignal } => {
   requestGeneration += 1;
   activeController?.abort();
@@ -253,11 +307,22 @@ const beginRequest = (): { token: number; signal: AbortSignal } => {
 const isCurrentRequest = (token: number, signal: AbortSignal): boolean =>
   !signal.aborted && token === requestGeneration;
 
+const invalidateGovernanceExecution = (): void => {
+  governanceExecutionGeneration += 1;
+  executingGovernance.value = false;
+  elevationDialogRef.value?.toggleDialog(false);
+};
+
+const clearGovernancePreview = (): void => {
+  governancePreview.value = null;
+  invalidateGovernanceExecution();
+};
+
 const clearSensitiveDetail = (): void => {
   piiValues.value = [];
   piiAuditEventId.value = "";
   piiForm.reason = "";
-  governancePreview.value = null;
+  clearGovernancePreview();
   piiFormRef.value?.restoreValidation();
   governanceFormRef.value?.restoreValidation();
 };
@@ -279,10 +344,23 @@ const buildGovernanceCommand = (): AdminUserCommandInput | null => {
   };
 };
 
+watch(governanceCommandOptions, (options) => {
+  if (options.some((option) => option.value === governanceForm.commandType)) {
+    return;
+  }
+  const fallbackCommand = options[0]?.value;
+  if (typeof fallbackCommand === "number") {
+    governanceForm.commandType = fallbackCommand as AdminUserCommandType;
+  }
+  governanceForm.roomId = "";
+  clearGovernancePreview();
+}, { immediate: true });
+
 const loadTags = async (): Promise<void> => {
   try {
     const response = await listUserTags({ pageSize: 100 });
     tags.value = response.tags;
+    tagCatalogVersion.value = response.catalogVersion ?? 0n;
   } catch (error) {
     message.error(errorMessage(error, "加载标签失败。"));
   }
@@ -303,7 +381,10 @@ const loadUsers = async (pageToken = ""): Promise<void> => {
     if (!isCurrentRequest(token, signal)) {
       return;
     }
-    users.value = pageToken ? [...users.value, ...response.users] : response.users;
+    const nextUsers = pageToken ? [...users.value, ...response.users] : response.users;
+    users.value = nextUsers;
+    const availableIds = new Set(nextUsers.map((user) => user.userId));
+    selectedBatchUserIds.value = selectedBatchUserIds.value.filter((userId) => availableIds.has(userId));
     nextPageToken.value = response.page?.nextPageToken ?? "";
   } catch (error) {
     if (!signal.aborted) {
@@ -361,6 +442,67 @@ const handleSearch = (): void => {
   void loadUsers();
 };
 
+const isBatchUserSelected = (userId: string): boolean => selectedBatchUserIds.value.includes(userId);
+
+const toggleBatchUserSelection = (userId: string, checked: boolean): void => {
+  selectedBatchUserIds.value = checked
+    ? [...selectedBatchUserIds.value, userId]
+    : selectedBatchUserIds.value.filter((value) => value !== userId);
+};
+
+const handleSelectAllVisibleUsers = (): void => {
+  selectedBatchUserIds.value = users.value.map((user) => user.userId);
+};
+
+const handleClearBatchUserSelection = (): void => {
+  selectedBatchUserIds.value = [];
+};
+
+/**
+ * Opens a version-bound mutation dialog for the selected catalog tag. The child owns the form,
+ * reason, and request lifecycle so this list never retains mutation-only state between actions.
+ */
+const openTagMutationDialog = (tag: AdminUserTag, mode: UserTagMutationDialogPayload["mode"]): void => {
+  tagMutationDialogRef.value?.toggleDialog(true, { tag, mode });
+};
+
+/**
+ * Reconciles a changed tag through every local user projection without refetching unrelated data.
+ */
+const handleTagUpdated = (updatedTag: AdminUserTag): void => {
+  const updateSummary = (summary: AdminUserSummary): AdminUserSummary => ({
+    ...summary,
+    tags: summary.tags.map((tag) => tag.tagId === updatedTag.tagId ? updatedTag : tag)
+  });
+
+  tags.value = tags.value.map((tag) => tag.tagId === updatedTag.tagId ? updatedTag : tag);
+  users.value = users.value.map(updateSummary);
+  if (detail.value?.summary) {
+    detail.value = { ...detail.value, summary: updateSummary(detail.value.summary) };
+  }
+  // Tag updates advance the server catalog version but the update response does not carry it,
+  // so resync the version (and list) to keep the next creation's CAS check valid.
+  void loadTags();
+};
+
+/**
+ * Mirrors the server's catalog delete semantics: assignments are removed from all cached summaries.
+ */
+const handleTagDeleted = (tagId: string): void => {
+  const removeFromSummary = (summary: AdminUserSummary): AdminUserSummary => ({
+    ...summary,
+    tags: summary.tags.filter((tag) => tag.tagId !== tagId)
+  });
+
+  tags.value = tags.value.filter((tag) => tag.tagId !== tagId);
+  users.value = users.value.map(removeFromSummary);
+  if (detail.value?.summary) {
+    detail.value = { ...detail.value, summary: removeFromSummary(detail.value.summary) };
+  }
+  // Deletion advances the catalog version; resync so the next creation presents the live version.
+  void loadTags();
+};
+
 const handleAssignTags = async (tagIds: string[]): Promise<void> => {
   const summary = selectedSummary.value;
   if (!summary) {
@@ -369,7 +511,7 @@ const handleAssignTags = async (tagIds: string[]): Promise<void> => {
   savingTags.value = true;
   try {
     const response = await setUserTags({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       userId: summary.userId,
       tagIds,
       reason: "后台用户中心标签维护",
@@ -396,7 +538,7 @@ const handleAppendNote = async (): Promise<void> => {
   savingNote.value = true;
   try {
     const response = await appendUserNote({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       userId: summary.userId,
       body: noteForm.body,
       reason: noteForm.reason,
@@ -453,11 +595,11 @@ const handlePreviewGovernance = async (): Promise<void> => {
   await governanceFormRef.value?.validate();
   const summary = selectedSummary.value;
   const command = buildGovernanceCommand();
-  if (!summary || !command) {
+  if (!summary || !command || !hasGovernancePermission(command.type)) {
     return;
   }
   previewingGovernance.value = true;
-  governancePreview.value = null;
+  clearGovernancePreview();
   try {
     governancePreview.value = await previewUserCommand({
       userId: summary.userId,
@@ -473,17 +615,23 @@ const handlePreviewGovernance = async (): Promise<void> => {
   }
 };
 
-const handleExecuteGovernance = async (): Promise<void> => {
-  const summary = selectedSummary.value;
-  const preview = governancePreview.value;
-  const command = buildGovernanceCommand();
-  if (!summary || !preview || !command || preview.blockers.length) {
+const executeGovernanceWithPreview = async (
+  summary: NonNullable<typeof selectedSummary.value>,
+  preview: PreviewUserCommandResponse,
+  command: AdminUserCommandInput,
+  executionGeneration: number
+): Promise<void> => {
+  if (
+    executionGeneration !== governanceExecutionGeneration ||
+    selectedSummary.value?.userId !== summary.userId ||
+    governancePreview.value?.previewId !== preview.previewId
+  ) {
     return;
   }
   executingGovernance.value = true;
   try {
     const response = await executeUserCommand({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       userId: summary.userId,
       command,
       previewId: preview.previewId,
@@ -491,32 +639,77 @@ const handleExecuteGovernance = async (): Promise<void> => {
       reason: governanceForm.reason,
       expectedUserVersion: preview.expectedUserVersion
     });
+    if (
+      executionGeneration !== governanceExecutionGeneration ||
+      selectedSummary.value?.userId !== summary.userId ||
+      governancePreview.value?.previewId !== preview.previewId
+    ) {
+      return;
+    }
     if (response.user) {
       detail.value = detail.value ? { ...detail.value, summary: response.user } : detail.value;
       users.value = users.value.map((user) => user.userId === response.user?.userId ? response.user : user);
     }
-    governancePreview.value = null;
+    clearGovernancePreview();
     message.success(`治理执行完成：${formatCommandOutcome(response.outcome)}。`);
   } catch (error) {
-    message.error(errorMessage(error, "执行治理命令失败。"));
+    if (executionGeneration === governanceExecutionGeneration) {
+      message.error(errorMessage(error, "执行治理命令失败。"));
+    }
   } finally {
-    executingGovernance.value = false;
+    if (executionGeneration === governanceExecutionGeneration) {
+      executingGovernance.value = false;
+    }
   }
+};
+
+const handleExecuteGovernance = async (): Promise<void> => {
+  const summary = selectedSummary.value;
+  const preview = governancePreview.value;
+  const command = buildGovernanceCommand();
+  if (!summary || !preview || !command || preview.blockers.length || !hasGovernancePermission(command.type)) {
+    return;
+  }
+  const executionGeneration = governanceExecutionGeneration + 1;
+  governanceExecutionGeneration = executionGeneration;
+  if (Number(preview.requiredElevation) > AdminElevationScope.UNSPECIFIED) {
+    const elevationPayload: ElevationDialogPayload = {
+      scope: preview.requiredElevation,
+      allowRecoveryCode: false,
+      onElevated: () => {
+        void executeGovernanceWithPreview(summary, preview, command, executionGeneration);
+      }
+    };
+    elevationDialogRef.value?.toggleDialog(true, elevationPayload);
+    return;
+  }
+  await executeGovernanceWithPreview(summary, preview, command, executionGeneration);
 };
 
 const handleCreateTag = async (): Promise<void> => {
   await tagFormRef.value?.validate();
+  // Canonicalize before the request so the catalog, the audit digest, and the echoed form value
+  // all use the uppercase form enforced by the backend contract.
+  tagForm.color = normalizeTagColor(tagForm.color);
+  // The catalog CAS is 1-based; an unloaded (0) version would be rejected server-side, so fetch
+  // the current version first instead of sending a request that cannot succeed.
+  if (tagCatalogVersion.value === 0n) {
+    await loadTags();
+  }
   creatingTag.value = true;
   try {
     const response = await createUserTag({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       name: tagForm.name,
       color: tagForm.color,
       reason: tagForm.reason,
-      expectedVersion: 0n
+      expectedVersion: tagCatalogVersion.value
     });
     if (response.tag) {
       tags.value = [response.tag, ...tags.value];
+    }
+    if (response.catalogVersion) {
+      tagCatalogVersion.value = response.catalogVersion;
     }
     tagForm.name = "";
     tagForm.reason = "";
@@ -542,11 +735,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-view user-center">
-    <header class="admin-view__header user-center__hero">
-      <div>
-        <p class="user-center__eyebrow">运营后台 / User Center</p>
-        <h1 class="admin-view__title">用户中心</h1>
-        <p class="admin-view__subtitle">查询用户、维护标签、追加审计备注，并按原因受控查看 PII。</p>
+    <div class="admin-toolbar user-center__toolbar">
+      <div class="admin-page-title">
+        <h1>用户中心</h1>
       </div>
       <NButton secondary :loading="loadingUsers" @click="handleSearch">
         <template #icon>
@@ -554,7 +745,7 @@ onBeforeUnmount(() => {
         </template>
         刷新
       </NButton>
-    </header>
+    </div>
 
     <div class="user-center__grid">
       <NCard :bordered="false" class="user-center__panel">
@@ -587,7 +778,14 @@ onBeforeUnmount(() => {
                 <NInput v-model:value="tagForm.name" maxlength="24" placeholder="例如：高价值玩家" />
               </NFormItem>
               <NFormItem label="颜色" path="color">
-                <NInput v-model:value="tagForm.color" placeholder="#2563eb" />
+                <NInput v-model:value="tagForm.color" placeholder="#2563EB">
+                  <template #suffix>
+                    <span
+                      v-if="isValidTagColorInput(tagForm.color)"
+                      :style="{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '4px', background: normalizeTagColor(tagForm.color) }"
+                    />
+                  </template>
+                </NInput>
               </NFormItem>
               <NFormItem label="原因" path="reason">
                 <NInput v-model:value="tagForm.reason" type="textarea" placeholder="说明创建这个标签的运营原因" />
@@ -599,42 +797,109 @@ onBeforeUnmount(() => {
                 创建标签
               </NButton>
             </NForm>
+            <div class="user-center__tag-catalog">
+              <div class="user-center__tag-catalog-header">
+                <h3>标签目录</h3>
+                <NTag size="small" type="info">{{ tags.length }}</NTag>
+              </div>
+              <div v-if="tags.length" class="user-center__tag-catalog-list">
+                <div v-for="tag in tags" :key="tag.tagId" class="user-center__tag-catalog-row">
+                  <NTag size="small" :color="{ color: tag.color, textColor: '#fff' }">{{ tag.name }}</NTag>
+                  <span>版本 {{ tag.version }}</span>
+                  <NSpace size="small">
+                    <NTooltip>
+                      <template #trigger>
+                        <NButton
+                          circle
+                          quaternary
+                          size="small"
+                          :aria-label="`编辑标签 ${tag.name}`"
+                          @click="openTagMutationDialog(tag, 'edit')"
+                        >
+                          <template #icon>
+                            <Pencil :size="15" />
+                          </template>
+                        </NButton>
+                      </template>
+                      编辑标签
+                    </NTooltip>
+                    <NTooltip>
+                      <template #trigger>
+                        <NButton
+                          circle
+                          quaternary
+                          size="small"
+                          type="error"
+                          :aria-label="`删除标签 ${tag.name}`"
+                          @click="openTagMutationDialog(tag, 'delete')"
+                        >
+                          <template #icon>
+                            <Trash2 :size="15" />
+                          </template>
+                        </NButton>
+                      </template>
+                      删除标签
+                    </NTooltip>
+                  </NSpace>
+                </div>
+              </div>
+              <NEmpty v-else size="small" description="尚未创建标签" />
+            </div>
           </PermissionGate>
         </NSpace>
       </NCard>
 
       <NCard :bordered="false" class="user-center__list">
         <template #header>
-          <span class="user-center__panel-title">用户列表</span>
+          <div class="user-center__list-header">
+            <span class="user-center__panel-title">用户列表</span>
+            <PermissionGate :permission="AdminPermission.USERS_GOVERN">
+              <NSpace size="small">
+                <NTag size="small" type="info">已勾选 {{ selectedBatchUserIds.length }}</NTag>
+                <NButton size="small" secondary @click="handleSelectAllVisibleUsers">全选当前页</NButton>
+                <NButton size="small" quaternary @click="handleClearBatchUserSelection">清空</NButton>
+              </NSpace>
+            </PermissionGate>
+          </div>
         </template>
         <NSpin :show="loadingUsers">
           <div v-if="users.length" class="user-list">
-            <button v-for="user in users" :key="user.userId" class="user-list__item" type="button" @click="openUser(user)">
-              <div class="user-list__avatar">
-                <UserRound :size="18" />
-              </div>
-              <div class="user-list__main">
-                <div class="user-list__topline">
-                  <strong>{{ user.username || "未命名用户" }}</strong>
-                  <NTag size="small" :type="userStatusType(user.status)">{{ formatUserStatus(user.status) }}</NTag>
+            <div v-for="user in users" :key="user.userId" class="user-list__row">
+              <PermissionGate :permission="AdminPermission.USERS_GOVERN">
+                <div class="user-list__check">
+                  <NCheckbox
+                    :checked="isBatchUserSelected(user.userId)"
+                    @update:checked="(checked) => toggleBatchUserSelection(user.userId, checked)"
+                  />
                 </div>
-                <div class="user-list__meta">
-                  <span>{{ user.userId }}</span>
-                  <span>版本 {{ user.version }}</span>
-                  <span>{{ user.online ? "在线" : "离线" }}</span>
+              </PermissionGate>
+              <button class="user-list__item" type="button" @click="openUser(user)">
+                <div class="user-list__avatar">
+                  <UserRound :size="18" />
                 </div>
-                <div class="user-list__tags">
-                  <NTag v-for="tag in user.tags" :key="tag.tagId" size="small" :color="{ color: tag.color, textColor: '#fff' }">
-                    {{ tag.name }}
-                  </NTag>
-                  <span v-if="!user.tags.length">暂无标签</span>
+                <div class="user-list__main">
+                  <div class="user-list__topline">
+                    <strong>{{ user.username || "未命名用户" }}</strong>
+                    <NTag size="small" :type="userStatusType(user.status)">{{ formatUserStatus(user.status) }}</NTag>
+                  </div>
+                  <div class="user-list__meta">
+                    <span>{{ user.userId }}</span>
+                    <span>版本 {{ user.version }}</span>
+                    <span>{{ user.online ? "在线" : "离线" }}</span>
+                  </div>
+                  <div class="user-list__tags">
+                    <NTag v-for="tag in user.tags" :key="tag.tagId" size="small" :color="{ color: tag.color, textColor: '#fff' }">
+                      {{ tag.name }}
+                    </NTag>
+                    <span v-if="!user.tags.length">暂无标签</span>
+                  </div>
                 </div>
-              </div>
-              <div class="user-list__time">
-                <span>最近活跃</span>
-                <strong>{{ formatDateTime(user.lastActivityAt) }}</strong>
-              </div>
-            </button>
+                <div class="user-list__time">
+                  <span>最近活跃</span>
+                  <strong>{{ formatDateTime(user.lastActivityAt) }}</strong>
+                </div>
+              </button>
+            </div>
             <NButton v-if="nextPageToken" secondary block :loading="loadingUsers" @click="loadUsers(nextPageToken)">
               加载更多
             </NButton>
@@ -643,6 +908,10 @@ onBeforeUnmount(() => {
         </NSpin>
       </NCard>
     </div>
+
+    <PermissionGate :permission="AdminPermission.USERS_GOVERN">
+      <BatchGovernancePanel :selected-users="selectedBatchUsers" :current-filter="batchFilterInput" />
+    </PermissionGate>
 
     <NDrawer :show="drawerOpen" width="720" placement="right" @update:show="(value) => !value && handleCloseDrawer()">
       <NDrawerContent :title="selectedSummary?.username || '用户详情'" closable>
@@ -724,19 +993,19 @@ onBeforeUnmount(() => {
                 <NEmpty v-if="!canReadPii" description="当前管理员无 PII 读取权限" />
               </NTabPane>
               <NTabPane name="governance" tab="治理">
-                <PermissionGate :permission="AdminPermission.USERS_GOVERN">
+                <template v-if="canAccessGovernance && governanceCommandOptions.length">
                   <NAlert type="warning" :bordered="false">
-                    单用户治理必须先预览影响；存在阻断项时不会执行，所有执行请求都会写入审计。
+                    单用户治理必须先预览影响；移出当前房间依赖房间控制权限，其余动作依赖用户治理权限，所有执行都会写入审计。
                   </NAlert>
                   <NForm ref="governanceFormRef" :model="governanceForm" :rules="rules" label-placement="top" class="user-center__governance-form">
                     <NFormItem label="治理动作" path="commandType">
-                      <NSelect v-model:value="governanceForm.commandType" :options="governanceCommandOptions" @update:value="governancePreview = null" />
+                      <NSelect v-model:value="governanceForm.commandType" :options="governanceCommandOptions" @update:value="clearGovernancePreview" />
                     </NFormItem>
                     <NFormItem v-if="governanceForm.commandType === AdminUserCommandType.REMOVE_FROM_CURRENT_ROOM" label="目标房间" path="roomId">
-                      <NSelect v-model:value="governanceForm.roomId" :options="roomCommandOptions" placeholder="选择要移出的当前房间" @update:value="governancePreview = null" />
+                      <NSelect v-model:value="governanceForm.roomId" :options="roomCommandOptions" placeholder="选择要移出的当前房间" @update:value="clearGovernancePreview" />
                     </NFormItem>
                     <NFormItem label="原因" path="reason">
-                      <NInput v-model:value="governanceForm.reason" type="textarea" placeholder="说明治理原因，供审计和复核使用" @input="governancePreview = null" />
+                      <NInput v-model:value="governanceForm.reason" type="textarea" placeholder="说明治理原因，供审计和复核使用" @input="clearGovernancePreview" />
                     </NFormItem>
                     <NSpace>
                       <NButton type="warning" :loading="previewingGovernance" @click="handlePreviewGovernance">预览治理</NButton>
@@ -752,18 +1021,21 @@ onBeforeUnmount(() => {
                   </NForm>
                   <NDescriptions v-if="governancePreview" bordered :column="1" label-placement="left" class="user-center__governance-preview">
                     <NDescriptionsItem label="预览 ID">{{ governancePreview.previewId }}</NDescriptionsItem>
-                    <NDescriptionsItem label="影响设备">{{ governancePreview.affectedDevices }}</NDescriptionsItem>
-                    <NDescriptionsItem label="影响房间">{{ governancePreview.affectedRooms }}</NDescriptionsItem>
-                    <NDescriptionsItem label="过期时间">{{ formatDateTime(governancePreview.expiresAt) }}</NDescriptionsItem>
-                    <NDescriptionsItem label="阻断项">
-                      <NTag v-for="blocker in governancePreview.blockers" :key="`${blocker.type}-${blocker.resourceId}`" type="error" size="small">
+                      <NDescriptionsItem label="影响设备">{{ governancePreview.affectedDevices }}</NDescriptionsItem>
+                      <NDescriptionsItem label="影响房间">{{ governancePreview.affectedRooms }}</NDescriptionsItem>
+                      <NDescriptionsItem v-if="Number(governancePreview.requiredElevation) !== AdminElevationScope.UNSPECIFIED" label="提权范围">
+                        {{ governancePreview.requiredElevation }}
+                      </NDescriptionsItem>
+                      <NDescriptionsItem label="过期时间">{{ formatDateTime(governancePreview.expiresAt) }}</NDescriptionsItem>
+                      <NDescriptionsItem label="阻断项">
+                        <NTag v-for="blocker in governancePreview.blockers" :key="`${blocker.type}-${blocker.resourceId}`" type="error" size="small">
                         {{ formatCommandBlocker(blocker.type) }} {{ blocker.resourceId }}
                       </NTag>
                       <span v-if="!governancePreview.blockers.length">无阻断，可执行</span>
-                    </NDescriptionsItem>
-                  </NDescriptions>
-                </PermissionGate>
-                <NEmpty v-if="!canGovern" description="当前管理员无用户治理权限" />
+                      </NDescriptionsItem>
+                    </NDescriptions>
+                </template>
+                <NEmpty v-else description="当前管理员无可用的单用户治理动作权限" />
               </NTabPane>
               <NTabPane name="activity" tab="活动快照">
                 <div class="user-center__activity">
@@ -787,55 +1059,46 @@ onBeforeUnmount(() => {
         </NSpin>
       </NDrawerContent>
     </NDrawer>
+    <UserTagMutationDialog ref="tagMutationDialogRef" @updated="handleTagUpdated" @deleted="handleTagDeleted" />
+    <ElevationDialog ref="elevationDialogRef" />
   </div>
 </template>
 
 <style scoped>
 .user-center {
-  --user-ink: #172033;
-  --user-muted: #667085;
-  --user-card: rgba(255, 255, 255, 0.86);
-  --user-line: rgba(44, 62, 80, 0.12);
-}
-
-.user-center__hero {
-  align-items: flex-end;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 32rem),
-    linear-gradient(135deg, rgba(15, 23, 42, 0.05), rgba(14, 165, 233, 0.08));
-  border: 1px solid var(--user-line);
-  border-radius: 28px;
-  display: flex;
-  justify-content: space-between;
-  padding: 24px;
-}
-
-.user-center__eyebrow {
-  color: #0369a1;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  margin: 0 0 8px;
-  text-transform: uppercase;
+  --user-ink: var(--admin-ink);
+  --user-muted: var(--admin-muted);
+  --user-card: var(--admin-surface);
+  --user-line: var(--admin-line);
 }
 
 .user-center__grid {
+  /* Keep the result list content-sized when the adjacent filters or tag form are taller. */
+  align-items: start;
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .user-center__panel,
 .user-center__list {
   background: var(--user-card);
-  border-radius: 22px;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--user-line);
+  border-radius: 8px;
+  box-shadow: var(--admin-shadow);
 }
 
 .user-center__panel-title {
   color: var(--user-ink);
   font-weight: 800;
+}
+
+.user-center__list-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
 .user-center__tag-form {
@@ -848,16 +1111,78 @@ onBeforeUnmount(() => {
   margin: 0 0 12px;
 }
 
+.user-center__tag-catalog {
+  border-top: 1px solid var(--user-line);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.user-center__tag-catalog-header,
+.user-center__tag-catalog-row {
+  align-items: center;
+  display: flex;
+}
+
+.user-center__tag-catalog-header {
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.user-center__tag-catalog-header h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.user-center__tag-catalog-list {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+}
+
+.user-center__tag-catalog-row {
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--user-line);
+  border-radius: 6px;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.user-center__tag-catalog-row > span {
+  color: var(--user-muted);
+  flex: 1;
+  font-size: 12px;
+  min-width: 0;
+}
+
 .user-list {
   display: grid;
   gap: 12px;
 }
 
+.user-list__row {
+  align-items: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.user-list__check {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 0 4px;
+}
+
 .user-list__item {
   align-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.88));
+  background: var(--admin-surface-muted);
   border: 1px solid var(--user-line);
-  border-radius: 18px;
+  border-radius: 6px;
   color: inherit;
   cursor: pointer;
   display: grid;
@@ -865,21 +1190,20 @@ onBeforeUnmount(() => {
   grid-template-columns: 44px minmax(0, 1fr) minmax(140px, auto);
   padding: 14px;
   text-align: left;
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
   width: 100%;
 }
 
 .user-list__item:hover {
-  border-color: rgba(14, 165, 233, 0.46);
-  box-shadow: 0 14px 34px rgba(14, 165, 233, 0.12);
-  transform: translateY(-1px);
+  background: var(--admin-brand-soft);
+  border-color: var(--admin-brand);
 }
 
 .user-list__avatar {
   align-items: center;
-  background: #e0f2fe;
-  border-radius: 16px;
-  color: #0369a1;
+  background: var(--admin-brand-soft);
+  border-radius: 6px;
+  color: var(--admin-brand);
   display: flex;
   height: 44px;
   justify-content: center;
@@ -949,13 +1273,27 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .user-center__hero {
+  .user-center__list-header {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .user-center__grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Mobile operators need the live result set before secondary search and tag-maintenance controls. */
+  .user-center__list {
+    order: -1;
+  }
+
+  .user-list__row {
+    grid-template-columns: 1fr;
+  }
+
+  .user-list__check {
+    justify-content: flex-start;
+    padding: 0;
   }
 
   .user-list__item {

@@ -19,6 +19,12 @@ WHERE preview_id = sqlc.arg(preview_id)
   AND expires_at > pg_catalog.clock_timestamp()
 FOR UPDATE;
 
+-- name: GetAdminBatchPreview :one
+SELECT *
+FROM admin_batch_previews
+WHERE preview_id = sqlc.arg(preview_id)
+  AND actor_admin_id = sqlc.arg(actor_admin_id);
+
 -- name: ConsumeAdminBatchPreviewCAS :one
 UPDATE admin_batch_previews
 SET consumed_at = sqlc.arg(consumed_at),
@@ -50,6 +56,53 @@ SELECT *
 FROM admin_batch_jobs
 WHERE actor_admin_id = sqlc.arg(actor_admin_id)
   AND operation_id = sqlc.arg(operation_id);
+
+-- name: GetAdminBatchJobByID :one
+SELECT *
+FROM admin_batch_jobs
+WHERE batch_job_id = sqlc.arg(batch_job_id);
+
+-- name: ListAdminBatchJobs :many
+SELECT *
+FROM admin_batch_jobs
+WHERE (cardinality(sqlc.arg(states)::text[]) = 0 OR state = ANY(sqlc.arg(states)::text[]))
+  AND (cardinality(sqlc.arg(commands)::text[]) = 0 OR command = ANY(sqlc.arg(commands)::text[]))
+  AND (sqlc.narg(created_from)::timestamptz IS NULL OR created_at >= sqlc.narg(created_from))
+  AND (sqlc.narg(created_to)::timestamptz IS NULL OR created_at <= sqlc.narg(created_to))
+  AND (
+      sqlc.narg(after_batch_job_id)::uuid IS NULL
+      OR (
+          sqlc.arg(sort_field)::text = 'created_at'
+          AND (
+              (sqlc.arg(sort_direction)::text = 'ascending' AND (created_at, batch_job_id) > (sqlc.narg(after_sort_time)::timestamptz, sqlc.narg(after_batch_job_id)::uuid))
+              OR (sqlc.arg(sort_direction)::text = 'descending' AND (created_at, batch_job_id) < (sqlc.narg(after_sort_time)::timestamptz, sqlc.narg(after_batch_job_id)::uuid))
+          )
+      )
+      OR (
+          sqlc.arg(sort_field)::text = 'updated_at'
+          AND (
+              (sqlc.arg(sort_direction)::text = 'ascending' AND (updated_at, batch_job_id) > (sqlc.narg(after_sort_time)::timestamptz, sqlc.narg(after_batch_job_id)::uuid))
+              OR (sqlc.arg(sort_direction)::text = 'descending' AND (updated_at, batch_job_id) < (sqlc.narg(after_sort_time)::timestamptz, sqlc.narg(after_batch_job_id)::uuid))
+          )
+      )
+      OR (
+          sqlc.arg(sort_field)::text = 'batch_job_id'
+          AND (
+              (sqlc.arg(sort_direction)::text = 'ascending' AND batch_job_id > sqlc.narg(after_batch_job_id)::uuid)
+              OR (sqlc.arg(sort_direction)::text = 'descending' AND batch_job_id < sqlc.narg(after_batch_job_id)::uuid)
+          )
+      )
+  )
+ORDER BY
+    CASE WHEN sqlc.arg(sort_field)::text = 'created_at' AND sqlc.arg(sort_direction)::text = 'ascending' THEN created_at END ASC,
+    CASE WHEN sqlc.arg(sort_field)::text = 'created_at' AND sqlc.arg(sort_direction)::text = 'descending' THEN created_at END DESC,
+    CASE WHEN sqlc.arg(sort_field)::text = 'updated_at' AND sqlc.arg(sort_direction)::text = 'ascending' THEN updated_at END ASC,
+    CASE WHEN sqlc.arg(sort_field)::text = 'updated_at' AND sqlc.arg(sort_direction)::text = 'descending' THEN updated_at END DESC,
+    CASE WHEN sqlc.arg(sort_field)::text = 'batch_job_id' AND sqlc.arg(sort_direction)::text = 'ascending' THEN batch_job_id END ASC,
+    CASE WHEN sqlc.arg(sort_field)::text = 'batch_job_id' AND sqlc.arg(sort_direction)::text = 'descending' THEN batch_job_id END DESC,
+    CASE WHEN sqlc.arg(sort_direction)::text = 'ascending' THEN batch_job_id END ASC,
+    CASE WHEN sqlc.arg(sort_direction)::text = 'descending' THEN batch_job_id END DESC
+LIMIT sqlc.arg(page_size);
 
 -- name: CreateAdminBatchJobItem :one
 INSERT INTO admin_batch_job_items (
@@ -90,6 +143,46 @@ SET state = 'running',
 FROM candidate
 WHERE item.item_id = candidate.item_id
 RETURNING item.*, candidate.previous_state = 'queued' AS started_now;
+
+-- name: ClaimNextAdminBatchJobItem :one
+WITH candidate AS (
+    SELECT queued.item_id, queued.state AS previous_state
+    FROM admin_batch_job_items AS queued
+    JOIN admin_batch_jobs AS job ON job.batch_job_id = queued.batch_job_id
+    WHERE job.state IN ('queued', 'running', 'canceling')
+      AND (
+          queued.state = 'queued'
+          OR (queued.state = 'running' AND queued.lease_until <= pg_catalog.clock_timestamp())
+      )
+    ORDER BY job.created_at, job.batch_job_id, queued.created_at, queued.item_id
+    FOR UPDATE OF queued SKIP LOCKED
+    LIMIT 1
+)
+UPDATE admin_batch_job_items AS item
+SET state = 'running',
+    attempt_count = item.attempt_count + 1,
+    lease_owner = sqlc.arg(lease_owner),
+    lease_until = pg_catalog.clock_timestamp() + (sqlc.arg(lease_seconds)::bigint * interval '1 second'),
+    started_at = COALESCE(item.started_at, pg_catalog.clock_timestamp()),
+    completed_at = NULL,
+    error_message_key = NULL,
+    version = item.version + 1,
+    updated_at = pg_catalog.clock_timestamp()
+FROM candidate
+WHERE item.item_id = candidate.item_id
+RETURNING item.*, candidate.previous_state = 'queued' AS started_now;
+
+-- name: ListAdminBatchJobItems :many
+SELECT *
+FROM admin_batch_job_items
+WHERE batch_job_id = sqlc.arg(batch_job_id)
+  AND (cardinality(sqlc.arg(states)::text[]) = 0 OR state = ANY(sqlc.arg(states)::text[]))
+  AND (
+      sqlc.narg(after_item_id)::uuid IS NULL
+      OR (created_at, item_id) > (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_item_id)::uuid)
+  )
+ORDER BY created_at, item_id
+LIMIT sqlc.arg(page_size);
 
 -- name: MarkAdminBatchJobItemClaimed :one
 UPDATE admin_batch_jobs
@@ -147,6 +240,93 @@ WHERE batch_job_id = sqlc.arg(batch_job_id)
   AND state IN ('running', 'canceling')
   AND running_count > 0
   AND sqlc.arg(next_state)::text IN ('succeeded', 'failed', 'skipped', 'canceled')
+RETURNING *;
+
+-- name: CancelAdminBatchJobCAS :one
+WITH canceled_items AS (
+    UPDATE admin_batch_job_items
+    SET state = 'canceled',
+        lease_owner = NULL,
+        lease_until = NULL,
+        completed_at = sqlc.arg(changed_at),
+        version = version + 1,
+        updated_at = sqlc.arg(changed_at)
+    WHERE batch_job_id = sqlc.arg(batch_job_id)
+      AND state = 'queued'
+    RETURNING 1
+), totals AS (
+    SELECT count(*)::bigint AS canceled_count
+    FROM canceled_items
+)
+UPDATE admin_batch_jobs
+SET queued_count = admin_batch_jobs.queued_count - COALESCE((SELECT canceled_count FROM totals), 0),
+    canceled_count = admin_batch_jobs.canceled_count + COALESCE((SELECT canceled_count FROM totals), 0),
+    state = CASE
+        WHEN admin_batch_jobs.running_count > 0 THEN 'canceling'
+        ELSE 'canceled'
+    END,
+    started_at = COALESCE(admin_batch_jobs.started_at, sqlc.arg(changed_at)),
+    completed_at = CASE
+        WHEN admin_batch_jobs.running_count > 0 THEN NULL
+        ELSE sqlc.arg(changed_at)
+    END,
+    version = admin_batch_jobs.version + 1,
+    updated_at = sqlc.arg(changed_at)
+WHERE admin_batch_jobs.batch_job_id = sqlc.arg(batch_job_id)
+  AND admin_batch_jobs.version = sqlc.arg(expected_version)
+  AND admin_batch_jobs.state IN ('queued', 'running', 'canceling')
+RETURNING *;
+
+-- name: RetryAdminBatchJobCAS :one
+WITH selected_items AS (
+    SELECT item_id, state
+    FROM admin_batch_job_items
+    WHERE batch_job_id = sqlc.arg(batch_job_id)
+      AND state IN ('failed', 'skipped', 'canceled')
+      AND (
+          cardinality(sqlc.arg(item_ids)::uuid[]) = 0
+          OR item_id = ANY(sqlc.arg(item_ids)::uuid[])
+      )
+    FOR UPDATE
+), retried_items AS (
+    UPDATE admin_batch_job_items AS item
+    SET state = 'queued',
+        lease_owner = NULL,
+        lease_until = NULL,
+        error_message_key = NULL,
+        audit_event_id = NULL,
+        completed_at = NULL,
+        version = item.version + 1,
+        updated_at = sqlc.arg(changed_at)
+    FROM selected_items
+    WHERE item.item_id = selected_items.item_id
+    RETURNING selected_items.state AS previous_state
+), totals AS (
+    SELECT count(*)::bigint AS requeued_count,
+           count(*) FILTER (WHERE previous_state = 'failed')::bigint AS failed_count,
+           count(*) FILTER (WHERE previous_state = 'skipped')::bigint AS skipped_count,
+           count(*) FILTER (WHERE previous_state = 'canceled')::bigint AS canceled_count
+    FROM retried_items
+)
+UPDATE admin_batch_jobs
+SET queued_count = admin_batch_jobs.queued_count + COALESCE((SELECT requeued_count FROM totals), 0),
+    failed_count = admin_batch_jobs.failed_count - COALESCE((SELECT failed_count FROM totals), 0),
+    skipped_count = admin_batch_jobs.skipped_count - COALESCE((SELECT skipped_count FROM totals), 0),
+    canceled_count = admin_batch_jobs.canceled_count - COALESCE((SELECT canceled_count FROM totals), 0),
+    state = CASE
+        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN 'running'
+        ELSE admin_batch_jobs.state
+    END,
+    completed_at = CASE
+        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN NULL
+        ELSE admin_batch_jobs.completed_at
+    END,
+    error_message_key = NULL,
+    version = admin_batch_jobs.version + 1,
+    updated_at = sqlc.arg(changed_at)
+WHERE admin_batch_jobs.batch_job_id = sqlc.arg(batch_job_id)
+  AND admin_batch_jobs.version = sqlc.arg(expected_version)
+  AND admin_batch_jobs.state IN ('succeeded', 'partially_succeeded', 'failed', 'canceled')
 RETURNING *;
 
 -- name: CreateAdminUserErasureJob :one

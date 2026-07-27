@@ -13,6 +13,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	realtimev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1/realtimev1connect"
@@ -23,6 +24,18 @@ import (
 	gameSDK "github.com/iFTY-R/game-night/sdk/go/game"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func TestMapRemoteErrorPreservesMaintenanceDenial(t *testing.T) {
+	remote := connect.NewError(connect.CodeFailedPrecondition, errors.New("service.maintenance.active"))
+	detail, err := connect.NewErrorDetail(&commonv1.BusinessErrorDetail{MessageKey: "service.maintenance.active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	remote.AddDetail(detail)
+	if mapped := mapRemoteError(remote); !errors.Is(mapped, gameruntime.ErrMutationBlocked) {
+		t.Fatalf("mapRemoteError() = %v, want %v", mapped, gameruntime.ErrMutationBlocked)
+	}
+}
 
 func TestRemoteRuntimeRoutesActionOnlyToAllowlistedReadyOwner(t *testing.T) {
 	actorID, roomID, sessionID := uuid.New(), uuid.New(), uuid.New()

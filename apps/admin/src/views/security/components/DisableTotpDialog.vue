@@ -5,7 +5,7 @@ import AppDialog from "../../../components/AppDialog.vue";
 import ElevationDialog, { type ElevationDialogPayload } from "./ElevationDialog.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { disableTotp } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { AdminElevationScope, type AdminElevationSummary } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 
@@ -93,7 +93,7 @@ const handleElevated = async (summary: AdminElevationSummary): Promise<void> => 
 
   try {
     const response = await disableTotp({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       reason: "用户主动停用",
       expectedEnrollmentVersion: auth.session?.mfa?.enrollmentVersion ?? 0n,
       ...(controller ? { signal: controller.signal } : {})

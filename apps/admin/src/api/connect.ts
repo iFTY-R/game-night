@@ -42,6 +42,22 @@ export const createRequestId = (): string => {
   return `admin-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+/**
+ * Creates the canonical Base64URL operation selector required by backend idempotency validation.
+ * This is intentionally distinct from a request trace ID: UUID text is valid for tracing but not for the operation contract.
+ */
+export const createOperationId = (): string => {
+  const bytes = new Uint8Array(24);
+  if (typeof crypto === "undefined" || typeof crypto.getRandomValues !== "function") {
+    throw new Error("浏览器未提供安全随机数，无法发起幂等操作。");
+  }
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+};
+
 const withHeaders = (method: UnaryMethod, options: UnaryOptions): Headers => {
   const headers = new Headers({
     Accept: "application/json",
@@ -103,6 +119,11 @@ const businessErrorMessages: Readonly<Record<string, string>> = {
   "request.csrf.invalid": "登录状态已失效，请重新登录。",
   "request.invalid": "请求参数无效，请检查后重试。",
   "audit.write.unavailable": "安全审计暂时不可用，请稍后重试。",
+  "admin.operations.preview_expired": "操作预览已失效，请重新生成预览。",
+  "admin.operations.retry_limit": "该任务已达到人工重试上限。",
+  "admin.version.conflict": "数据版本已变化，已重新加载最新状态。",
+  "admin.elevation.required": "该操作需要重新验证管理员身份。",
+  "admin.elevation.expired": "权限提升已过期，请重新验证身份。",
   "service.temporarily_unavailable": "服务暂时不可用，请稍后重试。"
 };
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	adminv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
@@ -34,6 +35,9 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 		Auth:         &testAdminAuthHandler{},
 		User:         &testAdminUserHandler{},
 		Room:         &testAdminRoomHandler{},
+		Audit:        &testAdminAuditHandler{},
+		Operations:   &testAdminOperationsHandler{},
+		Overview:     &testAdminOverviewHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -75,17 +79,32 @@ func TestSurfacesRejectCrossDomainServicePathsAndKeepInterceptorsIndependent(t *
 	if _, err = adminRoomClient.ListRooms(t.Context(), connect.NewRequest(&adminv1.ListRoomsRequest{})); err != nil {
 		t.Fatalf("call admin room surface: %v", err)
 	}
+	adminAuditClient := adminv1connect.NewAdminAuditServiceClient(adminServer.Client(), adminServer.URL)
+	if _, err = adminAuditClient.ListAuditEvents(t.Context(), connect.NewRequest(&adminv1.ListAuditEventsRequest{})); err != nil {
+		t.Fatalf("call admin audit surface: %v", err)
+	}
+	adminOperationsClient := adminv1connect.NewAdminOperationsServiceClient(adminServer.Client(), adminServer.URL)
+	if _, err = adminOperationsClient.GetOperationsSnapshot(t.Context(), connect.NewRequest(&adminv1.GetOperationsSnapshotRequest{})); err != nil {
+		t.Fatalf("call admin operations surface: %v", err)
+	}
+	adminOverviewClient := adminv1connect.NewAdminOverviewServiceClient(adminServer.Client(), adminServer.URL)
+	if _, err = adminOverviewClient.GetOverview(t.Context(), connect.NewRequest(&adminv1.GetOverviewRequest{})); err != nil {
+		t.Fatalf("call admin overview surface: %v", err)
+	}
 
 	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminAuthServiceGetSetupStateProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminUserServiceListUsersProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminRoomServiceListRoomsProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminAuditServiceListAuditEventsProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminOperationsServiceGetOperationsSnapshotProcedure, http.StatusNotFound)
+	assertHTTPStatus(t, userServer, http.MethodPost, adminv1connect.AdminOverviewServiceGetOverviewProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, userServer, http.MethodPost, "/platform.admin.v1.AdminIdentityService/GetUser", http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, identityv1connect.IdentityServiceGetCurrentIdentityProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, roomv1connect.RoomServiceGetRoomProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodPost, gamev1connect.GameServiceGetProjectionProcedure, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodGet, ReadinessPath, http.StatusNotFound)
 	assertHTTPStatus(t, adminServer, http.MethodGet, SensitiveReadinessPath, http.StatusNotFound)
-	if userCalls.Load() != 3 || adminCalls.Load() != 4 {
+	if userCalls.Load() != 3 || adminCalls.Load() != 7 {
 		t.Fatalf("interceptor calls crossed surfaces: user=%d admin=%d", userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -105,6 +124,9 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 		Auth:         &testAdminAuthHandler{},
 		User:         &testAdminUserHandler{},
 		Room:         &testAdminRoomHandler{},
+		Audit:        &testAdminAuditHandler{},
+		Operations:   &testAdminOperationsHandler{},
+		Overview:     &testAdminOverviewHandler{},
 		Interceptors: []connect.Interceptor{countingInterceptor(&adminCalls)},
 	})
 	if err != nil {
@@ -112,7 +134,8 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	}
 	handler, err := NewHandler(HandlerConfig{
 		User: userSurface, Admin: adminSurface,
-		Metrics: http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusNoContent) }),
+		Metrics:   http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusNoContent) }),
+		Heartbeat: http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusNoContent) }),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -150,12 +173,30 @@ func TestHandlerRoutesOneListenerWithoutCrossingInterceptorChains(t *testing.T) 
 	if _, err = adminRoomClient.ListRooms(t.Context(), connect.NewRequest(&adminv1.ListRoomsRequest{})); err != nil {
 		t.Fatal(err)
 	}
+	adminAuditClient := adminv1connect.NewAdminAuditServiceClient(testServer.Client(), testServer.URL)
+	if _, err = adminAuditClient.ListAuditEvents(t.Context(), connect.NewRequest(&adminv1.ListAuditEventsRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	adminOperationsClient := adminv1connect.NewAdminOperationsServiceClient(testServer.Client(), testServer.URL)
+	if _, err = adminOperationsClient.GetOperationsSnapshot(t.Context(), connect.NewRequest(&adminv1.GetOperationsSnapshotRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	adminOverviewClient := adminv1connect.NewAdminOverviewServiceClient(testServer.Client(), testServer.URL)
+	if _, err = adminOverviewClient.GetOverview(t.Context(), connect.NewRequest(&adminv1.GetOverviewRequest{})); err != nil {
+		t.Fatal(err)
+	}
 	response, err := testServer.Client().Get(testServer.URL + MetricsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusNoContent || userCalls.Load() != 3 || adminCalls.Load() != 4 {
+	heartbeatResponse, err := testServer.Client().Post(testServer.URL+serviceheartbeat.Path, "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	heartbeatResponse.Body.Close()
+	assertHTTPStatus(t, testServer, http.MethodPost, serviceheartbeat.Path+"/", http.StatusNotFound)
+	if response.StatusCode != http.StatusNoContent || heartbeatResponse.StatusCode != http.StatusNoContent || userCalls.Load() != 3 || adminCalls.Load() != 7 {
 		t.Fatalf("combined routing: metrics=%d user=%d admin=%d", response.StatusCode, userCalls.Load(), adminCalls.Load())
 	}
 }
@@ -204,6 +245,30 @@ type testAdminUserHandler struct {
 
 type testAdminRoomHandler struct {
 	adminv1connect.UnimplementedAdminRoomServiceHandler
+}
+
+type testAdminAuditHandler struct {
+	adminv1connect.UnimplementedAdminAuditServiceHandler
+}
+
+type testAdminOperationsHandler struct {
+	adminv1connect.UnimplementedAdminOperationsServiceHandler
+}
+
+type testAdminOverviewHandler struct {
+	adminv1connect.UnimplementedAdminOverviewServiceHandler
+}
+
+func (*testAdminAuditHandler) ListAuditEvents(context.Context, *connect.Request[adminv1.ListAuditEventsRequest]) (*connect.Response[adminv1.ListAuditEventsResponse], error) {
+	return connect.NewResponse(&adminv1.ListAuditEventsResponse{}), nil
+}
+
+func (*testAdminOperationsHandler) GetOperationsSnapshot(context.Context, *connect.Request[adminv1.GetOperationsSnapshotRequest]) (*connect.Response[adminv1.GetOperationsSnapshotResponse], error) {
+	return connect.NewResponse(&adminv1.GetOperationsSnapshotResponse{}), nil
+}
+
+func (*testAdminOverviewHandler) GetOverview(context.Context, *connect.Request[adminv1.GetOverviewRequest]) (*connect.Response[adminv1.GetOverviewResponse], error) {
+	return connect.NewResponse(&adminv1.GetOverviewResponse{}), nil
 }
 
 type testRoomHandler struct {

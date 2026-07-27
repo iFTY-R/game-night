@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package platform.admin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/admin/v1/admin_common.proto";
+import "platform/admin/v1/admin_operations.proto";
+
+option go_package = "github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1;adminv1";
+
+// AdminOverviewService aggregates bounded operational evidence for the console landing page.
+service AdminOverviewService {
+  rpc GetOverview(GetOverviewRequest) returns (GetOverviewResponse);
+}
+
+// AdminOverviewGranularity controls only the two pre-aggregated bucket widths.
+enum AdminOverviewGranularity {
+  ADMIN_OVERVIEW_GRANULARITY_UNSPECIFIED = 0;
+  ADMIN_OVERVIEW_GRANULARITY_HOUR = 1;
+  ADMIN_OVERVIEW_GRANULARITY_DAY = 2;
+}
+
+// AdminOverviewMetric identifies the fixed metrics shown in the overview.
+enum AdminOverviewMetric {
+  ADMIN_OVERVIEW_METRIC_UNSPECIFIED = 0;
+  ADMIN_OVERVIEW_METRIC_ONLINE_USERS = 1;
+  ADMIN_OVERVIEW_METRIC_ACTIVE_ROOMS = 2;
+  ADMIN_OVERVIEW_METRIC_RUNNING_GAMES = 3;
+  ADMIN_OVERVIEW_METRIC_NEW_USERS = 4;
+  ADMIN_OVERVIEW_METRIC_SUSPENDED_USERS = 5;
+  ADMIN_OVERVIEW_METRIC_UNSUSPENDED_USERS = 6;
+  ADMIN_OVERVIEW_METRIC_ABNORMAL_TERMINATIONS = 7;
+  ADMIN_OVERVIEW_METRIC_EMERGENCY_REPAIRS = 8;
+}
+
+// AdminOverviewUnavailableReason distinguishes a real zero from missing evidence.
+enum AdminOverviewUnavailableReason {
+  ADMIN_OVERVIEW_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  ADMIN_OVERVIEW_UNAVAILABLE_REASON_NONE = 1;
+  ADMIN_OVERVIEW_UNAVAILABLE_REASON_SOURCE_UNAVAILABLE = 2;
+  ADMIN_OVERVIEW_UNAVAILABLE_REASON_SOURCE_STALE = 3;
+  ADMIN_OVERVIEW_UNAVAILABLE_REASON_WINDOW_UNSUPPORTED = 4;
+}
+
+// AdminAttentionKind identifies the resource linked from an attention row.
+enum AdminAttentionKind {
+  ADMIN_ATTENTION_KIND_UNSPECIFIED = 0;
+  ADMIN_ATTENTION_KIND_ROOM = 1;
+  ADMIN_ATTENTION_KIND_GAME = 2;
+}
+
+// AdminOverviewMetricValue is one sampled metric with explicit availability.
+message AdminOverviewMetricValue {
+  AdminOverviewMetric metric = 1;
+  int64 value = 2;
+  AdminOverviewUnavailableReason unavailable_reason = 3;
+  google.protobuf.Timestamp window_start = 4;
+  google.protobuf.Timestamp window_end = 5;
+  google.protobuf.Timestamp sampled_at = 6;
+  google.protobuf.Timestamp fresh_until = 7;
+}
+
+// AdminOverviewTrendPoint is one persisted metric bucket.
+message AdminOverviewTrendPoint {
+  google.protobuf.Timestamp bucket_start = 1;
+  google.protobuf.Timestamp bucket_end = 2;
+  int64 value = 3;
+  google.protobuf.Timestamp sampled_at = 4;
+}
+
+// AdminOverviewTrendSeries contains one fixed metric and bucket width.
+message AdminOverviewTrendSeries {
+  AdminOverviewMetric metric = 1;
+  AdminOverviewGranularity granularity = 2;
+  repeated AdminOverviewTrendPoint points = 3;
+  AdminOverviewUnavailableReason unavailable_reason = 4;
+  google.protobuf.Timestamp fresh_until = 5;
+}
+
+// AdminOverviewAttentionItem contains only fields needed to open a room or game detail view.
+message AdminOverviewAttentionItem {
+  AdminAttentionKind kind = 1;
+  string resource_id = 2;
+  string room_id = 3;
+  string status_code = 4;
+  repeated string reason_codes = 5;
+  google.protobuf.Timestamp observed_at = 6;
+}
+
+// AdminOverviewRiskOperation is redacted high-risk audit metadata.
+message AdminOverviewRiskOperation {
+  string audit_event_id = 1;
+  string action = 2;
+  string actor_admin_id = 3;
+  string target_id = 4;
+  bool verified = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+}
+
+// AdminOverviewFailedTask identifies failed durable work without exposing its original payload.
+message AdminOverviewFailedTask {
+  AdminRetryTaskKind task_kind = 1;
+  string task_id = 2;
+  AdminJobState state = 3;
+  string stable_error_code = 4;
+  uint32 attempts = 5;
+  uint64 task_version = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GetOverviewRequest {
+  google.protobuf.Timestamp window_start = 1;
+  google.protobuf.Timestamp window_end = 2;
+  AdminOverviewGranularity granularity = 3;
+}
+
+message GetOverviewResponse {
+  repeated AdminOverviewMetricValue metrics = 1;
+  repeated AdminOverviewTrendSeries trends = 2;
+  repeated AdminOverviewAttentionItem attention = 3;
+  repeated AdminDependencyHealth dependencies = 4;
+  repeated AdminOverviewRiskOperation high_risk_operations = 5;
+  repeated AdminOverviewFailedTask failed_tasks = 6;
+  google.protobuf.Timestamp window_start = 7;
+  google.protobuf.Timestamp window_end = 8;
+  google.protobuf.Timestamp sampled_at = 9;
+  google.protobuf.Timestamp fresh_until = 10;
+}

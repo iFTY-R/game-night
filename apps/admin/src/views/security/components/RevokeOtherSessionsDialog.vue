@@ -5,7 +5,7 @@ import AppDialog from "../../../components/AppDialog.vue";
 import ElevationDialog, { type ElevationDialogPayload } from "./ElevationDialog.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { previewRevokeOtherAdminSessions, revokeOtherAdminSessions } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { AdminElevationScope, type AdminElevationSummary, type AdminSessionInfo } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 
@@ -173,7 +173,7 @@ const handleElevated = async (summary: AdminElevationSummary): Promise<void> => 
 
   try {
     const response = await revokeOtherAdminSessions({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       previewVersion: previewVersion.value,
       expectedAdminVersion: previewAdminVersion.value,
       expectedCurrentSessionVersion: previewSessionVersion.value,

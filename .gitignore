@@ -138,6 +138,7 @@ Thumbs.db
 
 # Local env files
 .env*.local
+/.local-secrets/
 
 # Vercel
 .vercel

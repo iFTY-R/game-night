@@ -61,6 +61,29 @@ func TestContextInterceptorRejectsUnknownProcedure(t *testing.T) {
 	}
 }
 
+func TestSecondFactorWireReportsAcceptedCredentialPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		usedSecondFactor bool
+		usedRecoveryCode bool
+		want             adminv1.AdminElevationSecondFactor
+	}{
+		{name: "password", want: adminv1.AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD},
+		{name: "totp", usedSecondFactor: true, want: adminv1.AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_TOTP},
+		{name: "recovery", usedSecondFactor: true, usedRecoveryCode: true, want: adminv1.AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := secondFactorWire(test.usedSecondFactor, test.usedRecoveryCode); got != test.want {
+				t.Fatalf("second factor = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestContextInterceptorAllowsAnonymousBeginLoginWithoutSessionLookup(t *testing.T) {
 	inspector := &fakeSessionInspector{}
 	interceptor := newInterceptor(t, inspector)
@@ -203,6 +226,39 @@ func TestGetCurrentAdminSessionReturnsSummaryWithoutLegacyStepState(t *testing.T
 	}
 	if values := response.Header().Values("Set-Cookie"); len(values) != 0 {
 		t.Fatalf("unexpected Set-Cookie = %v", values)
+	}
+}
+
+func TestElevateAdminSessionAllowsPasswordOnlyRequestWithoutMFAEnrollment(t *testing.T) {
+	now := time.Date(2026, time.July, 27, 16, 55, 0, 0, time.UTC)
+	issued, service := newHandlerService(t, now, admin.SessionKindFull)
+	view := admin.SessionView{
+		Session:     issued.Session,
+		Permissions: admin.ActiveAdminPermissionSet(),
+	}
+	actor, err := actorFromView(view, "request-elevation", "https://admin.example.test", "127.0.0.1", "handler-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := withRequestContext(t.Context(), requestContext{
+		transport: transportContext{
+			cookieToken: issued.Token,
+			csrfToken:   issued.CSRFToken,
+			clientIP:    "127.0.0.1",
+			requestID:   "request-elevation",
+		},
+		view:  &view,
+		actor: &actor,
+	})
+	request := connect.NewRequest(&adminv1.ElevateAdminSessionRequest{
+		OperationId:     base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{1}, 16)),
+		Scope:           adminv1.AdminElevationScope_ADMIN_ELEVATION_SCOPE_OPERATIONS_MAINTENANCE,
+		CurrentPassword: "wrong-password",
+	})
+
+	_, err = (&Handler{service: service}).ElevateAdminSession(ctx, request)
+	if !errors.Is(err, admin.ErrAuthentication) {
+		t.Fatalf("ElevateAdminSession error = %v, want authentication failure after password verification", err)
 	}
 }
 

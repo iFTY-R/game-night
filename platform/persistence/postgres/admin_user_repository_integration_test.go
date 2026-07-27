@@ -130,6 +130,12 @@ func TestAdminUserRepositoryTagCASNotesAndStableUserCursor(t *testing.T) {
 	if err != nil || len(firstPage) != 2 {
 		t.Fatalf("first user page: users=%+v err=%v", firstPage, err)
 	}
+	unfilteredPage, err := repository.ListUsers(ctx, adminuser.UserListQuery{
+		PageSize: 10, SampledAt: now.Add(time.Minute),
+	})
+	if err != nil || len(unfilteredPage) != len(userIDs) {
+		t.Fatalf("unfiltered user page: users=%+v err=%v", unfilteredPage, err)
+	}
 	secondPage, err := repository.ListUsers(ctx, adminuser.UserListQuery{
 		Statuses: []string{"active"}, PageSize: 2, SampledAt: now.Add(time.Minute),
 		After: adminuser.UserListPosition{SortTime: firstPage[1].CreatedAt, UserID: firstPage[1].ID},

@@ -275,7 +275,8 @@ func (repository *AdminUserRepository) ListUsers(ctx context.Context, query admi
 		!validUserListPosition(sortField, direction, query.SampledAt, query.After) {
 		return nil, adminuser.ErrInvalidInput
 	}
-	statuses := append([]string(nil), query.Statuses...)
+	// pgx serializes a nil slice as SQL NULL, while this query needs an empty SQL array to mean "all statuses".
+	statuses := append(make([]string, 0, len(query.Statuses)), query.Statuses...)
 	seenStatuses := make(map[string]struct{}, len(statuses))
 	for _, status := range statuses {
 		if status != "onboarding" && status != "active" && status != "suspended" && status != "deleted" {

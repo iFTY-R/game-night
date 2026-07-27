@@ -61,6 +61,249 @@ func (q *Queries) AppendAdminUserNote(ctx context.Context, arg AppendAdminUserNo
 	return i, err
 }
 
+const consumeAdminUserCommandPreviewCAS = `-- name: ConsumeAdminUserCommandPreviewCAS :one
+UPDATE admin_user_command_previews
+SET consumed_at = $1,
+    version = version + 1
+WHERE preview_id = $2
+  AND actor_admin_id = $3
+  AND version = $4
+  AND consumed_at IS NULL
+  AND expires_at > $1
+RETURNING preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+`
+
+type ConsumeAdminUserCommandPreviewCASParams struct {
+	ConsumedAt      pgtype.Timestamptz `json:"consumed_at"`
+	PreviewID       pgtype.UUID        `json:"preview_id"`
+	ActorAdminID    pgtype.UUID        `json:"actor_admin_id"`
+	ExpectedVersion int64              `json:"expected_version"`
+}
+
+// ConsumeAdminUserCommandPreviewCAS
+//
+//	UPDATE admin_user_command_previews
+//	SET consumed_at = $1,
+//	    version = version + 1
+//	WHERE preview_id = $2
+//	  AND actor_admin_id = $3
+//	  AND version = $4
+//	  AND consumed_at IS NULL
+//	  AND expires_at > $1
+//	RETURNING preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+func (q *Queries) ConsumeAdminUserCommandPreviewCAS(ctx context.Context, arg ConsumeAdminUserCommandPreviewCASParams) (AdminUserCommandPreview, error) {
+	row := q.db.QueryRow(ctx, consumeAdminUserCommandPreviewCAS,
+		arg.ConsumedAt,
+		arg.PreviewID,
+		arg.ActorAdminID,
+		arg.ExpectedVersion,
+	)
+	var i AdminUserCommandPreview
+	err := row.Scan(
+		&i.PreviewID,
+		&i.ActorAdminID,
+		&i.UserID,
+		&i.Command,
+		&i.SnapshotSchemaVersion,
+		&i.Snapshot,
+		&i.PreviewDigest,
+		&i.AffectedDevices,
+		&i.AffectedRooms,
+		&i.Blockers,
+		&i.RequiredElevation,
+		&i.SampledAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const countActiveAdminUserDevices = `-- name: CountActiveAdminUserDevices :one
+SELECT count(*)::integer
+FROM device_credentials
+WHERE user_id = $1
+  AND revoked_at IS NULL
+  AND idle_expires_at > $2
+  AND absolute_expires_at > $2
+`
+
+type CountActiveAdminUserDevicesParams struct {
+	UserID   pgtype.UUID        `json:"user_id"`
+	ActiveAt pgtype.Timestamptz `json:"active_at"`
+}
+
+// CountActiveAdminUserDevices
+//
+//	SELECT count(*)::integer
+//	FROM device_credentials
+//	WHERE user_id = $1
+//	  AND revoked_at IS NULL
+//	  AND idle_expires_at > $2
+//	  AND absolute_expires_at > $2
+func (q *Queries) CountActiveAdminUserDevices(ctx context.Context, arg CountActiveAdminUserDevicesParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countActiveAdminUserDevices, arg.UserID, arg.ActiveAt)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const createAdminUserCommandPreview = `-- name: CreateAdminUserCommandPreview :one
+INSERT INTO admin_user_command_previews (
+    preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot,
+    preview_digest, affected_devices, affected_rooms, blockers, required_elevation,
+    sampled_at, expires_at, version
+) VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11,
+    $12, $13, 1
+)
+RETURNING preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+`
+
+type CreateAdminUserCommandPreviewParams struct {
+	PreviewID             pgtype.UUID        `json:"preview_id"`
+	ActorAdminID          pgtype.UUID        `json:"actor_admin_id"`
+	UserID                pgtype.UUID        `json:"user_id"`
+	Command               string             `json:"command"`
+	SnapshotSchemaVersion int32              `json:"snapshot_schema_version"`
+	Snapshot              []byte             `json:"snapshot"`
+	PreviewDigest         []byte             `json:"preview_digest"`
+	AffectedDevices       int32              `json:"affected_devices"`
+	AffectedRooms         int32              `json:"affected_rooms"`
+	Blockers              []byte             `json:"blockers"`
+	RequiredElevation     pgtype.Text        `json:"required_elevation"`
+	SampledAt             pgtype.Timestamptz `json:"sampled_at"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+}
+
+// CreateAdminUserCommandPreview
+//
+//	INSERT INTO admin_user_command_previews (
+//	    preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot,
+//	    preview_digest, affected_devices, affected_rooms, blockers, required_elevation,
+//	    sampled_at, expires_at, version
+//	) VALUES (
+//	    $1, $2, $3, $4, $5, $6,
+//	    $7, $8, $9, $10, $11,
+//	    $12, $13, 1
+//	)
+//	RETURNING preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+func (q *Queries) CreateAdminUserCommandPreview(ctx context.Context, arg CreateAdminUserCommandPreviewParams) (AdminUserCommandPreview, error) {
+	row := q.db.QueryRow(ctx, createAdminUserCommandPreview,
+		arg.PreviewID,
+		arg.ActorAdminID,
+		arg.UserID,
+		arg.Command,
+		arg.SnapshotSchemaVersion,
+		arg.Snapshot,
+		arg.PreviewDigest,
+		arg.AffectedDevices,
+		arg.AffectedRooms,
+		arg.Blockers,
+		arg.RequiredElevation,
+		arg.SampledAt,
+		arg.ExpiresAt,
+	)
+	var i AdminUserCommandPreview
+	err := row.Scan(
+		&i.PreviewID,
+		&i.ActorAdminID,
+		&i.UserID,
+		&i.Command,
+		&i.SnapshotSchemaVersion,
+		&i.Snapshot,
+		&i.PreviewDigest,
+		&i.AffectedDevices,
+		&i.AffectedRooms,
+		&i.Blockers,
+		&i.RequiredElevation,
+		&i.SampledAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const createAdminUserCommandReceipt = `-- name: CreateAdminUserCommandReceipt :one
+INSERT INTO admin_user_command_receipts (
+    actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome,
+    user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7,
+    $8, $9, $10, $11, $12, $13
+)
+ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+SET operation_id = EXCLUDED.operation_id
+WHERE admin_user_command_receipts.request_digest = EXCLUDED.request_digest
+RETURNING actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome, user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+`
+
+type CreateAdminUserCommandReceiptParams struct {
+	ActorAdminID   pgtype.UUID        `json:"actor_admin_id"`
+	OperationID    string             `json:"operation_id"`
+	RequestDigest  []byte             `json:"request_digest"`
+	PreviewID      pgtype.UUID        `json:"preview_id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Command        string             `json:"command"`
+	Outcome        string             `json:"outcome"`
+	UserVersion    int64              `json:"user_version"`
+	RevokedDevices int32              `json:"revoked_devices"`
+	RemovedRooms   int32              `json:"removed_rooms"`
+	ErasureJobID   pgtype.UUID        `json:"erasure_job_id"`
+	AuditEventID   pgtype.UUID        `json:"audit_event_id"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+}
+
+// CreateAdminUserCommandReceipt
+//
+//	INSERT INTO admin_user_command_receipts (
+//	    actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome,
+//	    user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+//	) VALUES (
+//	    $1, $2, $3, $4, $5, $6, $7,
+//	    $8, $9, $10, $11, $12, $13
+//	)
+//	ON CONFLICT (actor_admin_id, operation_id) DO UPDATE
+//	SET operation_id = EXCLUDED.operation_id
+//	WHERE admin_user_command_receipts.request_digest = EXCLUDED.request_digest
+//	RETURNING actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome, user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+func (q *Queries) CreateAdminUserCommandReceipt(ctx context.Context, arg CreateAdminUserCommandReceiptParams) (AdminUserCommandReceipt, error) {
+	row := q.db.QueryRow(ctx, createAdminUserCommandReceipt,
+		arg.ActorAdminID,
+		arg.OperationID,
+		arg.RequestDigest,
+		arg.PreviewID,
+		arg.UserID,
+		arg.Command,
+		arg.Outcome,
+		arg.UserVersion,
+		arg.RevokedDevices,
+		arg.RemovedRooms,
+		arg.ErasureJobID,
+		arg.AuditEventID,
+		arg.CompletedAt,
+	)
+	var i AdminUserCommandReceipt
+	err := row.Scan(
+		&i.ActorAdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.PreviewID,
+		&i.UserID,
+		&i.Command,
+		&i.Outcome,
+		&i.UserVersion,
+		&i.RevokedDevices,
+		&i.RemovedRooms,
+		&i.ErasureJobID,
+		&i.AuditEventID,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const createAdminUserTag = `-- name: CreateAdminUserTag :one
 WITH advanced AS (
     UPDATE admin_user_tag_catalog
@@ -159,6 +402,71 @@ func (q *Queries) CreateAdminUserTag(ctx context.Context, arg CreateAdminUserTag
 	return i, err
 }
 
+const deleteAdminUserCAS = `-- name: DeleteAdminUserCAS :one
+UPDATE users
+SET status = 'deleted',
+    username = NULL,
+    current_username_key = NULL,
+    updated_at = $1,
+    account_version = account_version + 1
+WHERE user_id = $2
+  AND account_version = $3
+  AND status IN ('active', 'suspended')
+RETURNING user_id, status, account_version
+`
+
+type DeleteAdminUserCASParams struct {
+	ChangedAt       pgtype.Timestamptz `json:"changed_at"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	ExpectedVersion int64              `json:"expected_version"`
+}
+
+type DeleteAdminUserCASRow struct {
+	UserID         pgtype.UUID `json:"user_id"`
+	Status         string      `json:"status"`
+	AccountVersion int64       `json:"account_version"`
+}
+
+// DeleteAdminUserCAS
+//
+//	UPDATE users
+//	SET status = 'deleted',
+//	    username = NULL,
+//	    current_username_key = NULL,
+//	    updated_at = $1,
+//	    account_version = account_version + 1
+//	WHERE user_id = $2
+//	  AND account_version = $3
+//	  AND status IN ('active', 'suspended')
+//	RETURNING user_id, status, account_version
+func (q *Queries) DeleteAdminUserCAS(ctx context.Context, arg DeleteAdminUserCASParams) (DeleteAdminUserCASRow, error) {
+	row := q.db.QueryRow(ctx, deleteAdminUserCAS, arg.ChangedAt, arg.UserID, arg.ExpectedVersion)
+	var i DeleteAdminUserCASRow
+	err := row.Scan(&i.UserID, &i.Status, &i.AccountVersion)
+	return i, err
+}
+
+const deleteAdminUserProfile = `-- name: DeleteAdminUserProfile :execrows
+DELETE FROM user_profiles
+WHERE user_id = $1
+`
+
+type DeleteAdminUserProfileParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+// DeleteAdminUserProfile
+//
+//	DELETE FROM user_profiles
+//	WHERE user_id = $1
+func (q *Queries) DeleteAdminUserProfile(ctx context.Context, arg DeleteAdminUserProfileParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAdminUserProfile, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteAdminUserTagCAS = `-- name: DeleteAdminUserTagCAS :one
 WITH removed AS (
     DELETE FROM admin_user_tags
@@ -235,6 +543,184 @@ func (q *Queries) DeleteAdminUserTagLinks(ctx context.Context, arg DeleteAdminUs
 	return result.RowsAffected(), nil
 }
 
+const deleteAdminUsernameClaimForUser = `-- name: DeleteAdminUsernameClaimForUser :execrows
+DELETE FROM username_claims
+WHERE username_key = $1
+  AND owner_user_id = $2
+`
+
+type DeleteAdminUsernameClaimForUserParams struct {
+	UsernameKey string      `json:"username_key"`
+	OwnerUserID pgtype.UUID `json:"owner_user_id"`
+}
+
+// DeleteAdminUsernameClaimForUser
+//
+//	DELETE FROM username_claims
+//	WHERE username_key = $1
+//	  AND owner_user_id = $2
+func (q *Queries) DeleteAdminUsernameClaimForUser(ctx context.Context, arg DeleteAdminUsernameClaimForUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAdminUsernameClaimForUser, arg.UsernameKey, arg.OwnerUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getAdminCurrentRoomForUser = `-- name: GetAdminCurrentRoomForUser :one
+SELECT room.room_id,
+       room.status,
+       room.room_version,
+       room.membership_version
+FROM room_members AS member
+JOIN party_rooms AS room ON room.room_id = member.room_id
+WHERE member.user_id = $1
+ORDER BY member.last_seen_at DESC, room.updated_at DESC, room.room_id DESC
+LIMIT 1
+`
+
+type GetAdminCurrentRoomForUserParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+type GetAdminCurrentRoomForUserRow struct {
+	RoomID            pgtype.UUID `json:"room_id"`
+	Status            string      `json:"status"`
+	RoomVersion       int64       `json:"room_version"`
+	MembershipVersion int64       `json:"membership_version"`
+}
+
+// GetAdminCurrentRoomForUser
+//
+//	SELECT room.room_id,
+//	       room.status,
+//	       room.room_version,
+//	       room.membership_version
+//	FROM room_members AS member
+//	JOIN party_rooms AS room ON room.room_id = member.room_id
+//	WHERE member.user_id = $1
+//	ORDER BY member.last_seen_at DESC, room.updated_at DESC, room.room_id DESC
+//	LIMIT 1
+func (q *Queries) GetAdminCurrentRoomForUser(ctx context.Context, arg GetAdminCurrentRoomForUserParams) (GetAdminCurrentRoomForUserRow, error) {
+	row := q.db.QueryRow(ctx, getAdminCurrentRoomForUser, arg.UserID)
+	var i GetAdminCurrentRoomForUserRow
+	err := row.Scan(
+		&i.RoomID,
+		&i.Status,
+		&i.RoomVersion,
+		&i.MembershipVersion,
+	)
+	return i, err
+}
+
+const getAdminUserCommandPreview = `-- name: GetAdminUserCommandPreview :one
+SELECT preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+FROM admin_user_command_previews
+WHERE preview_id = $1
+  AND actor_admin_id = $2
+`
+
+type GetAdminUserCommandPreviewParams struct {
+	PreviewID    pgtype.UUID `json:"preview_id"`
+	ActorAdminID pgtype.UUID `json:"actor_admin_id"`
+}
+
+// GetAdminUserCommandPreview
+//
+//	SELECT preview_id, actor_admin_id, user_id, command, snapshot_schema_version, snapshot, preview_digest, affected_devices, affected_rooms, blockers, required_elevation, sampled_at, expires_at, consumed_at, version
+//	FROM admin_user_command_previews
+//	WHERE preview_id = $1
+//	  AND actor_admin_id = $2
+func (q *Queries) GetAdminUserCommandPreview(ctx context.Context, arg GetAdminUserCommandPreviewParams) (AdminUserCommandPreview, error) {
+	row := q.db.QueryRow(ctx, getAdminUserCommandPreview, arg.PreviewID, arg.ActorAdminID)
+	var i AdminUserCommandPreview
+	err := row.Scan(
+		&i.PreviewID,
+		&i.ActorAdminID,
+		&i.UserID,
+		&i.Command,
+		&i.SnapshotSchemaVersion,
+		&i.Snapshot,
+		&i.PreviewDigest,
+		&i.AffectedDevices,
+		&i.AffectedRooms,
+		&i.Blockers,
+		&i.RequiredElevation,
+		&i.SampledAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const getAdminUserCommandReceipt = `-- name: GetAdminUserCommandReceipt :one
+SELECT actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome, user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+FROM admin_user_command_receipts
+WHERE actor_admin_id = $1
+  AND operation_id = $2
+`
+
+type GetAdminUserCommandReceiptParams struct {
+	ActorAdminID pgtype.UUID `json:"actor_admin_id"`
+	OperationID  string      `json:"operation_id"`
+}
+
+// GetAdminUserCommandReceipt
+//
+//	SELECT actor_admin_id, operation_id, request_digest, preview_id, user_id, command, outcome, user_version, revoked_devices, removed_rooms, erasure_job_id, audit_event_id, completed_at
+//	FROM admin_user_command_receipts
+//	WHERE actor_admin_id = $1
+//	  AND operation_id = $2
+func (q *Queries) GetAdminUserCommandReceipt(ctx context.Context, arg GetAdminUserCommandReceiptParams) (AdminUserCommandReceipt, error) {
+	row := q.db.QueryRow(ctx, getAdminUserCommandReceipt, arg.ActorAdminID, arg.OperationID)
+	var i AdminUserCommandReceipt
+	err := row.Scan(
+		&i.ActorAdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.PreviewID,
+		&i.UserID,
+		&i.Command,
+		&i.Outcome,
+		&i.UserVersion,
+		&i.RevokedDevices,
+		&i.RemovedRooms,
+		&i.ErasureJobID,
+		&i.AuditEventID,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const getAdminUserGovernanceState = `-- name: GetAdminUserGovernanceState :one
+SELECT user_id, status, account_version
+FROM users
+WHERE user_id = $1
+`
+
+type GetAdminUserGovernanceStateParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+type GetAdminUserGovernanceStateRow struct {
+	UserID         pgtype.UUID `json:"user_id"`
+	Status         string      `json:"status"`
+	AccountVersion int64       `json:"account_version"`
+}
+
+// GetAdminUserGovernanceState
+//
+//	SELECT user_id, status, account_version
+//	FROM users
+//	WHERE user_id = $1
+func (q *Queries) GetAdminUserGovernanceState(ctx context.Context, arg GetAdminUserGovernanceStateParams) (GetAdminUserGovernanceStateRow, error) {
+	row := q.db.QueryRow(ctx, getAdminUserGovernanceState, arg.UserID)
+	var i GetAdminUserGovernanceStateRow
+	err := row.Scan(&i.UserID, &i.Status, &i.AccountVersion)
+	return i, err
+}
+
 const getAdminUserTagCatalog = `-- name: GetAdminUserTagCatalog :one
 SELECT singleton_id, catalog_version, updated_at
 FROM admin_user_tag_catalog
@@ -251,6 +737,194 @@ func (q *Queries) GetAdminUserTagCatalog(ctx context.Context) (AdminUserTagCatal
 	var i AdminUserTagCatalog
 	err := row.Scan(&i.SingletonID, &i.CatalogVersion, &i.UpdatedAt)
 	return i, err
+}
+
+const hasPendingAdminExportForUser = `-- name: HasPendingAdminExportForUser :one
+WITH candidate_user AS (
+    SELECT user_row.user_id,
+           user_row.status,
+           COALESCE(user_row.current_username_key, '') AS username_key,
+           user_row.created_at,
+           GREATEST(
+               user_row.updated_at,
+               COALESCE(device_activity.last_seen_at, user_row.created_at),
+               COALESCE(room_activity.last_seen_at, user_row.created_at)
+           )::timestamptz AS last_activity_at
+    FROM users AS user_row
+    LEFT JOIN LATERAL (
+        SELECT credential.last_seen_at
+        FROM device_credentials AS credential
+        WHERE credential.user_id = user_row.user_id
+        ORDER BY credential.last_seen_at DESC, credential.credential_id DESC
+        LIMIT 1
+    ) AS device_activity ON true
+    LEFT JOIN LATERAL (
+        SELECT member.last_seen_at
+        FROM room_members AS member
+        WHERE member.user_id = user_row.user_id
+        ORDER BY member.last_seen_at DESC, member.room_id DESC
+        LIMIT 1
+    ) AS room_activity ON true
+    WHERE user_row.user_id = $1
+)
+SELECT EXISTS (
+    SELECT 1
+    FROM admin_export_jobs AS export
+    JOIN candidate_user AS selected_user ON true
+    WHERE export.state IN ('queued', 'running')
+      AND (
+          NOT (export.filter_snapshot ? 'user_id')
+          OR export.filter_snapshot->>'user_id' = ''
+          OR export.filter_snapshot->>'user_id' = selected_user.user_id::text
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'statuses')
+          OR jsonb_array_length(export.filter_snapshot->'statuses') = 0
+          OR EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(export.filter_snapshot->'statuses') AS status_filter(value)
+              WHERE status_filter.value = selected_user.status
+          )
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'username_prefix')
+          OR export.filter_snapshot->>'username_prefix' = ''
+          OR selected_user.username_key LIKE export.filter_snapshot->>'username_prefix' || '%'
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'tag_ids')
+          OR jsonb_array_length(export.filter_snapshot->'tag_ids') = 0
+          OR NOT EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(export.filter_snapshot->'tag_ids') AS selected_tag(tag_id)
+              WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM admin_user_tag_links AS link
+                  WHERE link.user_id = selected_user.user_id
+                    AND link.tag_id = selected_tag.tag_id::uuid
+              )
+          )
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'created_from')
+          OR export.filter_snapshot->>'created_from' = ''
+          OR selected_user.created_at >= (export.filter_snapshot->>'created_from')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'created_to')
+          OR export.filter_snapshot->>'created_to' = ''
+          OR selected_user.created_at <= (export.filter_snapshot->>'created_to')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'last_activity_from')
+          OR export.filter_snapshot->>'last_activity_from' = ''
+          OR selected_user.last_activity_at >= (export.filter_snapshot->>'last_activity_from')::timestamptz
+      )
+      AND (
+          NOT (export.filter_snapshot ? 'last_activity_to')
+          OR export.filter_snapshot->>'last_activity_to' = ''
+          OR selected_user.last_activity_at <= (export.filter_snapshot->>'last_activity_to')::timestamptz
+      )
+)
+`
+
+type HasPendingAdminExportForUserParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+// HasPendingAdminExportForUser
+//
+//	WITH candidate_user AS (
+//	    SELECT user_row.user_id,
+//	           user_row.status,
+//	           COALESCE(user_row.current_username_key, '') AS username_key,
+//	           user_row.created_at,
+//	           GREATEST(
+//	               user_row.updated_at,
+//	               COALESCE(device_activity.last_seen_at, user_row.created_at),
+//	               COALESCE(room_activity.last_seen_at, user_row.created_at)
+//	           )::timestamptz AS last_activity_at
+//	    FROM users AS user_row
+//	    LEFT JOIN LATERAL (
+//	        SELECT credential.last_seen_at
+//	        FROM device_credentials AS credential
+//	        WHERE credential.user_id = user_row.user_id
+//	        ORDER BY credential.last_seen_at DESC, credential.credential_id DESC
+//	        LIMIT 1
+//	    ) AS device_activity ON true
+//	    LEFT JOIN LATERAL (
+//	        SELECT member.last_seen_at
+//	        FROM room_members AS member
+//	        WHERE member.user_id = user_row.user_id
+//	        ORDER BY member.last_seen_at DESC, member.room_id DESC
+//	        LIMIT 1
+//	    ) AS room_activity ON true
+//	    WHERE user_row.user_id = $1
+//	)
+//	SELECT EXISTS (
+//	    SELECT 1
+//	    FROM admin_export_jobs AS export
+//	    JOIN candidate_user AS selected_user ON true
+//	    WHERE export.state IN ('queued', 'running')
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'user_id')
+//	          OR export.filter_snapshot->>'user_id' = ''
+//	          OR export.filter_snapshot->>'user_id' = selected_user.user_id::text
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'statuses')
+//	          OR jsonb_array_length(export.filter_snapshot->'statuses') = 0
+//	          OR EXISTS (
+//	              SELECT 1
+//	              FROM jsonb_array_elements_text(export.filter_snapshot->'statuses') AS status_filter(value)
+//	              WHERE status_filter.value = selected_user.status
+//	          )
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'username_prefix')
+//	          OR export.filter_snapshot->>'username_prefix' = ''
+//	          OR selected_user.username_key LIKE export.filter_snapshot->>'username_prefix' || '%'
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'tag_ids')
+//	          OR jsonb_array_length(export.filter_snapshot->'tag_ids') = 0
+//	          OR NOT EXISTS (
+//	              SELECT 1
+//	              FROM jsonb_array_elements_text(export.filter_snapshot->'tag_ids') AS selected_tag(tag_id)
+//	              WHERE NOT EXISTS (
+//	                  SELECT 1
+//	                  FROM admin_user_tag_links AS link
+//	                  WHERE link.user_id = selected_user.user_id
+//	                    AND link.tag_id = selected_tag.tag_id::uuid
+//	              )
+//	          )
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'created_from')
+//	          OR export.filter_snapshot->>'created_from' = ''
+//	          OR selected_user.created_at >= (export.filter_snapshot->>'created_from')::timestamptz
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'created_to')
+//	          OR export.filter_snapshot->>'created_to' = ''
+//	          OR selected_user.created_at <= (export.filter_snapshot->>'created_to')::timestamptz
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'last_activity_from')
+//	          OR export.filter_snapshot->>'last_activity_from' = ''
+//	          OR selected_user.last_activity_at >= (export.filter_snapshot->>'last_activity_from')::timestamptz
+//	      )
+//	      AND (
+//	          NOT (export.filter_snapshot ? 'last_activity_to')
+//	          OR export.filter_snapshot->>'last_activity_to' = ''
+//	          OR selected_user.last_activity_at <= (export.filter_snapshot->>'last_activity_to')::timestamptz
+//	      )
+//	)
+func (q *Queries) HasPendingAdminExportForUser(ctx context.Context, arg HasPendingAdminExportForUserParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPendingAdminExportForUser, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const incrementAdminUserVersionCAS = `-- name: IncrementAdminUserVersionCAS :one
@@ -902,6 +1576,95 @@ func (q *Queries) LockAdminUserForTagUpdate(ctx context.Context, arg LockAdminUs
 	row := q.db.QueryRow(ctx, lockAdminUserForTagUpdate, arg.UserID)
 	var i LockAdminUserForTagUpdateRow
 	err := row.Scan(&i.UserID, &i.AccountVersion)
+	return i, err
+}
+
+const revokeActiveAdminUserDevices = `-- name: RevokeActiveAdminUserDevices :execrows
+UPDATE device_credentials
+SET revoked_at = $1,
+    revoke_reason = $2,
+    generation = generation + 1
+WHERE user_id = $3
+  AND revoked_at IS NULL
+  AND idle_expires_at > $4
+  AND absolute_expires_at > $4
+`
+
+type RevokeActiveAdminUserDevicesParams struct {
+	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason pgtype.Text        `json:"revoke_reason"`
+	UserID       pgtype.UUID        `json:"user_id"`
+	ActiveAt     pgtype.Timestamptz `json:"active_at"`
+}
+
+// RevokeActiveAdminUserDevices
+//
+//	UPDATE device_credentials
+//	SET revoked_at = $1,
+//	    revoke_reason = $2,
+//	    generation = generation + 1
+//	WHERE user_id = $3
+//	  AND revoked_at IS NULL
+//	  AND idle_expires_at > $4
+//	  AND absolute_expires_at > $4
+func (q *Queries) RevokeActiveAdminUserDevices(ctx context.Context, arg RevokeActiveAdminUserDevicesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeActiveAdminUserDevices,
+		arg.RevokedAt,
+		arg.RevokeReason,
+		arg.UserID,
+		arg.ActiveAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const transitionAdminUserStatusCAS = `-- name: TransitionAdminUserStatusCAS :one
+UPDATE users
+SET status = $1,
+    account_version = account_version + 1,
+    updated_at = $2
+WHERE user_id = $3
+  AND account_version = $4
+  AND status = $5
+RETURNING user_id, status, account_version
+`
+
+type TransitionAdminUserStatusCASParams struct {
+	NextStatus      string             `json:"next_status"`
+	ChangedAt       pgtype.Timestamptz `json:"changed_at"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	ExpectedVersion int64              `json:"expected_version"`
+	ExpectedStatus  string             `json:"expected_status"`
+}
+
+type TransitionAdminUserStatusCASRow struct {
+	UserID         pgtype.UUID `json:"user_id"`
+	Status         string      `json:"status"`
+	AccountVersion int64       `json:"account_version"`
+}
+
+// TransitionAdminUserStatusCAS
+//
+//	UPDATE users
+//	SET status = $1,
+//	    account_version = account_version + 1,
+//	    updated_at = $2
+//	WHERE user_id = $3
+//	  AND account_version = $4
+//	  AND status = $5
+//	RETURNING user_id, status, account_version
+func (q *Queries) TransitionAdminUserStatusCAS(ctx context.Context, arg TransitionAdminUserStatusCASParams) (TransitionAdminUserStatusCASRow, error) {
+	row := q.db.QueryRow(ctx, transitionAdminUserStatusCAS,
+		arg.NextStatus,
+		arg.ChangedAt,
+		arg.UserID,
+		arg.ExpectedVersion,
+		arg.ExpectedStatus,
+	)
+	var i TransitionAdminUserStatusCASRow
+	err := row.Scan(&i.UserID, &i.Status, &i.AccountVersion)
 	return i, err
 }
 

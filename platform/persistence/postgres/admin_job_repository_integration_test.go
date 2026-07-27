@@ -38,7 +38,8 @@ func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) 
 	itemDigest := digestMarker(0x22)
 	startCommand := adminuser.StartBatchJobCommand{
 		BatchJobID: uuid.New(), ActorAdminID: adminID, OperationID: "batch-op-1", RequestDigest: requestDigest,
-		PreviewID: preview.ID, PreviewDigest: previewDigest, Reason: "reviewed batch suspension", CreatedAt: now,
+		PreviewID: preview.ID, PreviewDigest: previewDigest, ExpectedPreviewVersion: preview.Version,
+		Reason: "reviewed batch suspension", CreatedAt: now,
 		Targets: []adminuser.BatchTarget{{ItemID: uuid.New(), UserID: userID, ExpectedUserVersion: 1, RequestDigest: itemDigest}},
 	}
 	job, err := repository.StartBatchJob(ctx, startCommand)
@@ -133,7 +134,8 @@ func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) 
 	}
 	cancelingJob, err := repository.StartBatchJob(ctx, adminuser.StartBatchJobCommand{
 		BatchJobID: uuid.New(), ActorAdminID: adminID, OperationID: "batch-op-canceling", RequestDigest: digestMarker(0x26),
-		PreviewID: cancelingPreview.ID, PreviewDigest: cancelingPreviewDigest, Reason: "cancel while one item is running", CreatedAt: now,
+		PreviewID: cancelingPreview.ID, PreviewDigest: cancelingPreviewDigest, ExpectedPreviewVersion: cancelingPreview.Version,
+		Reason: "cancel while one item is running", CreatedAt: now,
 		Targets: []adminuser.BatchTarget{
 			{ItemID: uuid.New(), UserID: userID, ExpectedUserVersion: 1, RequestDigest: digestMarker(0x27)},
 			{ItemID: uuid.New(), UserID: secondUserID, ExpectedUserVersion: 1, RequestDigest: digestMarker(0x28)},
@@ -228,7 +230,8 @@ func TestAdminJobRepositoryRejectsExpiredPreview(t *testing.T) {
 	}
 	_, err = repository.StartBatchJob(ctx, adminuser.StartBatchJobCommand{
 		BatchJobID: uuid.New(), ActorAdminID: adminID, OperationID: "expired-preview-op", RequestDigest: digestMarker(0x43),
-		PreviewID: preview.ID, PreviewDigest: previewDigest, Reason: "expired preview must fail", CreatedAt: now,
+		PreviewID: preview.ID, PreviewDigest: previewDigest, ExpectedPreviewVersion: preview.Version,
+		Reason: "expired preview must fail", CreatedAt: now,
 		Targets: []adminuser.BatchTarget{{ItemID: uuid.New(), UserID: userID, ExpectedUserVersion: 1, RequestDigest: digestMarker(0x44)}},
 	})
 	if !errors.Is(err, adminuser.ErrConflict) {

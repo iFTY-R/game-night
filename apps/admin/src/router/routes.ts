@@ -34,8 +34,14 @@ export const routes: RouteRecordRaw[] = [
     children: [
       {
         path: "",
-        redirect: { name: routeName.users }
+		redirect: { name: routeName.overview }
       },
+		{
+			path: "overview",
+			name: routeName.overview,
+			component: () => import("../views/overview/OverviewView.vue"),
+			meta: { title: "运营概览", tab: true, closable: false, menu: true, layout: "admin", permission: AdminPermission.OVERVIEW_READ }
+		},
       {
         path: "users",
         name: routeName.users,
@@ -75,6 +81,25 @@ export const routes: RouteRecordRaw[] = [
           permission: AdminPermission.SECURITY_READ
         }
       },
+      {
+        path: "audit",
+        name: routeName.audit,
+        component: () => import("../views/audit/AuditCenterView.vue"),
+        meta: {
+          title: "审计中心",
+          tab: true,
+          closable: true,
+          menu: true,
+          layout: "admin",
+          permission: AdminPermission.AUDIT_READ
+        }
+      },
+		{
+			path: "operations",
+			name: routeName.operations,
+			component: () => import("../views/operations/OperationsView.vue"),
+			meta: { title: "系统运维", tab: true, closable: true, menu: true, layout: "admin", permission: AdminPermission.OPERATIONS_READ }
+		},
       {
         path: "403",
         name: routeName.forbidden,

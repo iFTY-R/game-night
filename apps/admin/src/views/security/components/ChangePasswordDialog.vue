@@ -5,7 +5,7 @@ import type { FormInst, FormRules } from "naive-ui";
 import AppDialog from "../../../components/AppDialog.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { changeAdminPassword } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 
 const auth = useAuthStore();
@@ -113,7 +113,7 @@ const handleSubmit = async (close: () => void): Promise<void> => {
 
   try {
     const response = await changeAdminPassword({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       currentPassword: formData.value.currentPassword,
       newPassword: formData.value.newPassword,
       expectedPasswordVersion: auth.session?.passwordVersion ?? 0n,

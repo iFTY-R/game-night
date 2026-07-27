@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
 
 func TestLoadComposesBoundedWorkerSettings(t *testing.T) {
@@ -29,6 +30,9 @@ func TestLoadComposesBoundedWorkerSettings(t *testing.T) {
 	}
 	if loaded.CheckpointStorage.LocalDirectory == "" || loaded.Shared.PostgreSQL.Schema != "public" {
 		t.Fatal("shared worker dependencies were not composed")
+	}
+	if loaded.Heartbeat.TargetURL == "" || loaded.Heartbeat.Token == "" {
+		t.Fatalf("heartbeat configuration was not composed: %+v", loaded.Heartbeat)
 	}
 }
 
@@ -74,6 +78,8 @@ func validWorkerEnvironment(t *testing.T) map[string]string {
 		"GAME_NIGHT_CHECKPOINT_SINK":            "local",
 		"GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY": filepath.Join(directory, "checkpoints"),
 		workerInstanceEnvironment:               "worker-test",
+		serviceheartbeat.TargetURLEnvironment:   "http://127.0.0.1:8081" + serviceheartbeat.Path,
+		serviceheartbeat.TokenEnvironment:       strings.Repeat("h", 32),
 	}
 }
 

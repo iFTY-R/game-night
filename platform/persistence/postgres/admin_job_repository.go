@@ -53,6 +53,20 @@ func (repository *AdminJobRepository) CreateBatchPreview(ctx context.Context, co
 	return adminBatchPreviewFromRow(row)
 }
 
+// GetBatchPreview reloads one persisted preview so the service can reconstruct the exact frozen target set before execution.
+func (repository *AdminJobRepository) GetBatchPreview(ctx context.Context, previewID, actorAdminID uuid.UUID) (adminuser.BatchPreview, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || previewID == uuid.Nil || actorAdminID == uuid.Nil {
+		return adminuser.BatchPreview{}, adminuser.ErrInvalidInput
+	}
+	row, err := repository.queries.GetAdminBatchPreview(ctx, sqlcgen.GetAdminBatchPreviewParams{
+		PreviewID: uuidToPG(previewID), ActorAdminID: uuidToPG(actorAdminID),
+	})
+	if err != nil {
+		return adminuser.BatchPreview{}, mapAdminUserQueryError(ctx, err, adminuser.ErrNotFound)
+	}
+	return adminBatchPreviewFromRow(row)
+}
+
 // StartBatchJob atomically consumes a live preview, creates the job, and freezes every executable target.
 func (repository *AdminJobRepository) StartBatchJob(ctx context.Context, command adminuser.StartBatchJobCommand) (adminuser.BatchJob, error) {
 	if repository == nil || repository.runner == nil || ctx == nil || !validStartBatchJob(command) {
@@ -80,7 +94,8 @@ func (repository *AdminJobRepository) StartBatchJob(ctx context.Context, command
 		if err != nil {
 			return err
 		}
-		if !bytes.Equal(preview.PreviewDigest, command.PreviewDigest[:]) || preview.ExecutableCount != int64(len(command.Targets)) {
+		if preview.Version != int64(command.ExpectedPreviewVersion) || !bytes.Equal(preview.PreviewDigest, command.PreviewDigest[:]) ||
+			preview.ExecutableCount != int64(len(command.Targets)) {
 			return adminuser.ErrConflict
 		}
 		stored, err = queries.CreateAdminBatchJob(ctx, sqlcgen.CreateAdminBatchJobParams{
@@ -115,6 +130,46 @@ func (repository *AdminJobRepository) StartBatchJob(ctx context.Context, command
 	return adminBatchJobFromRow(stored)
 }
 
+// GetBatchJob reads one durable batch job without mutating any lease or aggregate state.
+func (repository *AdminJobRepository) GetBatchJob(ctx context.Context, batchJobID uuid.UUID) (adminuser.BatchJob, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || batchJobID == uuid.Nil {
+		return adminuser.BatchJob{}, adminuser.ErrInvalidInput
+	}
+	row, err := repository.queries.GetAdminBatchJobByID(ctx, sqlcgen.GetAdminBatchJobByIDParams{BatchJobID: uuidToPG(batchJobID)})
+	if err != nil {
+		return adminuser.BatchJob{}, mapAdminUserQueryError(ctx, err, adminuser.ErrNotFound)
+	}
+	return adminBatchJobFromRow(row)
+}
+
+// ListBatchJobs reads a bounded job history page; pagination tokens are handled at the service layer.
+func (repository *AdminJobRepository) ListBatchJobs(ctx context.Context, query adminuser.BatchJobListQuery) ([]adminuser.BatchJob, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || query.PageSize == 0 || query.PageSize > adminuser.MaximumBatchPageSize {
+		return nil, adminuser.ErrInvalidInput
+	}
+	commands := make([]string, 0, len(query.Commands))
+	for _, command := range query.Commands {
+		commands = append(commands, string(command))
+	}
+	rows, err := repository.queries.ListAdminBatchJobs(ctx, sqlcgen.ListAdminBatchJobsParams{
+		States: query.States, Commands: commands, CreatedFrom: adminOptionalTimeToPG(query.CreatedFrom), CreatedTo: adminOptionalTimeToPG(query.CreatedTo),
+		SortField: string(query.SortField), SortDirection: string(query.Direction), PageSize: int32(query.PageSize),
+		AfterSortTime: adminOptionalTimeToPG(query.After.SortTime), AfterBatchJobID: optionalUUID(query.After.BatchJobID),
+	})
+	if err != nil {
+		return nil, mapAdminUserQueryError(ctx, err, adminuser.ErrRepositoryUnavailable)
+	}
+	result := make([]adminuser.BatchJob, 0, len(rows))
+	for _, row := range rows {
+		job, mapErr := adminBatchJobFromRow(row)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		result = append(result, job)
+	}
+	return result, nil
+}
+
 // ClaimBatchItem leases the oldest runnable target and advances aggregate counters in the same transaction.
 func (repository *AdminJobRepository) ClaimBatchItem(ctx context.Context, batchJobID uuid.UUID, owner string, lease time.Duration) (adminuser.BatchItem, error) {
 	if repository == nil || repository.runner == nil || ctx == nil || batchJobID == uuid.Nil || !validLease(owner, lease) {
@@ -142,6 +197,59 @@ func (repository *AdminJobRepository) ClaimBatchItem(ctx context.Context, batchJ
 		claimed.State, claimed.AttemptCount, claimed.LeaseOwner, claimed.LeaseUntil, claimed.ErrorMessageKey, claimed.AuditEventID,
 		claimed.StartedAt, claimed.CompletedAt, claimed.Version, claimed.CreatedAt, claimed.UpdatedAt,
 	)
+}
+
+// ClaimNextBatchItem leases the oldest runnable item across all durable batch jobs. The worker never scans jobs
+// in application memory, so another process can resume abandoned work after the lease expires.
+func (repository *AdminJobRepository) ClaimNextBatchItem(ctx context.Context, owner string, lease time.Duration) (adminuser.BatchItem, error) {
+	if repository == nil || repository.runner == nil || ctx == nil || !validLease(owner, lease) {
+		return adminuser.BatchItem{}, adminuser.ErrInvalidInput
+	}
+	var claimed sqlcgen.ClaimNextAdminBatchJobItemRow
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		var claimErr error
+		claimed, claimErr = queries.ClaimNextAdminBatchJobItem(ctx, sqlcgen.ClaimNextAdminBatchJobItemParams{
+			LeaseOwner: pgtype.Text{String: owner, Valid: true}, LeaseSeconds: int64(lease / time.Second),
+		})
+		if claimErr != nil {
+			return claimErr
+		}
+		if claimed.StartedNow {
+			_, claimErr = queries.MarkAdminBatchJobItemClaimed(ctx, sqlcgen.MarkAdminBatchJobItemClaimedParams{BatchJobID: claimed.BatchJobID})
+		}
+		return claimErr
+	})
+	if err != nil {
+		return adminuser.BatchItem{}, mapAdminUserQueryError(ctx, err, adminuser.ErrNotFound)
+	}
+	return adminBatchItemFromValues(
+		claimed.ItemID, claimed.BatchJobID, claimed.UserID, claimed.ExpectedUserVersion, claimed.RequestDigest,
+		claimed.State, claimed.AttemptCount, claimed.LeaseOwner, claimed.LeaseUntil, claimed.ErrorMessageKey, claimed.AuditEventID,
+		claimed.StartedAt, claimed.CompletedAt, claimed.Version, claimed.CreatedAt, claimed.UpdatedAt,
+	)
+}
+
+// ListBatchItems reads one job's durable item states in creation order.
+func (repository *AdminJobRepository) ListBatchItems(ctx context.Context, query adminuser.BatchItemListQuery) ([]adminuser.BatchItem, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || query.BatchJobID == uuid.Nil || query.PageSize == 0 || query.PageSize > adminuser.MaximumBatchPageSize {
+		return nil, adminuser.ErrInvalidInput
+	}
+	rows, err := repository.queries.ListAdminBatchJobItems(ctx, sqlcgen.ListAdminBatchJobItemsParams{
+		BatchJobID: uuidToPG(query.BatchJobID), States: query.States, PageSize: int32(query.PageSize),
+		AfterCreatedAt: adminOptionalTimeToPG(query.After.CreatedAt), AfterItemID: optionalUUID(query.After.ItemID),
+	})
+	if err != nil {
+		return nil, mapAdminUserQueryError(ctx, err, adminuser.ErrRepositoryUnavailable)
+	}
+	result := make([]adminuser.BatchItem, 0, len(rows))
+	for _, row := range rows {
+		item, mapErr := adminBatchItemFromRow(row)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 // CompleteBatchItem commits the item result and aggregate progress together while the lease is still valid.
@@ -175,6 +283,56 @@ func (repository *AdminJobRepository) CompleteBatchItem(
 		return adminuser.BatchItem{}, mapAdminUserQueryError(ctx, err, adminuser.ErrConflict)
 	}
 	return adminBatchItemFromRow(stored)
+}
+
+// CancelBatchJob marks every still-queued item as canceled and leaves running items to close the job naturally.
+func (repository *AdminJobRepository) CancelBatchJob(ctx context.Context, batchJobID uuid.UUID, expectedVersion uint64, changedAt time.Time) (adminuser.BatchJob, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || batchJobID == uuid.Nil || expectedVersion == 0 || changedAt.IsZero() {
+		return adminuser.BatchJob{}, adminuser.ErrInvalidInput
+	}
+	row, err := repository.queries.CancelAdminBatchJobCAS(ctx, sqlcgen.CancelAdminBatchJobCASParams{
+		ChangedAt: timeToPG(changedAt), BatchJobID: uuidToPG(batchJobID), ExpectedVersion: int64(expectedVersion),
+	})
+	if err != nil {
+		return adminuser.BatchJob{}, mapAdminUserQueryError(ctx, err, adminuser.ErrConflict)
+	}
+	return adminBatchJobFromRow(row)
+}
+
+// RetryBatchJob requeues selected terminal items and reopens the parent aggregate for immediate processing.
+func (repository *AdminJobRepository) RetryBatchJob(
+	ctx context.Context,
+	batchJobID uuid.UUID,
+	itemIDs []uuid.UUID,
+	expectedVersion uint64,
+	changedAt time.Time,
+) (adminuser.BatchJob, int64, error) {
+	if repository == nil || repository.queries == nil || ctx == nil || batchJobID == uuid.Nil || expectedVersion == 0 || changedAt.IsZero() {
+		return adminuser.BatchJob{}, 0, adminuser.ErrInvalidInput
+	}
+	pgItemIDs, ok := uniqueUUIDs(itemIDs)
+	if !ok {
+		return adminuser.BatchJob{}, 0, adminuser.ErrInvalidInput
+	}
+	before, err := repository.GetBatchJob(ctx, batchJobID)
+	if err != nil {
+		return adminuser.BatchJob{}, 0, err
+	}
+	row, err := repository.queries.RetryAdminBatchJobCAS(ctx, sqlcgen.RetryAdminBatchJobCASParams{
+		ChangedAt: timeToPG(changedAt), BatchJobID: uuidToPG(batchJobID), ExpectedVersion: int64(expectedVersion), ItemIds: pgItemIDs,
+	})
+	if err != nil {
+		return adminuser.BatchJob{}, 0, mapAdminUserQueryError(ctx, err, adminuser.ErrConflict)
+	}
+	job, err := adminBatchJobFromRow(row)
+	if err != nil {
+		return adminuser.BatchJob{}, 0, err
+	}
+	requeued := job.QueuedCount - before.QueuedCount
+	if requeued < 0 {
+		requeued = 0
+	}
+	return job, requeued, nil
 }
 
 // CreateErasureJob provides idempotent creation and rejects digest changes for the same operation ID.
@@ -264,7 +422,8 @@ func validBatchPreview(preview adminuser.BatchPreview) bool {
 
 func validStartBatchJob(command adminuser.StartBatchJobCommand) bool {
 	if command.BatchJobID == uuid.Nil || command.ActorAdminID == uuid.Nil || command.PreviewID == uuid.Nil ||
-		len(command.OperationID) == 0 || len(command.OperationID) > 128 || !validAdminReason(command.Reason) || command.CreatedAt.IsZero() ||
+		command.ExpectedPreviewVersion == 0 || len(command.OperationID) == 0 || len(command.OperationID) > 128 ||
+		!validAdminReason(command.Reason) || command.CreatedAt.IsZero() ||
 		len(command.Targets) == 0 || len(command.Targets) > 100000 {
 		return false
 	}

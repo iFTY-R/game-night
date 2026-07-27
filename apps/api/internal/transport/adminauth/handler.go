@@ -540,6 +540,8 @@ func (handler *Handler) ElevateAdminSession(
 		ClientIP:        actor.ClientIP(),
 	}
 	switch secondFactor := request.Msg.GetSecondFactor().(type) {
+	case nil:
+		// Accounts without active MFA enrollments use password-only step-up; the domain service owns that state decision.
 	case *adminv1.ElevateAdminSessionRequest_TotpCode:
 		command.TOTPCode = secondFactor.TotpCode
 	case *adminv1.ElevateAdminSessionRequest_RecoveryCode:
@@ -559,7 +561,7 @@ func (handler *Handler) ElevateAdminSession(
 		OperationId:  request.Msg.GetOperationId(),
 		Elevation:    elevationSummaryWire(result.Elevation),
 		Session:      sessionSummaryFromView(view),
-		SecondFactor: secondFactorWire(result.UsedRecoveryCode),
+		SecondFactor: secondFactorWire(result.UsedSecondFactor, result.UsedRecoveryCode),
 	}), nil
 }
 
@@ -1003,7 +1005,11 @@ func operationResultWire(result admin.OperationResult) *commonv1.OperationResult
 	return message
 }
 
-func secondFactorWire(usedRecoveryCode bool) adminv1.AdminElevationSecondFactor {
+// secondFactorWire reports the credential path the domain actually accepted; password-only grants must not masquerade as TOTP.
+func secondFactorWire(usedSecondFactor, usedRecoveryCode bool) adminv1.AdminElevationSecondFactor {
+	if !usedSecondFactor {
+		return adminv1.AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_PASSWORD
+	}
 	if usedRecoveryCode {
 		return adminv1.AdminElevationSecondFactor_ADMIN_ELEVATION_SECOND_FACTOR_RECOVERY_CODE
 	}

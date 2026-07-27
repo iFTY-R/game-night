@@ -20,6 +20,9 @@ import (
 	"time"
 
 	"github.com/iFTY-R/game-night/apps/edge/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/runtimeinfo"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
+	"github.com/iFTY-R/game-night/platform/admin/operations"
 )
 
 const (
@@ -29,6 +32,10 @@ const (
 	adminSensitiveReadyPath = "/readyz/sensitive"
 	realtimeGamePath        = "/realtime/game"
 	staticIndexName         = "index.html"
+	// Edge reports only fixed upstream reachability codes so browser operators never receive raw transport errors.
+	heartbeatComponentAPIUpstream      = "api_upstream"
+	heartbeatComponentRealtimeUpstream = "realtime_upstream"
+	initialMaintenanceVersion          = uint64(1)
 )
 
 var (
@@ -48,7 +55,11 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if ctx == nil || logger == nil {
 		return errInvalidServer
 	}
-	handler, err := NewHandler(cfg, logger)
+	handler, err := newHandler(cfg, logger)
+	if err != nil {
+		return err
+	}
+	heartbeat, err := newHeartbeatReporter(cfg, handler)
 	if err != nil {
 		return err
 	}
@@ -59,6 +70,12 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
+	heartbeatCtx, cancelHeartbeat := context.WithCancel(context.Background())
+	heartbeatDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatDone)
+		heartbeat.Run(heartbeatCtx)
+	}()
 	serveErrors := make(chan error, 1)
 	go func() {
 		serveErrors <- server.ListenAndServe()
@@ -71,6 +88,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	)
 	select {
 	case serveErr := <-serveErrors:
+		stopHeartbeat(cancelHeartbeat, heartbeatDone, cfg.ShutdownTimeout)
 		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 			return serveErr
 		}
@@ -78,9 +96,12 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
+		cancelHeartbeat()
 		if err := server.Shutdown(shutdownCtx); err != nil {
+			waitForHeartbeatStop(heartbeatDone, shutdownCtx.Done())
 			return err
 		}
+		waitForHeartbeatStop(heartbeatDone, shutdownCtx.Done())
 		if serveErr := <-serveErrors; serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 			return serveErr
 		}
@@ -91,8 +112,13 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 // NewHandler constructs the single public edge HTTP surface.
 func NewHandler(cfg config.Config, logger *slog.Logger) (http.Handler, error) {
+	return newHandler(cfg, logger)
+}
+
+func newHandler(cfg config.Config, logger *slog.Logger) (*handler, error) {
 	if logger == nil || cfg.APIUpstreamURL == nil || cfg.RealtimeUpstreamURL == nil || cfg.UserStaticDirectory == "" ||
-		cfg.AdminStaticDirectory == "" || len(cfg.UserHosts) == 0 || len(cfg.AdminHosts) == 0 || len(cfg.TrustedProxyCIDRs) == 0 {
+		cfg.AdminStaticDirectory == "" || len(cfg.UserHosts) == 0 || len(cfg.AdminHosts) == 0 || len(cfg.TrustedProxyCIDRs) == 0 ||
+		cfg.InstanceID == "" {
 		return nil, errInvalidServer
 	}
 	return &handler{
@@ -118,6 +144,39 @@ func NewHandler(cfg config.Config, logger *slog.Logger) (http.Handler, error) {
 	}, nil
 }
 
+// newHeartbeatReporter binds one process identity to bounded upstream reachability checks.
+func newHeartbeatReporter(cfg config.Config, handler *handler) (*serviceheartbeat.Reporter, error) {
+	if handler == nil {
+		return nil, errInvalidServer
+	}
+	client := &http.Client{
+		Timeout: cfg.Heartbeat.Timeout,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: cfg.ProxyDialTimeout, KeepAlive: 30 * time.Second}).DialContext,
+			TLSHandshakeTimeout:   cfg.ProxyTLSHandshakeTimeout,
+			ResponseHeaderTimeout: cfg.ProxyResponseHeaderTimeout,
+			ExpectContinueTimeout: time.Second,
+			IdleConnTimeout:       30 * time.Second,
+			MaxIdleConns:          16,
+			MaxIdleConnsPerHost:   4,
+		},
+	}
+	sink, err := serviceheartbeat.NewHTTPClient(client, cfg.Heartbeat.TargetURL, cfg.Heartbeat.Token, false)
+	if err != nil {
+		return nil, errInvalidServer
+	}
+	info, err := runtimeinfo.New(operations.ServiceEdge, cfg.InstanceID, cfg.Heartbeat.BuildVersion, time.Now().Round(0).UTC())
+	if err != nil {
+		return nil, errInvalidServer
+	}
+	reporter, err := serviceheartbeat.NewReporter(sink, info, handler.heartbeatSnapshot, cfg.Heartbeat.Interval, cfg.Heartbeat.Timeout)
+	if err != nil {
+		return nil, errInvalidServer
+	}
+	return reporter, nil
+}
+
 type handler struct {
 	logger        *slog.Logger
 	cfg           config.Config
@@ -139,6 +198,9 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	switch {
+	case strings.HasPrefix(request.URL.Path, "/internal/"):
+		// Private service protocols are reachable only on the API listener and never through public hosts.
+		http.NotFound(writer, request)
 	case request.Method == http.MethodGet && request.URL.Path == healthLivePath:
 		writer.WriteHeader(http.StatusNoContent)
 	case request.Method == http.MethodGet && request.URL.Path == healthReadyPath:
@@ -150,6 +212,55 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	default:
 		http.NotFound(writer, request)
 	}
+}
+
+// heartbeatSnapshot converts private probe failures into bounded component statuses without leaking transport detail.
+func (h *handler) heartbeatSnapshot(ctx context.Context) serviceheartbeat.Snapshot {
+	components := map[string]operations.HealthStatus{
+		heartbeatComponentAPIUpstream:      operations.HealthUnavailable,
+		heartbeatComponentRealtimeUpstream: operations.HealthUnavailable,
+	}
+	type probeResult struct {
+		code   string
+		status operations.HealthStatus
+	}
+	results := make(chan probeResult, 2)
+	go func() {
+		results <- probeResult{code: heartbeatComponentAPIUpstream, status: h.probeHeartbeatComponent(ctx, h.cfg.APIUpstreamURL, adminReadyPath)}
+	}()
+	go func() {
+		results <- probeResult{code: heartbeatComponentRealtimeUpstream, status: h.probeHeartbeatComponent(ctx, h.cfg.RealtimeUpstreamURL, healthReadyPath)}
+	}()
+	healthyComponents := 0
+	for received := 0; received < cap(results); received++ {
+		select {
+		case <-ctx.Done():
+			return serviceheartbeat.Snapshot{
+				Status:             operations.HealthUnavailable,
+				Components:         components,
+				MaintenanceVersion: initialMaintenanceVersion,
+			}
+		case result := <-results:
+			components[result.code] = result.status
+			if result.status == operations.HealthHealthy {
+				healthyComponents++
+			}
+		}
+	}
+	status := operations.HealthUnavailable
+	if healthyComponents == len(components) {
+		status = operations.HealthHealthy
+	} else if healthyComponents > 0 {
+		status = operations.HealthDegraded
+	}
+	return serviceheartbeat.Snapshot{Status: status, Components: components, MaintenanceVersion: initialMaintenanceVersion}
+}
+
+func (h *handler) probeHeartbeatComponent(ctx context.Context, base *url.URL, suffix string) operations.HealthStatus {
+	if err := h.checkReady(ctx, base, suffix); err != nil {
+		return operations.HealthUnavailable
+	}
+	return operations.HealthHealthy
 }
 
 func (h *handler) handleReady(writer http.ResponseWriter, request *http.Request) {
@@ -392,6 +503,26 @@ func hostSet(values []string) map[string]struct{} {
 	return set
 }
 
+func stopHeartbeat(cancel context.CancelFunc, done <-chan struct{}, timeout time.Duration) {
+	if cancel == nil || done == nil {
+		return
+	}
+	cancel()
+	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), timeout)
+	defer timeoutCancel()
+	waitForHeartbeatStop(done, timeoutCtx.Done())
+}
+
+func waitForHeartbeatStop(done <-chan struct{}, fallback <-chan struct{}) {
+	if done == nil {
+		return
+	}
+	select {
+	case <-done:
+	case <-fallback:
+	}
+}
+
 func isUserRPCPath(path string) bool {
 	return strings.HasPrefix(path, "/platform.identity.v1.IdentityService/") ||
 		strings.HasPrefix(path, "/platform.room.v1.RoomService/") ||
@@ -401,7 +532,10 @@ func isUserRPCPath(path string) bool {
 func isAdminRPCPath(path string) bool {
 	return strings.HasPrefix(path, "/platform.admin.v1.AdminAuthService/") ||
 		strings.HasPrefix(path, "/platform.admin.v1.AdminUserService/") ||
-		strings.HasPrefix(path, "/platform.admin.v1.AdminRoomService/")
+		strings.HasPrefix(path, "/platform.admin.v1.AdminRoomService/") ||
+		strings.HasPrefix(path, "/platform.admin.v1.AdminAuditService/") ||
+		strings.HasPrefix(path, "/platform.admin.v1.AdminOperationsService/") ||
+		strings.HasPrefix(path, "/platform.admin.v1.AdminOverviewService/")
 }
 
 func copyForwardingHeaders(destination, source http.Header) {

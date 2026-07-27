@@ -28,7 +28,7 @@ export const usePreferencesStore = defineStore("admin-preferences", () => {
   // Only non-sensitive UI preferences may survive a page refresh.
   const theme = ref<ThemePreference>(readStored(storageKey.theme, "system"));
   const siderCollapsed = ref<boolean>(readStored(storageKey.collapsed, false));
-  const persistedTabs = ref<AppRouteName[]>(readStored(storageKey.tabs, ["security"]));
+  const persistedTabs = ref<AppRouteName[]>(readStored(storageKey.tabs, []));
 
   const systemThemeQuery =
     typeof window !== "undefined" && typeof window.matchMedia === "function"

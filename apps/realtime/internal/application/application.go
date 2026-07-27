@@ -8,9 +8,13 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
+	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/runtimeinfo"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/config"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/fanout"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/owner"
@@ -20,6 +24,7 @@ import (
 	"github.com/iFTY-R/game-night/apps/realtime/internal/transport/gamewebsocket"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/transport/internalgame"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/realtime/v1/realtimev1connect"
+	adminoperations "github.com/iFTY-R/game-night/platform/admin/operations"
 	"github.com/iFTY-R/game-night/platform/clock"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/outbox"
@@ -68,6 +73,10 @@ type Application struct {
 	durableRevocations *revocation.Dispatcher
 	redis              *goredis.Client
 	pool               *pgxpool.Pool
+	heartbeat          *serviceheartbeat.Reporter
+	healthMu           sync.RWMutex
+	health             map[string]adminoperations.HealthStatus
+	maintenanceVersion atomic.Uint64
 
 	closeOnce sync.Once
 	closeErr  error
@@ -87,7 +96,14 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	if err != nil {
 		return nil, errInitializePostgreSQL
 	}
-	application := &Application{config: cfg, logger: options.Logger, pool: pool}
+	application := &Application{
+		config: cfg, logger: options.Logger, pool: pool,
+		health: map[string]adminoperations.HealthStatus{
+			"owner": adminoperations.HealthUnavailable, "timer": adminoperations.HealthUnavailable,
+			"hub": adminoperations.HealthUnavailable, "fanout": adminoperations.HealthUnavailable,
+			"durable_fanout": adminoperations.HealthUnavailable, "revocation": adminoperations.HealthUnavailable,
+		},
+	}
 	defer func() {
 		if returnedErr != nil {
 			_ = application.Close(context.Background())
@@ -115,8 +131,14 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	}
 	sessions := postgres.NewGameSessionRepository(pool)
 	rooms := postgres.NewRoomRepository(pool)
-	runtime, err := gameruntime.NewService(
-		options.Registry, sessions, rooms, postgres.NewRoomGameSessionRepository(pool), source, gameruntime.SecureGenerator{},
+	operationsRepository := postgres.NewAdminOperationsRepository(pool)
+	mutationGate, err := gameruntime.NewMaintenanceMutationGate(operationsRepository)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	// Only user starts and actions use the maintenance gate; owner-driven convergence remains available.
+	runtime, err := gameruntime.NewServiceWithMutationGate(
+		options.Registry, sessions, rooms, postgres.NewRoomGameSessionRepository(pool), source, gameruntime.SecureGenerator{}, mutationGate,
 	)
 	if err != nil {
 		return nil, errInitializeRuntime
@@ -151,8 +173,20 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	if err != nil {
 		return nil, errInitializeSubscriber
 	}
+	presence, err := redisstore.NewAdminPresenceProjection(application.redis, redisstore.AdminPresenceConfig{
+		KeyPrefix: cfg.Shared.Redis.KeyPrefix,
+		Timeout:   cfg.Shared.Redis.Timeout,
+		TTL:       redisstore.AdminPresenceTTL,
+		Clock:     source,
+	})
+	if err != nil {
+		return nil, errInitializeSubscriber
+	}
 	application.hub, err = subscription.NewHub(authorizer, runtime, subscription.HubConfig{
-		ReconcileInterval: cfg.WebSocket.AuthorizationInterval, ProjectionTimeout: cfg.WebSocket.WriteTimeout,
+		ReconcileInterval: cfg.WebSocket.AuthorizationInterval,
+		ProjectionTimeout: cfg.WebSocket.WriteTimeout,
+		PresenceSink:      presence,
+		PresenceTimeout:   cfg.Shared.Redis.Timeout,
 	})
 	if err != nil {
 		return nil, errInitializeSubscriber
@@ -208,6 +242,28 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	publicMux := newPublicMux(websocketHandler, application.readyHandler())
 	application.publicServer = newHTTPServer(cfg.Listener.PublicAddress, publicMux, true)
 	application.internalServer = newHTTPServer(cfg.Listener.InternalAddress, internalMux, false)
+	maintenance, err := operationsRepository.GetMaintenanceState(ctx)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	application.maintenanceVersion.Store(maintenance.Version)
+	heartbeatClient, err := serviceheartbeat.NewHTTPClient(
+		&http.Client{Timeout: cfg.Heartbeat.Timeout}, cfg.Heartbeat.TargetURL, cfg.Heartbeat.Token,
+		cfg.Shared.Environment == sharedconfig.EnvironmentProduction,
+	)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	processInfo, err := runtimeinfo.New(adminoperations.ServiceRealtime, cfg.Ownership.InstanceID, cfg.Heartbeat.BuildVersion, source.Now())
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
+	application.heartbeat, err = serviceheartbeat.NewReporter(
+		heartbeatClient, processInfo, application.heartbeatSnapshot(operationsRepository), cfg.Heartbeat.Interval, cfg.Heartbeat.Timeout,
+	)
+	if err != nil {
+		return nil, errInitializeRuntime
+	}
 	return application, nil
 }
 
@@ -215,7 +271,7 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 func (application *Application) ListenAndServe(ctx context.Context) error {
 	if application == nil || ctx == nil || application.publicServer == nil || application.internalServer == nil ||
 		application.owner == nil || application.timer == nil || application.hub == nil || application.fanout == nil ||
-		application.durableFanout == nil || application.durableRevocations == nil {
+		application.durableFanout == nil || application.durableRevocations == nil || application.heartbeat == nil {
 		return errInvalidOptions
 	}
 	publicListener, err := net.Listen("tcp", application.publicServer.Addr)
@@ -232,24 +288,94 @@ func (application *Application) ListenAndServe(ctx context.Context) error {
 	errorsChannel := make(chan error, 8)
 	go func() { errorsChannel <- normalizeServeError(application.publicServer.Serve(publicListener)) }()
 	go func() { errorsChannel <- normalizeServeError(application.internalServer.Serve(internalListener)) }()
-	go func() { errorsChannel <- application.owner.Run(runCtx) }()
-	go func() { errorsChannel <- application.timer.Run(runCtx) }()
-	go func() { errorsChannel <- application.hub.Run(runCtx) }()
-	go func() { errorsChannel <- application.runFanout(runCtx) }()
-	go func() { errorsChannel <- application.durableFanout.Run(runCtx) }()
-	go func() { errorsChannel <- application.durableRevocations.Run(runCtx) }()
+	application.runComponent(runCtx, errorsChannel, "owner", application.owner.Run)
+	application.runComponent(runCtx, errorsChannel, "timer", application.timer.Run)
+	application.runComponent(runCtx, errorsChannel, "hub", application.hub.Run)
+	application.runComponent(runCtx, errorsChannel, "fanout", application.runFanout)
+	application.runComponent(runCtx, errorsChannel, "durable_fanout", application.durableFanout.Run)
+	application.runComponent(runCtx, errorsChannel, "revocation", application.durableRevocations.Run)
+	heartbeatContext, cancelHeartbeat := context.WithCancel(context.Background())
+	heartbeatDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatDone)
+		application.heartbeat.Run(heartbeatContext)
+	}()
 
 	select {
 	case <-ctx.Done():
 		cancelRun()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), application.config.Listener.ShutdownTimeout)
 		defer cancel()
+		stopHeartbeat(cancelHeartbeat, heartbeatDone, shutdownCtx.Done())
 		return application.Close(shutdownCtx)
 	case err := <-errorsChannel:
 		cancelRun()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), application.config.Listener.ShutdownTimeout)
 		defer cancel()
+		stopHeartbeat(cancelHeartbeat, heartbeatDone, shutdownCtx.Done())
 		return errors.Join(err, application.Close(shutdownCtx))
+	}
+}
+
+func (application *Application) runComponent(ctx context.Context, errorsChannel chan<- error, code string, run func(context.Context) error) {
+	application.setHealth(code, adminoperations.HealthHealthy)
+	go func() {
+		err := run(ctx)
+		application.setHealth(code, adminoperations.HealthUnavailable)
+		errorsChannel <- err
+	}()
+}
+
+func (application *Application) setHealth(code string, status adminoperations.HealthStatus) {
+	application.healthMu.Lock()
+	application.health[code] = status
+	application.healthMu.Unlock()
+}
+
+func (application *Application) heartbeatSnapshot(repository interface {
+	GetMaintenanceState(context.Context) (adminoperations.MaintenanceState, error)
+}) serviceheartbeat.SnapshotFunc {
+	return func(ctx context.Context) serviceheartbeat.Snapshot {
+		application.healthMu.RLock()
+		components := make(map[string]adminoperations.HealthStatus, len(application.health)+3)
+		for code, status := range application.health {
+			components[code] = status
+		}
+		application.healthMu.RUnlock()
+		components["postgresql"] = adminoperations.HealthUnavailable
+		if application.pool != nil && application.pool.Ping(ctx) == nil {
+			components["postgresql"] = adminoperations.HealthHealthy
+		}
+		components["redis"] = adminoperations.HealthUnavailable
+		if application.redis != nil && application.redis.Ping(ctx).Err() == nil {
+			components["redis"] = adminoperations.HealthHealthy
+		}
+		components["maintenance"] = adminoperations.HealthUnavailable
+		if maintenance, err := repository.GetMaintenanceState(ctx); err == nil {
+			application.maintenanceVersion.Store(maintenance.Version)
+			components["maintenance"] = adminoperations.HealthHealthy
+		}
+		healthy := 0
+		for _, status := range components {
+			if status == adminoperations.HealthHealthy {
+				healthy++
+			}
+		}
+		status := adminoperations.HealthUnavailable
+		if healthy == len(components) {
+			status = adminoperations.HealthHealthy
+		} else if healthy > 0 {
+			status = adminoperations.HealthDegraded
+		}
+		return serviceheartbeat.Snapshot{Status: status, Components: components, MaintenanceVersion: application.maintenanceVersion.Load()}
+	}
+}
+
+func stopHeartbeat(cancel context.CancelFunc, done <-chan struct{}, deadline <-chan struct{}) {
+	cancel()
+	select {
+	case <-done:
+	case <-deadline:
 	}
 }
 

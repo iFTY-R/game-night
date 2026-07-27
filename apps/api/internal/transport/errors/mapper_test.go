@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/iFTY-R/game-night/apps/api/internal/transport/maintenance"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	"github.com/iFTY-R/game-night/platform/admin"
+	adminoperations "github.com/iFTY-R/game-night/platform/admin/operations"
 	gameruntime "github.com/iFTY-R/game-night/platform/game-runtime"
 	"github.com/iFTY-R/game-night/platform/identifier"
 	"github.com/iFTY-R/game-night/platform/identity"
@@ -34,6 +36,10 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 		{name: "admin elevation required", err: admin.ErrElevationDenied, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ELEVATION_REQUIRED, wantKey: "admin.elevation.required"},
 		{name: "admin elevation expired", err: admin.ErrElevationExpired, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ELEVATION_EXPIRED, wantKey: "admin.elevation.expired"},
 		{name: "admin version conflict", err: admin.ErrConcurrentTransition, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_VERSION_CONFLICT, wantKey: "admin.version.conflict"},
+		{name: "operations version conflict", err: adminoperations.ErrConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_VERSION_CONFLICT, wantKey: "admin.version.conflict"},
+		{name: "operations elevation required", err: adminoperations.ErrElevationRequired, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ELEVATION_REQUIRED, wantKey: "admin.elevation.required"},
+		{name: "operations preview expired", err: adminoperations.ErrPreviewExpired, wantConnect: connect.CodeFailedPrecondition, wantKey: "admin.operations.preview_expired"},
+		{name: "operations retry limit", err: adminoperations.ErrRetryLimit, wantConnect: connect.CodeFailedPrecondition, wantKey: "admin.operations.retry_limit"},
 		{name: "admin recovery codes exhausted", err: admin.ErrRecoveryCodeExhausted, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_RECOVERY_CODE_EXHAUSTED, wantKey: "admin.recovery_codes.exhausted"},
 		{name: "admin MFA state conflict", err: admin.ErrMFAStateConflict, wantConnect: connect.CodeFailedPrecondition, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_MFA_STATE_CONFLICT, wantKey: "admin.mfa.state_conflict"},
 		{name: "room version", err: room.ErrRoomVersionConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_ROOM_VERSION_CONFLICT, wantKey: "room.version.conflict"},
@@ -50,6 +56,10 @@ func TestMapReturnsStableBusinessDetails(t *testing.T) {
 		{name: "game replay access", err: replay.ErrAccessDenied, wantConnect: connect.CodePermissionDenied, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_FORBIDDEN, wantKey: "game.replay.forbidden"},
 		{name: "game replay policy conflict", err: replay.ErrPolicyConflict, wantConnect: connect.CodeAborted, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_GAME_REPLAY_ACCESS_CONFLICT, wantKey: "game.replay.access_conflict"},
 		{name: "game rule", err: gameSDK.ErrInvalidContract, wantConnect: connect.CodeInvalidArgument, wantKey: "request.invalid"},
+		{name: "maintenance active", err: maintenance.ErrMutationBlocked, wantConnect: connect.CodeFailedPrecondition, wantKey: "service.maintenance.active"},
+		{name: "realtime maintenance active", err: gameruntime.ErrMutationBlocked, wantConnect: connect.CodeFailedPrecondition, wantKey: "service.maintenance.active"},
+		{name: "maintenance authority unavailable", err: maintenance.ErrStateUnavailable, wantConnect: connect.CodeUnavailable, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, wantKey: "service.temporarily_unavailable"},
+		{name: "realtime maintenance authority unavailable", err: gameruntime.ErrMutationStateUnavailable, wantConnect: connect.CodeUnavailable, wantBusiness: commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_SERVICE_TEMPORARILY_UNAVAILABLE, wantKey: "service.temporarily_unavailable"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

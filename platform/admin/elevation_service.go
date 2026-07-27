@@ -27,6 +27,7 @@ type ElevateSessionCommand struct {
 type ElevateSessionResult struct {
 	Elevation        Elevation
 	Session          Session
+	UsedSecondFactor bool
 	UsedRecoveryCode bool
 }
 
@@ -150,7 +151,12 @@ func (service *Service) ElevateAdminSession(ctx context.Context, command Elevate
 		if _, err = service.appendAdminAudit(ctx, transaction, account.Snapshot().ID, command.RequestID, audit.TargetAdmin, account.Snapshot().ID.String(), audit.ActionAdminSessionElevated, "elevation_granted", digestAdminRequest("admin.elevation.granted", string(command.Scope), strconv.FormatInt(enrollmentVersion, 10)).Bytes()); err != nil {
 			return err
 		}
-		result = ElevateSessionResult{Elevation: stored, Session: command.Session, UsedRecoveryCode: usedRecoveryCode}
+		result = ElevateSessionResult{
+			Elevation:        stored,
+			Session:          command.Session,
+			UsedSecondFactor: enrollment != nil,
+			UsedRecoveryCode: usedRecoveryCode,
+		}
 		return nil
 	})
 	return result, mapAdminUoWError(err)

@@ -6,11 +6,16 @@ import (
 	"time"
 
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
 
 func TestLoadProcessConfigUsesBoundedDevelopmentDefaults(t *testing.T) {
 	t.Parallel()
-	values := map[string]string{internalTokenEnvironment: strings.Repeat("a", 32)}
+	values := map[string]string{
+		internalTokenEnvironment:              strings.Repeat("a", 32),
+		serviceheartbeat.TargetURLEnvironment: "http://127.0.0.1:8081" + serviceheartbeat.Path,
+		serviceheartbeat.TokenEnvironment:     strings.Repeat("h", 32),
+	}
 	config, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
 	if err != nil {
 		t.Fatalf("loadProcessConfig() error = %v", err)
@@ -148,11 +153,13 @@ func TestLoadProcessConfigRejectsUnboundedTimerScheduling(t *testing.T) {
 
 func validProcessEnvironment() map[string]string {
 	return map[string]string{
-		publicListenAddressEnvironment:   ":8090",
-		internalListenAddressEnvironment: ":8091",
-		advertisedURLEnvironment:         "http://realtime.internal:8091",
-		instanceIDEnvironment:            "realtime-a",
-		internalTokenEnvironment:         strings.Repeat("t", 32),
+		publicListenAddressEnvironment:        ":8090",
+		internalListenAddressEnvironment:      ":8091",
+		advertisedURLEnvironment:              "http://realtime.internal:8091",
+		instanceIDEnvironment:                 "realtime-a",
+		internalTokenEnvironment:              strings.Repeat("t", 32),
+		serviceheartbeat.TargetURLEnvironment: "http://127.0.0.1:8081" + serviceheartbeat.Path,
+		serviceheartbeat.TokenEnvironment:     strings.Repeat("h", 32),
 	}
 }
 

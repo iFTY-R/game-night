@@ -53,4 +53,8 @@ var (
 	ErrGameSessionRepositoryUnavailable = errors.New("game session repository unavailable")
 	// ErrGameSessionIntegrity reports persisted rows that cannot restore a valid authoritative aggregate.
 	ErrGameSessionIntegrity = errors.New("game session persistence integrity failure")
+	// ErrMutationBlocked denies a user start or action while the authoritative maintenance scope is enabled.
+	ErrMutationBlocked = errors.New("game user mutation blocked by maintenance")
+	// ErrMutationStateUnavailable fails user mutations closed when maintenance authority cannot be read safely.
+	ErrMutationStateUnavailable = errors.New("game mutation maintenance state unavailable")
 )

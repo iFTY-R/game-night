@@ -128,6 +128,121 @@ func TestServiceAnnotationsRequirePermissionAuditAndVersion(t *testing.T) {
 	}
 }
 
+// Operators type hex colors in either case; the service must fold them to the uppercase form the
+// PostgreSQL CHECK constraint enforces, and must reject malformed colors before any audit write.
+func TestServiceTagColorCanonicalization(t *testing.T) {
+	now := time.Date(2026, 7, 26, 13, 0, 0, 0, time.UTC)
+	repository := &memoryRepository{}
+	audit := &memoryAudit{}
+	service := newTestService(t, repository, nil, nil, audit, now)
+	annotator := newTestActor(t, now, admin.PermissionUsersAnnotate)
+	operationID := newOperationID(t)
+
+	created, err := service.CreateTag(context.Background(), annotator,
+		CreateTagCommand{Name: "回归验证标签", Color: " #15803d ", Reason: "统一颜色大小写", ExpectedCatalogVersion: 1}, operationID)
+	if err != nil || created.Tag.Color != "#15803D" {
+		t.Fatalf("create tag canonical color = %q err=%v", created.Tag.Color, err)
+	}
+	if len(audit.annotation) != 1 || audit.annotation[0].DetailDigest != digestStrings("回归验证标签", "#15803D") {
+		t.Fatalf("create audit digest must bind the canonical color, events=%d", len(audit.annotation))
+	}
+
+	updated, err := service.UpdateTag(context.Background(), annotator,
+		UpdateTagCommand{TagID: uuid.New(), Name: "回归验证标签", Color: "#2563eb", Reason: "调整颜色", ExpectedVersion: 4}, operationID)
+	if err != nil || updated.Color != "#2563EB" {
+		t.Fatalf("update tag canonical color = %q err=%v", updated.Color, err)
+	}
+
+	auditEvents := len(audit.annotation)
+	for _, invalid := range []string{"", "#15803", "15803D", "#15803G", "#15803DFF", "rgb(21,128,61)"} {
+		if _, err := service.CreateTag(context.Background(), annotator,
+			CreateTagCommand{Name: "x", Color: invalid, Reason: "invalid color", ExpectedCatalogVersion: 1}, operationID); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("color %q must be rejected, err=%v", invalid, err)
+		}
+	}
+	// Version 0 can never match the 1-based catalog or tag versions; it must fail as invalid input
+	// before any audit event is produced.
+	if _, err := service.CreateTag(context.Background(), annotator,
+		CreateTagCommand{Name: "x", Color: "#15803D", Reason: "zero version"}, operationID); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("zero catalog version must be rejected, err=%v", err)
+	}
+	if _, err := service.UpdateTag(context.Background(), annotator,
+		UpdateTagCommand{TagID: uuid.New(), Name: "x", Color: "#15803D", Reason: "zero version"}, operationID); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("zero tag version must be rejected, err=%v", err)
+	}
+	if _, err := service.DeleteTag(context.Background(), annotator,
+		DeleteTagCommand{TagID: uuid.New()}, operationID, "zero version"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("zero delete version must be rejected, err=%v", err)
+	}
+	if len(audit.annotation) != auditEvents {
+		t.Fatalf("invalid colors and zero versions must fail before audit writes, events=%d", len(audit.annotation))
+	}
+}
+
+func TestServiceStartBatchOperationReplaysAfterPreviewVersionAdvance(t *testing.T) {
+	now := time.Date(2026, 7, 26, 14, 0, 0, 0, time.UTC)
+	actor := newElevatedTestActor(t, now, admin.ElevationScopeUsersBulkGovernance, admin.PermissionUsersGovern)
+	target := BatchExecutableTarget{ItemID: uuid.New(), UserID: uuid.New(), ExpectedUserVersion: 3}
+	snapshot, err := marshalBatchSelectionSnapshot(BatchCommandSuspend, now, []BatchExecutableTarget{target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	previewDigest := sha256.Sum256([]byte("batch-preview"))
+	jobs := &replayBatchRepository{
+		preview: BatchPreview{
+			ID: uuid.New(), ActorAdminID: actor.AdminID(), Command: string(BatchCommandSuspend),
+			SelectionSnapshot: snapshot, SelectionDigest: sha256.Sum256(snapshot), PreviewDigest: previewDigest,
+			Version: 2, // The original request already consumed version 1 before this network retry arrives.
+		},
+		job: BatchJob{ID: uuid.New()},
+	}
+	service, err := NewService(Config{Repository: &memoryRepository{}, Jobs: jobs, Clock: clock.NewFake(now)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job, err := service.StartBatchUserOperation(context.Background(), actor, StartBatchCommand{
+		OperationID: newOperationID(t), PreviewID: jobs.preview.ID, PreviewDigest: previewDigest,
+		ExpectedVersion: 1, Reason: "retry after an interrupted response",
+	})
+	if err != nil || job.ID != jobs.job.ID {
+		t.Fatalf("replayed start = %+v err=%v", job, err)
+	}
+	if len(jobs.starts) != 1 || jobs.starts[0].ExpectedPreviewVersion != 1 {
+		t.Fatalf("repository did not receive the original CAS version: %+v", jobs.starts)
+	}
+}
+
+func TestServiceProcessNextBatchItemCancelsExpiredWorkAfterBatchCancellation(t *testing.T) {
+	now := time.Date(2026, 7, 26, 15, 0, 0, 0, time.UTC)
+	item := BatchItem{
+		ID: uuid.New(), BatchJobID: uuid.New(), UserID: uuid.New(), ExpectedUserVersion: 2,
+		State: "running", LeaseOwner: "worker:test", Version: 3,
+	}
+	jobs := &cancelingBatchRepository{
+		item: item,
+		job:  BatchJob{ID: item.BatchJobID, State: "canceling"},
+	}
+	governance := &countingGovernance{}
+	service, err := NewService(Config{
+		Repository: &memoryRepository{}, Jobs: jobs, Governance: governance, Clock: clock.NewFake(now),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	processed, err := service.ProcessNextBatchItem(context.Background(), "test")
+	if err != nil || !processed {
+		t.Fatalf("process canceled item processed=%t err=%v", processed, err)
+	}
+	if governance.calls != 0 {
+		t.Fatalf("canceled batch invoked governance %d times", governance.calls)
+	}
+	if len(jobs.completions) != 1 || jobs.completions[0].state != "canceled" || jobs.completions[0].errorMessageKey != "" {
+		t.Fatalf("unexpected cancellation completion: %+v", jobs.completions)
+	}
+}
+
 type memoryRepository struct {
 	users       []UserRecord
 	notes       []Note
@@ -135,12 +250,92 @@ type memoryRepository struct {
 	queries     []UserListQuery
 }
 
-func (repository *memoryRepository) CreateTag(context.Context, CreateTagCommand) (TagMutation, error) {
-	return TagMutation{}, nil
+// replayBatchRepository exposes the operation-ID-first repository behavior without reproducing persistence details in a service test.
+type replayBatchRepository struct {
+	BatchRepository
+	preview BatchPreview
+	job     BatchJob
+	starts  []StartBatchJobCommand
 }
 
-func (repository *memoryRepository) UpdateTag(context.Context, UpdateTagCommand) (Tag, error) {
-	return Tag{}, nil
+func (repository *replayBatchRepository) GetBatchPreview(_ context.Context, previewID, actorAdminID uuid.UUID) (BatchPreview, error) {
+	if previewID != repository.preview.ID || actorAdminID != repository.preview.ActorAdminID {
+		return BatchPreview{}, ErrNotFound
+	}
+	return repository.preview, nil
+}
+
+func (repository *replayBatchRepository) StartBatchJob(_ context.Context, command StartBatchJobCommand) (BatchJob, error) {
+	repository.starts = append(repository.starts, command)
+	return repository.job, nil
+}
+
+type batchCompletion struct {
+	state           string
+	errorMessageKey string
+}
+
+type cancelingBatchRepository struct {
+	BatchRepository
+	item        BatchItem
+	job         BatchJob
+	completions []batchCompletion
+}
+
+func (repository *cancelingBatchRepository) ClaimNextBatchItem(_ context.Context, _ string, _ time.Duration) (BatchItem, error) {
+	return repository.item, nil
+}
+
+func (repository *cancelingBatchRepository) GetBatchJob(_ context.Context, batchJobID uuid.UUID) (BatchJob, error) {
+	if batchJobID != repository.job.ID {
+		return BatchJob{}, ErrNotFound
+	}
+	return repository.job, nil
+}
+
+func (repository *cancelingBatchRepository) CompleteBatchItem(
+	_ context.Context,
+	item BatchItem,
+	nextState, errorMessageKey string,
+	_ uuid.UUID,
+	_ time.Time,
+) (BatchItem, error) {
+	if item.ID != repository.item.ID {
+		return BatchItem{}, ErrNotFound
+	}
+	repository.completions = append(repository.completions, batchCompletion{state: nextState, errorMessageKey: errorMessageKey})
+	return item, nil
+}
+
+type countingGovernance struct{ calls int }
+
+func (governance *countingGovernance) GetUserState(context.Context, uuid.UUID) (GovernanceUserState, error) {
+	governance.calls++
+	return GovernanceUserState{}, errors.New("governance should not execute")
+}
+
+func (governance *countingGovernance) GetCurrentRoom(context.Context, uuid.UUID) (GovernanceRoomState, error) {
+	governance.calls++
+	return GovernanceRoomState{}, errors.New("governance should not execute")
+}
+
+func (governance *countingGovernance) TransitionUserStatus(context.Context, uuid.UUID, uint64, string, time.Time) (GovernanceUserState, error) {
+	governance.calls++
+	return GovernanceUserState{}, errors.New("governance should not execute")
+}
+
+func (governance *countingGovernance) RemoveUserFromRoom(context.Context, uuid.UUID, uuid.UUID, GovernanceRoomState, time.Time) error {
+	governance.calls++
+	return errors.New("governance should not execute")
+}
+
+func (repository *memoryRepository) CreateTag(_ context.Context, command CreateTagCommand) (TagMutation, error) {
+	// Echo the persisted shape so tests can assert the service handed persistence canonical values.
+	return TagMutation{Tag: Tag{Name: command.Name, Color: command.Color, Reason: command.Reason}}, nil
+}
+
+func (repository *memoryRepository) UpdateTag(_ context.Context, command UpdateTagCommand) (Tag, error) {
+	return Tag{ID: command.TagID, Name: command.Name, Color: command.Color, Reason: command.Reason}, nil
 }
 func (repository *memoryRepository) DeleteTag(context.Context, DeleteTagCommand) (uint64, error) {
 	return 0, nil
@@ -272,6 +467,31 @@ func newTestActor(t testing.TB, now time.Time, permissions ...admin.Permission) 
 		t.Fatal(err)
 	}
 	actor, err := admin.NewActorContext(adminID, sessionID, session, permissionSet, elevations, 0, "req-admin-user", "http://127.0.0.1:4174", "203.0.113.10", "admin-user-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return actor
+}
+
+func newElevatedTestActor(t testing.TB, now time.Time, scope admin.ElevationScope, permissions ...admin.Permission) admin.ActorContext {
+	t.Helper()
+	base := newTestActor(t, now, permissions...)
+	elevation, err := admin.NewElevation(base.Session(), base.EnrollmentVersion(), scope, now, now.Add(5*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	permissionSet, err := admin.NewPermissionSet(base.Permissions()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	elevations, err := admin.NewElevationSet(elevation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor, err := admin.NewActorContext(
+		base.AdminID(), base.SessionID(), base.Session(), permissionSet, elevations, base.EnrollmentVersion(),
+		base.RequestID(), base.Origin(), base.ClientIP(), base.UserAgent(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

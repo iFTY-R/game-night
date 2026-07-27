@@ -60,6 +60,10 @@ const (
 	EventTypeIdentityUserUnsuspended EventType = "identity.user.unsuspended.v1"
 	// EventTypeIdentityUserDeleted announces terminal account deletion to downstream modules.
 	EventTypeIdentityUserDeleted EventType = "identity.user.deleted.v1"
+	// EventTypeAdminCacheGenerationAdvanced asks projection workers to observe one committed generation.
+	EventTypeAdminCacheGenerationAdvanced EventType = "admin.cache_generation.advanced.v1"
+	// EventTypeAdminTaskRetried wakes durable workers after one reviewed failed task is requeued.
+	EventTypeAdminTaskRetried EventType = "admin.task.retried.v1"
 )
 
 // ParseEventType validates a durable event protocol name.
@@ -89,6 +93,10 @@ const (
 	AggregateTypeIdentityUser AggregateType = "identity.user"
 	// AggregateTypeIdentityDevice identifies durable events emitted for one device credential.
 	AggregateTypeIdentityDevice AggregateType = "identity.device"
+	// AggregateTypeAdminProjection identifies one fixed rebuildable administrator projection.
+	AggregateTypeAdminProjection AggregateType = "admin.projection"
+	// AggregateTypeAdminTask identifies one durable administrator background task.
+	AggregateTypeAdminTask AggregateType = "admin.task"
 )
 
 // ParseAggregateType validates a namespace-qualified aggregate type.

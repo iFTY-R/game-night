@@ -59,6 +59,36 @@ func TestRuntimeRunsRotationInTheSameSerialPass(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunsAdminJobsWithoutMaintenance(t *testing.T) {
+	dispatcher := &countingDispatcher{called: make(chan struct{}, 1)}
+	adminJobs := &countingMaintenance{called: make(chan struct{}, 1)}
+	runtime, err := NewWithAdminJobs(
+		dispatcher,
+		nil,
+		nil,
+		nil,
+		adminJobs,
+		10*time.Millisecond,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- runtime.Run(ctx) }()
+
+	select {
+	case <-adminJobs.called:
+		cancel()
+	case <-time.After(time.Second):
+		t.Fatal("admin batch jobs were not run without maintenance")
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 type countingDispatcher struct {
 	mu     sync.Mutex
 	calls  int
@@ -67,12 +97,22 @@ type countingDispatcher struct {
 
 type countingRotation struct{ called chan struct{} }
 
+type countingMaintenance struct{ called chan struct{} }
+
 func (rotation *countingRotation) RunOnce(context.Context) (keyrotation.Result, error) {
 	select {
 	case rotation.called <- struct{}{}:
 	default:
 	}
 	return keyrotation.Result{Idle: true}, nil
+}
+
+func (maintenance *countingMaintenance) RunOnce(context.Context) error {
+	select {
+	case maintenance.called <- struct{}{}:
+	default:
+	}
+	return nil
 }
 
 func (dispatcher *countingDispatcher) RunOnce(context.Context) (checkpoint.Result, error) {

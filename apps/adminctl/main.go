@@ -23,7 +23,12 @@ var (
 	errResetFailed       = errors.New("administrator reset failed")
 )
 
-const adminResetAuditTargetID = "admin" // Identifies the singleton account without granting adminctl table-read authority.
+const (
+	// adminResetAuditTargetID identifies the singleton account without granting adminctl table-read authority.
+	adminResetAuditTargetID = "admin"
+	// The one-slot queue accepts the reset's first hash request while the fixed worker is starting.
+	adminResetArgon2QueueCapacity = 1
+)
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.LookupEnv, os.Stdout); err != nil {
@@ -51,7 +56,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	if err != nil {
 		return errResetFailed
 	}
-	argon2Service, err := security.NewArgon2Service(security.DefaultArgon2Params(), 1, 0)
+	argon2Service, err := newAdminResetPasswordHasher()
 	if err != nil {
 		return errResetFailed
 	}
@@ -130,6 +135,11 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 	_, _ = io.WriteString(output, "admin reset committed\n")
 	return nil
+}
+
+// newAdminResetPasswordHasher provisions one bounded worker for the offline reset command.
+func newAdminResetPasswordHasher() (*security.Argon2Service, error) {
+	return security.NewArgon2Service(security.DefaultArgon2Params(), 1, adminResetArgon2QueueCapacity)
 }
 
 // adminResetAuditTarget uses a system identifier because the offline tool cannot read the UUID-backed admin row.

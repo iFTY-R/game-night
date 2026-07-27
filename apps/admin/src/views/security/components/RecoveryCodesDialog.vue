@@ -5,7 +5,7 @@ import AppDialog from "../../../components/AppDialog.vue";
 import ElevationDialog, { type ElevationDialogPayload } from "./ElevationDialog.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { regenerateAdminRecoveryCodes, confirmAdminSecretReceipt } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { AdminElevationScope, type AdminElevationSummary } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import { AdminSecretOperation } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
@@ -100,7 +100,7 @@ const handleElevated = async (summary: AdminElevationSummary): Promise<void> => 
   errorMessage.value = "";
 
   try {
-    const operationId = createRequestId();
+    const operationId = createOperationId();
     recoveryCodesOperationId.value = operationId;
 
     const response = await regenerateAdminRecoveryCodes({

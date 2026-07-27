@@ -5,7 +5,7 @@ import type { FormInst, FormRules } from "naive-ui";
 import AppDialog from "../../../components/AppDialog.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { beginTotpEnrollment, completeTotpEnrollment, confirmAdminSecretReceipt } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { AdminSecretOperation } from "../../../../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
 
@@ -127,7 +127,7 @@ const handlePasswordSubmit = async (): Promise<void> => {
   errorMessage.value = "";
 
   try {
-    const operationId = createRequestId();
+    const operationId = createOperationId();
     const response = await beginTotpEnrollment({
       operationId,
       currentPassword: password.value,
@@ -198,7 +198,7 @@ const handleTotpSubmit = async (): Promise<void> => {
   errorMessage.value = "";
 
   try {
-    const recoveryOperationId = createRequestId();
+    const recoveryOperationId = createOperationId();
     const response = await completeTotpEnrollment({
       enrollmentOperationId: enrollmentOperationId.value,
       recoveryCodesOperationId: recoveryOperationId,

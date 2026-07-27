@@ -29,4 +29,10 @@ export class AdminApiError extends Error {
 
 export const isSessionInvalidError = (error: unknown): boolean =>
   error instanceof AdminApiError &&
-  (error.businessKey === "admin.auth.invalid" || error.businessKey === "request.csrf.invalid");
+  // An expired browser cookie can be rejected by the edge before it adds a business-error detail.
+  // Treat the protocol-level unauthenticated result as a lost admin session as well, so protected
+  // pages cannot remain mounted with an empty client-side identity.
+  (error.status === 401 ||
+    error.code === "unauthenticated" ||
+    error.businessKey === "admin.auth.invalid" ||
+    error.businessKey === "request.csrf.invalid");

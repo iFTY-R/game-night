@@ -10,6 +10,7 @@ import (
 	"time"
 
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	redisstore "github.com/iFTY-R/game-night/platform/persistence/redis"
 )
 
@@ -104,6 +105,7 @@ type Config struct {
 	Timer         TimerConfig
 	Fanout        FanoutConfig
 	InternalToken string
+	Heartbeat     serviceheartbeat.Config
 }
 
 // Load validates shared dependencies first and never opens a listener or dependency connection.
@@ -141,6 +143,10 @@ func loadProcessConfig(lookup sharedconfig.LookupEnv, environment sharedconfig.E
 	internalToken, err := reader.required(internalTokenEnvironment)
 	if err != nil || !validInternalToken(internalToken) {
 		return Config{}, fieldError(internalTokenEnvironment, "missing or invalid internal credential")
+	}
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, environment == sharedconfig.EnvironmentProduction)
+	if err != nil {
+		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
 	}
 	leaseTTL, err := parseDuration(reader, leaseTTLEnvironment, defaultLeaseTTL, redisstore.MinimumSessionLeaseTTL, redisstore.MaximumSessionLeaseTTL)
 	if err != nil {
@@ -221,6 +227,7 @@ func loadProcessConfig(lookup sharedconfig.LookupEnv, environment sharedconfig.E
 			LeaseDuration: outboxLeaseDuration, PollInterval: outboxPollInterval, BatchSize: uint32(outboxBatchSize),
 		},
 		InternalToken: internalToken,
+		Heartbeat:     heartbeat,
 	}, nil
 }
 

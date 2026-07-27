@@ -57,12 +57,14 @@
 html,
 body,
 #app {
+  height: 100%;
   min-height: 100%;
   margin: 0;
 }
 
 body {
   min-width: 320px;
+  overflow: hidden;
   background: var(--admin-bg);
   color: var(--admin-ink);
   letter-spacing: 0;

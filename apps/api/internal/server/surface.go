@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"connectrpc.com/connect"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/admin/v1/adminv1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/identity/v1/identityv1connect"
@@ -35,6 +36,9 @@ type AdminSurfaceConfig struct {
 	Auth         adminv1connect.AdminAuthServiceHandler
 	User         adminv1connect.AdminUserServiceHandler
 	Room         adminv1connect.AdminRoomServiceHandler
+	Audit        adminv1connect.AdminAuditServiceHandler
+	Operations   adminv1connect.AdminOperationsServiceHandler
+	Overview     adminv1connect.AdminOverviewServiceHandler
 	Interceptors []connect.Interceptor
 }
 
@@ -74,17 +78,23 @@ type AdminSurface struct{ handler http.Handler }
 // NewAdminSurface builds an immutable administrator mux with an interceptor
 // chain independent from the one supplied to NewUserSurface.
 func NewAdminSurface(config AdminSurfaceConfig) (*AdminSurface, error) {
-	if config.Auth == nil || config.User == nil || config.Room == nil || invalidInterceptors(config.Interceptors) {
+	if config.Auth == nil || config.User == nil || config.Room == nil || config.Audit == nil || config.Operations == nil || config.Overview == nil || invalidInterceptors(config.Interceptors) {
 		return nil, errInvalidSurface
 	}
 	options := handlerOptions(config.Interceptors)
 	authPath, authHandler := adminv1connect.NewAdminAuthServiceHandler(config.Auth, options...)
 	userPath, userHandler := adminv1connect.NewAdminUserServiceHandler(config.User, options...)
 	roomPath, roomHandler := adminv1connect.NewAdminRoomServiceHandler(config.Room, options...)
+	auditPath, auditHandler := adminv1connect.NewAdminAuditServiceHandler(config.Audit, options...)
+	operationsPath, operationsHandler := adminv1connect.NewAdminOperationsServiceHandler(config.Operations, options...)
+	overviewPath, overviewHandler := adminv1connect.NewAdminOverviewServiceHandler(config.Overview, options...)
 	mux := http.NewServeMux()
 	mux.Handle(authPath, authHandler)
 	mux.Handle(userPath, userHandler)
 	mux.Handle(roomPath, roomHandler)
+	mux.Handle(auditPath, auditHandler)
+	mux.Handle(operationsPath, operationsHandler)
+	mux.Handle(overviewPath, overviewHandler)
 	return &AdminSurface{handler: mux}, nil
 }
 
@@ -99,14 +109,15 @@ func (surface *AdminSurface) ServeHTTP(writer http.ResponseWriter, request *http
 
 // HandlerConfig joins isolated user and administrator surfaces on one listener through fixed generated prefixes.
 type HandlerConfig struct {
-	User    *UserSurface
-	Admin   *AdminSurface
-	Metrics http.Handler
+	User      *UserSurface
+	Admin     *AdminSurface
+	Metrics   http.Handler
+	Heartbeat http.Handler
 }
 
 // NewHandler returns the process HTTP handler while preserving each surface's private interceptor chain.
 func NewHandler(config HandlerConfig) (http.Handler, error) {
-	if config.User == nil || config.Admin == nil || config.Metrics == nil {
+	if config.User == nil || config.Admin == nil || config.Metrics == nil || config.Heartbeat == nil {
 		return nil, errInvalidSurface
 	}
 	mux := http.NewServeMux()
@@ -116,10 +127,15 @@ func NewHandler(config HandlerConfig) (http.Handler, error) {
 	mux.Handle("/"+adminv1connect.AdminAuthServiceName+"/", config.Admin)
 	mux.Handle("/"+adminv1connect.AdminUserServiceName+"/", config.Admin)
 	mux.Handle("/"+adminv1connect.AdminRoomServiceName+"/", config.Admin)
+	mux.Handle("/"+adminv1connect.AdminAuditServiceName+"/", config.Admin)
+	mux.Handle("/"+adminv1connect.AdminOperationsServiceName+"/", config.Admin)
+	mux.Handle("/"+adminv1connect.AdminOverviewServiceName+"/", config.Admin)
 	// Both immutable surfaces own the same readiness instance; routing through one avoids duplicate public paths.
 	mux.Handle(ReadinessPath, config.User)
 	mux.Handle(SensitiveReadinessPath, config.User)
 	mux.Handle(MetricsPath, config.Metrics)
+	// Heartbeats use their own private bearer protocol and must not inherit browser Connect middleware.
+	mux.Handle(serviceheartbeat.Path, config.Heartbeat)
 	return mux, nil
 }
 

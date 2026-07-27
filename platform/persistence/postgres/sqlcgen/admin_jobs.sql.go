@@ -178,6 +178,115 @@ func (q *Queries) ApplyAdminBatchJobItemCompletion(ctx context.Context, arg Appl
 	return i, err
 }
 
+const cancelAdminBatchJobCAS = `-- name: CancelAdminBatchJobCAS :one
+WITH canceled_items AS (
+    UPDATE admin_batch_job_items
+    SET state = 'canceled',
+        lease_owner = NULL,
+        lease_until = NULL,
+        completed_at = $1,
+        version = version + 1,
+        updated_at = $1
+    WHERE batch_job_id = $2
+      AND state = 'queued'
+    RETURNING 1
+), totals AS (
+    SELECT count(*)::bigint AS canceled_count
+    FROM canceled_items
+)
+UPDATE admin_batch_jobs
+SET queued_count = admin_batch_jobs.queued_count - COALESCE((SELECT canceled_count FROM totals), 0),
+    canceled_count = admin_batch_jobs.canceled_count + COALESCE((SELECT canceled_count FROM totals), 0),
+    state = CASE
+        WHEN admin_batch_jobs.running_count > 0 THEN 'canceling'
+        ELSE 'canceled'
+    END,
+    started_at = COALESCE(admin_batch_jobs.started_at, $1),
+    completed_at = CASE
+        WHEN admin_batch_jobs.running_count > 0 THEN NULL
+        ELSE $1
+    END,
+    version = admin_batch_jobs.version + 1,
+    updated_at = $1
+WHERE admin_batch_jobs.batch_job_id = $2
+  AND admin_batch_jobs.version = $3
+  AND admin_batch_jobs.state IN ('queued', 'running', 'canceling')
+RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+`
+
+type CancelAdminBatchJobCASParams struct {
+	ChangedAt       pgtype.Timestamptz `json:"changed_at"`
+	BatchJobID      pgtype.UUID        `json:"batch_job_id"`
+	ExpectedVersion int64              `json:"expected_version"`
+}
+
+// CancelAdminBatchJobCAS
+//
+//	WITH canceled_items AS (
+//	    UPDATE admin_batch_job_items
+//	    SET state = 'canceled',
+//	        lease_owner = NULL,
+//	        lease_until = NULL,
+//	        completed_at = $1,
+//	        version = version + 1,
+//	        updated_at = $1
+//	    WHERE batch_job_id = $2
+//	      AND state = 'queued'
+//	    RETURNING 1
+//	), totals AS (
+//	    SELECT count(*)::bigint AS canceled_count
+//	    FROM canceled_items
+//	)
+//	UPDATE admin_batch_jobs
+//	SET queued_count = admin_batch_jobs.queued_count - COALESCE((SELECT canceled_count FROM totals), 0),
+//	    canceled_count = admin_batch_jobs.canceled_count + COALESCE((SELECT canceled_count FROM totals), 0),
+//	    state = CASE
+//	        WHEN admin_batch_jobs.running_count > 0 THEN 'canceling'
+//	        ELSE 'canceled'
+//	    END,
+//	    started_at = COALESCE(admin_batch_jobs.started_at, $1),
+//	    completed_at = CASE
+//	        WHEN admin_batch_jobs.running_count > 0 THEN NULL
+//	        ELSE $1
+//	    END,
+//	    version = admin_batch_jobs.version + 1,
+//	    updated_at = $1
+//	WHERE admin_batch_jobs.batch_job_id = $2
+//	  AND admin_batch_jobs.version = $3
+//	  AND admin_batch_jobs.state IN ('queued', 'running', 'canceling')
+//	RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+func (q *Queries) CancelAdminBatchJobCAS(ctx context.Context, arg CancelAdminBatchJobCASParams) (AdminBatchJob, error) {
+	row := q.db.QueryRow(ctx, cancelAdminBatchJobCAS, arg.ChangedAt, arg.BatchJobID, arg.ExpectedVersion)
+	var i AdminBatchJob
+	err := row.Scan(
+		&i.BatchJobID,
+		&i.ActorAdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.PreviewID,
+		&i.Command,
+		&i.SelectionSchemaVersion,
+		&i.SelectionSnapshot,
+		&i.SelectionDigest,
+		&i.Reason,
+		&i.State,
+		&i.TargetCount,
+		&i.QueuedCount,
+		&i.RunningCount,
+		&i.SucceededCount,
+		&i.FailedCount,
+		&i.SkippedCount,
+		&i.CanceledCount,
+		&i.ErrorMessageKey,
+		&i.Version,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const claimAdminBatchJobItem = `-- name: ClaimAdminBatchJobItem :one
 WITH candidate AS (
     SELECT queued.item_id, queued.state AS previous_state
@@ -357,6 +466,113 @@ func (q *Queries) ClaimAdminUserErasureJob(ctx context.Context, arg ClaimAdminUs
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const claimNextAdminBatchJobItem = `-- name: ClaimNextAdminBatchJobItem :one
+WITH candidate AS (
+    SELECT queued.item_id, queued.state AS previous_state
+    FROM admin_batch_job_items AS queued
+    JOIN admin_batch_jobs AS job ON job.batch_job_id = queued.batch_job_id
+    WHERE job.state IN ('queued', 'running', 'canceling')
+      AND (
+          queued.state = 'queued'
+          OR (queued.state = 'running' AND queued.lease_until <= pg_catalog.clock_timestamp())
+      )
+    ORDER BY job.created_at, job.batch_job_id, queued.created_at, queued.item_id
+    FOR UPDATE OF queued SKIP LOCKED
+    LIMIT 1
+)
+UPDATE admin_batch_job_items AS item
+SET state = 'running',
+    attempt_count = item.attempt_count + 1,
+    lease_owner = $1,
+    lease_until = pg_catalog.clock_timestamp() + ($2::bigint * interval '1 second'),
+    started_at = COALESCE(item.started_at, pg_catalog.clock_timestamp()),
+    completed_at = NULL,
+    error_message_key = NULL,
+    version = item.version + 1,
+    updated_at = pg_catalog.clock_timestamp()
+FROM candidate
+WHERE item.item_id = candidate.item_id
+RETURNING item.item_id, item.batch_job_id, item.user_id, item.expected_user_version, item.request_digest, item.state, item.attempt_count, item.lease_owner, item.lease_until, item.error_message_key, item.audit_event_id, item.started_at, item.completed_at, item.version, item.created_at, item.updated_at, candidate.previous_state = 'queued' AS started_now
+`
+
+type ClaimNextAdminBatchJobItemParams struct {
+	LeaseOwner   pgtype.Text `json:"lease_owner"`
+	LeaseSeconds int64       `json:"lease_seconds"`
+}
+
+type ClaimNextAdminBatchJobItemRow struct {
+	ItemID              pgtype.UUID        `json:"item_id"`
+	BatchJobID          pgtype.UUID        `json:"batch_job_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	ExpectedUserVersion int64              `json:"expected_user_version"`
+	RequestDigest       []byte             `json:"request_digest"`
+	State               string             `json:"state"`
+	AttemptCount        int32              `json:"attempt_count"`
+	LeaseOwner          pgtype.Text        `json:"lease_owner"`
+	LeaseUntil          pgtype.Timestamptz `json:"lease_until"`
+	ErrorMessageKey     pgtype.Text        `json:"error_message_key"`
+	AuditEventID        pgtype.UUID        `json:"audit_event_id"`
+	StartedAt           pgtype.Timestamptz `json:"started_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+	Version             int64              `json:"version"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	StartedNow          bool               `json:"started_now"`
+}
+
+// ClaimNextAdminBatchJobItem
+//
+//	WITH candidate AS (
+//	    SELECT queued.item_id, queued.state AS previous_state
+//	    FROM admin_batch_job_items AS queued
+//	    JOIN admin_batch_jobs AS job ON job.batch_job_id = queued.batch_job_id
+//	    WHERE job.state IN ('queued', 'running', 'canceling')
+//	      AND (
+//	          queued.state = 'queued'
+//	          OR (queued.state = 'running' AND queued.lease_until <= pg_catalog.clock_timestamp())
+//	      )
+//	    ORDER BY job.created_at, job.batch_job_id, queued.created_at, queued.item_id
+//	    FOR UPDATE OF queued SKIP LOCKED
+//	    LIMIT 1
+//	)
+//	UPDATE admin_batch_job_items AS item
+//	SET state = 'running',
+//	    attempt_count = item.attempt_count + 1,
+//	    lease_owner = $1,
+//	    lease_until = pg_catalog.clock_timestamp() + ($2::bigint * interval '1 second'),
+//	    started_at = COALESCE(item.started_at, pg_catalog.clock_timestamp()),
+//	    completed_at = NULL,
+//	    error_message_key = NULL,
+//	    version = item.version + 1,
+//	    updated_at = pg_catalog.clock_timestamp()
+//	FROM candidate
+//	WHERE item.item_id = candidate.item_id
+//	RETURNING item.item_id, item.batch_job_id, item.user_id, item.expected_user_version, item.request_digest, item.state, item.attempt_count, item.lease_owner, item.lease_until, item.error_message_key, item.audit_event_id, item.started_at, item.completed_at, item.version, item.created_at, item.updated_at, candidate.previous_state = 'queued' AS started_now
+func (q *Queries) ClaimNextAdminBatchJobItem(ctx context.Context, arg ClaimNextAdminBatchJobItemParams) (ClaimNextAdminBatchJobItemRow, error) {
+	row := q.db.QueryRow(ctx, claimNextAdminBatchJobItem, arg.LeaseOwner, arg.LeaseSeconds)
+	var i ClaimNextAdminBatchJobItemRow
+	err := row.Scan(
+		&i.ItemID,
+		&i.BatchJobID,
+		&i.UserID,
+		&i.ExpectedUserVersion,
+		&i.RequestDigest,
+		&i.State,
+		&i.AttemptCount,
+		&i.LeaseOwner,
+		&i.LeaseUntil,
+		&i.ErrorMessageKey,
+		&i.AuditEventID,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StartedNow,
 	)
 	return i, err
 }
@@ -872,6 +1088,53 @@ func (q *Queries) CreateAdminUserErasureJob(ctx context.Context, arg CreateAdmin
 	return i, err
 }
 
+const getAdminBatchJobByID = `-- name: GetAdminBatchJobByID :one
+SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+FROM admin_batch_jobs
+WHERE batch_job_id = $1
+`
+
+type GetAdminBatchJobByIDParams struct {
+	BatchJobID pgtype.UUID `json:"batch_job_id"`
+}
+
+// GetAdminBatchJobByID
+//
+//	SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+//	FROM admin_batch_jobs
+//	WHERE batch_job_id = $1
+func (q *Queries) GetAdminBatchJobByID(ctx context.Context, arg GetAdminBatchJobByIDParams) (AdminBatchJob, error) {
+	row := q.db.QueryRow(ctx, getAdminBatchJobByID, arg.BatchJobID)
+	var i AdminBatchJob
+	err := row.Scan(
+		&i.BatchJobID,
+		&i.ActorAdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.PreviewID,
+		&i.Command,
+		&i.SelectionSchemaVersion,
+		&i.SelectionSnapshot,
+		&i.SelectionDigest,
+		&i.Reason,
+		&i.State,
+		&i.TargetCount,
+		&i.QueuedCount,
+		&i.RunningCount,
+		&i.SucceededCount,
+		&i.FailedCount,
+		&i.SkippedCount,
+		&i.CanceledCount,
+		&i.ErrorMessageKey,
+		&i.Version,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getAdminBatchJobByOperation = `-- name: GetAdminBatchJobByOperation :one
 SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
 FROM admin_batch_jobs
@@ -922,6 +1185,46 @@ func (q *Queries) GetAdminBatchJobByOperation(ctx context.Context, arg GetAdminB
 	return i, err
 }
 
+const getAdminBatchPreview = `-- name: GetAdminBatchPreview :one
+SELECT preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
+FROM admin_batch_previews
+WHERE preview_id = $1
+  AND actor_admin_id = $2
+`
+
+type GetAdminBatchPreviewParams struct {
+	PreviewID    pgtype.UUID `json:"preview_id"`
+	ActorAdminID pgtype.UUID `json:"actor_admin_id"`
+}
+
+// GetAdminBatchPreview
+//
+//	SELECT preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
+//	FROM admin_batch_previews
+//	WHERE preview_id = $1
+//	  AND actor_admin_id = $2
+func (q *Queries) GetAdminBatchPreview(ctx context.Context, arg GetAdminBatchPreviewParams) (AdminBatchPreview, error) {
+	row := q.db.QueryRow(ctx, getAdminBatchPreview, arg.PreviewID, arg.ActorAdminID)
+	var i AdminBatchPreview
+	err := row.Scan(
+		&i.PreviewID,
+		&i.ActorAdminID,
+		&i.Command,
+		&i.SelectionSchemaVersion,
+		&i.SelectionSnapshot,
+		&i.SelectionDigest,
+		&i.PreviewDigest,
+		&i.TargetCount,
+		&i.ExecutableCount,
+		&i.BlockedCount,
+		&i.SampledAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const getUsableAdminBatchPreviewForUpdate = `-- name: GetUsableAdminBatchPreviewForUpdate :one
 SELECT preview_id, actor_admin_id, command, selection_schema_version, selection_snapshot, selection_digest, preview_digest, target_count, executable_count, blocked_count, sampled_at, expires_at, consumed_at, version
 FROM admin_batch_previews
@@ -968,6 +1271,234 @@ func (q *Queries) GetUsableAdminBatchPreviewForUpdate(ctx context.Context, arg G
 	return i, err
 }
 
+const listAdminBatchJobItems = `-- name: ListAdminBatchJobItems :many
+SELECT item_id, batch_job_id, user_id, expected_user_version, request_digest, state, attempt_count, lease_owner, lease_until, error_message_key, audit_event_id, started_at, completed_at, version, created_at, updated_at
+FROM admin_batch_job_items
+WHERE batch_job_id = $1
+  AND (cardinality($2::text[]) = 0 OR state = ANY($2::text[]))
+  AND (
+      $3::uuid IS NULL
+      OR (created_at, item_id) > ($4::timestamptz, $3::uuid)
+  )
+ORDER BY created_at, item_id
+LIMIT $5
+`
+
+type ListAdminBatchJobItemsParams struct {
+	BatchJobID     pgtype.UUID        `json:"batch_job_id"`
+	States         []string           `json:"states"`
+	AfterItemID    pgtype.UUID        `json:"after_item_id"`
+	AfterCreatedAt pgtype.Timestamptz `json:"after_created_at"`
+	PageSize       int32              `json:"page_size"`
+}
+
+// ListAdminBatchJobItems
+//
+//	SELECT item_id, batch_job_id, user_id, expected_user_version, request_digest, state, attempt_count, lease_owner, lease_until, error_message_key, audit_event_id, started_at, completed_at, version, created_at, updated_at
+//	FROM admin_batch_job_items
+//	WHERE batch_job_id = $1
+//	  AND (cardinality($2::text[]) = 0 OR state = ANY($2::text[]))
+//	  AND (
+//	      $3::uuid IS NULL
+//	      OR (created_at, item_id) > ($4::timestamptz, $3::uuid)
+//	  )
+//	ORDER BY created_at, item_id
+//	LIMIT $5
+func (q *Queries) ListAdminBatchJobItems(ctx context.Context, arg ListAdminBatchJobItemsParams) ([]AdminBatchJobItem, error) {
+	rows, err := q.db.Query(ctx, listAdminBatchJobItems,
+		arg.BatchJobID,
+		arg.States,
+		arg.AfterItemID,
+		arg.AfterCreatedAt,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminBatchJobItem{}
+	for rows.Next() {
+		var i AdminBatchJobItem
+		if err := rows.Scan(
+			&i.ItemID,
+			&i.BatchJobID,
+			&i.UserID,
+			&i.ExpectedUserVersion,
+			&i.RequestDigest,
+			&i.State,
+			&i.AttemptCount,
+			&i.LeaseOwner,
+			&i.LeaseUntil,
+			&i.ErrorMessageKey,
+			&i.AuditEventID,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminBatchJobs = `-- name: ListAdminBatchJobs :many
+SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+FROM admin_batch_jobs
+WHERE (cardinality($1::text[]) = 0 OR state = ANY($1::text[]))
+  AND (cardinality($2::text[]) = 0 OR command = ANY($2::text[]))
+  AND ($3::timestamptz IS NULL OR created_at >= $3)
+  AND ($4::timestamptz IS NULL OR created_at <= $4)
+  AND (
+      $5::uuid IS NULL
+      OR (
+          $6::text = 'created_at'
+          AND (
+              ($7::text = 'ascending' AND (created_at, batch_job_id) > ($8::timestamptz, $5::uuid))
+              OR ($7::text = 'descending' AND (created_at, batch_job_id) < ($8::timestamptz, $5::uuid))
+          )
+      )
+      OR (
+          $6::text = 'updated_at'
+          AND (
+              ($7::text = 'ascending' AND (updated_at, batch_job_id) > ($8::timestamptz, $5::uuid))
+              OR ($7::text = 'descending' AND (updated_at, batch_job_id) < ($8::timestamptz, $5::uuid))
+          )
+      )
+      OR (
+          $6::text = 'batch_job_id'
+          AND (
+              ($7::text = 'ascending' AND batch_job_id > $5::uuid)
+              OR ($7::text = 'descending' AND batch_job_id < $5::uuid)
+          )
+      )
+  )
+ORDER BY
+    CASE WHEN $6::text = 'created_at' AND $7::text = 'ascending' THEN created_at END ASC,
+    CASE WHEN $6::text = 'created_at' AND $7::text = 'descending' THEN created_at END DESC,
+    CASE WHEN $6::text = 'updated_at' AND $7::text = 'ascending' THEN updated_at END ASC,
+    CASE WHEN $6::text = 'updated_at' AND $7::text = 'descending' THEN updated_at END DESC,
+    CASE WHEN $6::text = 'batch_job_id' AND $7::text = 'ascending' THEN batch_job_id END ASC,
+    CASE WHEN $6::text = 'batch_job_id' AND $7::text = 'descending' THEN batch_job_id END DESC,
+    CASE WHEN $7::text = 'ascending' THEN batch_job_id END ASC,
+    CASE WHEN $7::text = 'descending' THEN batch_job_id END DESC
+LIMIT $9
+`
+
+type ListAdminBatchJobsParams struct {
+	States          []string           `json:"states"`
+	Commands        []string           `json:"commands"`
+	CreatedFrom     pgtype.Timestamptz `json:"created_from"`
+	CreatedTo       pgtype.Timestamptz `json:"created_to"`
+	AfterBatchJobID pgtype.UUID        `json:"after_batch_job_id"`
+	SortField       string             `json:"sort_field"`
+	SortDirection   string             `json:"sort_direction"`
+	AfterSortTime   pgtype.Timestamptz `json:"after_sort_time"`
+	PageSize        int32              `json:"page_size"`
+}
+
+// ListAdminBatchJobs
+//
+//	SELECT batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+//	FROM admin_batch_jobs
+//	WHERE (cardinality($1::text[]) = 0 OR state = ANY($1::text[]))
+//	  AND (cardinality($2::text[]) = 0 OR command = ANY($2::text[]))
+//	  AND ($3::timestamptz IS NULL OR created_at >= $3)
+//	  AND ($4::timestamptz IS NULL OR created_at <= $4)
+//	  AND (
+//	      $5::uuid IS NULL
+//	      OR (
+//	          $6::text = 'created_at'
+//	          AND (
+//	              ($7::text = 'ascending' AND (created_at, batch_job_id) > ($8::timestamptz, $5::uuid))
+//	              OR ($7::text = 'descending' AND (created_at, batch_job_id) < ($8::timestamptz, $5::uuid))
+//	          )
+//	      )
+//	      OR (
+//	          $6::text = 'updated_at'
+//	          AND (
+//	              ($7::text = 'ascending' AND (updated_at, batch_job_id) > ($8::timestamptz, $5::uuid))
+//	              OR ($7::text = 'descending' AND (updated_at, batch_job_id) < ($8::timestamptz, $5::uuid))
+//	          )
+//	      )
+//	      OR (
+//	          $6::text = 'batch_job_id'
+//	          AND (
+//	              ($7::text = 'ascending' AND batch_job_id > $5::uuid)
+//	              OR ($7::text = 'descending' AND batch_job_id < $5::uuid)
+//	          )
+//	      )
+//	  )
+//	ORDER BY
+//	    CASE WHEN $6::text = 'created_at' AND $7::text = 'ascending' THEN created_at END ASC,
+//	    CASE WHEN $6::text = 'created_at' AND $7::text = 'descending' THEN created_at END DESC,
+//	    CASE WHEN $6::text = 'updated_at' AND $7::text = 'ascending' THEN updated_at END ASC,
+//	    CASE WHEN $6::text = 'updated_at' AND $7::text = 'descending' THEN updated_at END DESC,
+//	    CASE WHEN $6::text = 'batch_job_id' AND $7::text = 'ascending' THEN batch_job_id END ASC,
+//	    CASE WHEN $6::text = 'batch_job_id' AND $7::text = 'descending' THEN batch_job_id END DESC,
+//	    CASE WHEN $7::text = 'ascending' THEN batch_job_id END ASC,
+//	    CASE WHEN $7::text = 'descending' THEN batch_job_id END DESC
+//	LIMIT $9
+func (q *Queries) ListAdminBatchJobs(ctx context.Context, arg ListAdminBatchJobsParams) ([]AdminBatchJob, error) {
+	rows, err := q.db.Query(ctx, listAdminBatchJobs,
+		arg.States,
+		arg.Commands,
+		arg.CreatedFrom,
+		arg.CreatedTo,
+		arg.AfterBatchJobID,
+		arg.SortField,
+		arg.SortDirection,
+		arg.AfterSortTime,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminBatchJob{}
+	for rows.Next() {
+		var i AdminBatchJob
+		if err := rows.Scan(
+			&i.BatchJobID,
+			&i.ActorAdminID,
+			&i.OperationID,
+			&i.RequestDigest,
+			&i.PreviewID,
+			&i.Command,
+			&i.SelectionSchemaVersion,
+			&i.SelectionSnapshot,
+			&i.SelectionDigest,
+			&i.Reason,
+			&i.State,
+			&i.TargetCount,
+			&i.QueuedCount,
+			&i.RunningCount,
+			&i.SucceededCount,
+			&i.FailedCount,
+			&i.SkippedCount,
+			&i.CanceledCount,
+			&i.ErrorMessageKey,
+			&i.Version,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markAdminBatchJobItemClaimed = `-- name: MarkAdminBatchJobItemClaimed :one
 UPDATE admin_batch_jobs
 SET state = 'running',
@@ -1001,6 +1532,155 @@ type MarkAdminBatchJobItemClaimedParams struct {
 //	RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
 func (q *Queries) MarkAdminBatchJobItemClaimed(ctx context.Context, arg MarkAdminBatchJobItemClaimedParams) (AdminBatchJob, error) {
 	row := q.db.QueryRow(ctx, markAdminBatchJobItemClaimed, arg.BatchJobID)
+	var i AdminBatchJob
+	err := row.Scan(
+		&i.BatchJobID,
+		&i.ActorAdminID,
+		&i.OperationID,
+		&i.RequestDigest,
+		&i.PreviewID,
+		&i.Command,
+		&i.SelectionSchemaVersion,
+		&i.SelectionSnapshot,
+		&i.SelectionDigest,
+		&i.Reason,
+		&i.State,
+		&i.TargetCount,
+		&i.QueuedCount,
+		&i.RunningCount,
+		&i.SucceededCount,
+		&i.FailedCount,
+		&i.SkippedCount,
+		&i.CanceledCount,
+		&i.ErrorMessageKey,
+		&i.Version,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const retryAdminBatchJobCAS = `-- name: RetryAdminBatchJobCAS :one
+WITH selected_items AS (
+    SELECT item_id, state
+    FROM admin_batch_job_items
+    WHERE batch_job_id = $2
+      AND state IN ('failed', 'skipped', 'canceled')
+      AND (
+          cardinality($4::uuid[]) = 0
+          OR item_id = ANY($4::uuid[])
+      )
+    FOR UPDATE
+), retried_items AS (
+    UPDATE admin_batch_job_items AS item
+    SET state = 'queued',
+        lease_owner = NULL,
+        lease_until = NULL,
+        error_message_key = NULL,
+        audit_event_id = NULL,
+        completed_at = NULL,
+        version = item.version + 1,
+        updated_at = $1
+    FROM selected_items
+    WHERE item.item_id = selected_items.item_id
+    RETURNING selected_items.state AS previous_state
+), totals AS (
+    SELECT count(*)::bigint AS requeued_count,
+           count(*) FILTER (WHERE previous_state = 'failed')::bigint AS failed_count,
+           count(*) FILTER (WHERE previous_state = 'skipped')::bigint AS skipped_count,
+           count(*) FILTER (WHERE previous_state = 'canceled')::bigint AS canceled_count
+    FROM retried_items
+)
+UPDATE admin_batch_jobs
+SET queued_count = admin_batch_jobs.queued_count + COALESCE((SELECT requeued_count FROM totals), 0),
+    failed_count = admin_batch_jobs.failed_count - COALESCE((SELECT failed_count FROM totals), 0),
+    skipped_count = admin_batch_jobs.skipped_count - COALESCE((SELECT skipped_count FROM totals), 0),
+    canceled_count = admin_batch_jobs.canceled_count - COALESCE((SELECT canceled_count FROM totals), 0),
+    state = CASE
+        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN 'running'
+        ELSE admin_batch_jobs.state
+    END,
+    completed_at = CASE
+        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN NULL
+        ELSE admin_batch_jobs.completed_at
+    END,
+    error_message_key = NULL,
+    version = admin_batch_jobs.version + 1,
+    updated_at = $1
+WHERE admin_batch_jobs.batch_job_id = $2
+  AND admin_batch_jobs.version = $3
+  AND admin_batch_jobs.state IN ('succeeded', 'partially_succeeded', 'failed', 'canceled')
+RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+`
+
+type RetryAdminBatchJobCASParams struct {
+	ChangedAt       pgtype.Timestamptz `json:"changed_at"`
+	BatchJobID      pgtype.UUID        `json:"batch_job_id"`
+	ExpectedVersion int64              `json:"expected_version"`
+	ItemIds         []pgtype.UUID      `json:"item_ids"`
+}
+
+// RetryAdminBatchJobCAS
+//
+//	WITH selected_items AS (
+//	    SELECT item_id, state
+//	    FROM admin_batch_job_items
+//	    WHERE batch_job_id = $2
+//	      AND state IN ('failed', 'skipped', 'canceled')
+//	      AND (
+//	          cardinality($4::uuid[]) = 0
+//	          OR item_id = ANY($4::uuid[])
+//	      )
+//	    FOR UPDATE
+//	), retried_items AS (
+//	    UPDATE admin_batch_job_items AS item
+//	    SET state = 'queued',
+//	        lease_owner = NULL,
+//	        lease_until = NULL,
+//	        error_message_key = NULL,
+//	        audit_event_id = NULL,
+//	        completed_at = NULL,
+//	        version = item.version + 1,
+//	        updated_at = $1
+//	    FROM selected_items
+//	    WHERE item.item_id = selected_items.item_id
+//	    RETURNING selected_items.state AS previous_state
+//	), totals AS (
+//	    SELECT count(*)::bigint AS requeued_count,
+//	           count(*) FILTER (WHERE previous_state = 'failed')::bigint AS failed_count,
+//	           count(*) FILTER (WHERE previous_state = 'skipped')::bigint AS skipped_count,
+//	           count(*) FILTER (WHERE previous_state = 'canceled')::bigint AS canceled_count
+//	    FROM retried_items
+//	)
+//	UPDATE admin_batch_jobs
+//	SET queued_count = admin_batch_jobs.queued_count + COALESCE((SELECT requeued_count FROM totals), 0),
+//	    failed_count = admin_batch_jobs.failed_count - COALESCE((SELECT failed_count FROM totals), 0),
+//	    skipped_count = admin_batch_jobs.skipped_count - COALESCE((SELECT skipped_count FROM totals), 0),
+//	    canceled_count = admin_batch_jobs.canceled_count - COALESCE((SELECT canceled_count FROM totals), 0),
+//	    state = CASE
+//	        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN 'running'
+//	        ELSE admin_batch_jobs.state
+//	    END,
+//	    completed_at = CASE
+//	        WHEN COALESCE((SELECT requeued_count FROM totals), 0) > 0 THEN NULL
+//	        ELSE admin_batch_jobs.completed_at
+//	    END,
+//	    error_message_key = NULL,
+//	    version = admin_batch_jobs.version + 1,
+//	    updated_at = $1
+//	WHERE admin_batch_jobs.batch_job_id = $2
+//	  AND admin_batch_jobs.version = $3
+//	  AND admin_batch_jobs.state IN ('succeeded', 'partially_succeeded', 'failed', 'canceled')
+//	RETURNING batch_job_id, actor_admin_id, operation_id, request_digest, preview_id, command, selection_schema_version, selection_snapshot, selection_digest, reason, state, target_count, queued_count, running_count, succeeded_count, failed_count, skipped_count, canceled_count, error_message_key, version, created_at, started_at, completed_at, updated_at
+func (q *Queries) RetryAdminBatchJobCAS(ctx context.Context, arg RetryAdminBatchJobCASParams) (AdminBatchJob, error) {
+	row := q.db.QueryRow(ctx, retryAdminBatchJobCAS,
+		arg.ChangedAt,
+		arg.BatchJobID,
+		arg.ExpectedVersion,
+		arg.ItemIds,
+	)
 	var i AdminBatchJob
 	err := row.Scan(
 		&i.BatchJobID,

@@ -160,6 +160,40 @@ var procedurePolicies = map[string]procedurePolicy{
 		session:      sessionRequirementAuthenticated,
 		requiresCSRF: true,
 	},
+	// Audit browsing is read-only, but remains bound to a full CSRF-protected administrator session.
+	adminv1connect.AdminAuditServiceListAuditEventsProcedure: {
+		procedure:    adminv1connect.AdminAuditServiceListAuditEventsProcedure,
+		session:      sessionRequirementFull,
+		requiresCSRF: true,
+		permission:   admin.PermissionAuditRead,
+	},
+	adminv1connect.AdminOperationsServiceGetOperationsSnapshotProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServiceGetOperationsSnapshotProcedure, admin.PermissionOperationsRead, false, "",
+	),
+	adminv1connect.AdminOperationsServiceGetMaintenanceStateProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServiceGetMaintenanceStateProcedure, admin.PermissionOperationsRead, false, "",
+	),
+	adminv1connect.AdminOperationsServicePreviewMaintenanceChangeProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServicePreviewMaintenanceChangeProcedure, admin.PermissionOperationsMaintain, true, "",
+	),
+	adminv1connect.AdminOperationsServiceApplyMaintenanceChangeProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServiceApplyMaintenanceChangeProcedure, admin.PermissionOperationsMaintain, true, admin.ElevationScopeOperationsMaintenance,
+	),
+	adminv1connect.AdminOperationsServicePreviewCacheRefreshProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServicePreviewCacheRefreshProcedure, admin.PermissionOperationsMaintain, true, "",
+	),
+	adminv1connect.AdminOperationsServiceApplyCacheRefreshProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServiceApplyCacheRefreshProcedure, admin.PermissionOperationsMaintain, true, admin.ElevationScopeOperationsMaintenance,
+	),
+	adminv1connect.AdminOperationsServicePreviewTaskRetryProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServicePreviewTaskRetryProcedure, admin.PermissionOperationsMaintain, true, "",
+	),
+	adminv1connect.AdminOperationsServiceApplyTaskRetryProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOperationsServiceApplyTaskRetryProcedure, admin.PermissionOperationsMaintain, true, admin.ElevationScopeOperationsMaintenance,
+	),
+	adminv1connect.AdminOverviewServiceGetOverviewProcedure: adminOperationsProcedurePolicy(
+		adminv1connect.AdminOverviewServiceGetOverviewProcedure, admin.PermissionOverviewRead, false, "",
+	),
 	adminv1connect.AdminUserServiceListUsersProcedure: adminUserProcedurePolicy(
 		adminv1connect.AdminUserServiceListUsersProcedure, admin.PermissionUsersRead, false, "",
 	),
@@ -295,6 +329,18 @@ func adminUserPayloadProcedurePolicy(procedure string, requiresRequestID bool, p
 
 // adminRoomProcedurePolicy applies the full-session, CSRF, and audited-command boundary to room/game control RPCs.
 func adminRoomProcedurePolicy(procedure string, permission admin.Permission, requiresRequestID bool, elevation admin.ElevationScope) procedurePolicy {
+	return procedurePolicy{
+		procedure:         procedure,
+		session:           sessionRequirementFull,
+		requiresCSRF:      true,
+		requiresRequestID: requiresRequestID,
+		permission:        permission,
+		elevation:         elevation,
+	}
+}
+
+// adminOperationsProcedurePolicy applies the full-session boundary and reserves elevation for apply procedures only.
+func adminOperationsProcedurePolicy(procedure string, permission admin.Permission, requiresRequestID bool, elevation admin.ElevationScope) procedurePolicy {
 	return procedurePolicy{
 		procedure:         procedure,
 		session:           sessionRequirementFull,

@@ -3,7 +3,7 @@ import { computed, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { NAlert, NDataTable, NSpin, NButton, NPopconfirm } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { listAdminSessions, revokeAdminSession } from "../../../api/admin-auth";
-import { createRequestId } from "../../../api/connect";
+import { createOperationId } from "../../../api/connect";
 import { AdminApiError } from "../../../api/errors";
 import { useAuthStore } from "../../../stores/auth";
 import { formatDateTime, formatSessionKind } from "../../../utils/format";
@@ -59,7 +59,7 @@ const handleRevokeSession = async (session: AdminSessionInfo): Promise<void> => 
 
   try {
     await revokeAdminSession({
-      operationId: createRequestId(),
+      operationId: createOperationId(),
       sessionId: session.sessionId,
       expectedSessionVersion: session.sessionVersion,
       signal: controller.signal

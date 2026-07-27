@@ -9,6 +9,7 @@ import (
 
 	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	"github.com/iFTY-R/game-night/platform/outbox"
 )
 
@@ -46,6 +47,7 @@ type Config struct {
 	Shared            sharedconfig.WorkerDependencies
 	CheckpointStorage checkpointstorage.Config
 	Runtime           RuntimeConfig
+	Heartbeat         serviceheartbeat.Config
 }
 
 // Load validates all worker settings before opening a database pool or object-storage client.
@@ -86,12 +88,17 @@ func Load(lookup sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, fieldError(roomIdleEnvironment)
 	}
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, shared.Environment == sharedconfig.EnvironmentProduction)
+	if err != nil {
+		return Config{}, fieldError(serviceheartbeat.TokenEnvironment)
+	}
 	return Config{
 		Shared: shared, CheckpointStorage: storage,
 		Runtime: RuntimeConfig{
 			InstanceID: instanceID, LeaseDuration: leaseDuration, BatchSize: uint32(batchSize),
 			PollInterval: pollInterval, ShutdownTimeout: shutdownTimeout, RoomIdleTimeout: roomIdleTimeout,
 		},
+		Heartbeat: heartbeat,
 	}, nil
 }
 

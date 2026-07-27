@@ -1,7 +1,9 @@
 .auth-shell {
   position: relative;
   display: grid;
+  height: 100dvh;
   min-height: 100dvh;
+  overflow-y: auto;
   place-items: center;
   padding: 48px 24px;
   background-color: var(--admin-bg);
@@ -111,19 +113,23 @@
 }
 
 .admin-layout {
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--admin-bg);
 }
 
 .admin-layout__body {
   display: grid;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
   grid-template-columns: max-content minmax(0, 1fr);
 }
 
 .admin-layout__content {
   display: grid;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
   grid-template-rows: 60px 36px 44px minmax(0, 1fr);
   background: var(--admin-bg);
@@ -348,7 +354,11 @@
 }
 
 .admin-pane {
+  min-height: 0;
   min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   background: var(--admin-bg);
 }

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
 
 const (
@@ -27,6 +29,7 @@ const (
 	realtimeBootstrapURLEnvironment  = "GAME_NIGHT_API_REALTIME_BOOTSTRAP_URL"
 	realtimePeerURLsEnvironment      = "GAME_NIGHT_API_REALTIME_PEER_URLS"
 	realtimeInternalTokenEnvironment = "GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN"
+	instanceIDEnvironment            = "GAME_NIGHT_API_INSTANCE_ID"
 	// Listener defaults support mobile requests without allowing stalled clients to hold resources indefinitely.
 	defaultListenAddress     = ":8080"
 	defaultReadHeaderTimeout = 5 * time.Second
@@ -49,7 +52,10 @@ const (
 	defaultArgon2Queue          = 64
 	maximumArgon2Queue          = 4096
 	defaultRealtimeBootstrapURL = "http://127.0.0.1:8091"
+	defaultInstanceID           = "api-local"
 )
+
+var instanceIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 // ListenerConfig bounds HTTP resource use and graceful shutdown time for the API process.
 type ListenerConfig struct {
@@ -82,6 +88,8 @@ type Config struct {
 	Listener          ListenerConfig
 	Argon2            Argon2Config
 	Realtime          RealtimeConfig
+	InstanceID        string
+	Heartbeat         serviceheartbeat.Config
 }
 
 // Load validates shared configuration first, then parses bounded API listener settings without opening sockets.
@@ -107,7 +115,18 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config, Realtime: realtimeConfig}, nil
+	instanceID := reader.valueOrDefault(instanceIDEnvironment, defaultInstanceID)
+	if !instanceIDPattern.MatchString(instanceID) {
+		return Config{}, fieldError(instanceIDEnvironment, "invalid instance identifier")
+	}
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookupEnv), false, shared.Environment == sharedconfig.EnvironmentProduction)
+	if err != nil {
+		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
+	}
+	return Config{
+		Shared: shared, CheckpointStorage: checkpointStorage, Listener: listener, Argon2: argon2Config,
+		Realtime: realtimeConfig, InstanceID: instanceID, Heartbeat: heartbeat,
+	}, nil
 }
 
 type environmentReader struct {

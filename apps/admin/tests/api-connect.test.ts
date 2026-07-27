@@ -11,11 +11,22 @@ import {
   verifyAdminTotp
 } from "../src/api/admin-auth";
 import {
+  adminAuditRequestPolicies,
+  listAuditEvents
+} from "../src/api/admin-audit";
+import {
   adminUserRequestPolicies,
+  cancelBatchUserOperation,
   executeUserCommand,
+  getBatchUserOperation,
   getUserPII,
+  listBatchUserOperationItems,
+  listBatchUserOperations,
   listUsers,
+  previewBatchUserOperation,
   previewUserCommand,
+  retryBatchUserOperation,
+  startBatchUserOperation,
   setUserTags
 } from "../src/api/admin-user";
 import {
@@ -23,11 +34,19 @@ import {
   forceCloseRoom,
   listRooms
 } from "../src/api/admin-room";
-import { installSessionInvalidHandler } from "../src/api/connect";
+import { createOperationId, installSessionInvalidHandler } from "../src/api/connect";
 import { AdminApiError } from "../src/api/errors";
 import { AdminAuthService } from "../../../contracts/gen/ts/platform/admin/v1/admin_auth_pb";
+import { AdminAuditService } from "../../../contracts/gen/ts/platform/admin/v1/admin_audit_pb";
 import { AdminRoomService } from "../../../contracts/gen/ts/platform/admin/v1/admin_room_pb";
-import { AdminUserCommandType, AdminUserPIIField, AdminUserService } from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
+import {
+  AdminBatchUserCommandType,
+  AdminBatchUserItemState,
+  AdminUserCommandType,
+  AdminUserPIIField,
+  AdminUserService
+} from "../../../contracts/gen/ts/platform/admin/v1/admin_user_pb";
+import { AdminJobState } from "../../../contracts/gen/ts/platform/admin/v1/admin_common_pb";
 import { BusinessErrorDetailSchema } from "../../../contracts/gen/ts/platform/common/v1/error_pb";
 
 const base64BusinessError = (messageKey: string): string => {
@@ -37,6 +56,12 @@ const base64BusinessError = (messageKey: string): string => {
 };
 
 describe("admin connect transport", () => {
+  it("creates canonical base64url selectors for idempotent mutations", () => {
+    const operationId = createOperationId();
+
+    expect(operationId).toMatch(/^[A-Za-z0-9_-]{32}$/u);
+  });
+
   it("keeps frontend request policies exhaustive against AdminAuthService", () => {
     expect(Object.keys(adminAuthRequestPolicies)).toEqual(AdminAuthService.methods.map((method) => method.name));
     expect(adminAuthRequestPolicies).toEqual({
@@ -64,6 +89,13 @@ describe("admin connect transport", () => {
     });
   });
 
+  it("keeps frontend request policies exhaustive against AdminAuditService", () => {
+    expect(Object.keys(adminAuditRequestPolicies)).toEqual(AdminAuditService.methods.map((method) => method.name));
+    expect(adminAuditRequestPolicies).toEqual({
+      ListAuditEvents: { csrf: true, requestId: false }
+    });
+  });
+
   it("keeps frontend request policies scoped to implemented AdminUserService procedures", () => {
     const implementedMethods = AdminUserService.methods
       .map((method) => method.name)
@@ -81,7 +113,14 @@ describe("admin connect transport", () => {
       ListUserNotes: { csrf: true, requestId: false },
       AppendUserNote: { csrf: true, requestId: true },
       PreviewUserCommand: { csrf: true, requestId: true },
-      ExecuteUserCommand: { csrf: true, requestId: true }
+      ExecuteUserCommand: { csrf: true, requestId: true },
+      PreviewBatchUserOperation: { csrf: true, requestId: true },
+      StartBatchUserOperation: { csrf: true, requestId: true },
+      GetBatchUserOperation: { csrf: true, requestId: false },
+      ListBatchUserOperations: { csrf: true, requestId: false },
+      ListBatchUserOperationItems: { csrf: true, requestId: false },
+      CancelBatchUserOperation: { csrf: true, requestId: true },
+      RetryBatchUserOperation: { csrf: true, requestId: true }
     });
   });
 
@@ -200,6 +239,31 @@ describe("admin connect transport", () => {
     expect(writeHeaders.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
 
+  it("posts audit timeline reads to AdminAuditService without an audit request id", async () => {
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      writable: true,
+      value: "__Host-gn_admin_csrf=csrf-token"
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ events: [], page: {}, scannedEvents: 0 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await listAuditEvents({ requestId: "req-1", reasonCode: "audit.review" });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/platform.admin.v1.AdminAuditService/ListAuditEvents");
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(headers.get("X-Request-ID")).toBeNull();
+    expect(String(init.body)).toContain("req-1");
+    expect(String(init.body)).toContain("audit.review");
+  });
+
   it.each([
     ["GetUserPII", () => getUserPII({ userId: "user-1", fields: [AdminUserPIIField.ADMIN_USER_PII_FIELD_REAL_NAME], reason: "申诉核验" })],
     ["SetUserTags", () => setUserTags({ operationId: "op-1", userId: "user-1", tagIds: ["tag-1"], reason: "运营标注", expectedVersion: 2n })],
@@ -217,6 +281,31 @@ describe("admin connect transport", () => {
       previewDigest: "digest",
       reason: "风控处置",
       expectedUserVersion: 2n
+    })],
+    ["PreviewBatchUserOperation", () => previewBatchUserOperation({
+      selection: { mode: "explicit", users: [{ userId: "user-1", expectedUserVersion: 2n }] },
+      command: AdminBatchUserCommandType.SUSPEND,
+      reason: "批量风控处置"
+    })],
+    ["StartBatchUserOperation", () => startBatchUserOperation({
+      operationId: "op-2",
+      previewId: "preview-batch-1",
+      previewDigest: "digest-batch",
+      reason: "批量风控处置",
+      expectedVersion: 3n
+    })],
+    ["CancelBatchUserOperation", () => cancelBatchUserOperation({
+      operationId: "op-3",
+      batchOperationId: "batch-1",
+      reason: "批量任务撤回",
+      expectedVersion: 4n
+    })],
+    ["RetryBatchUserOperation", () => retryBatchUserOperation({
+      operationId: "op-4",
+      batchOperationId: "batch-1",
+      itemIds: ["item-1"],
+      reason: "重试失败条目",
+      expectedVersion: 5n
     })]
   ])("assigns request ids to audited user-center procedure %s", async (procedureName, invoke) => {
     Object.defineProperty(document, "cookie", {
@@ -239,6 +328,33 @@ describe("admin connect transport", () => {
     expect(url).toBe(`/platform.admin.v1.AdminUserService/${procedureName}`);
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
+  });
+
+  it.each([
+    ["GetBatchUserOperation", { batchOperation: {}, sampledAt: "1970-01-01T00:00:00Z" }, () => getBatchUserOperation({ batchOperationId: "batch-1" })],
+    ["ListBatchUserOperations", { batchOperations: [], page: {} }, () => listBatchUserOperations({ states: [AdminJobState.RUNNING] })],
+    ["ListBatchUserOperationItems", { items: [], page: {} }, () => listBatchUserOperationItems({ batchOperationId: "batch-1", states: [AdminBatchUserItemState.FAILED] })]
+  ])("keeps request id off read-only batch procedure %s", async (procedureName, responseBody, invoke) => {
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      writable: true,
+      value: "__Host-gn_admin_csrf=csrf-token"
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(responseBody), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await invoke();
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe(`/platform.admin.v1.AdminUserService/${procedureName}`);
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(headers.get("X-Request-ID")).toBeNull();
   });
 
   it("assigns request ids to protected mutation procedures", async () => {
@@ -342,6 +458,26 @@ describe("admin connect transport", () => {
     await expect(verifyAdminTotp({ totpCode: "000000" })).rejects.toMatchObject({
       businessKey: "admin.auth.invalid",
       message: "登录状态已失效，请重新登录。"
+    });
+    expect(invalidSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a bare 401 unauthenticated response as a lost admin session", async () => {
+    const invalidSpy = vi.fn();
+    installSessionInvalidHandler(invalidSpy);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: "unauthenticated", message: "authentication required" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    await expect(verifyAdminTotp({ totpCode: "000000" })).rejects.toMatchObject({
+      status: 401,
+      code: "unauthenticated"
     });
     expect(invalidSpy).toHaveBeenCalledTimes(1);
   });

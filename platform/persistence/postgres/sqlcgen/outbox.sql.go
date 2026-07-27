@@ -481,7 +481,9 @@ WITH consumer_state AS MATERIALIZED (
       AND lease_owner = $2
       AND lease_until > pg_catalog.clock_timestamp()
       AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
-      AND $3::timestamptz <= pg_catalog.clock_timestamp()
+      -- A database-calibrated process clock may lead this connection by a small amount. The
+      -- current lease bounds the caller timestamp while database time still gates availability.
+      AND $3::timestamptz < lease_until
 ), candidates AS MATERIALIZED (
     SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
            event.aggregate_id, event.payload, event.created_at, event.available_at
@@ -532,7 +534,9 @@ type ListOutboxEventsForConsumerRow struct {
 //	      AND lease_owner = $2
 //	      AND lease_until > pg_catalog.clock_timestamp()
 //	      AND (next_attempt_at IS NULL OR next_attempt_at <= pg_catalog.clock_timestamp())
-//	      AND $3::timestamptz <= pg_catalog.clock_timestamp()
+//	      -- A database-calibrated process clock may lead this connection by a small amount. The
+//	      -- current lease bounds the caller timestamp while database time still gates availability.
+//	      AND $3::timestamptz < lease_until
 //	), candidates AS MATERIALIZED (
 //	    SELECT event.event_sequence, event.event_id, event.event_type, event.aggregate_type,
 //	           event.aggregate_id, event.payload, event.created_at, event.available_at

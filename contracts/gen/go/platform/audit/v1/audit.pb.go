@@ -175,6 +175,10 @@ const (
 	AuditAction_AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED    AuditAction = 36
 	AuditAction_AUDIT_ACTION_ADMIN_ELEVATION_DENIED           AuditAction = 37
 	AuditAction_AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED          AuditAction = 38
+	// Operations commands use dedicated append-only actions so signed history preserves command intent.
+	AuditAction_AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED AuditAction = 39
+	AuditAction_AUDIT_ACTION_ADMIN_CACHE_REFRESHED     AuditAction = 40
+	AuditAction_AUDIT_ACTION_ADMIN_TASK_RETRIED        AuditAction = 41
 )
 
 // Enum value maps for AuditAction.
@@ -219,6 +223,9 @@ var (
 		36: "AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED",
 		37: "AUDIT_ACTION_ADMIN_ELEVATION_DENIED",
 		38: "AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED",
+		39: "AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED",
+		40: "AUDIT_ACTION_ADMIN_CACHE_REFRESHED",
+		41: "AUDIT_ACTION_ADMIN_TASK_RETRIED",
 	}
 	AuditAction_value = map[string]int32{
 		"AUDIT_ACTION_UNSPECIFIED":                      0,
@@ -260,6 +267,9 @@ var (
 		"AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED":    36,
 		"AUDIT_ACTION_ADMIN_ELEVATION_DENIED":           37,
 		"AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED":          38,
+		"AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED":        39,
+		"AUDIT_ACTION_ADMIN_CACHE_REFRESHED":            40,
+		"AUDIT_ACTION_ADMIN_TASK_RETRIED":               41,
 	}
 )
 
@@ -744,7 +754,7 @@ const file_platform_audit_v1_audit_proto_rawDesc = "" +
 	"\x18AUDIT_TARGET_TYPE_DEVICE\x10\x02\x12$\n" +
 	" AUDIT_TARGET_TYPE_PROFILE_EXPORT\x10\x03\x12\x1b\n" +
 	"\x17AUDIT_TARGET_TYPE_ADMIN\x10\x04\x12\x1c\n" +
-	"\x18AUDIT_TARGET_TYPE_SYSTEM\x10\x05*\x89\f\n" +
+	"\x18AUDIT_TARGET_TYPE_SYSTEM\x10\x05*\x82\r\n" +
 	"\vAuditAction\x12\x1c\n" +
 	"\x18AUDIT_ACTION_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fAUDIT_ACTION_IDENTITY_ONBOARDED\x10\x01\x12#\n" +
@@ -785,7 +795,10 @@ const file_platform_audit_v1_audit_proto_rawDesc = "" +
 	"'AUDIT_ACTION_ADMIN_SECRET_RESULT_OPENED\x10#\x12.\n" +
 	"*AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED\x10$\x12'\n" +
 	"#AUDIT_ACTION_ADMIN_ELEVATION_DENIED\x10%\x12(\n" +
-	"$AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED\x10&BIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1;auditv1b\x06proto3"
+	"$AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED\x10&\x12*\n" +
+	"&AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED\x10'\x12&\n" +
+	"\"AUDIT_ACTION_ADMIN_CACHE_REFRESHED\x10(\x12#\n" +
+	"\x1fAUDIT_ACTION_ADMIN_TASK_RETRIED\x10)BIZGgithub.com/iFTY-R/game-night/contracts/gen/go/platform/audit/v1;auditv1b\x06proto3"
 
 var (
 	file_platform_audit_v1_audit_proto_rawDescOnce sync.Once

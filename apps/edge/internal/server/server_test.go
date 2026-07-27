@@ -2,6 +2,8 @@ package server
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net"
@@ -17,6 +19,8 @@ import (
 	"time"
 
 	"github.com/iFTY-R/game-night/apps/edge/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
+	"github.com/iFTY-R/game-night/platform/admin/operations"
 )
 
 const (
@@ -126,6 +130,9 @@ func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
 		{name: "user-admin-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", wantStatus: http.StatusNotFound},
 		{name: "user-admin-user-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminUserService/ListUsers", wantStatus: http.StatusNotFound},
 		{name: "user-admin-room-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminRoomService/ListRooms", wantStatus: http.StatusNotFound},
+		{name: "user-admin-audit-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuditService/ListAuditEvents", wantStatus: http.StatusNotFound},
+		{name: "user-admin-operations-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOperationsService/GetOperationsSnapshot", wantStatus: http.StatusNotFound},
+		{name: "user-admin-overview-rpc-404", host: testUserHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOverviewService/GetOverview", wantStatus: http.StatusNotFound},
 		{name: "user-readiness-404", host: testUserHost, method: http.MethodGet, target: "/readyz", wantStatus: http.StatusNotFound},
 		{name: "user-realtime", host: testUserHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusOK, wantBody: "realtime", wantUpstream: "realtime"},
 		{name: "user-realtime-other-404", host: testUserHost, method: http.MethodGet, target: "/realtime/other", wantStatus: http.StatusNotFound},
@@ -134,6 +141,9 @@ func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
 		{name: "admin-preview-revoke-other-sessions-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
 		{name: "admin-user-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminUserService/ListUsers", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
 		{name: "admin-room-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminRoomService/ListRooms", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-audit-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuditService/ListAuditEvents", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-operations-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOperationsService/GetOperationsSnapshot", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-overview-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOverviewService/GetOverview", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
 		{name: "admin-identity-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminIdentityService/ListAuditEvents", wantStatus: http.StatusNotFound},
 		{name: "admin-user-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/platform.identity.v1.IdentityService/Bootstrap", wantStatus: http.StatusNotFound},
 		{name: "admin-realtime-404", host: testAdminHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusNotFound},
@@ -141,6 +151,8 @@ func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
 		{name: "admin-sensitive-readyz-404", host: testAdminHost, method: http.MethodHead, target: "/readyz/sensitive", wantStatus: http.StatusNotFound},
 		{name: "known-platform-miss", host: testAdminHost, method: http.MethodGet, target: "/platform.example", wantStatus: http.StatusNotFound},
 		{name: "known-health-miss", host: testUserHost, method: http.MethodGet, target: "/health/not-real", wantStatus: http.StatusNotFound},
+		{name: "user-private-heartbeat-404", host: testUserHost, method: http.MethodPost, target: "/internal/admin/operations/heartbeat", wantStatus: http.StatusNotFound},
+		{name: "admin-private-heartbeat-404", host: testAdminHost, method: http.MethodPost, target: "/internal/admin/operations/heartbeat", wantStatus: http.StatusNotFound},
 		{name: "known-non-get-route", host: testAdminHost, method: http.MethodPatch, target: "/dashboard", wantStatus: http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -354,6 +366,114 @@ func TestHealthReadyHidesFailures(t *testing.T) {
 	}
 }
 
+func TestRunStartsAndStopsHeartbeatReporter(t *testing.T) {
+	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != adminReadyPath {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(apiUpstream.Close)
+	realtimeUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != healthReadyPath {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(realtimeUpstream.Close)
+	heartbeatToken := strings.Repeat("h", 32)
+	received := make(chan recordedHeartbeat, 4)
+	heartbeatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		record := recordedHeartbeat{
+			method:        r.Method,
+			path:          r.URL.Path,
+			authorization: r.Header.Get("Authorization"),
+			contentType:   r.Header.Get("Content-Type"),
+		}
+		record.decodeErr = json.NewDecoder(r.Body).Decode(&record.payload)
+		_ = r.Body.Close()
+		received <- record
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(heartbeatServer.Close)
+	cfg := config.Config{
+		ListenAddress:       "127.0.0.1:0",
+		APIUpstreamURL:      mustURL(t, apiUpstream.URL),
+		RealtimeUpstreamURL: mustURL(t, realtimeUpstream.URL),
+		UserStaticDirectory: writeStaticRoot(t, map[string]string{"index.html": "USER-INDEX"}),
+		AdminStaticDirectory: writeStaticRoot(t, map[string]string{
+			"index.html": "ADMIN-INDEX",
+		}),
+		UserHosts:                  []string{testUserHost},
+		AdminHosts:                 []string{testAdminHost},
+		TrustedProxyCIDRs:          []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")},
+		ShutdownTimeout:            2 * time.Second,
+		ReadHeaderTimeout:          time.Second,
+		ProxyDialTimeout:           time.Second,
+		ProxyTLSHandshakeTimeout:   time.Second,
+		ProxyResponseHeaderTimeout: time.Second,
+		HealthTimeout:              500 * time.Millisecond,
+		InstanceID:                 "edge-run-test",
+		Heartbeat: serviceheartbeat.Config{
+			TargetURL:    heartbeatServer.URL + serviceheartbeat.Path,
+			Token:        heartbeatToken,
+			BuildVersion: "edge-build",
+			Interval:     time.Second,
+			Timeout:      300 * time.Millisecond,
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- Run(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	}()
+
+	first := waitForHeartbeat(t, received)
+	if first.decodeErr != nil {
+		t.Fatalf("decode err=%v", first.decodeErr)
+	}
+	if first.method != http.MethodPost || first.path != serviceheartbeat.Path {
+		t.Fatalf("heartbeat request=%s %s", first.method, first.path)
+	}
+	if first.authorization != "Bearer "+heartbeatToken || first.contentType != "application/json" {
+		t.Fatalf("heartbeat headers auth=%q content-type=%q", first.authorization, first.contentType)
+	}
+	if first.payload.ServiceKind != operations.ServiceEdge || first.payload.InstanceID != cfg.InstanceID || first.payload.BuildVersion != cfg.Heartbeat.BuildVersion {
+		t.Fatalf("heartbeat payload identity=%+v", first.payload)
+	}
+	if first.payload.Status != operations.HealthDegraded {
+		t.Fatalf("heartbeat status=%s", first.payload.Status)
+	}
+	if first.payload.Components[heartbeatComponentAPIUpstream] != operations.HealthUnavailable ||
+		first.payload.Components[heartbeatComponentRealtimeUpstream] != operations.HealthHealthy {
+		t.Fatalf("heartbeat components=%v", first.payload.Components)
+	}
+	if first.payload.MaintenanceVersion != initialMaintenanceVersion {
+		t.Fatalf("maintenance version=%d", first.payload.MaintenanceVersion)
+	}
+
+	cancel()
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("run err=%v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("run did not stop after cancellation")
+	}
+
+	final := waitForHeartbeat(t, received)
+	if final.decodeErr != nil {
+		t.Fatalf("final decode err=%v", final.decodeErr)
+	}
+	if !final.payload.StartedAt.Equal(first.payload.StartedAt) {
+		t.Fatalf("started_at drifted: first=%s final=%s", first.payload.StartedAt, final.payload.StartedAt)
+	}
+}
+
 func TestRealtimeGameWebSocketUpgrade(t *testing.T) {
 	upgradeSeen := make(chan recordedRequest, 1)
 	realtimeUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -466,6 +586,7 @@ func newTestHandlerWithRoots(t *testing.T, apiURL, realtimeURL *url.URL, userFil
 		ProxyTLSHandshakeTimeout:   time.Second,
 		ProxyResponseHeaderTimeout: time.Second,
 		HealthTimeout:              500 * time.Millisecond,
+		InstanceID:                 "edge-test",
 	}
 	if apiURL == nil {
 		cfg.APIUpstreamURL = mustURL(t, "http://127.0.0.1:1")
@@ -505,6 +626,15 @@ type recordedRequest struct {
 	XForwardedFor  string
 	XForwardedHost string
 	XRealIP        string
+}
+
+type recordedHeartbeat struct {
+	method        string
+	path          string
+	authorization string
+	contentType   string
+	payload       serviceheartbeat.Payload
+	decodeErr     error
 }
 
 type capturedUpstream struct {
@@ -587,5 +717,16 @@ func waitForTwo(t *testing.T, left, right <-chan struct{}) {
 		case <-deadline:
 			t.Fatal("upstreams did not start concurrently")
 		}
+	}
+}
+
+func waitForHeartbeat(t *testing.T, heartbeats <-chan recordedHeartbeat) recordedHeartbeat {
+	t.Helper()
+	select {
+	case heartbeat := <-heartbeats:
+		return heartbeat
+	case <-time.After(3 * time.Second):
+		t.Fatal("heartbeat was not received")
+		return recordedHeartbeat{}
 	}
 }

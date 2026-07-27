@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -56,21 +57,31 @@ type AnnotationAuditEvent struct {
 // Service coordinates authorization, cursor binding, PII decryption, and annotation audit for the user center.
 type Service struct {
 	repository Repository
-	profiles   ProfileReader
-	protector  *profile.PIIProtector
-	audit      AuditRecorder
-	cursor     *CursorCodec
-	clock      clock.Clock
+	jobs       BatchRepository
+	governance GovernanceExecutor
+	// commandStore retains short-lived previews and idempotent single-user command outcomes independently from batch jobs.
+	commandStore UserCommandRepository
+	// singleGovernance owns destructive identity/device effects that must remain unavailable to ordinary query paths.
+	singleGovernance SingleUserGovernanceExecutor
+	profiles         ProfileReader
+	protector        *profile.PIIProtector
+	audit            AuditRecorder
+	cursor           *CursorCodec
+	clock            clock.Clock
 }
 
 // Config makes every side effect explicit so tests can run without hidden global time or audit state.
 type Config struct {
-	Repository Repository
-	Profiles   ProfileReader
-	Protector  *profile.PIIProtector
-	Audit      AuditRecorder
-	Cursor     *CursorCodec
-	Clock      clock.Clock
+	Repository       Repository
+	Jobs             BatchRepository
+	Governance       GovernanceExecutor
+	UserCommands     UserCommandRepository
+	SingleGovernance SingleUserGovernanceExecutor
+	Profiles         ProfileReader
+	Protector        *profile.PIIProtector
+	Audit            AuditRecorder
+	Cursor           *CursorCodec
+	Clock            clock.Clock
 }
 
 // NewService validates the minimum query dependencies; PII dependencies are required only for GetUserPII.
@@ -79,7 +90,9 @@ func NewService(config Config) (*Service, error) {
 		return nil, ErrInvalidInput
 	}
 	return &Service{
-		repository: config.Repository, profiles: config.Profiles, protector: config.Protector,
+		repository: config.Repository, jobs: config.Jobs, governance: config.Governance,
+		commandStore: config.UserCommands, singleGovernance: config.SingleGovernance,
+		profiles: config.Profiles, protector: config.Protector,
 		audit: config.Audit, cursor: config.Cursor, clock: config.Clock,
 	}, nil
 }
@@ -210,12 +223,31 @@ func (service *Service) ListTags(ctx context.Context, actor admin.ActorContext, 
 	return service.repository.ListTags(ctx, query)
 }
 
+// tagColorPattern is the canonical stored color shape; it must stay aligned with the PostgreSQL
+// CHECK constraint on user_tag definitions (uppercase #RRGGBB) in the user-center migration.
+var tagColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
+
+// canonicalTagColor folds operator-entered hex colors (any case, padded) into the single stored
+// form so audit digests, idempotent replays, and the database constraint all see one value.
+// Rejecting here keeps invalid colors from producing an audit event for a doomed write.
+func canonicalTagColor(raw string) (string, bool) {
+	color := strings.ToUpper(strings.TrimSpace(raw))
+	return color, tagColorPattern.MatchString(color)
+}
+
 // CreateTag adds one catalog tag after an audited annotate-permission check.
 func (service *Service) CreateTag(ctx context.Context, actor admin.ActorContext, command CreateTagCommand, operationID idempotency.OperationID) (TagMutation, error) {
+	// Catalog versions are 1-based, so 0 can never match a live catalog; rejecting it here keeps a
+	// doomed request from producing an audit event before persistence refuses it.
 	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
-		!operationID.Valid() || !validReason(command.Reason) {
+		!operationID.Valid() || !validReason(command.Reason) || command.ExpectedCatalogVersion == 0 {
 		return TagMutation{}, ErrInvalidInput
 	}
+	color, colorOK := canonicalTagColor(command.Color)
+	if !colorOK {
+		return TagMutation{}, ErrInvalidInput
+	}
+	command.Color = color
 	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {
 		return TagMutation{}, ErrPermissionDenied
 	}
@@ -233,9 +265,14 @@ func (service *Service) CreateTag(ctx context.Context, actor admin.ActorContext,
 // UpdateTag changes one exact tag version and records the reviewed operator reason before persistence.
 func (service *Service) UpdateTag(ctx context.Context, actor admin.ActorContext, command UpdateTagCommand, operationID idempotency.OperationID) (Tag, error) {
 	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
-		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(command.Reason) {
+		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(command.Reason) || command.ExpectedVersion == 0 {
 		return Tag{}, ErrInvalidInput
 	}
+	color, colorOK := canonicalTagColor(command.Color)
+	if !colorOK {
+		return Tag{}, ErrInvalidInput
+	}
+	command.Color = color
 	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {
 		return Tag{}, ErrPermissionDenied
 	}
@@ -253,7 +290,7 @@ func (service *Service) UpdateTag(ctx context.Context, actor admin.ActorContext,
 // DeleteTag removes an unused tag definition only at the exact reviewed version.
 func (service *Service) DeleteTag(ctx context.Context, actor admin.ActorContext, command DeleteTagCommand, operationID idempotency.OperationID, reason string) (uint64, error) {
 	if service == nil || service.repository == nil || service.audit == nil || service.clock == nil || ctx == nil ||
-		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(reason) {
+		command.TagID == uuid.Nil || !operationID.Valid() || !validReason(reason) || command.ExpectedVersion == 0 {
 		return 0, ErrInvalidInput
 	}
 	if err := actor.Require(admin.PermissionUsersAnnotate); err != nil {

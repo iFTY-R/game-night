@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NLayout, NLayoutContent } from "naive-ui";
-import { RouterView } from "vue-router";
+import { RouterView, useRoute } from "vue-router";
 import AdminBreadcrumb from "./components/AdminBreadcrumb.vue";
 import AdminHeader from "./components/AdminHeader.vue";
 import AdminSider from "./components/AdminSider.vue";
@@ -11,8 +11,11 @@ import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
 const navigation = useNavigationStore();
+const route = useRoute();
 
 navigation.restoreTabs(auth.permissions);
+// Layout creation can happen after the router has already resolved; restore persisted tabs first, then make the current route authoritative.
+navigation.syncFromRoute(route, auth.permissions);
 </script>
 
 <template>

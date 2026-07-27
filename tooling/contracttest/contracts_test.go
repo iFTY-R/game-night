@@ -92,6 +92,9 @@ func TestServiceMethodsMatchApprovedContract(t *testing.T) {
 		"ExecuteEmergencyRepair",
 		"GetRepairOperation",
 	})
+	assertServiceMethods(t, adminv1.File_platform_admin_v1_admin_audit_proto, "AdminAuditService", []string{
+		"ListAuditEvents",
+	})
 	assertServiceMethods(t, roomv1.File_platform_room_v1_room_proto, "RoomService", []string{
 		"CreateRoom",
 		"GetRoom",
@@ -305,6 +308,9 @@ func TestAuditActionContractShape(t *testing.T) {
 		"AUDIT_ACTION_ADMIN_SECRET_RESULT_CONFIRMED",
 		"AUDIT_ACTION_ADMIN_ELEVATION_DENIED",
 		"AUDIT_ACTION_ADMIN_ELEVATION_EXPIRED",
+		"AUDIT_ACTION_ADMIN_MAINTENANCE_CHANGED",
+		"AUDIT_ACTION_ADMIN_CACHE_REFRESHED",
+		"AUDIT_ACTION_ADMIN_TASK_RETRIED",
 	})
 }
 
@@ -319,6 +325,7 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		adminv1.File_platform_admin_v1_admin_auth_proto,
 		adminv1.File_platform_admin_v1_admin_user_proto,
 		adminv1.File_platform_admin_v1_admin_room_proto,
+		adminv1.File_platform_admin_v1_admin_audit_proto,
 		auditv1.File_platform_audit_v1_audit_proto,
 		roomv1.File_platform_room_v1_room_proto,
 	}
@@ -326,6 +333,55 @@ func TestDescriptorsUseBoundedPortableFields(t *testing.T) {
 		assertEnumsHaveUnspecifiedZero(t, file.Enums(), file.Path())
 		assertMessagesUsePortableFields(t, file.Messages(), file.Path())
 	}
+}
+
+func TestAdminAuditContractShape(t *testing.T) {
+	t.Parallel()
+
+	file := adminv1.File_platform_admin_v1_admin_audit_proto
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminAuditFilter"), []fieldShape{
+		{name: "event_id", kind: protoreflect.StringKind},
+		{name: "actions", kind: protoreflect.EnumKind, list: true, typeName: "platform.audit.v1.AuditAction"},
+		{name: "actor_types", kind: protoreflect.EnumKind, list: true, typeName: "platform.audit.v1.AuditActorType"},
+		{name: "actor_id", kind: protoreflect.StringKind},
+		{name: "target_types", kind: protoreflect.EnumKind, list: true, typeName: "platform.audit.v1.AuditTargetType"},
+		{name: "target_id", kind: protoreflect.StringKind},
+		{name: "request_id", kind: protoreflect.StringKind},
+		{name: "reason_code", kind: protoreflect.StringKind},
+		{name: "occurred_from", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "occurred_to", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminAuditEvent"), []fieldShape{
+		{name: "event_id", kind: protoreflect.StringKind},
+		{name: "sequence", kind: protoreflect.Uint64Kind},
+		{name: "previous_hash", kind: protoreflect.StringKind},
+		{name: "event_hash", kind: protoreflect.StringKind},
+		{name: "request_id", kind: protoreflect.StringKind},
+		{name: "occurred_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+		{name: "actor", kind: protoreflect.MessageKind, typeName: "platform.audit.v1.AuditActor"},
+		{name: "target", kind: protoreflect.MessageKind, typeName: "platform.audit.v1.AuditTarget"},
+		{name: "action", kind: protoreflect.EnumKind, typeName: "platform.audit.v1.AuditAction"},
+		{name: "reason_code", kind: protoreflect.StringKind},
+		{name: "detail_digest", kind: protoreflect.StringKind},
+		{name: "signing_key_version", kind: protoreflect.Uint32Kind},
+		{name: "verified", kind: protoreflect.BoolKind},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("AdminAuditChainHead"), []fieldShape{
+		{name: "sequence", kind: protoreflect.Uint64Kind},
+		{name: "event_hash", kind: protoreflect.StringKind},
+		{name: "updated_at", kind: protoreflect.MessageKind, typeName: "google.protobuf.Timestamp"},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("ListAuditEventsRequest"), []fieldShape{
+		{name: "filter", kind: protoreflect.MessageKind, typeName: "platform.admin.v1.AdminAuditFilter"},
+		{name: "page_size", kind: protoreflect.Uint32Kind},
+		{name: "page_token", kind: protoreflect.StringKind},
+	})
+	assertMessageFieldShapes(t, file.Messages().ByName("ListAuditEventsResponse"), []fieldShape{
+		{name: "events", kind: protoreflect.MessageKind, list: true, typeName: "platform.admin.v1.AdminAuditEvent"},
+		{name: "page", kind: protoreflect.MessageKind, typeName: "platform.admin.v1.AdminPageInfo"},
+		{name: "chain_head", kind: protoreflect.MessageKind, typeName: "platform.admin.v1.AdminAuditChainHead"},
+		{name: "scanned_events", kind: protoreflect.Uint32Kind},
+	})
 }
 
 func TestAdminCommonContractShape(t *testing.T) {

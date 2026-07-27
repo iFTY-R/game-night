@@ -675,6 +675,10 @@ func mapRemoteError(err error) error {
 		if !ok {
 			continue
 		}
+		// Maintenance has no public business enum yet; preserve the stable message key across the private owner hop.
+		if business.GetMessageKey() == "service.maintenance.active" {
+			return gameruntime.ErrMutationBlocked
+		}
 		switch business.GetCode() {
 		case commonv1.BusinessErrorCode_BUSINESS_ERROR_CODE_IDEMPOTENCY_CONFLICT:
 			return idempotency.ErrConflict

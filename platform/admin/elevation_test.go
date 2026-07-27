@@ -34,7 +34,10 @@ func TestElevationGrantBindsVersionsScopeAndTTL(t *testing.T) {
 	if err := grant.Validate(session, 9, ElevationScopeSecurityDisableMFA, now.Add(time.Minute)); err != nil {
 		t.Fatalf("expected valid grant, got %v", err)
 	}
-	if err := grant.Validate(session, 9, ElevationScopeSecurityDisableMFA, now.Add(-time.Second)); !errors.Is(err, ErrElevationDenied) {
+	if err := grant.Validate(session, 9, ElevationScopeSecurityDisableMFA, now.Add(-AdminElevationClockSkewTolerance/2)); err != nil {
+		t.Fatalf("expected bounded clock-skew tolerance, got %v", err)
+	}
+	if err := grant.Validate(session, 9, ElevationScopeSecurityDisableMFA, now.Add(-AdminElevationClockSkewTolerance-time.Millisecond)); !errors.Is(err, ErrElevationDenied) {
 		t.Fatalf("expected pre-issuance denial, got %v", err)
 	}
 	if err := grant.Validate(session, 9, ElevationScopeSecurityDisableMFA, now.Add(6*time.Minute)); !errors.Is(err, ErrElevationExpired) {

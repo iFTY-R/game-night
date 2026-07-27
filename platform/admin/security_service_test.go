@@ -125,7 +125,7 @@ func TestElevateAdminSessionUsesPasswordOnlyWhenMFAIsDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.UsedRecoveryCode || result.Elevation.Snapshot().EnrollmentVersion != 0 {
+	if result.UsedSecondFactor || result.UsedRecoveryCode || result.Elevation.Snapshot().EnrollmentVersion != 0 {
 		t.Fatalf("password-only elevation = %+v", result)
 	}
 	if err := result.Elevation.Validate(current.Session, 0, ElevationScopeSecurityRevokeSessions, now); err != nil {

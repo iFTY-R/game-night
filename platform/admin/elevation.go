@@ -9,6 +9,8 @@ import (
 const (
 	// AdminElevationMaxTTL is the hard upper bound for any short-lived admin step-up grant.
 	AdminElevationMaxTTL = 5 * time.Minute
+	// AdminElevationClockSkewTolerance admits only a bounded backward wall-clock adjustment between grant and immediate use.
+	AdminElevationClockSkewTolerance = time.Second
 )
 
 // ElevationScope is the stable high-risk command family bound into a short-lived step-up grant.
@@ -149,7 +151,7 @@ func (elevation Elevation) Validate(session Session, enrollmentVersion int64, re
 		return ErrElevationDenied
 	}
 	now := canonicalAdminTime(at)
-	if now.IsZero() || now.Before(snapshot.GrantedAt) {
+	if now.IsZero() || now.Add(AdminElevationClockSkewTolerance).Before(snapshot.GrantedAt) {
 		return ErrElevationDenied
 	}
 	if !now.Before(snapshot.ExpiresAt) {

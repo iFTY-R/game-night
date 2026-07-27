@@ -373,6 +373,40 @@ func TestAuditOutboxRepositoriesIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("database calibrated read ahead remains valid inside lease", func(t *testing.T) {
+		eventType, _ := outbox.ParseEventType("test.calibrated_clock")
+		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")
+		createdAt := databaseIntegrationTime(t, ctx, fixture)
+		event, _ := outbox.NewEvent(uuid.New(), eventType, aggregateType, uuid.New(), []byte("calibrated"), createdAt, createdAt)
+		if _, err := newOutboxEventRepository(sqlcgen.New(fixture.Pool)).Insert(ctx, event); err != nil {
+			t.Fatal(err)
+		}
+		consumerRepository := newOutboxConsumerRepository(sqlcgen.New(fixture.Pool))
+		consumer := registerIntegrationConsumer(t, ctx, consumerRepository, "test.calibrated_clock_consumer", eventType, createdAt)
+		owner, _ := outbox.ParseLeaseOwner("calibrated-worker")
+		leased, transition, err := consumer.AcquireLease(owner, createdAt, createdAt.Add(time.Minute))
+		if err != nil {
+			t.Fatal(err)
+		}
+		leased, err = consumerRepository.AcquireLeaseCAS(ctx, transition)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The process timestamp is deliberately ahead of the database but remains inside the lease
+		// created by the same calibrated clock. Database time still decides whether the event is due.
+		batch, err := outbox.NewEventBatch(leased.Snapshot().ID, owner, createdAt.Add(30*time.Second), 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		available, err := consumerRepository.ListAvailable(ctx, batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(available) != 1 || available[0].Snapshot().ID != event.Snapshot().ID {
+			t.Fatalf("available calibrated events = %+v, want inserted event", available)
+		}
+	})
+
 	t.Run("expired lease rejects a preconstructed acknowledgement", func(t *testing.T) {
 		eventType, _ := outbox.ParseEventType("test.expired_lease")
 		aggregateType, _ := outbox.ParseAggregateType("test.aggregate")

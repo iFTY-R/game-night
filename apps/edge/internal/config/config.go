@@ -8,9 +8,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
 
 const (
@@ -22,6 +25,7 @@ const (
 	userHostsEnvironment            = "GAME_NIGHT_EDGE_USER_HOSTS"
 	adminHostsEnvironment           = "GAME_NIGHT_EDGE_ADMIN_HOSTS"
 	trustedProxyCIDRsEnvironment    = "GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS"
+	instanceIDEnvironment           = "GAME_NIGHT_EDGE_INSTANCE_ID"
 	defaultListenAddress            = ":8080"
 	defaultAPIUpstreamURL           = "http://127.0.0.1:8081"
 	defaultRealtimeUpstreamURL      = "http://127.0.0.1:8090"
@@ -29,6 +33,7 @@ const (
 	defaultAdminStaticDirectory     = "/app/admin"
 	defaultUserHosts                = "localhost:8080,127.0.0.1:8080"
 	defaultAdminHosts               = "admin.localhost:8080"
+	defaultInstanceID               = "edge-local"
 	// Only local loopback is trusted by default; deployments must explicitly name their proxy networks.
 	defaultTrustedProxyCIDRs          = "127.0.0.1/32,::1/128"
 	defaultShutdownTimeout            = 15 * time.Second
@@ -39,6 +44,8 @@ const (
 	defaultHealthTimeout              = 2 * time.Second
 	staticIndexFileName               = "index.html"
 )
+
+var instanceIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 // LookupEnv matches os.LookupEnv so tests can inject a fixed environment.
 type LookupEnv func(string) (string, bool)
@@ -59,6 +66,10 @@ type Config struct {
 	ProxyTLSHandshakeTimeout   time.Duration
 	ProxyResponseHeaderTimeout time.Duration
 	HealthTimeout              time.Duration
+	// InstanceID identifies one concrete edge process in the operations surface.
+	InstanceID string
+	// Heartbeat carries the private API target, credential, and bounded reporting cadence.
+	Heartbeat serviceheartbeat.Config
 }
 
 // Load validates URLs, CIDRs, and the static asset directory before the server starts.
@@ -107,6 +118,14 @@ func Load(lookup LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	instanceID := valueOrDefault(lookup, instanceIDEnvironment, defaultInstanceID)
+	if !instanceIDPattern.MatchString(instanceID) {
+		return Config{}, fieldError(instanceIDEnvironment, "invalid instance identifier")
+	}
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, false)
+	if err != nil {
+		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
+	}
 	return Config{
 		ListenAddress:              listenAddress,
 		APIUpstreamURL:             apiUpstreamURL,
@@ -122,6 +141,8 @@ func Load(lookup LookupEnv) (Config, error) {
 		ProxyTLSHandshakeTimeout:   defaultProxyTLSHandshakeTimeout,
 		ProxyResponseHeaderTimeout: defaultProxyResponseHeaderTimeout,
 		HealthTimeout:              defaultHealthTimeout,
+		InstanceID:                 instanceID,
+		Heartbeat:                  heartbeat,
 	}, nil
 }
 

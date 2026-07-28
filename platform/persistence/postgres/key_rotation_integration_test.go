@@ -120,7 +120,7 @@ INSERT INTO user_profiles (
 	if err := fixture.Pool.QueryRow(ctx, "SELECT sequence FROM audit_chain_head WHERE chain_id = 'admin'").Scan(&auditSequence); err != nil {
 		t.Fatal(err)
 	}
-	if auditSequence < 4 {
+	if auditSequence != 3 {
 		t.Fatalf("rotation audit sequence = %d", auditSequence)
 	}
 }

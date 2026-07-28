@@ -81,7 +81,14 @@ func TestExpiryCleanupRevokesExpiredAdminElevations(t *testing.T) {
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
 	unitOfWork := NewAdminUnitOfWork(fixture.Pool)
-	now := time.Date(2026, time.July, 25, 14, 0, 0, 0, time.UTC)
+	now := databaseIntegrationTime(t, ctx, fixture)
+	if _, err := fixture.Pool.Exec(ctx, `
+		UPDATE admin_accounts
+		SET created_at = $1, updated_at = $1
+		WHERE singleton_id = 1
+	`, now.Add(-10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.Transaction) error {
 		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now.Add(-10*time.Minute))

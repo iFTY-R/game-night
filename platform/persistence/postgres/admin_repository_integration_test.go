@@ -146,7 +146,7 @@ func TestAdminSecurityMigrationResetsLegacySecurityState(t *testing.T) {
 		) VALUES (
 			$1, $2, 'legacy-assisted-selector', $3, 'identity.assisted_recovery', 'active', 0, 5, $4, $5, $6
         )
-    `, assistedGrantID, userID, adminPersistenceTestHash, adminID, now.Add(-time.Hour), now.Add(time.Hour)); err != nil {
+	`, assistedGrantID, userID, adminPersistenceTestHash, adminID, now.Add(-5*time.Minute), now.Add(10*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fixture.Pool.Exec(ctx, `
@@ -156,7 +156,7 @@ func TestAdminSecurityMigrationResetsLegacySecurityState(t *testing.T) {
         ) VALUES (
             $1, $2, NULL, $3, 'legacy-attempt-selector', $4, 'active', $5, $6, decode(repeat('09', 32), 'hex')
         )
-    `, attemptID, userID, assistedGrantID, adminPersistenceTestHash, now.Add(-10*time.Minute), now.Add(10*time.Minute)); err != nil {
+	`, attemptID, userID, assistedGrantID, adminPersistenceTestHash, now.Add(-time.Minute), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if err := goose.UpByOneContext(ctx, database, migrationsDir); err != nil {
@@ -233,7 +233,7 @@ func TestAdminSessionEnrollmentElevationAndReceiptPersistence(t *testing.T) {
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
 	unitOfWork := NewAdminUnitOfWork(fixture.Pool)
-	now := time.Date(2026, time.July, 25, 12, 0, 0, 0, time.UTC)
+	now := databaseIntegrationTime(t, ctx, fixture)
 
 	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.Transaction) error {
 		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now)
@@ -428,7 +428,7 @@ func TestAdminSessionAndElevationCASOperations(t *testing.T) {
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
 	unitOfWork := NewAdminUnitOfWork(fixture.Pool)
-	now := time.Date(2026, time.July, 25, 16, 0, 0, 0, time.UTC)
+	now := databaseIntegrationTime(t, ctx, fixture)
 
 	buildSession := func(marker byte, adminID uuid.UUID, at time.Time, adminVersion, passwordVersion int64) adminDomain.Session {
 		return mustRestoreSession(t, adminDomain.SessionSnapshot{
@@ -452,7 +452,7 @@ func TestAdminSessionAndElevationCASOperations(t *testing.T) {
 	}
 
 	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.Transaction) error {
-		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now.Add(-time.Minute))
+		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now)
 		if err != nil {
 			return err
 		}
@@ -750,7 +750,7 @@ func seedActiveAdminAccount(
 	if err != nil {
 		return adminDomain.Account{}, err
 	}
-	return repository.TransitionStatusCAS(ctx, bootstrapped, adminDomain.AccountStatusActive, at.Add(time.Second))
+	return repository.TransitionStatusCAS(ctx, bootstrapped, adminDomain.AccountStatusActive, at)
 }
 
 func mustRestoreEnrollment(t testing.TB, snapshot adminDomain.EnrollmentSnapshot) adminDomain.Enrollment {

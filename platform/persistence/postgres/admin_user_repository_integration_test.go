@@ -227,7 +227,7 @@ func seedAdminUserCenterPrincipal(
 	unitOfWork := NewAdminUnitOfWork(fixture.Pool)
 	var adminID, sessionID uuid.UUID
 	if err := unitOfWork.Run(ctx, func(ctx context.Context, transaction adminDomain.Transaction) error {
-		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now.Add(-10*time.Minute))
+		account, err := seedActiveAdminAccount(ctx, transaction.Accounts(), now)
 		if err != nil {
 			return err
 		}
@@ -237,7 +237,7 @@ func seedAdminUserCenterPrincipal(
 			CSRFHash: mustAdminSessionMAC(0xD3), Kind: adminDomain.SessionKindFull,
 			AdminVersion: account.Snapshot().AdminVersion, PasswordVersion: account.Snapshot().PasswordVersion,
 			SessionVersion: 1, ClientIP: "203.0.113.90", UserAgent: "admin-user-center-test", MaxAttempts: 5,
-			CreatedAt: now.Add(-5 * time.Minute), LastSeenAt: now.Add(-time.Minute),
+			CreatedAt: now, LastSeenAt: now,
 			IdleExpiresAt: now.Add(time.Hour), AbsoluteExpiresAt: now.Add(12 * time.Hour),
 		})
 		sessionID = session.Snapshot().ID

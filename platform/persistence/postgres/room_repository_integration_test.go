@@ -232,9 +232,13 @@ func TestRoomRepositoryListsFilteredPublicCardsWithStableKeyset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	playingSession, playingBatch, err := gameruntime.NewSession(gameSessionCreateRequest(
-		start.SessionID, withParticipant.Snapshot().ID, hostIDs[4], participantID, start.StartedAt,
-	))
+	playingRequest := gameSessionCreateRequest(start.SessionID, withParticipant.Snapshot().ID, hostIDs[4], participantID, start.StartedAt)
+	playingRequest.Start = gameruntime.FrozenStartConfig{
+		Config: playingRequest.Input.Clone(), ConfigRevision: 7,
+		RoomVersion: withParticipant.Version().Room, MembershipVersion: withParticipant.Version().Membership,
+		RoomOwnershipEpoch: withParticipant.Snapshot().OwnershipEpoch,
+	}
+	playingSession, playingBatch, err := gameruntime.NewSession(playingRequest)
 	if err != nil {
 		t.Fatal(err)
 	}

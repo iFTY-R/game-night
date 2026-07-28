@@ -283,7 +283,10 @@ jobs:
           set -e
           if [[ $integration_status -ne 0 ]]; then
             # Keep annotations secret-safe while exposing the failed test and package without downloading job logs.
-            failure_summary="$(grep -E '(apply transaction test migrations:|SQLSTATE [0-9A-Z]{5}|^--- FAIL:|^FAIL[[:space:]]+github.com/iFTY-R/game-night/)' "$integration_log" | awk '!seen[$0]++' | tail -n 20 | cut -c 1-500 | paste -sd ';' - || true)"
+            failure_summary="$(grep -Ei '(apply transaction test migrations:|SQLSTATE [0-9A-Z]{5}|^--- FAIL:|^FAIL[[:space:]]+github.com/iFTY-R/game-night/|_test\.go:[0-9]+:.*(error|mismatch|expected|want|got|failed|invalid|violate|not found|unavailable))' "$integration_log" | awk '!seen[$0]++' | tail -n 20 | cut -c 1-500 | paste -sd ';' - || true)"
+            for sensitive_value in "$MINIO_ROOT_PASSWORD" "$GAME_NIGHT_TEST_S3_SECRET_KEY" "game-night-ci-postgres-secret"; do
+              failure_summary="${failure_summary//"$sensitive_value"/"[REDACTED]"}"
+            done
             failure_summary="${failure_summary//'%'/'%25'}"
             printf '::error title=Backend integration failures::%s\n' "${failure_summary:-backend integration command failed; inspect the job log}"
             exit "$integration_status"

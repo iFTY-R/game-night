@@ -1,9 +1,53 @@
 # Game Night 单容器部署编排
-# 只运行一个应用容器，PostgreSQL、Redis 和 S3 由外部现成服务提供。
-# 该文件只负责串联边缘网关、各子进程环境变量和外部依赖，
-# 不在 compose 内创建数据库、缓存或对象存储。
+# 应用使用外部 PostgreSQL/Redis；密钥与开发 checkpoint 由 Docker 命名卷持久化。
+# 部署目录只需本文件和 .env，不依赖宿主机绝对路径或 secrets 目录。
+
+name: game-night
+
+networks:
+  deployment:
+    external: true
+    name: ${GAME_NIGHT_EXTERNAL_NETWORK:-1panel-network}
 
 services:
+  # 将 .env 中的稳定 Base64 密钥写入只读运行卷；重复执行会写回同一份内容，不会轮换密钥。
+  secrets-init:
+    image: ${GAME_NIGHT_SECRETS_INIT_IMAGE:-alpine:3.22}
+    container_name: game-night-secrets-init
+    restart: "no"
+    entrypoint: ["/bin/sh", "-euc"]
+    command: |
+      umask 077
+      printf '%s' "$${GAME_NIGHT_SECRET_ADMIN_BOOTSTRAP_B64}" | base64 -d > /api-target/admin-bootstrap.txt
+      printf '%s' "$${GAME_NIGHT_SECRET_ADMIN_CHALLENGE_B64}" | base64 -d > /api-target/admin-challenge.json
+      printf '%s' "$${GAME_NIGHT_SECRET_ADMIN_CURSOR_B64}" | base64 -d > /api-target/admin-cursor.json
+      printf '%s' "$${GAME_NIGHT_SECRET_ADMIN_SESSION_B64}" | base64 -d > /api-target/admin-session.json
+      printf '%s' "$${GAME_NIGHT_SECRET_AUDIT_B64}" | base64 -d > /api-target/audit.json
+      printf '%s' "$${GAME_NIGHT_SECRET_DEVICE_B64}" | base64 -d > /api-target/device.json
+      printf '%s' "$${GAME_NIGHT_SECRET_PII_B64}" | base64 -d > /api-target/pii.json
+      printf '%s' "$${GAME_NIGHT_SECRET_RATE_LIMIT_B64}" | base64 -d > /api-target/rate-limit.json
+      printf '%s' "$${GAME_NIGHT_SECRET_RESULT_ENVELOPE_B64}" | base64 -d > /api-target/result-envelope.json
+      printf '%s' "$${GAME_NIGHT_SECRET_TOTP_B64}" | base64 -d > /api-target/totp.json
+      printf '%s' "$${GAME_NIGHT_SECRET_USER_CHALLENGE_B64}" | base64 -d > /api-target/user-challenge.json
+      cp /api-target/pii.json /api-target/totp.json /api-target/audit.json /worker-target/
+      chown -R 10001:10001 /api-target /worker-target
+      chmod 0400 /api-target/* /worker-target/*
+    environment:
+      GAME_NIGHT_SECRET_ADMIN_BOOTSTRAP_B64: ${GAME_NIGHT_SECRET_ADMIN_BOOTSTRAP_B64:?GAME_NIGHT_SECRET_ADMIN_BOOTSTRAP_B64 is required}
+      GAME_NIGHT_SECRET_ADMIN_CHALLENGE_B64: ${GAME_NIGHT_SECRET_ADMIN_CHALLENGE_B64:?GAME_NIGHT_SECRET_ADMIN_CHALLENGE_B64 is required}
+      GAME_NIGHT_SECRET_ADMIN_CURSOR_B64: ${GAME_NIGHT_SECRET_ADMIN_CURSOR_B64:?GAME_NIGHT_SECRET_ADMIN_CURSOR_B64 is required}
+      GAME_NIGHT_SECRET_ADMIN_SESSION_B64: ${GAME_NIGHT_SECRET_ADMIN_SESSION_B64:?GAME_NIGHT_SECRET_ADMIN_SESSION_B64 is required}
+      GAME_NIGHT_SECRET_AUDIT_B64: ${GAME_NIGHT_SECRET_AUDIT_B64:?GAME_NIGHT_SECRET_AUDIT_B64 is required}
+      GAME_NIGHT_SECRET_DEVICE_B64: ${GAME_NIGHT_SECRET_DEVICE_B64:?GAME_NIGHT_SECRET_DEVICE_B64 is required}
+      GAME_NIGHT_SECRET_PII_B64: ${GAME_NIGHT_SECRET_PII_B64:?GAME_NIGHT_SECRET_PII_B64 is required}
+      GAME_NIGHT_SECRET_RATE_LIMIT_B64: ${GAME_NIGHT_SECRET_RATE_LIMIT_B64:?GAME_NIGHT_SECRET_RATE_LIMIT_B64 is required}
+      GAME_NIGHT_SECRET_RESULT_ENVELOPE_B64: ${GAME_NIGHT_SECRET_RESULT_ENVELOPE_B64:?GAME_NIGHT_SECRET_RESULT_ENVELOPE_B64 is required}
+      GAME_NIGHT_SECRET_TOTP_B64: ${GAME_NIGHT_SECRET_TOTP_B64:?GAME_NIGHT_SECRET_TOTP_B64 is required}
+      GAME_NIGHT_SECRET_USER_CHALLENGE_B64: ${GAME_NIGHT_SECRET_USER_CHALLENGE_B64:?GAME_NIGHT_SECRET_USER_CHALLENGE_B64 is required}
+    volumes:
+      - game_night_api_secrets:/api-target
+      - game_night_worker_secrets:/worker-target
+
   # 单体拓扑：API、实时服务、worker、迁移和边缘网关由同一个镜像拉起，
   # 适合开发环境、小型自托管环境，或先验证部署链路的场景。
   game-night:
@@ -14,6 +58,9 @@ services:
     # serve-all 会同时托管所有服务端角色；除非拆分下面的环境变量块，
     # 否则不要把它替换为单一角色启动命令。
     command: ["serve-all"]
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     # 自动恢复临时故障，同时仍然尊重手动执行的 docker compose stop。
     restart: unless-stopped
     # 给 API 请求、实时会话和 worker 租约预留优雅退出时间。
@@ -25,17 +72,14 @@ services:
     extra_hosts:
       # 允许容器访问运行在 Docker 宿主机上的外部托管服务。
       - "host.docker.internal:host-gateway"
+    networks:
+      - deployment
     volumes:
-      # API 密钥目录只读挂载，方便在镜像外轮换 keyring 和初始化密钥文件。
-      - type: bind
-        source: ${GAME_NIGHT_API_SECRETS_DIR:-./secrets}
-        target: /run/game-night/api-secrets
-        read_only: true
-      # worker 密钥目录单独挂载，生产环境可以独立控制文件归属和权限。
-      - type: bind
-        source: ${GAME_NIGHT_WORKER_SECRETS_DIR:-./secrets}
-        target: /run/game-night/worker-secrets
-        read_only: true
+      # 初始化容器持有写权限，应用进程只读挂载用途隔离后的密钥卷。
+      - game_night_api_secrets:/run/game-night/api-secrets:ro
+      - game_night_worker_secrets:/run/game-night/worker-secrets:ro
+      # development 环境使用本地 append-only checkpoint，避免强制依赖 S3。
+      - game_night_checkpoints:/var/lib/game-night/checkpoints
     environment:
       # 下面先列部署者需要通过 .env 调整的外部环境和基础设施配置。
       GAME_NIGHT_ENVIRONMENT: ${GAME_NIGHT_ENVIRONMENT:-development}
@@ -53,17 +97,9 @@ services:
       GAME_NIGHT_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
       # 公网 HTTPS 部署应设为 true，让浏览器会话使用 Secure Cookie。
       GAME_NIGHT_COOKIE_SECURE: ${GAME_NIGHT_COOKIE_SECURE:-false}
-      # 审计和检查点持久化写入兼容 S3 的对象存储。
-      GAME_NIGHT_CHECKPOINT_SINK: s3
-      GAME_NIGHT_CHECKPOINT_S3_REGION: ${GAME_NIGHT_CHECKPOINT_S3_REGION:-us-east-1}
-      GAME_NIGHT_CHECKPOINT_S3_BUCKET: ${GAME_NIGHT_CHECKPOINT_S3_BUCKET:?GAME_NIGHT_CHECKPOINT_S3_BUCKET is required}
-      GAME_NIGHT_CHECKPOINT_S3_ENDPOINT: ${GAME_NIGHT_CHECKPOINT_S3_ENDPOINT:?GAME_NIGHT_CHECKPOINT_S3_ENDPOINT is required}
-      # 保留时间使用 duration 格式，按需要的审计恢复窗口调整。
-      GAME_NIGHT_CHECKPOINT_S3_RETENTION: ${GAME_NIGHT_CHECKPOINT_S3_RETENTION:-8760h}
-      # AWS_* 凭据由 S3 检查点客户端读取，也适用于自定义 S3 兼容端点。
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
+      # 本地 sink 仅允许 development/test；生产环境必须恢复为 S3/WORM 部署策略。
+      GAME_NIGHT_CHECKPOINT_SINK: local
+      GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY: /var/lib/game-night/checkpoints
 
       # serve-all 会把每个数据库连接串分发给对应的子进程。
       # 生产环境如果需要权限隔离，应在这里给各角色配置不同 PostgreSQL 账号。
@@ -72,6 +108,12 @@ services:
       GAME_NIGHT_WORKER_DATABASE_URL: ${GAME_NIGHT_WORKER_DATABASE_URL:?GAME_NIGHT_WORKER_DATABASE_URL is required}
       # 迁移连接串通常需要比运行期服务账号更高的 DDL 权限。
       GAME_NIGHT_MIGRATION_DATABASE_URL: ${GAME_NIGHT_MIGRATION_DATABASE_URL:?GAME_NIGHT_MIGRATION_DATABASE_URL is required}
+      # 迁移器需要显式角色边界；单账号部署可将五项配置为同一 PostgreSQL role。
+      GAME_NIGHT_DATABASE_OWNER_ROLE: ${GAME_NIGHT_DATABASE_OWNER_ROLE:?GAME_NIGHT_DATABASE_OWNER_ROLE is required}
+      GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE: ${GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE:?GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE is required}
+      GAME_NIGHT_DATABASE_MIGRATION_ROLE: ${GAME_NIGHT_DATABASE_MIGRATION_ROLE:?GAME_NIGHT_DATABASE_MIGRATION_ROLE is required}
+      GAME_NIGHT_DATABASE_RUNTIME_ROLE: ${GAME_NIGHT_DATABASE_RUNTIME_ROLE:?GAME_NIGHT_DATABASE_RUNTIME_ROLE is required}
+      GAME_NIGHT_DATABASE_WORKER_ROLE: ${GAME_NIGHT_DATABASE_WORKER_ROLE:?GAME_NIGHT_DATABASE_WORKER_ROLE is required}
       GAME_NIGHT_API_KEYRING_DIRECTORY: /run/game-night/api-secrets
       GAME_NIGHT_WORKER_KEYRING_DIRECTORY: /run/game-night/worker-secrets
       # 初始化管理密钥通过文件注入，避免把初始管理员凭据写进镜像。
@@ -110,7 +152,8 @@ services:
       GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY: /app/web
       GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY: /app/admin
       # Host 白名单决定请求返回玩家端还是管理端前端资源。
-      GAME_NIGHT_EDGE_USER_HOSTS: ${GAME_NIGHT_EDGE_USER_HOSTS:-localhost:40891,127.0.0.1:40891}
+      # 127.0.0.1:8080 是容器内 healthcheck 的 authority，不能从白名单移除。
+      GAME_NIGHT_EDGE_USER_HOSTS: ${GAME_NIGHT_EDGE_USER_HOSTS:-localhost:40891,127.0.0.1:40891,127.0.0.1:8080}
       GAME_NIGHT_EDGE_ADMIN_HOSTS: ${GAME_NIGHT_EDGE_ADMIN_HOSTS:-admin.localhost:40891}
       GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
 
@@ -127,3 +170,11 @@ services:
       timeout: 3s
       retries: 6
       start_period: 15s
+
+volumes:
+  game_night_api_secrets:
+    name: game-night-api-secrets
+  game_night_worker_secrets:
+    name: game-night-worker-secrets
+  game_night_checkpoints:
+    name: game-night-checkpoints

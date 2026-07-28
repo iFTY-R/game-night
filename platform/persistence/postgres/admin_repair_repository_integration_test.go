@@ -16,7 +16,7 @@ func TestAdminRepairRepositoryPreviewExpiryAndCompletionCAS(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	applyTransactionTestMigrations(t, ctx, fixture)
-	now := databaseIntegrationTime(t, ctx, fixture).Truncate(time.Second)
+	now := databaseIntegrationTime(t, ctx, fixture)
 	adminID, _ := seedAdminUserCenterPrincipal(t, ctx, fixture, now)
 
 	repository := NewAdminRepairRepository(fixture.Pool)

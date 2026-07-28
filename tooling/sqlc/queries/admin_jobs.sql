@@ -233,7 +233,7 @@ SET running_count = running_count - 1,
         -- A running item may finish after cancellation begins; unfinished work must not reopen the parent job.
         ELSE CASE WHEN state = 'canceling' THEN 'canceling' ELSE 'running' END
     END,
-    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN sqlc.arg(completed_at) ELSE NULL END,
+    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN sqlc.arg(completed_at)::timestamptz ELSE NULL END,
     version = version + 1,
     updated_at = sqlc.arg(completed_at)
 WHERE batch_job_id = sqlc.arg(batch_job_id)

@@ -230,7 +230,19 @@ BEGIN
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
         WHERE namespace.nspname = trusted_schema
           AND class.relkind IN ('r', 'p', 'S', 'v')
-          AND NOT (class.relkind = 'S' AND class.relname = 'goose_db_version_id_seq')
+          -- Sequences owned by table columns follow the table owner and cannot be reassigned independently.
+          AND NOT (
+              class.relkind = 'S'
+              AND EXISTS (
+                  SELECT 1
+                  FROM pg_catalog.pg_depend AS dependency
+                  WHERE dependency.classid = class.tableoid
+                    AND dependency.objid = class.oid
+                    AND dependency.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass
+                    AND dependency.refobjsubid > 0
+                    AND dependency.deptype IN ('a', 'i')
+              )
+          )
     LOOP
         EXECUTE format(
             CASE object_record.relkind

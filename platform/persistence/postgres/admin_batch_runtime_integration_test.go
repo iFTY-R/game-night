@@ -66,8 +66,7 @@ func TestAdminJobRepositorySupportsGetListCancelAndRetry(t *testing.T) {
 	}
 	failedAt := databaseIntegrationTime(t, ctx, fixture)
 	if _, err = repository.CompleteBatchItem(ctx, claimed, "failed", "admin.user.synthetic_failure", uuid.Nil, failedAt); err != nil {
-		stage, diagnosticErr := diagnoseBatchItemCompletion(ctx, repository, claimed, "failed", "admin.user.synthetic_failure", uuid.Nil, failedAt)
-		t.Fatalf("complete batch item: err=%v diagnostic_stage=%s diagnostic_err=%v", err, stage, diagnosticErr)
+		t.Fatal(err)
 	}
 	items, err := repository.ListBatchItems(ctx, adminuser.BatchItemListQuery{BatchJobID: job.ID, States: []string{"failed"}, PageSize: 10})
 	if err != nil || len(items) != 1 || items[0].State != "failed" {

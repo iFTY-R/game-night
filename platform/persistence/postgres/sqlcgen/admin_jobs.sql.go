@@ -103,7 +103,7 @@ SET running_count = running_count - 1,
         -- A running item may finish after cancellation begins; unfinished work must not reopen the parent job.
         ELSE CASE WHEN state = 'canceling' THEN 'canceling' ELSE 'running' END
     END,
-    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN $2 ELSE NULL END,
+    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN $2::timestamptz ELSE NULL END,
     version = version + 1,
     updated_at = $2
 WHERE batch_job_id = $3
@@ -138,7 +138,7 @@ type ApplyAdminBatchJobItemCompletionParams struct {
 //	        -- A running item may finish after cancellation begins; unfinished work must not reopen the parent job.
 //	        ELSE CASE WHEN state = 'canceling' THEN 'canceling' ELSE 'running' END
 //	    END,
-//	    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN $2 ELSE NULL END,
+//	    completed_at = CASE WHEN queued_count = 0 AND running_count = 1 THEN $2::timestamptz ELSE NULL END,
 //	    version = version + 1,
 //	    updated_at = $2
 //	WHERE batch_job_id = $3

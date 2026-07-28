@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,8 @@ const (
 	testAdminDatabaseURLEnvironment = "GAME_NIGHT_TEST_ADMIN_DATABASE_URL"
 	// postgresCleanupTimeout bounds fixture setup and cleanup so failed services cannot hang the test process.
 	postgresCleanupTimeout = 15 * time.Second
+	// postgresPrivilegeCleanupTimeout covers forced database removal followed by all cluster-role removals.
+	postgresPrivilegeCleanupTimeout = 30 * time.Second
 )
 
 // PostgresSchema owns one random schema and pools whose search_path starts at that schema.
@@ -174,7 +177,7 @@ func OpenPrivilegeDatabase(t testing.TB) *PrivilegeDatabase {
 	grantRole(t, ctx, adminPool, fixture.OwnerRole, fixture.MigrationRole)
 	grantRole(t, ctx, adminPool, fixture.AuditWriterRole, fixture.RuntimeRole)
 	grantRole(t, ctx, adminPool, fixture.AuditWriterRole, fixture.WorkerRole)
-	createDatabase(t, ctx, adminPool, fixture.DatabaseName, fixture.MigrationRole)
+	createDatabase(t, ctx, adminPool, fixture.DatabaseName, fixture.OwnerRole)
 
 	fixture.MigrationURL = roleDatabaseURL(t, adminConfig.ConnConfig, fixture.DatabaseName, fixture.Schema, fixture.MigrationRole, migrationPassword)
 	fixture.RuntimeURL = roleDatabaseURL(t, adminConfig.ConnConfig, fixture.DatabaseName, fixture.Schema, fixture.RuntimeRole, runtimePassword)
@@ -239,33 +242,34 @@ func execFormattedStatement(t testing.TB, ctx context.Context, pool *pgxpool.Poo
 	}
 }
 
+// roleDatabaseURL derives an isolated role connection without relying on ConnConfig.ConnString,
+// which returns the original unmodified input rather than serializing field mutations.
 func roleDatabaseURL(t testing.TB, base *pgx.ConnConfig, databaseName, schemaName, role, password string) string {
 	t.Helper()
 
-	config := base.Copy()
-	config.Database = databaseName
-	config.User = role
-	config.Password = password
-	config.RuntimeParams = map[string]string{
-		"search_path": pgx.Identifier{schemaName}.Sanitize() + ",pg_catalog",
+	connectionURL, err := url.Parse(base.ConnString())
+	if err != nil || (connectionURL.Scheme != "postgres" && connectionURL.Scheme != "postgresql") {
+		t.Fatal("PostgreSQL privilege test requires a URL connection string")
 	}
-	return config.ConnString()
+	connectionURL.User = url.UserPassword(role, password)
+	connectionURL.Path = "/" + databaseName
+	query := connectionURL.Query()
+	query.Set("search_path", pgx.Identifier{schemaName}.Sanitize()+",pg_catalog")
+	connectionURL.RawQuery = query.Encode()
+	return connectionURL.String()
 }
 
 func cleanupPrivilegeDatabase(t testing.TB, adminPool *pgxpool.Pool, fixture *PrivilegeDatabase) {
 	t.Helper()
 	defer adminPool.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), postgresCleanupTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), postgresPrivilegeCleanupTimeout)
 	defer cancel()
-	if _, err := adminPool.Exec(ctx, "SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE datname = $1 AND pid <> pg_catalog.pg_backend_pid()", fixture.DatabaseName); err != nil {
-		t.Errorf("terminate PostgreSQL fixture connections: %v", err)
-	}
 	for _, statement := range []struct {
 		template string
 		name     string
 	}{
-		{template: "DROP DATABASE IF EXISTS %I", name: fixture.DatabaseName},
+		{template: "DROP DATABASE IF EXISTS %I WITH (FORCE)", name: fixture.DatabaseName},
 		{template: "DROP ROLE IF EXISTS %I", name: fixture.WorkerRole},
 		{template: "DROP ROLE IF EXISTS %I", name: fixture.RuntimeRole},
 		{template: "DROP ROLE IF EXISTS %I", name: fixture.MigrationRole},

@@ -705,6 +705,7 @@ type Querier interface {
 	//      SET state = 'canceled',
 	//          lease_owner = NULL,
 	//          lease_until = NULL,
+	//          started_at = COALESCE(started_at, $1),
 	//          completed_at = $1,
 	//          version = version + 1,
 	//          updated_at = $1

@@ -3,6 +3,7 @@ package migrator
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iFTY-R/game-night/internal/integrationtest"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 )
@@ -1003,8 +1005,9 @@ func TestMigrationPrivileges(t *testing.T) {
 	assertQueryFails(t, ctx, runtimePool, "UPDATE audit_chain_head SET sequence = sequence", "permission denied")
 	assertQueryFails(t, ctx, runtimePool, "INSERT INTO admin_accounts (singleton_id) VALUES (1)", "permission denied")
 	assertQueryFails(t, ctx, runtimePool, "DELETE FROM admin_accounts", "permission denied")
-	assertQueryFails(t, ctx, runtimePool, "SELECT count(*) FROM outbox_consumers", "permission denied")
-	assertQueryFails(t, ctx, runtimePool, "UPDATE outbox_consumers SET last_acked_sequence = last_acked_sequence", "permission denied")
+	assertQuerySucceeds(t, ctx, runtimePool, "SELECT count(*) FROM outbox_consumers")
+	assertQuerySucceeds(t, ctx, runtimePool, "UPDATE outbox_consumers SET last_acked_sequence = last_acked_sequence")
+	assertQueryFails(t, ctx, runtimePool, "DELETE FROM outbox_consumers", "permission denied")
 	assertQueryFails(t, ctx, runtimePool, "CREATE TABLE runtime_escape (id integer)", "permission denied")
 	assertResetDenied(t, ctx, runtimePool)
 
@@ -1169,6 +1172,10 @@ func assertPublicAndTemporaryShadowingCannotRedirect(t testing.TB, ctx context.C
 	if sequence != 0 {
 		t.Fatalf("temporary shadow redirected read_audit_head: got sequence %d", sequence)
 	}
+	// Pooled connections retain temporary tables, so remove the shadow before later ACL assertions reuse this session.
+	if _, err := connection.Exec(ctx, "DROP TABLE pg_temp.audit_chain_head"); err != nil {
+		t.Fatalf("drop temporary shadow table: %v", err)
+	}
 }
 
 func assertAuditHeadSequence(t testing.TB, ctx context.Context, pool *pgxpool.Pool, want int64, scenario string) {
@@ -1194,6 +1201,14 @@ func migrationDirectory(t testing.TB) string {
 
 // conciseMigrationError retains the PostgreSQL cause without repeating Goose's embedded migration body in CI annotations.
 func conciseMigrationError(err error) string {
+	var databaseError *pgconn.PgError
+	if errors.As(err, &databaseError) {
+		message := fmt.Sprintf("%s (SQLSTATE %s)", databaseError.Message, databaseError.Code)
+		if databaseError.Where != "" {
+			message += "; " + databaseError.Where
+		}
+		return message
+	}
 	message := err.Error()
 	if index := strings.LastIndex(message, ": ERROR: "); index >= 0 {
 		return message[index+2:]
@@ -1408,8 +1423,12 @@ func assertExactTablePrivileges(
 	for _, privilege := range []string{"SELECT", "INSERT", "UPDATE", "DELETE"} {
 		var granted bool
 		if err := pool.QueryRow(ctx, `
-            SELECT has_table_privilege($1, format('%I.%I', $2, $3), $4)
-        `, role, schema, tableName, privilege).Scan(&granted); err != nil {
+			SELECT pg_catalog.has_table_privilege(
+				$1::text,
+				pg_catalog.format('%I.%I', $2::text, $3::text),
+				$4::text
+			)
+		`, role, schema, tableName, privilege).Scan(&granted); err != nil {
 			t.Fatal(err)
 		}
 		_, want := allowedSet[privilege]

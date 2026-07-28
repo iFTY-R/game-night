@@ -224,6 +224,9 @@ BEGIN
         END IF;
     END LOOP;
 
+    -- The target owner must own the schema before PostgreSQL permits table and sequence ownership transfers.
+    EXECUTE format('ALTER SCHEMA %I OWNER TO %I', trusted_schema, owner_role);
+
     FOR object_record IN
         SELECT class.relname, class.relkind
         FROM pg_catalog.pg_class AS class
@@ -271,7 +274,6 @@ BEGIN
         );
     END LOOP;
 
-    EXECUTE format('ALTER SCHEMA %I OWNER TO %I', trusted_schema, owner_role);
     EXECUTE format('REVOKE ALL ON SCHEMA %I FROM PUBLIC', trusted_schema);
     EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM PUBLIC', trusted_schema);
     EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA %I FROM PUBLIC', trusted_schema);

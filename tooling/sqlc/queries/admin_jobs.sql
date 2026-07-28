@@ -248,6 +248,7 @@ WITH canceled_items AS (
     SET state = 'canceled',
         lease_owner = NULL,
         lease_until = NULL,
+        started_at = COALESCE(started_at, sqlc.arg(changed_at)),
         completed_at = sqlc.arg(changed_at),
         version = version + 1,
         updated_at = sqlc.arg(changed_at)

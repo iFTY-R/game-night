@@ -5,7 +5,7 @@ ALTER TABLE admin_accounts
 
 ALTER TABLE admin_accounts
     ADD CONSTRAINT admin_accounts_status_check
-    CHECK (status IN ('bootstrap_pending', 'setup_required', 'active'));
+    CHECK (status IN ('bootstrap_pending', 'setup_required', 'active')) NOT VALID;
 
 ALTER TABLE admin_totp_enrollments
     ADD COLUMN enrollment_version bigint,
@@ -31,11 +31,11 @@ ALTER TABLE admin_totp_enrollments
 
 ALTER TABLE admin_totp_enrollments
     ADD CONSTRAINT admin_totp_enrollments_status_check
-    CHECK (status IN ('pending', 'active', 'disabled')),
+    CHECK (status IN ('pending', 'active', 'disabled')) NOT VALID,
     ADD CONSTRAINT admin_totp_enrollments_version_check
-    CHECK (enrollment_version > 0),
+    CHECK (enrollment_version > 0) NOT VALID,
     ADD CONSTRAINT admin_totp_enrollments_replay_floor_check
-    CHECK (replay_floor IS NULL OR replay_floor >= 0),
+    CHECK (replay_floor IS NULL OR replay_floor >= 0) NOT VALID,
     ADD CONSTRAINT admin_totp_enrollments_security_state_check
     CHECK (
         (status = 'pending'
@@ -56,7 +56,7 @@ ALTER TABLE admin_totp_enrollments
             AND ciphertext IS NULL
             AND nonce IS NULL
             AND disabled_at IS NOT NULL)
-    );
+    ) NOT VALID;
 
 ALTER TABLE admin_sessions
     ADD COLUMN session_version bigint,
@@ -184,6 +184,8 @@ BEGIN
     WHERE admin_id = singleton_admin_id
       AND status = 'active';
 
+    -- Legacy expired enrollments no longer satisfy the new state machine, so the reset folds every
+    -- non-disabled row into the disabled terminal state before the stricter constraint lands.
     UPDATE admin_totp_enrollments
     SET status = 'disabled',
         enrollment_version = enrollment_version + 1,
@@ -192,7 +194,7 @@ BEGIN
         expires_at = NULL,
         disabled_at = COALESCE(disabled_at, boundary)
     WHERE admin_id = singleton_admin_id
-      AND status IN ('pending', 'active');
+      AND status <> 'disabled';
 
     DELETE FROM admin_elevation_grants
     WHERE admin_id = singleton_admin_id;
@@ -202,6 +204,16 @@ BEGIN
 END;
 $reset$;
 -- +goose StatementEnd
+
+-- The reset above rewrites every legacy row into the new state machine before the deferred scans run.
+ALTER TABLE admin_accounts
+    VALIDATE CONSTRAINT admin_accounts_status_check;
+
+ALTER TABLE admin_totp_enrollments
+    VALIDATE CONSTRAINT admin_totp_enrollments_status_check,
+    VALIDATE CONSTRAINT admin_totp_enrollments_version_check,
+    VALIDATE CONSTRAINT admin_totp_enrollments_replay_floor_check,
+    VALIDATE CONSTRAINT admin_totp_enrollments_security_state_check;
 
 ALTER TABLE admin_accounts
     DROP COLUMN last_accepted_totp_step;

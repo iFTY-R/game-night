@@ -11,7 +11,6 @@ import (
 	"github.com/iFTY-R/game-night/internal/integrationtest"
 	admin "github.com/iFTY-R/game-night/platform/admin"
 	adminuser "github.com/iFTY-R/game-night/platform/admin/user"
-	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -59,10 +58,7 @@ func TestAdminUserGovernanceRepositoryCommandPreviewReceiptAndDeviceGovernance(t
 	}
 
 	auditEventID := insertAuditEvent(t, ctx, fixture, now.Add(2*time.Minute))
-	operationID, err := idempotency.ParseOperationID("user-command-op-1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	operationID := mustOperationID(t, 0x41)
 	receipt := adminuser.UserCommandReceipt{
 		ActorAdminID: adminID, OperationID: operationID, RequestDigest: governanceDigest(0x12), PreviewID: previewID,
 		UserID: userID, Command: adminuser.UserCommandRevokeAllDevices, Outcome: adminuser.UserCommandOutcomeExecuted,
@@ -126,10 +122,7 @@ func TestAdminUserGovernanceRepositoryDeleteUserAndEraseProfile(t *testing.T) {
 	insertUserProfile(t, ctx, fixture, userID, adminID, now.Add(-30*time.Minute))
 
 	repository := NewAdminUserGovernanceRepository(fixture.Pool)
-	deleteOperationID, err := idempotency.ParseOperationID("user-command-delete-op")
-	if err != nil {
-		t.Fatal(err)
-	}
+	deleteOperationID := mustOperationID(t, 0x42)
 	deleted, err := repository.DeleteUser(ctx, adminuser.DeleteUserCommand{
 		ActorAdminID: adminID, OperationID: deleteOperationID, RequestDigest: governanceDigest(0x21),
 		UserID: userID, ExpectedUserVersion: 1, Reason: "account lifecycle completed", ChangedAt: now,

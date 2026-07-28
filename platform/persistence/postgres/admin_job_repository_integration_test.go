@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/iFTY-R/game-night/internal/integrationtest"
 	adminuser "github.com/iFTY-R/game-night/platform/admin/user"
+	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) {
@@ -105,7 +107,11 @@ func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) 
 	}
 	completedAt := databaseIntegrationTime(t, ctx, fixture)
 	completed, err := repository.CompleteBatchItem(ctx, claimed, "succeeded", "", uuid.Nil, completedAt)
-	if err != nil || completed.State != "succeeded" {
+	if err != nil {
+		stage, diagnosticErr := diagnoseBatchItemCompletion(ctx, repository, claimed, "succeeded", "", uuid.Nil, completedAt)
+		t.Fatalf("complete item: err=%v diagnostic_stage=%s diagnostic_err=%v", err, stage, diagnosticErr)
+	}
+	if completed.State != "succeeded" {
 		t.Fatalf("complete item: err=%v item=%+v", err, completed)
 	}
 	var state string
@@ -207,6 +213,37 @@ func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) 
 	if err != nil || finishedErasure.State != "succeeded" {
 		t.Fatalf("complete erasure: job=%+v err=%v", finishedErasure, err)
 	}
+}
+
+// diagnoseBatchItemCompletion repeats the failed transaction without repository error mapping so CI retains the failing SQL stage and PostgreSQL cause.
+func diagnoseBatchItemCompletion(
+	ctx context.Context,
+	repository *AdminJobRepository,
+	item adminuser.BatchItem,
+	nextState, errorMessageKey string,
+	auditEventID uuid.UUID,
+	completedAt time.Time,
+) (string, error) {
+	stage := "item_cas"
+	err := repository.runner.Run(ctx, func(ctx context.Context, queries QueryHandle) error {
+		stored, err := queries.CompleteAdminBatchJobItemCAS(ctx, sqlcgen.CompleteAdminBatchJobItemCASParams{
+			NextState: nextState, ErrorMessageKey: optionalText(errorMessageKey), AuditEventID: optionalUUID(auditEventID),
+			CompletedAt: timeToPG(completedAt), ItemID: uuidToPG(item.ID),
+			ExpectedLeaseOwner: pgtype.Text{String: item.LeaseOwner, Valid: true}, ExpectedVersion: int64(item.Version),
+		})
+		if err != nil {
+			return err
+		}
+		stage = "job_aggregate"
+		_, err = queries.ApplyAdminBatchJobItemCompletion(ctx, sqlcgen.ApplyAdminBatchJobItemCompletionParams{
+			NextState: nextState, CompletedAt: timeToPG(completedAt), BatchJobID: stored.BatchJobID,
+		})
+		if err == nil {
+			stage = "commit"
+		}
+		return err
+	})
+	return stage, err
 }
 
 func TestAdminJobRepositoryRejectsExpiredPreview(t *testing.T) {

@@ -1253,8 +1253,6 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"outbox_consumers",
 		"outbox_events",
 		"party_rooms",
-		"profile_export_contexts",
-		"profile_export_items",
 		"room_activity_leases",
 		"room_game_config_drafts",
 		"room_members",

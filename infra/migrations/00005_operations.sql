@@ -230,6 +230,7 @@ BEGIN
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
         WHERE namespace.nspname = trusted_schema
           AND class.relkind IN ('r', 'p', 'S', 'v')
+          AND NOT (class.relkind = 'S' AND class.relname = 'goose_db_version_id_seq')
     LOOP
         EXECUTE format(
             CASE object_record.relkind

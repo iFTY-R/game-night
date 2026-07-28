@@ -94,6 +94,18 @@ jobs:
         with:
           # Keep CI aligned with the local generation baseline; upgrades require rerunning generation and breaking checks.
           version: 1.66.0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
       - name: Verify Buf smoke generation
         run: |
           (cd tooling/testdata/proto && buf format --diff --exit-code && buf lint && buf generate --template buf.gen.yaml && go test ./...)
@@ -124,7 +136,8 @@ jobs:
             done < <(find contracts games -type f -name '*.proto' -print)
             buf format --diff --exit-code
             buf lint
-            buf generate
+            # The repository generator applies each module's output layout and TS normalization.
+            pnpm run generate:contracts
             git diff --exit-code
             test -z "$(git status --porcelain)"
           else
@@ -247,8 +260,21 @@ jobs:
         run: |
           set -o pipefail
           # Migration tests change shared PostgreSQL catalogs; serialize packages while race still exercises in-package concurrency.
-          go test -p 1 ./... 2>&1 | tee "$RUNNER_TEMP/backend-integration.log"
-          pnpm run test:backend:integration 2>&1 | tee -a "$RUNNER_TEMP/backend-integration.log"
+          integration_log="$RUNNER_TEMP/backend-integration.log"
+          set +e
+          go test -p 1 ./... 2>&1 | tee "$integration_log"
+          integration_status=${PIPESTATUS[0]}
+          if [[ $integration_status -eq 0 ]]; then
+            pnpm run test:backend:integration 2>&1 | tee -a "$integration_log"
+            integration_status=${PIPESTATUS[0]}
+          fi
+          set -e
+          if [[ $integration_status -ne 0 ]]; then
+            # Keep annotations secret-safe while exposing the failed test and package without downloading job logs.
+            failure_summary="$(grep -E '^(--- FAIL:|FAIL[[:space:]]+github.com/iFTY-R/game-night/)' "$integration_log" | tail -n 20 | paste -sd ';' - || true)"
+            printf '::error title=Backend integration failures::%s\n' "${failure_summary:-backend integration command failed; inspect the job log}"
+            exit "$integration_status"
+          fi
       - name: Reject sensitive values in captured test output
         if: always()
         run: |

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package platform.admin.v1;
 
-import "google/protobuf/timestamp.proto";
 import "platform/admin/v1/admin_common.proto";
 import "platform/common/v1/common.proto";
 

@@ -123,9 +123,9 @@ func projectionWire(session gameruntime.Session, viewerKind gameSDK.ViewerKind, 
 func replayTerminalMetaWire(session gameruntime.Session) *gamev1.ReplayTerminalMeta {
 	snapshot := session.Snapshot()
 	meta := &gamev1.ReplayTerminalMeta{
-		Finished: snapshot.Status == gameruntime.StatusFinished,
-		Cancelled: snapshot.Status == gameruntime.StatusCancelled,
-		EndedAt: timestamppb.New(snapshot.EndedAt),
+		Finished:     snapshot.Status == gameruntime.StatusFinished,
+		Cancelled:    snapshot.Status == gameruntime.StatusCancelled,
+		EndedAt:      timestamppb.New(snapshot.EndedAt),
 		CancelReason: string(snapshot.CancelReason),
 	}
 	if snapshot.Status == gameruntime.StatusFinished {

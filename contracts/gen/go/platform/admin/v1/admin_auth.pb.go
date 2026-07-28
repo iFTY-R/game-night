@@ -10,7 +10,6 @@ import (
 	v1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -2532,7 +2531,7 @@ var File_platform_admin_v1_admin_auth_proto protoreflect.FileDescriptor
 
 const file_platform_admin_v1_admin_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"platform/admin/v1/admin_auth.proto\x12\x11platform.admin.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$platform/admin/v1/admin_common.proto\x1a\x1fplatform/common/v1/common.proto\"\x16\n" +
+	"\"platform/admin/v1/admin_auth.proto\x12\x11platform.admin.v1\x1a$platform/admin/v1/admin_common.proto\x1a\x1fplatform/common/v1/common.proto\"\x16\n" +
 	"\x14GetSetupStateRequest\"S\n" +
 	"\x15GetSetupStateResponse\x12:\n" +
 	"\x05state\x18\x01 \x01(\x0e2$.platform.admin.v1.AdminAccountStateR\x05state\"\x1f\n" +

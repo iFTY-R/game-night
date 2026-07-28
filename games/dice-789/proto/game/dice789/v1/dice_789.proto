@@ -158,11 +158,17 @@ message State {
 
 message Roll {}
 message ConfirmLanded {}
-message AddToPool { uint32 ticks = 1; }
-message ChooseTarget { string user_id = 1; }
+message AddToPool {
+  uint32 ticks = 1;
+}
+message ChooseTarget {
+  string user_id = 1;
+}
 message Reroll {}
 message Pass {}
-message ReportDropped { string reason = 1; }
+message ReportDropped {
+  string reason = 1;
+}
 message Finish {
   // Empty means a runtime-authorized host finish; platform cancellation is explicit.
   string reason = 1;

@@ -199,20 +199,23 @@ func insertDeviceCredential(
 	expired bool,
 ) {
 	t.Helper()
+	rotatedAt := createdAt
 	lastSeenAt := createdAt
-	idleExpiresAt := createdAt.Add(180 * 24 * time.Hour)
-	absoluteExpiresAt := createdAt.Add(365 * 24 * time.Hour)
 	if expired {
-		lastSeenAt = createdAt
-		idleExpiresAt = createdAt.Add(time.Hour)
-		absoluteExpiresAt = createdAt.Add(2 * time.Hour)
+		// Expired fixtures still need to satisfy the new invariant: rotated <= last_seen < idle <= absolute.
+		lastSeenAt = createdAt.Add(200 * 24 * time.Hour)
+	}
+	absoluteExpiresAt := createdAt.Add(365 * 24 * time.Hour)
+	idleExpiresAt := lastSeenAt.Add(180 * 24 * time.Hour)
+	if idleExpiresAt.After(absoluteExpiresAt) {
+		idleExpiresAt = absoluteExpiresAt
 	}
 	if _, err := fixture.Pool.Exec(ctx, `
         INSERT INTO device_credentials (
             credential_id, user_id, secret_hash, secret_key_version, csrf_hash, generation, label,
             created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at
-        ) VALUES ($1, $2, decode(repeat('01', 32), 'hex'), 1, decode(repeat('02', 32), 'hex'), 1, $3, $4, $5, $5, $6, $7)
-    `, credentialID, userID, label, createdAt, lastSeenAt, idleExpiresAt, absoluteExpiresAt); err != nil {
+        ) VALUES ($1, $2, decode(repeat('01', 32), 'hex'), 1, decode(repeat('02', 32), 'hex'), 1, $3, $4, $5, $6, $7)
+    `, credentialID, userID, label, createdAt, lastSeenAt, rotatedAt, idleExpiresAt, absoluteExpiresAt); err != nil {
 		t.Fatal(err)
 	}
 }

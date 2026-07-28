@@ -151,7 +151,7 @@ func TestAdminSecurityMigrationResetsLegacySecurityState(t *testing.T) {
 	}
 	if _, err := fixture.Pool.Exec(ctx, `
         INSERT INTO user_recovery_attempts (
-            attempt_id, user_id, challenge_id, assisted_grant_id, selector, secret_hash, status,
+            recovery_attempt_id, user_id, challenge_id, assisted_grant_id, selector, secret_hash, status,
             created_at, expires_at, request_digest
         ) VALUES (
             $1, $2, NULL, $3, 'legacy-attempt-selector', $4, 'active', $5, $6, decode(repeat('09', 32), 'hex')
@@ -389,12 +389,13 @@ func TestAdminSessionEnrollmentElevationAndReceiptPersistence(t *testing.T) {
 
 		operationID := mustOperationID(t, 0x44)
 		digest := mustDigest(t, 0x55)
+		auditEventID := insertAuditEvent(t, ctx, fixture, now.Add(6*time.Minute))
 		receipt, err := transaction.CommandReceipts().Save(ctx, adminDomain.CommandReceipt{
 			AdminID: account.Snapshot().ID, OperationID: operationID, RequestDigest: digest,
 			Command: "revoke_other_admin_sessions", TargetType: "admin", TargetID: account.Snapshot().ID.String(),
 			ResultAdminVersion: nextAccount.Snapshot().AdminVersion, ResultPasswordVersion: nextAccount.Snapshot().PasswordVersion,
 			ResultSessionVersion: staleSession.Snapshot().SessionVersion, ResultEnrollmentVersion: accepted.Snapshot().EnrollmentVersion,
-			AuditEventID: uuid.New(), CreatedAt: now.Add(6 * time.Minute),
+			AuditEventID: auditEventID, CreatedAt: now.Add(6 * time.Minute),
 		})
 		if err != nil {
 			return err

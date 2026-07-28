@@ -48,7 +48,19 @@ jobs:
             exit 1
           fi
       - name: Test Go packages
-        run: go test ./...
+        run: |
+          set -o pipefail
+          repository_test_log="$RUNNER_TEMP/repository-go-test.log"
+          set +e
+          go test ./... 2>&1 | tee "$repository_test_log"
+          repository_test_status=${PIPESTATUS[0]}
+          set -e
+          if [[ $repository_test_status -ne 0 ]]; then
+            failure_summary="$(grep -E '(apply transaction test migrations:|SQLSTATE [0-9A-Z]{5}|^--- FAIL:|^FAIL[[:space:]]+github.com/iFTY-R/game-night/)' "$repository_test_log" | awk '!seen[$0]++' | tail -n 20 | cut -c 1-500 | paste -sd ';' - || true)"
+            failure_summary="${failure_summary//'%'/'%25'}"
+            printf '::error title=Repository Go test failures::%s\n' "${failure_summary:-repository Go tests failed; inspect the job log}"
+            exit "$repository_test_status"
+          fi
       - name: Race Go packages
         run: go test -race ./...
       - name: Run bounded game fuzz smoke
@@ -271,7 +283,8 @@ jobs:
           set -e
           if [[ $integration_status -ne 0 ]]; then
             # Keep annotations secret-safe while exposing the failed test and package without downloading job logs.
-            failure_summary="$(grep -E '^(--- FAIL:|FAIL[[:space:]]+github.com/iFTY-R/game-night/)' "$integration_log" | tail -n 20 | paste -sd ';' - || true)"
+            failure_summary="$(grep -E '(apply transaction test migrations:|SQLSTATE [0-9A-Z]{5}|^--- FAIL:|^FAIL[[:space:]]+github.com/iFTY-R/game-night/)' "$integration_log" | awk '!seen[$0]++' | tail -n 20 | cut -c 1-500 | paste -sd ';' - || true)"
+            failure_summary="${failure_summary//'%'/'%25'}"
             printf '::error title=Backend integration failures::%s\n' "${failure_summary:-backend integration command failed; inspect the job log}"
             exit "$integration_status"
           fi

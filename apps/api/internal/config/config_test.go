@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
@@ -73,21 +74,39 @@ func TestLoadUsesBoundedAPIListenerDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadRealtimeRoutingRequiresAllowlistedTLSPeersInProduction(t *testing.T) {
+func TestLoadRealtimeRoutingAllowsPrivateHTTPPeersInProduction(t *testing.T) {
 	environment := validAPIEnvironment(t)
-	environment[realtimeBootstrapURLEnvironment] = "https://realtime-a.internal:8091"
-	environment[realtimePeerURLsEnvironment] = "https://realtime-a.internal:8091,https://realtime-b.internal:8091"
+	environment[realtimeBootstrapURLEnvironment] = "http://realtime-a.internal:8091"
+	environment[realtimePeerURLsEnvironment] = "http://realtime-a.internal:8091,http://realtime-b.internal:8091"
 	reader := environmentReader{lookup: mapLookup(environment)}
-	loaded, err := loadRealtime(reader, sharedconfig.EnvironmentProduction)
+	loaded, err := loadRealtime(reader)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(loaded.PeerURLs) != 2 {
 		t.Fatalf("realtime peers = %v", loaded.PeerURLs)
 	}
-	environment[realtimePeerURLsEnvironment] = "https://realtime-b.internal:8091"
-	if _, err := loadRealtime(reader, sharedconfig.EnvironmentProduction); err == nil || !strings.Contains(err.Error(), realtimePeerURLsEnvironment) {
+	environment[realtimePeerURLsEnvironment] = "http://realtime-b.internal:8091"
+	if _, err := loadRealtime(reader); err == nil || !strings.Contains(err.Error(), realtimePeerURLsEnvironment) {
 		t.Fatalf("missing bootstrap allowlist error = %v", err)
+	}
+}
+
+func TestLoadAllowsPrivateInfrastructureAndLocalCheckpointInProduction(t *testing.T) {
+	environment := validAPIEnvironment(t)
+	environment["GAME_NIGHT_ENVIRONMENT"] = "production"
+	environment["GAME_NIGHT_DATABASE_URL"] = "postgres://runtime:database-secret@db.internal/game_night?sslmode=disable"
+	environment["GAME_NIGHT_REDIS_URL"] = "redis://:redis-secret@redis.internal/0"
+	environment[realtimeBootstrapURLEnvironment] = "http://realtime.internal:8091"
+	environment[realtimePeerURLsEnvironment] = "http://realtime.internal:8091"
+	environment[serviceheartbeat.TargetURLEnvironment] = "http://api.internal:8081" + serviceheartbeat.Path
+
+	loaded, err := Load(mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Shared.Environment != sharedconfig.EnvironmentProduction || loaded.CheckpointStorage.Kind != checkpointstorage.SinkLocal {
+		t.Fatalf("production private configuration was not preserved: environment=%q checkpoint=%q", loaded.Shared.Environment, loaded.CheckpointStorage.Kind)
 	}
 }
 

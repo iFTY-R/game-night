@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -58,7 +57,7 @@ type Config struct {
 }
 
 // LoadConfig validates shared heartbeat settings without opening a network connection.
-func LoadConfig(lookup LookupEnv, requireTarget, requireTLS bool) (Config, error) {
+func LoadConfig(lookup LookupEnv, requireTarget bool) (Config, error) {
 	if lookup == nil {
 		return Config{}, ErrInvalidConfig
 	}
@@ -71,7 +70,7 @@ func LoadConfig(lookup LookupEnv, requireTarget, requireTLS bool) (Config, error
 		return Config{}, ErrInvalidConfig
 	}
 	target := read(TargetURLEnvironment)
-	if requireTarget && !validTargetURL(target, requireTLS) || !requireTarget && target != "" && !validTargetURL(target, requireTLS) {
+	if requireTarget && !validTargetURL(target) || !requireTarget && target != "" && !validTargetURL(target) {
 		return Config{}, ErrInvalidConfig
 	}
 	buildVersion := read(BuildVersionEnvironment)
@@ -215,9 +214,9 @@ type HTTPClient struct {
 }
 
 // NewHTTPClient validates the private target and credential without opening the network.
-func NewHTTPClient(client *http.Client, targetURL, token string, requireTLS bool) (*HTTPClient, error) {
+func NewHTTPClient(client *http.Client, targetURL, token string) (*HTTPClient, error) {
 	parsed, err := url.Parse(targetURL)
-	if client == nil || err != nil || !validTargetURL(targetURL, requireTLS) || !ValidToken(token) {
+	if client == nil || err != nil || !validTargetURL(targetURL) || !ValidToken(token) {
 		return nil, errInvalidHeartbeat
 	}
 	return &HTTPClient{client: client, url: parsed.String(), token: token}, nil
@@ -271,17 +270,13 @@ func TokenMatches(expected, actual string) bool {
 	return subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) == 1
 }
 
-func validTargetURL(value string, requireTLS bool) bool {
+func validTargetURL(value string) bool {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Path != Path ||
 		parsed.Hostname() == "" || parsed.Port() == "" || parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return false
 	}
-	if !requireTLS || parsed.Scheme == "https" {
-		return true
-	}
-	address := net.ParseIP(parsed.Hostname())
-	return parsed.Hostname() == "localhost" || address != nil && address.IsLoopback()
+	return true
 }
 
 func parseDuration(value string, fallback, minimum, maximum time.Duration) (time.Duration, error) {

@@ -29,7 +29,7 @@ API / realtime / worker / migrate
   |
   +-- 外部 PostgreSQL
   +-- 外部 Redis
-  +-- 外部 S3 兼容对象存储
+  +-- 本地 checkpoint 命名卷
 ```
 
 `game-night` 容器内部 edge 网关监听 `8080`，宿主机默认发布到 `127.0.0.1:40891`。1Panel 反向代理只需要转发到这个本地端口。
@@ -37,11 +37,10 @@ API / realtime / worker / migrate
 ## 前置资源
 
 1. 1Panel 主机已安装 Docker，并能正常使用 1Panel 的容器编排功能。
-2. 1Panel 主机能访问外部 PostgreSQL、Redis 和 S3 endpoint。
+2. 1Panel 主机能访问外部 PostgreSQL 和 Redis。
 3. PostgreSQL 已创建目标数据库，推荐使用 PostgreSQL 17 或兼容版本。
-4. Redis 已开启认证；生产环境建议使用 TLS，即 `rediss://`。
-5. S3 兼容对象存储已创建 bucket；生产环境建议启用对象锁或保留策略，用于审计检查点。
-6. 如果镜像不是公开包，需要先在 1Panel 主机执行 `docker login ghcr.io`。
+4. Redis 已开启认证；受控私网可使用 `redis://`，跨不可信网络时建议使用 `rediss://`。
+5. 如果镜像不是公开包，需要先在 1Panel 主机执行 `docker login ghcr.io`。
 
 ## 目录结构
 
@@ -77,7 +76,7 @@ API / realtime / worker / migrate
 
 在部署目录创建 `.env`。推荐把仓库中的 `deploy/.env.standalone.example` 上传到部署目录并重命名为 `.env`；不要从 `deploy/.env.example` 复制，那个文件是完整部署的兼容模板。
 
-`.env` 只放你在 1Panel 部署时需要决定的外部参数，例如域名、宿主机发布端口、数据库、Redis、S3 和 secret 目录。Compose 文件里的 `GAME_NIGHT_EDGE_LISTEN_ADDRESS`、`GAME_NIGHT_API_LISTEN_ADDRESS`、`GAME_NIGHT_EDGE_API_UPSTREAM_URL`、`GAME_NIGHT_REALTIME_PUBLIC_LISTEN_ADDRESS` 这类值是容器内部固定布线，不需要也不应该放进 `.env` 手动配置。
+`.env` 只放你在 1Panel 部署时需要决定的外部参数，例如域名、宿主机发布端口、数据库、Redis 和 secret 目录。Compose 文件里的 `GAME_NIGHT_EDGE_LISTEN_ADDRESS`、`GAME_NIGHT_API_LISTEN_ADDRESS`、`GAME_NIGHT_EDGE_API_UPSTREAM_URL`、`GAME_NIGHT_REALTIME_PUBLIC_LISTEN_ADDRESS` 这类值是容器内部固定布线，不需要也不应该放进 `.env` 手动配置。
 
 下面是 1Panel standalone 推荐模板。生产环境请替换全部占位值。
 
@@ -99,8 +98,8 @@ GAME_NIGHT_EDGE_USER_HOSTS=game.example.com
 GAME_NIGHT_EDGE_ADMIN_HOSTS=admin-game.example.com
 GAME_NIGHT_COOKIE_SECURE=true
 
-# Redis
-GAME_NIGHT_REDIS_URL=rediss://:change-me-redis-password@redis.example.internal:6379/0
+# Redis；受控私网可以使用 redis://，需要链路加密时改为 rediss://。
+GAME_NIGHT_REDIS_URL=redis://:change-me-redis-password@redis.example.internal:6379/0
 GAME_NIGHT_REDIS_KEY_PREFIX=game-night:prod:
 GAME_NIGHT_REDIS_TIMEOUT=1s
 
@@ -114,22 +113,13 @@ GAME_NIGHT_WORKER_SECRETS_DIR=./secrets
 GAME_NIGHT_API_BOOTSTRAP_SECRET_FILE=/run/game-night/api-secrets/admin-bootstrap.txt
 
 # PostgreSQL。开发环境可以先复用一个账号；生产环境推荐拆分 runtime、worker、migration 权限。
-GAME_NIGHT_API_DATABASE_URL=postgresql://game_night_runtime:change-me@postgres.example.internal:5432/game_night?sslmode=require
-GAME_NIGHT_REALTIME_DATABASE_URL=postgresql://game_night_runtime:change-me@postgres.example.internal:5432/game_night?sslmode=require
-GAME_NIGHT_WORKER_DATABASE_URL=postgresql://game_night_worker:change-me@postgres.example.internal:5432/game_night?sslmode=require
-GAME_NIGHT_MIGRATION_DATABASE_URL=postgresql://game_night_migration:change-me@postgres.example.internal:5432/game_night?sslmode=require
-
-# S3 兼容对象存储，用于审计检查点。
-GAME_NIGHT_CHECKPOINT_S3_REGION=us-east-1
-GAME_NIGHT_CHECKPOINT_S3_BUCKET=game-night-audit
-GAME_NIGHT_CHECKPOINT_S3_ENDPOINT=https://s3.example.internal
-GAME_NIGHT_CHECKPOINT_S3_RETENTION=8760h
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=change-me-s3-access-key
-AWS_SECRET_ACCESS_KEY=change-me-s3-secret-key
+GAME_NIGHT_API_DATABASE_URL=postgresql://game_night_runtime:change-me@postgres.example.internal:5432/game_night?sslmode=disable
+GAME_NIGHT_REALTIME_DATABASE_URL=postgresql://game_night_runtime:change-me@postgres.example.internal:5432/game_night?sslmode=disable
+GAME_NIGHT_WORKER_DATABASE_URL=postgresql://game_night_worker:change-me@postgres.example.internal:5432/game_night?sslmode=disable
+GAME_NIGHT_MIGRATION_DATABASE_URL=postgresql://game_night_migration:change-me@postgres.example.internal:5432/game_night?sslmode=disable
 ```
 
-如果只是内网开发并暂时不用 HTTPS，可以把 `GAME_NIGHT_ENVIRONMENT=development`、`GAME_NIGHT_COOKIE_SECURE=false`，并把 origin 改成 `http://服务器IP:40891` 或 1Panel 配置的 HTTP 域名。
+如果暂时不用 HTTPS，可以保留 `GAME_NIGHT_ENVIRONMENT=production`，将 `GAME_NIGHT_COOKIE_SECURE=false`，并把 origin 改成 `http://服务器IP:40891` 或 1Panel 配置的 HTTP 域名。正式对外访问仍建议由 1Panel 反向代理提供 HTTPS。
 
 `GAME_NIGHT_TRUSTED_PROXY_CIDRS` 和 `GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS` 默认不用写进 `.env`。standalone 编排已经默认信任 `127.0.0.1/32,::1/128`，适合 1Panel 反向代理转发到本机 `127.0.0.1:40891` 的场景。只有 1Panel/OpenResty 不在本机、或前面还有一层代理时，才取消注释并改成真实代理网段：
 
@@ -266,7 +256,7 @@ GAME_NIGHT_COOKIE_SECURE=true
 如果暂时只用 IP 和端口直连测试：
 
 ```dotenv
-GAME_NIGHT_ENVIRONMENT=development
+GAME_NIGHT_ENVIRONMENT=production
 GAME_NIGHT_HTTP_BIND_ADDRESS=0.0.0.0
 GAME_NIGHT_HTTP_PUBLISHED_PORT=40891
 GAME_NIGHT_USER_ORIGINS=http://服务器IP:40891

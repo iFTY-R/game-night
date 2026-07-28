@@ -42,7 +42,7 @@ var (
 type SinkKind string
 
 const (
-	// SinkLocal is an append-only process-local development sink without privileged deletion resistance.
+	// SinkLocal is an append-only process-local sink without privileged deletion resistance.
 	SinkLocal SinkKind = "local"
 	// SinkS3 requires create-only writes, exact read-back, and Object Lock Compliance retention.
 	SinkS3 SinkKind = "s3"
@@ -75,9 +75,6 @@ func Load(lookup sharedconfig.LookupEnv, environment sharedconfig.Environment) (
 	kind := SinkKind(read(checkpointSinkEnvironment))
 	switch kind {
 	case SinkLocal:
-		if environment == sharedconfig.EnvironmentProduction {
-			return Config{}, ErrInvalidConfig
-		}
 		directory := read(checkpointLocalDirectoryEnvironment)
 		if directory == "" || read(checkpointS3RegionEnvironment) != "" || read(checkpointS3BucketEnvironment) != "" ||
 			read(checkpointS3EndpointEnvironment) != "" || read(checkpointS3RetentionEnvironment) != "" {

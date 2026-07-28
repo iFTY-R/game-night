@@ -114,7 +114,7 @@ func Load(lookup sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	process, err := loadProcessConfig(lookup, shared.Environment)
+	process, err := loadProcessConfig(lookup)
 	if err != nil {
 		return Config{}, err
 	}
@@ -122,7 +122,7 @@ func Load(lookup sharedconfig.LookupEnv) (Config, error) {
 	return process, nil
 }
 
-func loadProcessConfig(lookup sharedconfig.LookupEnv, environment sharedconfig.Environment) (Config, error) {
+func loadProcessConfig(lookup sharedconfig.LookupEnv) (Config, error) {
 	reader := environmentReader{lookup: lookup}
 	publicAddress := reader.valueOrDefault(publicListenAddressEnvironment, defaultPublicListenAddress)
 	if !validListenAddress(publicAddress) {
@@ -133,7 +133,7 @@ func loadProcessConfig(lookup sharedconfig.LookupEnv, environment sharedconfig.E
 		return Config{}, fieldError(internalListenAddressEnvironment, "invalid or shared listen address")
 	}
 	advertisedURL := reader.valueOrDefault(advertisedURLEnvironment, defaultAdvertisedURL)
-	if !validAdvertisedURL(advertisedURL, environment == sharedconfig.EnvironmentProduction) {
+	if !validAdvertisedURL(advertisedURL) {
 		return Config{}, fieldError(advertisedURLEnvironment, "invalid internal service URL")
 	}
 	instanceID := reader.valueOrDefault(instanceIDEnvironment, defaultInstanceID)
@@ -144,7 +144,7 @@ func loadProcessConfig(lookup sharedconfig.LookupEnv, environment sharedconfig.E
 	if err != nil || !validInternalToken(internalToken) {
 		return Config{}, fieldError(internalTokenEnvironment, "missing or invalid internal credential")
 	}
-	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, environment == sharedconfig.EnvironmentProduction)
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true)
 	if err != nil {
 		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
 	}
@@ -264,13 +264,10 @@ func validListenAddress(value string) bool {
 	return err == nil && parsedPort >= 1 && parsedPort <= 65535
 }
 
-func validAdvertisedURL(value string, requireTLS bool) bool {
+func validAdvertisedURL(value string) bool {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return false
-	}
-	if requireTLS && parsed.Scheme != "https" {
 		return false
 	}
 	return parsed.Hostname() != "" && parsed.Port() != ""

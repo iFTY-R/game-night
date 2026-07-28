@@ -31,7 +31,7 @@ func TestHTTPClientUsesExactPathAndCredential(t *testing.T) {
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	t.Cleanup(server.Close)
-	client, err := NewHTTPClient(server.Client(), server.URL+Path, token, false)
+	client, err := NewHTTPClient(server.Client(), server.URL+Path, token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestLoadConfigValidatesPrivateTargetCredentialAndTiming(t *testing.T) {
 		IntervalEnvironment:     "12s",
 		TimeoutEnvironment:      "3s",
 	}
-	config, err := LoadConfig(func(name string) (string, bool) { value, ok := values[name]; return value, ok }, true, false)
+	config, err := LoadConfig(func(name string) (string, bool) { value, ok := values[name]; return value, ok }, true)
 	if err != nil || config.Interval != 12*time.Second || config.Timeout != 3*time.Second {
 		t.Fatalf("config=%+v err=%v", config, err)
 	}
@@ -89,10 +89,20 @@ func TestLoadConfigValidatesPrivateTargetCredentialAndTiming(t *testing.T) {
 			case "excessive timeout":
 				invalid[TimeoutEnvironment] = value
 			}
-			if _, loadErr := LoadConfig(func(key string) (string, bool) { candidate, ok := invalid[key]; return candidate, ok }, true, false); !errors.Is(loadErr, ErrInvalidConfig) {
+			if _, loadErr := LoadConfig(func(key string) (string, bool) { candidate, ok := invalid[key]; return candidate, ok }, true); !errors.Is(loadErr, ErrInvalidConfig) {
 				t.Fatalf("error=%v", loadErr)
 			}
 		})
+	}
+}
+
+func TestLoadConfigAllowsPrivateHTTPWithoutEnvironmentTLSPolicy(t *testing.T) {
+	values := map[string]string{
+		TargetURLEnvironment: "http://api.internal:8081" + Path,
+		TokenEnvironment:     "heartbeat-private-token-1234567890",
+	}
+	if _, err := LoadConfig(func(name string) (string, bool) { value, ok := values[name]; return value, ok }, true); err != nil {
+		t.Fatalf("private HTTP heartbeat target was rejected: %v", err)
 	}
 }
 

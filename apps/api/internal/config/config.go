@@ -111,7 +111,7 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	realtimeConfig, err := loadRealtime(reader, shared.Environment)
+	realtimeConfig, err := loadRealtime(reader)
 	if err != nil {
 		return Config{}, err
 	}
@@ -119,7 +119,7 @@ func Load(lookupEnv sharedconfig.LookupEnv) (Config, error) {
 	if !instanceIDPattern.MatchString(instanceID) {
 		return Config{}, fieldError(instanceIDEnvironment, "invalid instance identifier")
 	}
-	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookupEnv), false, shared.Environment == sharedconfig.EnvironmentProduction)
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookupEnv), false)
 	if err != nil {
 		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
 	}
@@ -197,9 +197,9 @@ func loadArgon2(reader environmentReader) (Argon2Config, error) {
 	return Argon2Config{Workers: workers, QueueCapacity: queueCapacity}, nil
 }
 
-func loadRealtime(reader environmentReader, environment sharedconfig.Environment) (RealtimeConfig, error) {
+func loadRealtime(reader environmentReader) (RealtimeConfig, error) {
 	bootstrapURL := reader.valueOrDefault(realtimeBootstrapURLEnvironment, defaultRealtimeBootstrapURL)
-	if !validRealtimeURL(bootstrapURL, environment == sharedconfig.EnvironmentProduction) {
+	if !validRealtimeURL(bootstrapURL) {
 		return RealtimeConfig{}, fieldError(realtimeBootstrapURLEnvironment, "invalid realtime URL")
 	}
 	peerRaw := reader.valueOrDefault(realtimePeerURLsEnvironment, bootstrapURL)
@@ -207,7 +207,7 @@ func loadRealtime(reader environmentReader, environment sharedconfig.Environment
 	seen := make(map[string]struct{})
 	for _, candidate := range strings.Split(peerRaw, ",") {
 		candidate = strings.TrimSpace(candidate)
-		if !validRealtimeURL(candidate, environment == sharedconfig.EnvironmentProduction) {
+		if !validRealtimeURL(candidate) {
 			return RealtimeConfig{}, fieldError(realtimePeerURLsEnvironment, "invalid realtime peer URL")
 		}
 		if _, exists := seen[candidate]; !exists {
@@ -230,14 +230,14 @@ func loadRealtime(reader environmentReader, environment sharedconfig.Environment
 	return RealtimeConfig{BootstrapURL: bootstrapURL, PeerURLs: peers, InternalToken: token}, nil
 }
 
-func validRealtimeURL(value string, requireTLS bool) bool {
+func validRealtimeURL(value string) bool {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") || (parsed.Scheme != "http" && parsed.Scheme != "https") ||
 		parsed.Hostname() == "" || parsed.Port() == "" {
 		return false
 	}
-	return !requireTLS || parsed.Scheme == "https"
+	return true
 }
 
 func validListenAddress(value string) bool {

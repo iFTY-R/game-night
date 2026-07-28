@@ -122,7 +122,7 @@ func Load(lookup LookupEnv) (Config, error) {
 	if !instanceIDPattern.MatchString(instanceID) {
 		return Config{}, fieldError(instanceIDEnvironment, "invalid instance identifier")
 	}
-	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, false)
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true)
 	if err != nil {
 		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
 	}

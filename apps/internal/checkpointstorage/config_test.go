@@ -11,7 +11,7 @@ import (
 	"github.com/iFTY-R/game-night/platform/persistence/objectstorage"
 )
 
-func TestLoadUsesLocalSinkOnlyOutsideProduction(t *testing.T) {
+func TestLoadUsesLocalSinkInEveryEnvironment(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "checkpoints")
 	config, err := Load(environment(map[string]string{
 		checkpointSinkEnvironment:           string(SinkLocal),
@@ -24,12 +24,12 @@ func TestLoadUsesLocalSinkOnlyOutsideProduction(t *testing.T) {
 		t.Fatalf("unexpected local config: %+v", config)
 	}
 
-	_, err = Load(environment(map[string]string{
+	production, err := Load(environment(map[string]string{
 		checkpointSinkEnvironment:           string(SinkLocal),
 		checkpointLocalDirectoryEnvironment: directory,
 	}), sharedconfig.EnvironmentProduction)
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("production local sink error = %v, want ErrInvalidConfig", err)
+	if err != nil || production.Kind != SinkLocal || production.LocalDirectory != directory {
+		t.Fatalf("production local config = %+v, error = %v", production, err)
 	}
 }
 
@@ -70,8 +70,8 @@ func TestReadinessCachesProductionProbeAndAllowsExplicitLocalPolicy(t *testing.T
 		t.Fatalf("development local readiness = %v, err=%v", localProbe.Ready(t.Context()), err)
 	}
 	productionProbe, err := NewReadiness(sharedconfig.EnvironmentProduction, localSink, time.Minute, time.Second)
-	if err != nil || productionProbe.Ready(t.Context()) {
-		t.Fatal("non-production sink satisfied production readiness")
+	if err != nil || !productionProbe.Ready(t.Context()) {
+		t.Fatalf("production local readiness = %v, err=%v", productionProbe.Ready(t.Context()), err)
 	}
 }
 

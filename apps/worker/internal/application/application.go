@@ -163,7 +163,6 @@ func New(ctx context.Context, config workerconfig.Config, logger *slog.Logger) (
 		&http.Client{Timeout: config.Heartbeat.Timeout},
 		config.Heartbeat.TargetURL,
 		config.Heartbeat.Token,
-		config.Shared.Environment == sharedconfig.EnvironmentProduction,
 	)
 	if err != nil {
 		return nil, errInitializeRuntime

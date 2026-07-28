@@ -12,17 +12,16 @@ import (
 
 // Readiness caches the bounded external sink probe so API database health transactions never wait on S3 per request.
 type Readiness struct {
-	environment sharedconfig.Environment
-	sink        objectstorage.Sink
-	interval    time.Duration
-	timeout     time.Duration
+	sink     objectstorage.Sink
+	interval time.Duration
+	timeout  time.Duration
 
 	mu        sync.Mutex
 	ready     bool
 	expiresAt time.Time
 }
 
-// NewReadiness binds deployment policy to a live sink without allowing a local sink to satisfy production health.
+// NewReadiness binds a supported environment to a live sink and bounded probe schedule.
 func NewReadiness(
 	environment sharedconfig.Environment,
 	sink objectstorage.Sink,
@@ -34,7 +33,7 @@ func NewReadiness(
 			environment != sharedconfig.EnvironmentProduction) {
 		return nil, ErrInvalidConfig
 	}
-	return &Readiness{environment: environment, sink: sink, interval: interval, timeout: timeout}, nil
+	return &Readiness{sink: sink, interval: interval, timeout: timeout}, nil
 }
 
 // Ready refreshes one serialized external probe after the cache expires and caches both success and failure.
@@ -51,8 +50,7 @@ func (readiness *Readiness) Ready(ctx context.Context) bool {
 	probeContext, cancel := context.WithTimeout(ctx, readiness.timeout)
 	err := readiness.sink.CheckProductionReady(probeContext)
 	cancel()
-	readiness.ready = err == nil || readiness.environment != sharedconfig.EnvironmentProduction &&
-		errors.Is(err, objectstorage.ErrNonProductionSink)
+	readiness.ready = err == nil || errors.Is(err, objectstorage.ErrNonProductionSink)
 	readiness.expiresAt = now.Add(readiness.interval)
 	return readiness.ready
 }

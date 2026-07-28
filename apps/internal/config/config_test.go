@@ -110,15 +110,18 @@ func TestLoadRequiresExplicitEnvironment(t *testing.T) {
 	assertSafeError(t, err, environmentName, "")
 }
 
-func TestLoadRequiresSecureCookiesInProduction(t *testing.T) {
+func TestLoadAllowsExplicitInsecureCookiesInProduction(t *testing.T) {
 	environment := validEnvironment(t)
 	environment[environmentName] = string(EnvironmentProduction)
-	environment[userOriginsEnvironment] = "https://play.example.test"
-	environment[adminOriginsEnvironment] = "https://admin.example.test"
 	environment[cookieSecureEnvironment] = "false"
 
-	_, err := Load(mapLookup(environment))
-	assertSafeError(t, err, cookieSecureEnvironment, "false")
+	loaded, err := Load(mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Network.CookieSecure {
+		t.Fatal("explicit insecure cookie setting was ignored")
+	}
 }
 
 func TestLoadDefaultsToSecureCookiesInProduction(t *testing.T) {
@@ -136,25 +139,18 @@ func TestLoadDefaultsToSecureCookiesInProduction(t *testing.T) {
 	}
 }
 
-func TestLoadRequiresEncryptedDependenciesInProduction(t *testing.T) {
-	tests := []struct {
-		name  string
-		field string
-		value string
-	}{
-		{name: "PostgreSQL missing sslmode", field: databaseURLEnvironment, value: "postgres://runtime:secret@db.example.test/game_night"},
-		{name: "PostgreSQL disabled TLS", field: databaseURLEnvironment, value: "postgres://runtime:secret@db.example.test/game_night?sslmode=disable"},
-		{name: "PostgreSQL ambiguous TLS", field: databaseURLEnvironment, value: "postgres://runtime:secret@db.example.test/game_night?sslmode=require&sslmode=disable"},
-		{name: "Redis plaintext", field: redisURLEnvironment, value: "redis://:secret@redis.example.test/0"},
-	}
+func TestLoadAllowsPlaintextPrivateDependenciesInProduction(t *testing.T) {
+	environment := validEnvironment(t)
+	environment[environmentName] = string(EnvironmentProduction)
+	environment[databaseURLEnvironment] = "postgres://runtime:secret@db.internal/game_night?sslmode=disable"
+	environment[redisURLEnvironment] = "redis://:secret@redis.internal/0"
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			environment := productionEnvironment(t)
-			environment[test.field] = test.value
-			_, err := Load(mapLookup(environment))
-			assertSafeError(t, err, test.field, test.value)
-		})
+	loaded, err := Load(mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.PostgreSQL.DSN != environment[databaseURLEnvironment] || loaded.Redis.URL != environment[redisURLEnvironment] {
+		t.Fatalf("plaintext private dependencies were not preserved: postgres=%q redis=%q", loaded.PostgreSQL.DSN, loaded.Redis.URL)
 	}
 }
 

@@ -11,15 +11,15 @@ import (
 // LookupEnv matches os.LookupEnv and keeps process configuration deterministic in tests.
 type LookupEnv func(string) (string, bool)
 
-// Environment controls validations that must fail closed in a production deployment.
+// Environment selects deployment defaults without imposing one infrastructure transport policy.
 type Environment string
 
 const (
-	// EnvironmentDevelopment permits explicit local-only settings such as insecure cookies.
+	// EnvironmentDevelopment selects local-friendly defaults such as non-Secure cookies.
 	EnvironmentDevelopment Environment = "development"
 	// EnvironmentTest identifies isolated automated test processes.
 	EnvironmentTest Environment = "test"
-	// EnvironmentProduction enables deployment checks that protect browser credentials.
+	// EnvironmentProduction selects production defaults while allowing trusted private-network dependencies.
 	EnvironmentProduction Environment = "production"
 )
 

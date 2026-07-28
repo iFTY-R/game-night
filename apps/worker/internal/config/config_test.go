@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iFTY-R/game-night/apps/internal/checkpointstorage"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 )
@@ -43,6 +44,21 @@ func TestLoadDefaultsRoomIdleTimeout(t *testing.T) {
 	}
 	if loaded.Runtime.RoomIdleTimeout != 10*time.Minute {
 		t.Fatalf("default room idle timeout=%v", loaded.Runtime.RoomIdleTimeout)
+	}
+}
+
+func TestLoadAllowsPrivatePostgreSQLAndLocalCheckpointInProduction(t *testing.T) {
+	values := validWorkerEnvironment(t)
+	values["GAME_NIGHT_ENVIRONMENT"] = "production"
+	values["GAME_NIGHT_DATABASE_URL"] = "postgres://worker:database-secret@db.internal/game_night?sslmode=disable"
+	values[serviceheartbeat.TargetURLEnvironment] = "http://api.internal:8081" + serviceheartbeat.Path
+
+	loaded, err := Load(mapLookup(values))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Shared.Environment != sharedconfig.EnvironmentProduction || loaded.CheckpointStorage.Kind != checkpointstorage.SinkLocal {
+		t.Fatalf("production private worker configuration was not preserved: environment=%q checkpoint=%q", loaded.Shared.Environment, loaded.CheckpointStorage.Kind)
 	}
 }
 

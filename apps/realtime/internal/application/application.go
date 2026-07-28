@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 	"github.com/iFTY-R/game-night/apps/internal/runtimeinfo"
 	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	"github.com/iFTY-R/game-night/apps/realtime/internal/config"
@@ -249,7 +248,6 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	application.maintenanceVersion.Store(maintenance.Version)
 	heartbeatClient, err := serviceheartbeat.NewHTTPClient(
 		&http.Client{Timeout: cfg.Heartbeat.Timeout}, cfg.Heartbeat.TargetURL, cfg.Heartbeat.Token,
-		cfg.Shared.Environment == sharedconfig.EnvironmentProduction,
 	)
 	if err != nil {
 		return nil, errInitializeRuntime

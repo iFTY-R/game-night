@@ -293,11 +293,11 @@ Compose 不配置 `user:`，由 Dockerfile 的非 root `USER` 作为唯一运行
 - `minio` 和一次性 `minio-init`，负责本地 S3 bucket、保留策略和应用凭据。
 - 一次性 `secrets-init`，把部署 secret staging 为应用用户可读的只读 volume。
 
-这些依赖通过 Compose 服务名访问，不向宿主机发布端口。内部 PostgreSQL、Redis 和 MinIO 使用私有网络明文连接，因此完整编排默认用于开发或单机演示，并保持 `GAME_NIGHT_ENVIRONMENT=development`。
+这些依赖通过 Compose 服务名访问，不向宿主机发布端口。内部 PostgreSQL、Redis 和 MinIO 使用私有网络明文连接，可用于开发或受控私网中的小规模单机生产。
 
 ### 8.3 Standalone 编排（`deploy/docker-compose.standalone.yml`）
 
-standalone 编排只定义 `game-night` 服务，不定义数据库、Redis、MinIO 或初始化服务。部署者必须提供各进程专用 PostgreSQL DSN、Redis URL、S3 endpoint 和只读 keyring 目录。生产环境切换为 `GAME_NIGHT_ENVIRONMENT=production` 前，必须配置 PostgreSQL TLS、Redis TLS 和 HTTPS 对象存储 endpoint。
+standalone 编排只定义 `game-night` 服务，不定义数据库、Redis 或初始化服务。部署者必须提供各进程专用 PostgreSQL DSN、Redis URL 和只读 keyring 目录；checkpoint 默认使用本地命名卷。TLS 依赖和 S3/WORM checkpoint 是不可信网络或高可靠场景的可选增强项，不是 `GAME_NIGHT_ENVIRONMENT=production` 的启动门槛。
 
 ### 8.4 Migration command
 

@@ -16,7 +16,7 @@ func TestLoadProcessConfigUsesBoundedDevelopmentDefaults(t *testing.T) {
 		serviceheartbeat.TargetURLEnvironment: "http://127.0.0.1:8081" + serviceheartbeat.Path,
 		serviceheartbeat.TokenEnvironment:     strings.Repeat("h", 32),
 	}
-	config, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+	config, err := loadProcessConfig(lookupMap(values))
 	if err != nil {
 		t.Fatalf("loadProcessConfig() error = %v", err)
 	}
@@ -45,23 +45,18 @@ func TestLoadProcessConfigRejectsSharedListener(t *testing.T) {
 	t.Parallel()
 	values := validProcessEnvironment()
 	values[internalListenAddressEnvironment] = values[publicListenAddressEnvironment]
-	_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+	_, err := loadProcessConfig(lookupMap(values))
 	if err == nil || !strings.Contains(err.Error(), internalListenAddressEnvironment) {
 		t.Fatalf("loadProcessConfig() error = %v", err)
 	}
 }
 
-func TestLoadProcessConfigRequiresTLSAdvertisedURLInProduction(t *testing.T) {
+func TestLoadProcessConfigAllowsPrivateHTTPAdvertisedURLInProduction(t *testing.T) {
 	t.Parallel()
 	values := validProcessEnvironment()
 	values[advertisedURLEnvironment] = "http://realtime.internal:8091"
-	_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentProduction)
-	if err == nil || !strings.Contains(err.Error(), advertisedURLEnvironment) {
-		t.Fatalf("loadProcessConfig() error = %v", err)
-	}
-	values[advertisedURLEnvironment] = "https://realtime.internal:8091"
-	if _, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentProduction); err != nil {
-		t.Fatalf("loadProcessConfig() production TLS error = %v", err)
+	if _, err := loadProcessConfig(lookupMap(values)); err != nil {
+		t.Fatalf("loadProcessConfig() private HTTP error = %v", err)
 	}
 }
 
@@ -70,7 +65,7 @@ func TestLoadProcessConfigRejectsWeakInternalCredentialWithoutEchoingIt(t *testi
 	values := validProcessEnvironment()
 	secret := "short-secret"
 	values[internalTokenEnvironment] = secret
-	_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+	_, err := loadProcessConfig(lookupMap(values))
 	if err == nil || !strings.Contains(err.Error(), internalTokenEnvironment) || strings.Contains(err.Error(), secret) {
 		t.Fatalf("loadProcessConfig() error = %v", err)
 	}
@@ -81,7 +76,7 @@ func TestLoadProcessConfigRejectsRenewalTooCloseToExpiry(t *testing.T) {
 	values := validProcessEnvironment()
 	values[leaseTTLEnvironment] = "10s"
 	values[renewIntervalEnvironment] = "6s"
-	_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+	_, err := loadProcessConfig(lookupMap(values))
 	if err == nil || !strings.Contains(err.Error(), renewIntervalEnvironment) {
 		t.Fatalf("loadProcessConfig() error = %v", err)
 	}
@@ -99,7 +94,7 @@ func TestLoadProcessConfigParsesResourceOverrides(t *testing.T) {
 	values[outboxLeaseDurationEnvironment] = "20s"
 	values[outboxPollIntervalEnvironment] = "500ms"
 	values[outboxBatchSizeEnvironment] = "32"
-	config, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+	config, err := loadProcessConfig(lookupMap(values))
 	if err != nil {
 		t.Fatalf("loadProcessConfig() error = %v", err)
 	}
@@ -125,7 +120,7 @@ func TestLoadProcessConfigRejectsUnboundedDurableFanout(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			values := validProcessEnvironment()
 			values[name] = value
-			_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+			_, err := loadProcessConfig(lookupMap(values))
 			if err == nil || !strings.Contains(err.Error(), name) {
 				t.Fatalf("loadProcessConfig() error = %v", err)
 			}
@@ -143,7 +138,7 @@ func TestLoadProcessConfigRejectsUnboundedTimerScheduling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			values := validProcessEnvironment()
 			values[name] = value
-			_, err := loadProcessConfig(lookupMap(values), sharedconfig.EnvironmentDevelopment)
+			_, err := loadProcessConfig(lookupMap(values))
 			if err == nil || !strings.Contains(err.Error(), name) {
 				t.Fatalf("loadProcessConfig() error = %v", err)
 			}

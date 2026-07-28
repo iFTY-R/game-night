@@ -1,5 +1,5 @@
 # Game Night 单容器部署编排
-# 应用使用外部 PostgreSQL/Redis；密钥与开发 checkpoint 由 Docker 命名卷持久化。
+# 应用使用外部 PostgreSQL/Redis；密钥与本地 checkpoint 由 Docker 命名卷持久化。
 # 部署目录只需本文件和 .env，不依赖宿主机绝对路径或 secrets 目录。
 
 name: game-night
@@ -78,7 +78,7 @@ services:
       # 初始化容器持有写权限，应用进程只读挂载用途隔离后的密钥卷。
       - game_night_api_secrets:/run/game-night/api-secrets:ro
       - game_night_worker_secrets:/run/game-night/worker-secrets:ro
-      # development 环境使用本地 append-only checkpoint，避免强制依赖 S3。
+      # 本地 append-only checkpoint 通过命名卷持久化；需要跨主机保留时可改用 S3 sink。
       - game_night_checkpoints:/var/lib/game-night/checkpoints
     environment:
       # 下面先列部署者需要通过 .env 调整的外部环境和基础设施配置。
@@ -97,7 +97,7 @@ services:
       GAME_NIGHT_TRUSTED_PROXY_CIDRS: ${GAME_NIGHT_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
       # 公网 HTTPS 部署应设为 true，让浏览器会话使用 Secure Cookie。
       GAME_NIGHT_COOKIE_SECURE: ${GAME_NIGHT_COOKIE_SECURE:-false}
-      # 本地 sink 仅允许 development/test；生产环境必须恢复为 S3/WORM 部署策略。
+      # 小规模单机生产允许使用本地 sink，不强制依赖 S3/WORM。
       GAME_NIGHT_CHECKPOINT_SINK: local
       GAME_NIGHT_CHECKPOINT_LOCAL_DIRECTORY: /var/lib/game-night/checkpoints
 

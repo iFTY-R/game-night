@@ -59,11 +59,11 @@ docker compose up -d
 docker compose ps
 ```
 
-完整部署中的依赖连接使用 Compose 私有网络明文通信，因此示例环境保持 `GAME_NIGHT_ENVIRONMENT=development`。生产环境应使用 standalone 编排连接启用 TLS 的托管依赖。
+完整部署中的依赖连接使用 Compose 私有网络明文通信，可按实际用途设置 `GAME_NIGHT_ENVIRONMENT=development` 或 `production`。TLS PostgreSQL、TLS Redis 和远程 S3 checkpoint 是可选增强项，不是小规模私网生产的启动前提。
 
 ## Standalone 部署
 
-`docker-compose.standalone.yml` 只定义一个 `game-night` 服务。启动前必须配置外部 PostgreSQL、Redis、S3 URL 和对应凭据。
+`docker-compose.standalone.yml` 只定义一个 `game-night` 服务。启动前必须配置外部 PostgreSQL、Redis 和对应凭据；checkpoint 默认保存在 Docker 命名卷中。
 
 ```powershell
 Set-Location deploy

@@ -171,7 +171,7 @@ func newHeartbeatReporter(cfg config.Config, handler *handler) (*serviceheartbea
 			MaxIdleConnsPerHost:   4,
 		},
 	}
-	sink, err := serviceheartbeat.NewHTTPClient(client, cfg.Heartbeat.TargetURL, cfg.Heartbeat.Token, false)
+	sink, err := serviceheartbeat.NewHTTPClient(client, cfg.Heartbeat.TargetURL, cfg.Heartbeat.Token)
 	if err != nil {
 		return nil, errInvalidServer
 	}

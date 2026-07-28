@@ -23,7 +23,7 @@ func TestCheckpointReadinessUsesRealSinkPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if production.Ready(t.Context()) {
-		t.Fatal("production checkpoint sink was reported ready without a WORM worker probe")
+	if !production.Ready(t.Context()) {
+		t.Fatal("production local checkpoint sink was not reported ready")
 	}
 }

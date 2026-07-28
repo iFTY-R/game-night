@@ -88,7 +88,7 @@ func Load(lookup sharedconfig.LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, fieldError(roomIdleEnvironment)
 	}
-	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true, shared.Environment == sharedconfig.EnvironmentProduction)
+	heartbeat, err := serviceheartbeat.LoadConfig(serviceheartbeat.LookupEnv(lookup), true)
 	if err != nil {
 		return Config{}, fieldError(serviceheartbeat.TokenEnvironment)
 	}

@@ -83,11 +83,11 @@ func Load(lookupEnv LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	postgres, err := loadPostgreSQL(reader, environment)
+	postgres, err := loadPostgreSQL(reader)
 	if err != nil {
 		return Config{}, err
 	}
-	redisConfig, err := loadRedis(reader, environment)
+	redisConfig, err := loadRedis(reader)
 	if err != nil {
 		return Config{}, err
 	}
@@ -129,7 +129,7 @@ func LoadWorker(lookupEnv LookupEnv) (WorkerDependencies, error) {
 	if err != nil {
 		return WorkerDependencies{}, err
 	}
-	postgres, err := loadPostgreSQL(reader, environment)
+	postgres, err := loadPostgreSQL(reader)
 	if err != nil {
 		return WorkerDependencies{}, err
 	}
@@ -168,11 +168,11 @@ func LoadRealtime(lookupEnv LookupEnv) (RealtimeDependencies, error) {
 	if err != nil {
 		return RealtimeDependencies{}, err
 	}
-	postgres, err := loadPostgreSQL(reader, environment)
+	postgres, err := loadPostgreSQL(reader)
 	if err != nil {
 		return RealtimeDependencies{}, err
 	}
-	redisConfig, err := loadRedis(reader, environment)
+	redisConfig, err := loadRedis(reader)
 	if err != nil {
 		return RealtimeDependencies{}, err
 	}
@@ -223,7 +223,7 @@ func loadEnvironment(reader environmentReader) (Environment, error) {
 	}
 }
 
-func loadPostgreSQL(reader environmentReader, environment Environment) (PostgreSQLConfig, error) {
+func loadPostgreSQL(reader environmentReader) (PostgreSQLConfig, error) {
 	dsn, err := reader.required(databaseURLEnvironment)
 	if err != nil {
 		return PostgreSQLConfig{}, err
@@ -231,10 +231,6 @@ func loadPostgreSQL(reader environmentReader, environment Environment) (PostgreS
 	if !validServiceURL(dsn, map[string]struct{}{"postgres": {}, "postgresql": {}}, true) {
 		return PostgreSQLConfig{}, fieldError(databaseURLEnvironment, "invalid PostgreSQL URL")
 	}
-	if environment == EnvironmentProduction && !validProductionPostgreSQLTLS(dsn) {
-		return PostgreSQLConfig{}, fieldError(databaseURLEnvironment, "production PostgreSQL requires TLS")
-	}
-
 	schema := reader.valueOrDefault(databaseSchemaEnvironment, defaultDatabaseSchema)
 	if !postgresIdentifierPattern.MatchString(schema) {
 		return PostgreSQLConfig{}, fieldError(databaseSchemaEnvironment, "invalid PostgreSQL identifier")
@@ -274,16 +270,13 @@ func loadPostgreSQL(reader environmentReader, environment Environment) (PostgreS
 	}, nil
 }
 
-func loadRedis(reader environmentReader, environment Environment) (RedisConfig, error) {
+func loadRedis(reader environmentReader) (RedisConfig, error) {
 	redisURL, err := reader.required(redisURLEnvironment)
 	if err != nil {
 		return RedisConfig{}, err
 	}
 	if !validServiceURL(redisURL, map[string]struct{}{"redis": {}, "rediss": {}}, false) {
 		return RedisConfig{}, fieldError(redisURLEnvironment, "invalid Redis URL")
-	}
-	if environment == EnvironmentProduction && !strings.HasPrefix(strings.ToLower(redisURL), "rediss://") {
-		return RedisConfig{}, fieldError(redisURLEnvironment, "production Redis requires TLS")
 	}
 	timeout, err := parseDurationInRange(reader, redisTimeoutEnvironment, defaultRedisTimeout, time.Millisecond, maximumRedisTimeout)
 	if err != nil {
@@ -300,11 +293,11 @@ func loadRedis(reader environmentReader, environment Environment) (RedisConfig, 
 }
 
 func loadNetwork(reader environmentReader, environment Environment) (NetworkConfig, error) {
-	userOrigins, err := parseOrigins(reader, userOriginsEnvironment, environment == EnvironmentProduction)
+	userOrigins, err := parseOrigins(reader, userOriginsEnvironment)
 	if err != nil {
 		return NetworkConfig{}, err
 	}
-	adminOrigins, err := parseOrigins(reader, adminOriginsEnvironment, environment == EnvironmentProduction)
+	adminOrigins, err := parseOrigins(reader, adminOriginsEnvironment)
 	if err != nil {
 		return NetworkConfig{}, err
 	}
@@ -318,10 +311,6 @@ func loadNetwork(reader environmentReader, environment Environment) (NetworkConf
 	cookieSecure, err := parseBool(reader, cookieSecureEnvironment, environment == EnvironmentProduction)
 	if err != nil {
 		return NetworkConfig{}, err
-	}
-	// Production cookies carry long-lived authentication material and may never traverse plaintext HTTP.
-	if environment == EnvironmentProduction && !cookieSecure {
-		return NetworkConfig{}, fieldError(cookieSecureEnvironment, "must be enabled in production")
 	}
 	return NetworkConfig{
 		UserOrigins:    userOrigins,
@@ -421,7 +410,7 @@ func loadKeyringFiles(reader environmentReader) (KeyringFiles, error) {
 	}, nil
 }
 
-func parseOrigins(reader environmentReader, name string, requireHTTPS bool) (OriginAllowlist, error) {
+func parseOrigins(reader environmentReader, name string) (OriginAllowlist, error) {
 	value, err := reader.required(name)
 	if err != nil {
 		return nil, err
@@ -436,9 +425,6 @@ func parseOrigins(reader environmentReader, name string, requireHTTPS bool) (Ori
 		}
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
 			return nil, fieldError(name, "invalid origin allowlist")
-		}
-		if requireHTTPS && parsed.Scheme != "https" {
-			return nil, fieldError(name, "production origins require HTTPS")
 		}
 		canonical := parsed.Scheme + "://" + strings.ToLower(parsed.Host)
 		if _, exists := seen[canonical]; exists {
@@ -512,23 +498,6 @@ func originAllowlistsOverlap(first, second OriginAllowlist) bool {
 		}
 	}
 	return false
-}
-
-func validProductionPostgreSQLTLS(value string) bool {
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return false
-	}
-	modes := parsed.Query()["sslmode"]
-	if len(modes) != 1 {
-		return false
-	}
-	switch strings.ToLower(modes[0]) {
-	case "require", "verify-ca", "verify-full":
-		return true
-	default:
-		return false
-	}
 }
 
 func validServiceURL(value string, allowedSchemes map[string]struct{}, requireDatabasePath bool) bool {

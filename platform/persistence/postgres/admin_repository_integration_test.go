@@ -150,13 +150,28 @@ func TestAdminSecurityMigrationResetsLegacySecurityState(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := fixture.Pool.Exec(ctx, `
-        INSERT INTO user_recovery_attempts (
-            recovery_attempt_id, user_id, challenge_id, assisted_grant_id, selector, secret_hash, status,
-            created_at, expires_at, request_digest
+        INSERT INTO anonymous_challenges (
+            challenge_id, selector, secret_hash, secret_key_version, purpose, audience,
+            origin_hash, request_flow_id, max_attempts, created_at, expires_at
         ) VALUES (
-            $1, $2, NULL, $3, 'legacy-attempt-selector', $4, 'active', $5, $6, decode(repeat('09', 32), 'hex')
+            $1, 'legacy-recovery-challenge', decode(repeat('0a', 32), 'hex'), 1,
+            'identity.recovery', 'identity.v1.IdentityService', decode(repeat('0b', 32), 'hex'),
+            'legacy-recovery-flow', 5, $2, $3
         )
-	`, attemptID, userID, assistedGrantID, adminPersistenceTestHash, now.Add(-time.Minute), now.Add(4*time.Minute)); err != nil {
+    `, challengeID, now.Add(-time.Minute), now.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.Pool.Exec(ctx, `
+        INSERT INTO user_recovery_attempts (
+            recovery_attempt_id, grant_selector, grant_secret_hash, grant_key_version, user_id,
+            assisted_grant_id, challenge_id, origin_hash, purpose, request_digest,
+            attempt_count, max_attempts, status, created_at, expires_at
+        ) VALUES (
+            $1, 'legacy-attempt-selector', decode(repeat('0c', 32), 'hex'), 1, $2,
+            $3, $4, decode(repeat('0b', 32), 'hex'), 'identity.recovery', NULL,
+            0, 5, 'active', $5, $6
+        )
+    `, attemptID, userID, assistedGrantID, challengeID, now.Add(-time.Minute), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if err := goose.UpByOneContext(ctx, database, migrationsDir); err != nil {
@@ -412,7 +427,7 @@ func TestAdminSessionEnrollmentElevationAndReceiptPersistence(t *testing.T) {
 			Command: "revoke_other_admin_sessions", TargetType: "admin", TargetID: account.Snapshot().ID.String(),
 			ResultAdminVersion: nextAccount.Snapshot().AdminVersion, ResultPasswordVersion: nextAccount.Snapshot().PasswordVersion,
 			ResultSessionVersion: staleSession.Snapshot().SessionVersion, ResultEnrollmentVersion: accepted.Snapshot().EnrollmentVersion,
-			AuditEventID: uuid.New(), CreatedAt: now.Add(6 * time.Minute),
+			AuditEventID: auditEventID, CreatedAt: now.Add(6 * time.Minute),
 		}); !errors.Is(err, adminDomain.ErrIdempotencyConflict) {
 			t.Fatalf("receipt digest conflict error = %v, want ErrIdempotencyConflict", err)
 		}

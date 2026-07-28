@@ -263,6 +263,9 @@ FROM party_rooms AS room
 JOIN room_members AS host
   ON host.room_id = room.room_id
  AND host.user_id = room.host_user_id
+JOIN users AS host_user
+  ON host_user.user_id = room.host_user_id
+ AND host_user.status = 'active'
 JOIN LATERAL (
     SELECT count(*) FILTER (WHERE member.role = 'participant') AS participant_count,
         count(*) FILTER (WHERE member.role = 'spectator') AS spectator_count,

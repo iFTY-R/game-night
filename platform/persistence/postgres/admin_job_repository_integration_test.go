@@ -106,7 +106,7 @@ func TestAdminJobRepositoryPreviewLeaseIdempotencyAndErasureState(t *testing.T) 
 	completedAt := databaseIntegrationTime(t, ctx, fixture)
 	completed, err := repository.CompleteBatchItem(ctx, claimed, "succeeded", "", uuid.Nil, completedAt)
 	if err != nil || completed.State != "succeeded" {
-		t.Fatalf("complete item: item=%+v err=%v", completed, err)
+		t.Fatalf("complete item: err=%v item=%+v", err, completed)
 	}
 	var state string
 	var succeeded, running int64

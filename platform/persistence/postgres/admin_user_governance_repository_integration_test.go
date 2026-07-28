@@ -214,7 +214,7 @@ func insertDeviceCredential(
         INSERT INTO device_credentials (
             credential_id, user_id, secret_hash, secret_key_version, csrf_hash, generation, label,
             created_at, last_seen_at, rotated_at, idle_expires_at, absolute_expires_at
-        ) VALUES ($1, $2, decode(repeat('01', 32), 'hex'), 1, decode(repeat('02', 32), 'hex'), 1, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, decode(repeat('01', 32), 'hex'), 1, decode(repeat('02', 32), 'hex'), 1, $3, $4, $5, $6, $7, $8)
     `, credentialID, userID, label, createdAt, lastSeenAt, rotatedAt, idleExpiresAt, absoluteExpiresAt); err != nil {
 		t.Fatal(err)
 	}

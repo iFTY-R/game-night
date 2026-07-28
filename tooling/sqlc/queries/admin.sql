@@ -487,6 +487,7 @@ INSERT INTO admin_command_receipts (
     sqlc.arg(audit_event_id),
     sqlc.arg(created_at)
 )
+ON CONFLICT (admin_id, operation_id) DO NOTHING
 RETURNING admin_id, operation_id, request_digest, command, target_type, target_id,
           result_admin_version, result_password_version, result_session_version,
           result_enrollment_version, audit_event_id, created_at;

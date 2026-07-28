@@ -10,7 +10,7 @@ import (
 	adminDomain "github.com/iFTY-R/game-night/platform/admin"
 	"github.com/iFTY-R/game-night/platform/idempotency"
 	"github.com/iFTY-R/game-night/platform/persistence/postgres/sqlcgen"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -438,8 +438,7 @@ func (repository *adminCommandReceiptRepository) Save(ctx context.Context, recei
 	if err == nil {
 		return adminCommandReceiptFromRow(row)
 	}
-	var pgError *pgconn.PgError
-	if !errors.As(err, &pgError) || pgError.Code != "23505" {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return adminDomain.CommandReceipt{}, mapAdminQueryError(err, adminDomain.ErrRepositoryUnavailable)
 	}
 	existing, getErr := repository.Get(ctx, receipt.AdminID, receipt.OperationID)

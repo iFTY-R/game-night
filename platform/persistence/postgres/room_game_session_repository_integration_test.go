@@ -207,8 +207,7 @@ func TestRoomGameSessionRepositoryReplaysReceiptWithoutPendingDependency(t *test
 	}
 	if _, err := fixture.fixture.Pool.Exec(
 		fixture.ctx,
-		`UPDATE room_pending_starts SET cancelled_at = $1 WHERE pending_start_id = $2`,
-		fixture.commit.Session.Snapshot().StartedAt.Add(time.Second),
+		`DELETE FROM room_pending_starts WHERE pending_start_id = $1`,
 		fixture.pending.ID,
 	); err != nil {
 		t.Fatal(err)

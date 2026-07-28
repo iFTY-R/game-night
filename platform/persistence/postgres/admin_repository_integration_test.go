@@ -65,8 +65,8 @@ func TestAdminSecurityMigrationResetsLegacySecurityState(t *testing.T) {
 	attemptID := uuid.New()
 
 	if _, err := fixture.Pool.Exec(ctx, `
-        INSERT INTO users (user_id, status, account_version, created_at, updated_at)
-        VALUES ($1, 'active', 1, $2, $2)
+		INSERT INTO users (user_id, status, created_at, updated_at)
+		VALUES ($1, 'active', $2, $2)
     `, userID, now); err != nil {
 		t.Fatal(err)
 	}
@@ -726,7 +726,7 @@ func assertFunctionExecuteDeniedToPublic(
 	if err := fixture.Pool.QueryRow(ctx, `
 		SELECT has_function_privilege(
 			'public',
-			format('%I.%s', current_schema(), $1),
+			format('%I.%s', current_schema(), $1::text),
 			'EXECUTE'
 		)
 	`, signature).Scan(&allowed); err != nil {

@@ -92,7 +92,7 @@ func seedAdminRoomQueryFixture(
 			room_version, membership_version, created_at, updated_at
 		) VALUES ($1, 'AR01', 'private', 'playing', $2, 4, 'closed', 'open', $3, 'dice',
 			NULL, NULL, 'dice', 1, 3, 2, $4, $5)
-	`, roomID, hostID, sessionID, now.Add(-9*time.Minute), now.Add(-time.Minute)); err != nil {
+	`, roomID, hostID, sessionID, now.Add(-9*time.Minute), now); err != nil {
 		t.Fatal(err)
 	}
 	for index, member := range []struct {

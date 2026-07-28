@@ -50,6 +50,15 @@ const (
 	adminSurface
 )
 
+type staticPathResult uint8
+
+const (
+	// Missing paths may use the SPA fallback; rejected paths crossed a filesystem security boundary and must remain 404.
+	staticPathMissing staticPathResult = iota
+	staticPathServed
+	staticPathRejected
+)
+
 // Run loads the handler, starts the listener, and shuts down gracefully on cancellation.
 func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if ctx == nil || logger == nil {
@@ -345,8 +354,13 @@ func (h *handler) serveStatic(writer http.ResponseWriter, request *http.Request,
 		http.NotFound(writer, request)
 		return
 	}
-	if served := h.tryServeResolvedPath(writer, request, root, relative); served {
+	switch h.tryServeResolvedPath(writer, request, root, relative) {
+	case staticPathServed:
 		return
+	case staticPathRejected:
+		http.NotFound(writer, request)
+		return
+	case staticPathMissing:
 	}
 	if request.Method == http.MethodHead || acceptsHTML(request.Header.Get("Accept")) {
 		if h.tryServeIndex(writer, request, root) {
@@ -357,31 +371,38 @@ func (h *handler) serveStatic(writer http.ResponseWriter, request *http.Request,
 }
 
 func (h *handler) tryServeIndex(writer http.ResponseWriter, request *http.Request, root string) bool {
-	return h.tryServeResolvedPath(writer, request, root, staticIndexName)
+	return h.tryServeResolvedPath(writer, request, root, staticIndexName) == staticPathServed
 }
 
-func (h *handler) tryServeResolvedPath(writer http.ResponseWriter, request *http.Request, root, relative string) bool {
+func (h *handler) tryServeResolvedPath(writer http.ResponseWriter, request *http.Request, root, relative string) staticPathResult {
 	candidate := filepath.Join(root, filepath.FromSlash(relative))
-	// Reject lexical traversal before touching the filesystem, then re-check after resolving symlinks.
+	// Crossing the configured root is a security rejection, not a normal SPA route miss.
 	if !withinRoot(root, candidate) {
-		return false
+		return staticPathRejected
 	}
 	resolved, err := filepath.EvalSymlinks(candidate)
 	if err != nil {
-		return false
+		if os.IsNotExist(err) {
+			return staticPathMissing
+		}
+		return staticPathRejected
 	}
-	if !withinRoot(root, resolved) {
-		return false
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil || !withinRoot(resolvedRoot, resolved) {
+		return staticPathRejected
 	}
 	info, err := os.Stat(resolved)
 	if err != nil {
-		return false
+		if os.IsNotExist(err) {
+			return staticPathMissing
+		}
+		return staticPathRejected
 	}
 	if info.IsDir() {
 		return h.tryServeResolvedPath(writer, request, root, filepath.Join(relative, staticIndexName))
 	}
 	http.ServeFile(writer, request, resolved)
-	return true
+	return staticPathServed
 }
 
 func newProxy(target *url.URL, trustedCIDRs []netip.Prefix, logger *slog.Logger, name string, noStore bool, cfg config.Config) *httputil.ReverseProxy {
@@ -596,6 +617,11 @@ func inferPort(host, proto string) string {
 }
 
 func cleanRequestPath(requestPath string) (string, bool) {
+	for _, segment := range strings.Split(requestPath, "/") {
+		if segment == ".." {
+			return "", false
+		}
+	}
 	cleaned := path.Clean("/" + requestPath)
 	if cleaned == "." || cleaned == "/" {
 		return "", true
@@ -623,9 +649,6 @@ func withinRoot(root, candidate string) bool {
 func normalizePath(value string) string {
 	if abs, err := filepath.Abs(value); err == nil {
 		value = abs
-	}
-	if resolved, err := filepath.EvalSymlinks(value); err == nil {
-		value = resolved
 	}
 	value = filepath.Clean(value)
 	if runtime.GOOS == "windows" {

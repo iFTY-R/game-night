@@ -524,34 +524,32 @@ func TestStaticRoutingBlocksTraversalAndSymlinkEscape(t *testing.T) {
 	}, map[string]string{
 		"index.html": "ADMIN-INDEX",
 	})
-	outside := filepath.Join(t.TempDir(), "outside.txt")
-	if err := os.WriteFile(outside, []byte("OUTSIDE"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(roots.user, "escape.txt")
-	if err := os.Symlink(outside, link); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
+	assertNotFound := func(t *testing.T, target string) {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.Host = testUserHost
+		req.Header.Set("Accept", "text/html")
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+		}
 	}
 
-	for _, tc := range []struct {
-		name   string
-		host   string
-		target string
-	}{
-		{name: "path-traversal", host: testUserHost, target: "/../outside.txt"},
-		{name: "symlink-escape", host: testUserHost, target: "/escape.txt"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
-			req.Host = tc.host
-			req.Header.Set("Accept", "text/html")
-			handler.ServeHTTP(rr, req)
-			if rr.Code != http.StatusNotFound {
-				t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
-			}
-		})
-	}
+	t.Run("path-traversal", func(t *testing.T) {
+		assertNotFound(t, "/../outside.txt")
+	})
+	t.Run("symlink-escape", func(t *testing.T) {
+		outside := filepath.Join(t.TempDir(), "outside.txt")
+		if err := os.WriteFile(outside, []byte("OUTSIDE"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(roots.user, "escape.txt")
+		if err := os.Symlink(outside, link); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		assertNotFound(t, "/escape.txt")
+	})
 }
 
 type testRoots struct {

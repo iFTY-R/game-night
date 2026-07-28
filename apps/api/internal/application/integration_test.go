@@ -38,6 +38,7 @@ import (
 	identitytransport "github.com/iFTY-R/game-night/apps/api/internal/transport/identity"
 	"github.com/iFTY-R/game-night/apps/api/internal/transport/logging"
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
+	"github.com/iFTY-R/game-night/apps/internal/serviceheartbeat"
 	commonv1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/common/v1"
 	gamev1 "github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1"
 	"github.com/iFTY-R/game-night/contracts/gen/go/platform/game/v1/gamev1connect"
@@ -347,6 +348,10 @@ func newApplicationIntegrationRuntime(t testing.TB) *applicationIntegrationRunti
 		Argon2: apiConfig.Argon2Config{Workers: 1, QueueCapacity: 16},
 		Realtime: apiConfig.RealtimeConfig{
 			BootstrapURL: realtimeServer.URL, PeerURLs: []string{realtimeServer.URL}, InternalToken: strings.Repeat("r", 32),
+		},
+		InstanceID: "api-integration",
+		Heartbeat: serviceheartbeat.Config{
+			Token: strings.Repeat("h", 32), BuildVersion: "integration", Interval: serviceheartbeat.DefaultInterval, Timeout: serviceheartbeat.DefaultTimeout,
 		},
 	}
 	logs := &bytes.Buffer{}

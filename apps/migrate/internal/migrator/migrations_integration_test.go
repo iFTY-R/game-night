@@ -987,7 +987,7 @@ func TestMigrationPrivileges(t *testing.T) {
 	}
 	defer database.Close()
 	if err := Run(ctx, database, config.MigrationsDir, "up"); err != nil {
-		t.Fatal(err)
+		t.Fatalf("apply privilege migrations: %s", conciseMigrationError(err))
 	}
 
 	migrationPool := openRolePool(t, ctx, fixture.MigrationURL)
@@ -1044,13 +1044,13 @@ func TestResetAdminAccountRejectsMissingSingleton(t *testing.T) {
 	if err := goose.SetDialect("postgres"); err != nil {
 		t.Fatal(err)
 	}
-	if err := goose.UpToContext(ctx, database, migrationsDir, 4); err != nil {
+	if err := goose.UpToContext(ctx, database, migrationsDir, 28); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fixture.Pool.Exec(ctx, "DELETE FROM admin_accounts WHERE singleton_id = 1"); err != nil {
 		t.Fatal(err)
 	}
-	// Later migrations revoke direct singleton deletion, so construct the missing-row state before applying them.
+	// Migration 28 requires the singleton while rebuilding security state; remove it only after that invariant has been exercised.
 	if err := Run(ctx, database, migrationsDir, "up"); err != nil {
 		t.Fatal(err)
 	}
@@ -1192,6 +1192,15 @@ func migrationDirectory(t testing.TB) string {
 	return directory
 }
 
+// conciseMigrationError retains the PostgreSQL cause without repeating Goose's embedded migration body in CI annotations.
+func conciseMigrationError(err error) string {
+	message := err.Error()
+	if index := strings.LastIndex(message, ": ERROR: "); index >= 0 {
+		return message[index+2:]
+	}
+	return message
+}
+
 func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	want := []string{
@@ -1200,14 +1209,24 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"admin_batch_job_items",
 		"admin_batch_jobs",
 		"admin_batch_previews",
+		"admin_cache_generations",
 		"admin_challenges",
 		"admin_command_receipts",
 		"admin_elevation_grants",
 		"admin_export_download_grants",
 		"admin_export_jobs",
+		"admin_maintenance_state",
+		"admin_metric_buckets",
+		"admin_operations_command_receipts",
+		"admin_operations_previews",
+		"admin_operations_retry_receipts",
 		"admin_recovery_codes",
+		"admin_repair_operations",
+		"admin_service_instances",
 		"admin_sessions",
 		"admin_totp_enrollments",
+		"admin_user_command_previews",
+		"admin_user_command_receipts",
 		"admin_user_erasure_jobs",
 		"admin_user_notes",
 		"admin_user_tag_catalog",
@@ -1234,6 +1253,8 @@ func assertExpectedTables(t testing.TB, ctx context.Context, pool *pgxpool.Pool)
 		"outbox_consumers",
 		"outbox_events",
 		"party_rooms",
+		"profile_export_contexts",
+		"profile_export_items",
 		"room_activity_leases",
 		"room_game_config_drafts",
 		"room_members",

@@ -131,7 +131,7 @@ func TestRoomRepositoryCommitRemovalAcceptsAdminRevocationActor(t *testing.T) {
 	}
 	event, err := roomDomain.NewParticipantRevokedEvent(roomDomain.ParticipantRevocationFact{
 		EventID: uuid.New(), RoomID: room.Snapshot().ID, SessionID: result.SessionID, UserID: removedUserID,
-		ActorKind: roomDomain.RemovalActorAdmin, ActorID: adminID, Reason: roomDomain.RemovalReasonHostRemoved,
+		ActorKind: roomDomain.RemovalActorAdmin, ActorID: adminID, Reason: roomDomain.RemovalReasonAdminRemoved,
 		MembershipVersion: next.Version().Membership, OccurredAt: next.Snapshot().UpdatedAt,
 	})
 	if err != nil {

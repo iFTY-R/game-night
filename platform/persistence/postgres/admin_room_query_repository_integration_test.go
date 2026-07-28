@@ -10,6 +10,9 @@ import (
 	adminroom "github.com/iFTY-R/game-night/platform/admin/room"
 )
 
+// The fixture keeps more event batches than the detail limit, so its aggregate version must cover every seeded batch.
+const adminRoomQueryFixtureStateVersion = 64
+
 func TestAdminRoomQueryRepositoryListsDetailsAndLimitsEvents(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -49,7 +52,7 @@ func TestAdminRoomQueryRepositoryListsDetailsAndLimitsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(games) != 1 || games[0].SessionID != sessionID || games[0].StateVersion != 25 || games[0].OwnershipEpoch != 1 {
+	if len(games) != 1 || games[0].SessionID != sessionID || games[0].StateVersion != adminRoomQueryFixtureStateVersion || games[0].OwnershipEpoch != 1 {
 		t.Fatalf("game list mismatch: %+v", games)
 	}
 	game, err := repository.GetGame(ctx, sessionID)
@@ -117,12 +120,12 @@ func seedAdminRoomQueryFixture(
 			cancel_reason, next_deadline_at, suspended_at, status, started_at, updated_at, ended_at
 		) VALUES (
 			$1, $2, 'dice', '1.0.0', '1.0.0', '1.0.0',
-			25, 1, 1, 'game.state', 1, $3,
+			$4, 1, 1, 'game.state', 1, $3,
 			NULL, NULL, NULL, NULL,
 			NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL, 'active', $4, $5, NULL
+			NULL, NULL, NULL, 'active', $5, $6, NULL
 		)
-	`, sessionID, roomID, []byte{1, 2, 3}, now.Add(-7*time.Minute), now.Add(-time.Minute)); err != nil {
+	`, sessionID, roomID, []byte{1, 2, 3}, adminRoomQueryFixtureStateVersion, now.Add(-7*time.Minute), now.Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	for index, userID := range []uuid.UUID{hostID, playerID} {

@@ -147,12 +147,14 @@ func (repository *AdminJobRepository) ListBatchJobs(ctx context.Context, query a
 	if repository == nil || repository.queries == nil || ctx == nil || query.PageSize == 0 || query.PageSize > adminuser.MaximumBatchPageSize {
 		return nil, adminuser.ErrInvalidInput
 	}
+	// pgx encodes a nil slice as SQL NULL, while the query uses cardinality(states) = 0 to mean no state filter.
+	states := append([]string{}, query.States...)
 	commands := make([]string, 0, len(query.Commands))
 	for _, command := range query.Commands {
 		commands = append(commands, string(command))
 	}
 	rows, err := repository.queries.ListAdminBatchJobs(ctx, sqlcgen.ListAdminBatchJobsParams{
-		States: query.States, Commands: commands, CreatedFrom: adminOptionalTimeToPG(query.CreatedFrom), CreatedTo: adminOptionalTimeToPG(query.CreatedTo),
+		States: states, Commands: commands, CreatedFrom: adminOptionalTimeToPG(query.CreatedFrom), CreatedTo: adminOptionalTimeToPG(query.CreatedTo),
 		SortField: string(query.SortField), SortDirection: string(query.Direction), PageSize: int32(query.PageSize),
 		AfterSortTime: adminOptionalTimeToPG(query.After.SortTime), AfterBatchJobID: optionalUUID(query.After.BatchJobID),
 	})

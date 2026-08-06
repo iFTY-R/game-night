@@ -14,7 +14,51 @@ permissions:
   packages: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: game_night
+          POSTGRES_USER: game_night
+          POSTGRES_PASSWORD: game_night
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U game_night -d game_night"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      GAME_NIGHT_TEST_DATABASE_URL: postgresql://game_night:game_night@127.0.0.1:5432/game_night?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Run short tests
+        run: go test -short ./...
+
+      - name: Run vet
+        run: go vet ./apps/...
+
+      - name: Run migration smoke tests
+        run: go test ./apps/migrate/internal/migrator -run 'TestOpenDatabaseCreatesMissingSchema|TestMigrationsUpDownUp'
+
+      - name: Validate deployment Compose
+        run: docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config --quiet
+
   build:
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

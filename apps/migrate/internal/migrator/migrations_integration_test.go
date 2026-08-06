@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iFTY-R/game-night/internal/integrationtest"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
@@ -18,6 +19,32 @@ import (
 
 // migrationTestTimeout covers database creation plus a complete up/down/up cycle on shared CI runners.
 const migrationTestTimeout = 90 * time.Second
+
+func TestOpenDatabaseCreatesMissingSchema(t *testing.T) {
+	fixture := integrationtest.OpenPostgresSchema(t)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTestTimeout)
+	defer cancel()
+
+	if _, err := fixture.Pool.Exec(ctx, "DROP SCHEMA "+pgx.Identifier{fixture.Name}.Sanitize()+" CASCADE"); err != nil {
+		t.Fatal(err)
+	}
+	database, err := OpenDatabase(ctx, Config{
+		DatabaseURL: fixture.Pool.Config().ConnString(),
+		Schema:      fixture.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	var currentSchema string
+	if err := database.QueryRowContext(ctx, "SELECT current_schema()").Scan(&currentSchema); err != nil {
+		t.Fatal(err)
+	}
+	if currentSchema != fixture.Name {
+		t.Fatalf("current schema = %q, want %q", currentSchema, fixture.Name)
+	}
+}
 
 func TestMigrationsUpDownUp(t *testing.T) {
 	fixture := integrationtest.OpenPostgresSchema(t)

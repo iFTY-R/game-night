@@ -28,7 +28,7 @@ docker-compose.yml
 从模板开始：
 
 ```dotenv
-GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.7
+GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.8
 GAME_NIGHT_EXTERNAL_NETWORK=1panel-network
 GAME_NIGHT_HTTP_BIND_ADDRESS=127.0.0.1
 GAME_NIGHT_HTTP_PUBLISHED_PORT=40891
@@ -53,10 +53,11 @@ GAME_NIGHT_SECRET=replace-with-at-least-32-random-bytes
 cd /opt/1panel/apps/game-night
 docker compose -f docker-compose.yml config
 docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
 docker compose -f docker-compose.yml up -d
 docker compose -f docker-compose.yml ps
 ```
+
+容器每次启动都会先执行幂等的数据库迁移；迁移失败时不会启动 API、realtime 和 worker，直接查看容器日志即可获得具体数据库错误。
 
 首次管理员初始化使用 `GAME_NIGHT_SECRET` 派生的 bootstrap 密钥。初始化完成后，后续重启仍可复用同一主密钥，不需要维护或删除 secret 文件；更换主密钥会使历史加密数据无法解密，请先完成密钥迁移。
 
@@ -68,7 +69,6 @@ docker compose -f docker-compose.yml ps
 
 ```bash
 docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
 docker compose -f docker-compose.yml up -d
 ```
 

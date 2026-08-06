@@ -205,6 +205,63 @@ func TestRunDispatchesDirectCommandsToExpectedBinary(t *testing.T) {
 	}
 }
 
+func TestRunServeAllMigratesBeforeStartingServices(t *testing.T) {
+	binDirectory := t.TempDir()
+	starter := &capturingStarter{}
+	environ := []string{
+		environmentBinDirectory + "=" + binDirectory,
+		environmentShutdownTimeout + "=20ms",
+		environmentDatabaseURL + "=postgres://shared",
+		environmentSecret + "=" + strings.Repeat("s", minimumRuntimeSecretLength),
+	}
+	err := run(
+		context.Background(),
+		[]string{commandServeAll},
+		environ,
+		testStreams(),
+		mapLookup(map[string]string{
+			environmentBinDirectory:    binDirectory,
+			environmentShutdownTimeout: "20ms",
+		}),
+		starter.start,
+		nil,
+	)
+	if err == nil {
+		t.Fatal("serve-all succeeded after supervised child processes exited")
+	}
+	if len(starter.specs) != 5 {
+		t.Fatalf("started %d commands, want migration plus four services", len(starter.specs))
+	}
+	if starter.specs[0].name != commandMigrate || !slices.Equal(starter.specs[0].args, []string{"up"}) {
+		t.Fatalf("first command = %#v", starter.specs[0])
+	}
+	for index, name := range []string{commandAPI, commandRealtime, commandWorker, commandEdge} {
+		if starter.specs[index+1].name != name {
+			t.Fatalf("command %d = %q, want %q", index+1, starter.specs[index+1].name, name)
+		}
+	}
+}
+
+func TestRunServeAllDoesNotStartServicesWhenMigrationFails(t *testing.T) {
+	binDirectory := t.TempDir()
+	starter := &capturingStarter{waitErr: errors.New("migration failed")}
+	err := run(
+		context.Background(),
+		[]string{commandServeAll},
+		[]string{environmentBinDirectory + "=" + binDirectory},
+		testStreams(),
+		mapLookup(map[string]string{environmentBinDirectory: binDirectory}),
+		starter.start,
+		nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), commandMigrate) {
+		t.Fatalf("migration failure = %v", err)
+	}
+	if len(starter.specs) != 1 || starter.specs[0].name != commandMigrate {
+		t.Fatalf("started commands after migration failure: %#v", starter.specs)
+	}
+}
+
 func TestRunProxyCommandForwardsArgsAndExitCode(t *testing.T) {
 	binDirectory := t.TempDir()
 	outputFile := filepath.Join(t.TempDir(), "api.json")

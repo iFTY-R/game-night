@@ -77,6 +77,14 @@ func run(
 		}
 		return runProxyCommand(ctx, spec, config.shutdownTimeout, streams, starter, signals)
 	case commandServeAll:
+		migration, buildErr := newProxyCommandSpec(commandMigrate, []string{"up"}, environ, config.binDirectory)
+		if buildErr != nil {
+			return commandError{message: buildErr.Error(), code: 1}
+		}
+		// The single-container command owns schema readiness so API, realtime, and worker never race migrations.
+		if migrationErr := runProxyCommand(ctx, migration, config.shutdownTimeout, streams, starter, signals); migrationErr != nil {
+			return migrationErr
+		}
 		prepared, cleanup, prepareErr := prepareRuntimeSecrets(newEnvironment(environ))
 		if prepareErr != nil {
 			return commandError{message: prepareErr.Error(), code: 1}

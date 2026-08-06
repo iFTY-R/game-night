@@ -63,6 +63,10 @@ func OpenDatabase(ctx context.Context, config Config) (*sql.DB, error) {
 		database.Close()
 		return nil, fmt.Errorf("connect migration database: %w", err)
 	}
+	if err := ensureSchema(ctx, database, config.Schema, roles[0]); err != nil {
+		database.Close()
+		return nil, err
+	}
 	var currentSchema string
 	if err := database.QueryRowContext(ctx, "SELECT current_schema()").Scan(&currentSchema); err != nil {
 		database.Close()
@@ -73,6 +77,26 @@ func OpenDatabase(ctx context.Context, config Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("migration schema %q does not exist or is not first in search_path", config.Schema)
 	}
 	return database, nil
+}
+
+// ensureSchema creates the isolated application schema for single-account deployments before goose opens it.
+func ensureSchema(ctx context.Context, database *sql.DB, schema, owner string) error {
+	var exists bool
+	if err := database.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = $1
+		)
+	`, schema).Scan(&exists); err != nil {
+		return fmt.Errorf("inspect migration schema: %w", err)
+	}
+	if exists {
+		return nil
+	}
+	statement := "CREATE SCHEMA " + pgx.Identifier{schema}.Sanitize() + " AUTHORIZATION " + pgx.Identifier{owner}.Sanitize()
+	if _, err := database.ExecContext(ctx, statement); err != nil {
+		return fmt.Errorf("create migration schema %q: %w", schema, err)
+	}
+	return nil
 }
 
 func hasEmptyRole(roles []string) bool {

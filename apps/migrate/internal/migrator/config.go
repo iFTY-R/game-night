@@ -7,18 +7,12 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"slices"
 	"strings"
 )
 
 const (
-	databaseURLEnvironment     = "GAME_NIGHT_MIGRATION_DATABASE_URL"
-	databaseSchemaEnvironment  = "GAME_NIGHT_DATABASE_SCHEMA"
-	ownerRoleEnvironment       = "GAME_NIGHT_DATABASE_OWNER_ROLE"
-	auditWriterRoleEnvironment = "GAME_NIGHT_DATABASE_AUDIT_WRITER_ROLE"
-	migrationRoleEnvironment   = "GAME_NIGHT_DATABASE_MIGRATION_ROLE"
-	runtimeRoleEnvironment     = "GAME_NIGHT_DATABASE_RUNTIME_ROLE"
-	workerRoleEnvironment      = "GAME_NIGHT_DATABASE_WORKER_ROLE"
+	databaseURLEnvironment    = "GAME_NIGHT_DATABASE_URL"
+	databaseSchemaEnvironment = "GAME_NIGHT_DATABASE_SCHEMA"
 )
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
@@ -26,7 +20,8 @@ var identifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
 // LookupEnv matches os.LookupEnv while allowing deterministic CLI tests.
 type LookupEnv func(string) (string, bool)
 
-// Config contains non-secret identifiers plus the migration DSN loaded from the process environment.
+// Config contains the shared DSN and schema. Role fields remain available for integration fixtures;
+// production parsing leaves them empty so OpenDatabase derives every role from current_user.
 type Config struct {
 	DatabaseURL     string
 	Schema          string
@@ -39,7 +34,7 @@ type Config struct {
 	AllowDown       bool
 }
 
-// ParseConfig validates the command and all role bindings before opening PostgreSQL.
+// ParseConfig validates the command and shared database settings before opening PostgreSQL.
 func ParseConfig(args []string, lookupEnv LookupEnv, output io.Writer) (Config, string, error) {
 	flags := flag.NewFlagSet("game-night-migrate", flag.ContinueOnError)
 	flags.SetOutput(output)
@@ -60,47 +55,19 @@ func ParseConfig(args []string, lookupEnv LookupEnv, output io.Writer) (Config, 
 	}
 
 	config := Config{
-		DatabaseURL:     requiredEnvironment(lookupEnv, databaseURLEnvironment),
-		Schema:          environmentOrDefault(lookupEnv, databaseSchemaEnvironment, "public"),
-		OwnerRole:       requiredEnvironment(lookupEnv, ownerRoleEnvironment),
-		AuditWriterRole: requiredEnvironment(lookupEnv, auditWriterRoleEnvironment),
-		MigrationRole:   requiredEnvironment(lookupEnv, migrationRoleEnvironment),
-		RuntimeRole:     requiredEnvironment(lookupEnv, runtimeRoleEnvironment),
-		WorkerRole:      requiredEnvironment(lookupEnv, workerRoleEnvironment),
-		MigrationsDir:   strings.TrimSpace(*migrationsDir),
-		AllowDown:       *allowDown,
+		DatabaseURL:   requiredEnvironment(lookupEnv, databaseURLEnvironment),
+		Schema:        environmentOrDefault(lookupEnv, databaseSchemaEnvironment, "public"),
+		MigrationsDir: strings.TrimSpace(*migrationsDir),
+		AllowDown:     *allowDown,
 	}
-	missing := make([]string, 0)
-	for name, value := range map[string]string{
-		databaseURLEnvironment:     config.DatabaseURL,
-		ownerRoleEnvironment:       config.OwnerRole,
-		auditWriterRoleEnvironment: config.AuditWriterRole,
-		migrationRoleEnvironment:   config.MigrationRole,
-		runtimeRoleEnvironment:     config.RuntimeRole,
-		workerRoleEnvironment:      config.WorkerRole,
-	} {
-		if value == "" {
-			missing = append(missing, name)
-		}
-	}
-	if len(missing) > 0 {
-		slices.Sort(missing)
-		return Config{}, "", fmt.Errorf("missing required migration environment: %s", strings.Join(missing, ", "))
+	if config.DatabaseURL == "" {
+		return Config{}, "", fmt.Errorf("missing required migration environment: %s", databaseURLEnvironment)
 	}
 	if config.MigrationsDir == "" {
 		return Config{}, "", errors.New("migration directory cannot be empty")
 	}
-	for name, value := range map[string]string{
-		"schema":            config.Schema,
-		"owner role":        config.OwnerRole,
-		"audit writer role": config.AuditWriterRole,
-		"migration role":    config.MigrationRole,
-		"runtime role":      config.RuntimeRole,
-		"worker role":       config.WorkerRole,
-	} {
-		if !identifierPattern.MatchString(value) {
-			return Config{}, "", fmt.Errorf("%s must be an unquoted PostgreSQL identifier", name)
-		}
+	if !identifierPattern.MatchString(config.Schema) {
+		return Config{}, "", errors.New("schema must be an unquoted PostgreSQL identifier")
 	}
 	return config, command, nil
 }

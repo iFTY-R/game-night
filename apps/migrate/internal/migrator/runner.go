@@ -33,18 +33,30 @@ func RunCLI(ctx context.Context, args []string, lookupEnv LookupEnv, output io.W
 	return Run(ctx, database, config.MigrationsDir, command)
 }
 
-// OpenDatabase applies schema and role settings to every goose connection without logging the DSN.
+// OpenDatabase applies schema and single-account role settings to every goose connection without logging the DSN.
 func OpenDatabase(ctx context.Context, config Config) (*sql.DB, error) {
 	connectionConfig, err := pgx.ParseConfig(config.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid migration database URL")
 	}
 	connectionConfig.RuntimeParams["search_path"] = pgx.Identifier{config.Schema}.Sanitize() + ",pg_catalog"
-	connectionConfig.RuntimeParams[ownerRoleSetting] = config.OwnerRole
-	connectionConfig.RuntimeParams[auditWriterRoleSetting] = config.AuditWriterRole
-	connectionConfig.RuntimeParams[migrationRoleSetting] = config.MigrationRole
-	connectionConfig.RuntimeParams[runtimeRoleSetting] = config.RuntimeRole
-	connectionConfig.RuntimeParams[workerRoleSetting] = config.WorkerRole
+	roles := []string{config.OwnerRole, config.AuditWriterRole, config.MigrationRole, config.RuntimeRole, config.WorkerRole}
+	if hasEmptyRole(roles) {
+		currentUser, err := readCurrentUser(ctx, *connectionConfig)
+		if err != nil {
+			return nil, err
+		}
+		for index := range roles {
+			if roles[index] == "" {
+				roles[index] = currentUser
+			}
+		}
+	}
+	connectionConfig.RuntimeParams[ownerRoleSetting] = roles[0]
+	connectionConfig.RuntimeParams[auditWriterRoleSetting] = roles[1]
+	connectionConfig.RuntimeParams[migrationRoleSetting] = roles[2]
+	connectionConfig.RuntimeParams[runtimeRoleSetting] = roles[3]
+	connectionConfig.RuntimeParams[workerRoleSetting] = roles[4]
 
 	database := stdlib.OpenDB(*connectionConfig)
 	if err := database.PingContext(ctx); err != nil {
@@ -61,6 +73,29 @@ func OpenDatabase(ctx context.Context, config Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("migration schema %q does not exist or is not first in search_path", config.Schema)
 	}
 	return database, nil
+}
+
+func hasEmptyRole(roles []string) bool {
+	for _, role := range roles {
+		if role == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// readCurrentUser probes the shared DSN before applying startup role settings to goose connections.
+func readCurrentUser(ctx context.Context, config pgx.ConnConfig) (string, error) {
+	probe := stdlib.OpenDB(config)
+	defer probe.Close()
+	if err := probe.PingContext(ctx); err != nil {
+		return "", fmt.Errorf("connect migration database: %w", err)
+	}
+	var currentUser string
+	if err := probe.QueryRowContext(ctx, "SELECT current_user").Scan(&currentUser); err != nil || currentUser == "" {
+		return "", fmt.Errorf("read migration database user")
+	}
+	return currentUser, nil
 }
 
 // Run invokes goose without allowing application startup to mutate schema implicitly.

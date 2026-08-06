@@ -73,23 +73,23 @@ if ($LASTEXITCODE -ne 0) { throw 'frozen pnpm install failed' }
 
 - 用户端开发服务器由 `apps/web` 负责，继续使用既有 `pnpm dev` 流程。
 - 管理端开发服务器固定运行在 `http://127.0.0.1:4174`，使用 `pnpm dev:admin` 启动。
-- 本地 API 仍通过 edge 暴露在 `http://127.0.0.1:8080`；管理端 Origin 必须与 `GAME_NIGHT_ADMIN_ORIGINS=http://127.0.0.1:4174` 保持一致。
+- 本地 API 仍通过 edge 暴露在 `http://127.0.0.1:8080`；管理端使用 `admin.` 子域访问，其他合法 Host 使用玩家端。
 - 管理员 TOTP 默认关闭，只能在后台“安全设置”中按账户启用或停用；进程环境变量不再控制 MFA 策略。
 
 ## Docker Compose 本地部署
 
-默认 `deploy/docker-compose.yml` 使用一个 `game-night` 应用容器，并创建 PostgreSQL、Redis、MinIO 和必要的初始化容器。镜像内的 `serve-all` 在同一应用容器管理 edge、API、realtime 和 worker，对宿主机只发布 `8080`。
+`deploy/docker-compose.yml` 使用一个 `game-night` 应用容器，连接外部 PostgreSQL、Redis 和 S3 兼容对象存储。镜像内的 `serve-all` 在同一应用容器管理 edge、API、realtime 和 worker，对宿主机默认发布 `127.0.0.1:40891`。
 
 ```powershell
 Copy-Item deploy/.env.example deploy/.env
-# 编辑 deploy/.env，替换所有 change-me 值并准备 deploy/secrets
+# 编辑 deploy/.env，替换所有 change-me 值
 Set-Location deploy
 
-docker compose run --rm game-night migrate up
-docker compose up -d
+docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
+docker compose -f docker-compose.yml up -d
 ```
 
-Compose 示例现在同时挂载 `/app/web/index.html` 和 `/app/admin/index.html`，并通过 `GAME_NIGHT_EDGE_USER_HOSTS`、`GAME_NIGHT_EDGE_ADMIN_HOSTS`、`GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY`、`GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY` 控制 Edge 的双站点边界。只运行一个应用容器并连接外部 PostgreSQL、Redis 和 S3 时，改用 `deploy/docker-compose.standalone.yml`。两种模式的应用拓扑相同，区别仅是依赖由 Compose 创建还是由外部提供；完整命令和变量说明见 [`deploy/README.md`](../../deploy/README.md)。
+编排同时提供 `/app/web/index.html` 和 `/app/admin/index.html`；Edge 按 `admin.` 子域自动选择站点，完整命令和变量说明见 [`deploy/README.md`](../../deploy/README.md)。
 
 ## 仓库验证
 
@@ -136,7 +136,7 @@ $taskIds = @($dryRun.tasks.taskId)
 
 ## Realtime 开发进程
 
-Realtime 只加载 PostgreSQL、Redis、Origin/代理策略和独立内部凭据，不加载设备、管理员、PII 或审计密钥。开发环境使用占位凭据启动：
+Realtime 只加载 PostgreSQL、Redis、固定代理策略和主密钥派生的内部凭据，不加载设备、管理员、PII 或审计密钥。开发环境使用占位凭据启动：
 
 ```powershell
 $env:GAME_NIGHT_ENVIRONMENT = 'development'
@@ -144,16 +144,13 @@ $env:GAME_NIGHT_DATABASE_URL = 'postgresql://runtime:replace-me@127.0.0.1:5432/g
 $env:GAME_NIGHT_DATABASE_SCHEMA = 'public'
 $env:GAME_NIGHT_REDIS_URL = 'redis://:replace-me@127.0.0.1:6379/0'
 $env:GAME_NIGHT_REDIS_KEY_PREFIX = 'game-night:dev:'
-$env:GAME_NIGHT_USER_ORIGINS = 'http://127.0.0.1:5173'
-$env:GAME_NIGHT_ADMIN_ORIGINS = 'http://127.0.0.1:4174'
-$env:GAME_NIGHT_TRUSTED_PROXY_CIDRS = '127.0.0.1/32,::1/128'
-$env:GAME_NIGHT_REALTIME_INTERNAL_TOKEN = ('t' * 32)
+$env:GAME_NIGHT_SECRET = ('s' * 32)
 $env:GAME_NIGHT_REALTIME_INSTANCE_ID = 'realtime-local'
 $env:GAME_NIGHT_REALTIME_ADVERTISED_URL = 'http://127.0.0.1:8091'
 go run ./apps/realtime
 ```
 
-公网监听默认 `:8090`，私网 owner RPC 默认 `:8091`。部署编排中由 edge 将精确 `/realtime/game` 路径转发给 realtime；外部 Nginx 只反代应用入口 `127.0.0.1:8080`，并分别把 user/admin Host 透传给同一个 edge upstream，不直接配置 realtime upstream，`:8091` 绝不能接入公网代理。
+公网监听默认 `:8090`，私网 owner RPC 默认 `:8091`。部署编排中由 edge 将精确 `/realtime/game` 路径转发给 realtime；外部 Nginx 只反代应用入口 `127.0.0.1:8080`，不直接配置 realtime upstream，`:8091` 绝不能接入公网代理。
 
 权威 timer 默认每 `250ms` 扫描 128 条候选、单条超时 `5s`，可通过 `GAME_NIGHT_REALTIME_TIMER_SCAN_INTERVAL`、`GAME_NIGHT_REALTIME_TIMER_BATCH_SIZE`、`GAME_NIGHT_REALTIME_TIMER_OPERATION_TIMEOUT` 调整。durable fanout consumer 默认使用 `15s` lease、每 `250ms` 读取 128 条，可通过 `GAME_NIGHT_REALTIME_OUTBOX_LEASE_DURATION`、`GAME_NIGHT_REALTIME_OUTBOX_POLL_INTERVAL`、`GAME_NIGHT_REALTIME_OUTBOX_BATCH_SIZE` 调整；所有值均受进程配置硬上限约束。
 
@@ -223,6 +220,6 @@ if ($baseProto.Count -eq 0) {
 - 不从 `.tmp/` 或外部参考仓库复制代码、架构或资产。
 - 不手工修改 `pnpm-lock.yaml` 或 Buf 生成文件。
 - 新包必须遵守各责任根 README 和边界检查器规则。
-## 密钥文件权限
+## 密钥
 
-Keyring JSON 必须以只读普通文件挂载，不能使用符号链接。Unix 部署必须使用 `0400` 权限；Windows 部署除设置只读属性外，还必须通过 ACL 仅向服务身份授予读取权限，因为 Go 的跨平台文件模式接口无法区分 Windows ACL 的所有者和用户组。
+部署只注入 `GAME_NIGHT_SECRET`。launcher 在临时目录生成只读 keyring 文件并在退出时清理；不要在仓库或部署目录维护 `secrets/` 文件树。

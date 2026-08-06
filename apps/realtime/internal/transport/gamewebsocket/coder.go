@@ -13,10 +13,12 @@ type coderAcceptor struct {
 	options websocket.AcceptOptions
 }
 
-// NewAcceptor configures an independent handshake Origin check and disables compression for private game views.
-func NewAcceptor(allowedOrigins sharedconfig.OriginAllowlist) (Acceptor, error) {
-	if len(allowedOrigins) == 0 {
-		return nil, ErrInvalidSinkConfig
+// NewAcceptor disables compression and accepts the request Origin policy owned by the handler.
+// An optional allowlist remains available for focused tests and older embedders.
+func NewAcceptor(allowlist ...sharedconfig.OriginAllowlist) (Acceptor, error) {
+	var allowedOrigins sharedconfig.OriginAllowlist
+	if len(allowlist) > 0 {
+		allowedOrigins = allowlist[0]
 	}
 	patterns := make([]string, 0, len(allowedOrigins))
 	seen := make(map[string]struct{}, len(allowedOrigins))
@@ -30,6 +32,9 @@ func NewAcceptor(allowedOrigins sharedconfig.OriginAllowlist) (Acceptor, error) 
 		}
 		seen[pattern] = struct{}{}
 		patterns = append(patterns, pattern)
+	}
+	if len(patterns) == 0 {
+		patterns = []string{"*"}
 	}
 	return &coderAcceptor{options: websocket.AcceptOptions{
 		OriginPatterns: patterns, CompressionMode: websocket.CompressionDisabled,

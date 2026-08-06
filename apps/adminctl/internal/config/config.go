@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DatabaseURLEnvironment  = "GAME_NIGHT_MIGRATION_DATABASE_URL"
+	DatabaseURLEnvironment  = "GAME_NIGHT_DATABASE_URL"
 	SchemaEnvironment       = "GAME_NIGHT_DATABASE_SCHEMA"
 	AuditKeyringEnvironment = "GAME_NIGHT_AUDIT_KEYRING_FILE"
 	confirmationValue       = "RESET-ADMIN"

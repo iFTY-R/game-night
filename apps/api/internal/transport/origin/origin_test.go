@@ -83,7 +83,6 @@ func TestValidatorFailsClosedForMissingDuplicateConflictingAndNonCanonicalHeader
 
 func TestValidatorRejectsUnsafeConfigurationWithoutLeakingValues(t *testing.T) {
 	tests := []sharedconfig.OriginAllowlist{
-		nil,
 		{"*"},
 		{"https://secret.example.test/path"},
 		{"https://secret.example.test", "https://secret.example.test"},
@@ -102,6 +101,17 @@ func TestValidatorRejectsUnsafeConfigurationWithoutLeakingValues(t *testing.T) {
 				t.Fatalf("config error leaked origin %q", configured)
 			}
 		}
+	}
+}
+
+func TestValidatorAcceptsWellFormedOriginWithoutAllowlist(t *testing.T) {
+	validator, err := NewUserValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted, err := validator.Validate(requestWithOrigin("https://play.example.test"))
+	if err != nil || accepted.Canonical() != "https://play.example.test" {
+		t.Fatalf("origin=%q err=%v", accepted.Canonical(), err)
 	}
 }
 

@@ -43,12 +43,6 @@ func TestLoadUsesDefaultsAndValidatesStaticDirectories(t *testing.T) {
 	if cfg.UserStaticDirectory != userDir || cfg.AdminStaticDirectory != adminDir {
 		t.Fatalf("static directories = %q / %q", cfg.UserStaticDirectory, cfg.AdminStaticDirectory)
 	}
-	if got, want := cfg.UserHosts, []string{"localhost:8080", "127.0.0.1:8080"}; !equalStrings(got, want) {
-		t.Fatalf("user hosts = %v, want %v", got, want)
-	}
-	if got, want := cfg.AdminHosts, []string{"admin.localhost:8080"}; !equalStrings(got, want) {
-		t.Fatalf("admin hosts = %v, want %v", got, want)
-	}
 	if len(cfg.TrustedProxyCIDRs) != 2 {
 		t.Fatalf("trusted proxy cidrs = %v", cfg.TrustedProxyCIDRs)
 	}
@@ -60,40 +54,6 @@ func TestLoadUsesDefaultsAndValidatesStaticDirectories(t *testing.T) {
 	}
 	if got, want := cfg.Heartbeat.Token, heartbeatToken; got != want {
 		t.Fatalf("heartbeat token = %q, want %q", got, want)
-	}
-}
-
-func TestLoadCanonicalizesHosts(t *testing.T) {
-	userDir := writeStaticRoot(t, "USER")
-	adminDir := writeStaticRoot(t, "ADMIN")
-	heartbeatTarget := "http://127.0.0.1:8081" + serviceheartbeat.Path
-	heartbeatToken := strings.Repeat("h", 32)
-	cfg, err := Load(func(name string) (string, bool) {
-		switch name {
-		case userStaticDirectoryEnvironment:
-			return userDir, true
-		case adminStaticDirectoryEnvironment:
-			return adminDir, true
-		case userHostsEnvironment:
-			return " LOCALHOST:8080 , [2001:db8::1]:8443 , localhost:8080 ", true
-		case adminHostsEnvironment:
-			return " Admin.LocalHost:8080 ", true
-		case serviceheartbeat.TargetURLEnvironment:
-			return heartbeatTarget, true
-		case serviceheartbeat.TokenEnvironment:
-			return heartbeatToken, true
-		default:
-			return "", false
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := cfg.UserHosts, []string{"localhost:8080", "[2001:db8::1]:8443"}; !equalStrings(got, want) {
-		t.Fatalf("user hosts = %v, want %v", got, want)
-	}
-	if got, want := cfg.AdminHosts, []string{"admin.localhost:8080"}; !equalStrings(got, want) {
-		t.Fatalf("admin hosts = %v, want %v", got, want)
 	}
 }
 
@@ -109,37 +69,12 @@ func TestLoadRejectsInvalidInputs(t *testing.T) {
 			},
 		},
 		{
-			name: "bad-cidr",
-			env: map[string]string{
-				trustedProxyCIDRsEnvironment: "not-a-cidr",
-			},
-		},
-		{
 			name: "missing-user-index",
 			env:  map[string]string{},
 		},
 		{
 			name: "missing-admin-index",
 			env:  map[string]string{},
-		},
-		{
-			name: "empty-user-hosts",
-			env: map[string]string{
-				userHostsEnvironment: " , ",
-			},
-		},
-		{
-			name: "wildcard-host",
-			env: map[string]string{
-				adminHostsEnvironment: "*.example.test",
-			},
-		},
-		{
-			name: "overlapping-hosts",
-			env: map[string]string{
-				userHostsEnvironment:  "shared.example.test",
-				adminHostsEnvironment: "SHARED.EXAMPLE.TEST",
-			},
 		},
 		{
 			name: "bad-instance-id",
@@ -199,16 +134,4 @@ func writeIndexFile(t testing.TB, dir, body string) {
 	if err := os.WriteFile(filepath.Join(dir, staticIndexFileName), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func equalStrings(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for index := range left {
-		if left[index] != right[index] {
-			return false
-		}
-	}
-	return true
 }

@@ -190,7 +190,7 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 	if err != nil {
 		return nil, errInitializeSubscriber
 	}
-	websocketAcceptor, err := gamewebsocket.NewAcceptor(cfg.Shared.Network.UserOrigins)
+	websocketAcceptor, err := gamewebsocket.NewAcceptor()
 	if err != nil {
 		return nil, errInitializeTransport
 	}
@@ -202,7 +202,7 @@ func New(ctx context.Context, cfg config.Config, options Options) (_ *Applicatio
 		websocketAcceptor,
 		source,
 		gamewebsocket.Config{
-			AllowedOrigins: cfg.Shared.Network.UserOrigins,
+			AllowedOrigins: nil,
 			HelloTimeout:   cfg.WebSocket.HelloTimeout, WriteTimeout: cfg.WebSocket.WriteTimeout,
 			PingInterval: cfg.WebSocket.PingInterval, MaxMessageBytes: cfg.WebSocket.MaxMessageBytes,
 			QueueCapacity: cfg.WebSocket.SendQueueCapacity,

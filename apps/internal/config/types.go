@@ -122,7 +122,7 @@ type Origin string
 // OriginAllowlist contains the exact origins accepted for one browser security boundary.
 type OriginAllowlist []Origin
 
-// NetworkConfig separates user and administrator origins and defines which socket peers may proxy client IPs.
+// NetworkConfig keeps the fixed proxy boundary and cookie policy shared by API transports.
 type NetworkConfig struct {
 	UserOrigins    OriginAllowlist
 	AdminOrigins   OriginAllowlist

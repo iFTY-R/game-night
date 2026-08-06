@@ -22,7 +22,7 @@ func TestLoadRealtimeDoesNotRequireSecurityKeyrings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.PostgreSQL.DSN == "" || loaded.Redis.URL == "" || len(loaded.Network.UserOrigins) == 0 {
+	if loaded.PostgreSQL.DSN == "" || loaded.Redis.URL == "" || len(loaded.Network.TrustedProxies) != 2 {
 		t.Fatalf("realtime dependencies = %+v", loaded)
 	}
 }
@@ -37,10 +37,6 @@ func TestLoadBuildsValidatedSharedConfig(t *testing.T) {
 	environment[databaseMaxConnectionIdleTimeEnvironment] = "10m"
 	environment[databaseHealthCheckPeriodEnvironment] = "30s"
 	environment[redisTimeoutEnvironment] = "750ms"
-	environment[userOriginsEnvironment] = "https://play.example.test, https://friends.example.test"
-	environment[adminOriginsEnvironment] = "https://admin.example.test"
-	environment[trustedProxyCIDRsEnvironment] = "10.0.0.0/8, 2001:db8::/32"
-	environment[cookieSecureEnvironment] = "true"
 	environment[checkpointMaxEventsEnvironment] = "80"
 	environment[checkpointMaxIntervalEnvironment] = "4m"
 	environment[bootstrapSecretFileEnvironment] = filepath.Join(t.TempDir(), "bootstrap-password")
@@ -62,10 +58,7 @@ func TestLoadBuildsValidatedSharedConfig(t *testing.T) {
 	if loaded.Redis.Timeout != 750*time.Millisecond || loaded.Redis.KeyPrefix != "game-night:test:" {
 		t.Fatalf("unexpected Redis config: %+v", loaded.Redis)
 	}
-	if got := []Origin(loaded.Network.UserOrigins); !reflect.DeepEqual(got, []Origin{"https://play.example.test", "https://friends.example.test"}) {
-		t.Fatalf("unexpected user origins: %v", got)
-	}
-	if len(loaded.Network.TrustedProxies) != 2 || loaded.Network.TrustedProxies[0].String() != "10.0.0.0/8" || !loaded.Network.CookieSecure {
+	if len(loaded.Network.TrustedProxies) != 2 || loaded.Network.TrustedProxies[0].String() != "127.0.0.1/32" || !loaded.Network.CookieSecure {
 		t.Fatalf("unexpected network config: %+v", loaded.Network)
 	}
 	if loaded.Checkpoint.MaxEvents != 80 || loaded.Checkpoint.MaxInterval != 4*time.Minute {
@@ -110,25 +103,9 @@ func TestLoadRequiresExplicitEnvironment(t *testing.T) {
 	assertSafeError(t, err, environmentName, "")
 }
 
-func TestLoadAllowsExplicitInsecureCookiesInProduction(t *testing.T) {
-	environment := validEnvironment(t)
-	environment[environmentName] = string(EnvironmentProduction)
-	environment[cookieSecureEnvironment] = "false"
-
-	loaded, err := Load(mapLookup(environment))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loaded.Network.CookieSecure {
-		t.Fatal("explicit insecure cookie setting was ignored")
-	}
-}
-
 func TestLoadDefaultsToSecureCookiesInProduction(t *testing.T) {
 	environment := validEnvironment(t)
 	environment[environmentName] = string(EnvironmentProduction)
-	environment[userOriginsEnvironment] = "https://play.example.test"
-	environment[adminOriginsEnvironment] = "https://admin.example.test"
 
 	loaded, err := Load(mapLookup(environment))
 	if err != nil {
@@ -164,14 +141,6 @@ func TestLoadAllowsExplicitPlaintextDependenciesOutsideProduction(t *testing.T) 
 	}
 }
 
-func TestLoadRejectsOriginOverlapAcrossUserAndAdminSurfaces(t *testing.T) {
-	environment := validEnvironment(t)
-	environment[adminOriginsEnvironment] = environment[userOriginsEnvironment]
-
-	_, err := Load(mapLookup(environment))
-	assertSafeError(t, err, adminOriginsEnvironment, environment[adminOriginsEnvironment])
-}
-
 func TestLoadRejectsCheckpointThresholdsAboveFailClosedBounds(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -192,24 +161,6 @@ func TestLoadRejectsCheckpointThresholdsAboveFailClosedBounds(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsTrustingEveryProxyAddress(t *testing.T) {
-	for _, cidr := range []string{
-		"0.0.0.0/0",
-		"::/0",
-		"0.0.0.0/1,128.0.0.0/1",
-		"::/1,8000::/1",
-		"10.0.0.0/8,10.0.0.0/9",
-	} {
-		t.Run(cidr, func(t *testing.T) {
-			environment := validEnvironment(t)
-			environment[trustedProxyCIDRsEnvironment] = cidr
-
-			_, err := Load(mapLookup(environment))
-			assertSafeError(t, err, trustedProxyCIDRsEnvironment, cidr)
-		})
-	}
-}
-
 func TestLoadRejectsInvalidConfigurationWithoutLeakingValues(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -225,10 +176,6 @@ func TestLoadRejectsInvalidConfigurationWithoutLeakingValues(t *testing.T) {
 		{name: "Redis URL", environment: redisURLEnvironment, value: "redis://top-secret@"},
 		{name: "Redis timeout", environment: redisTimeoutEnvironment, value: "secret-timeout"},
 		{name: "Redis key prefix", environment: redisKeyPrefixEnvironment, value: "secret prefix"},
-		{name: "user origins", environment: userOriginsEnvironment, value: "https://user-secret.example.test/path"},
-		{name: "admin origins", environment: adminOriginsEnvironment, value: "admin-secret.example.test"},
-		{name: "trusted proxies", environment: trustedProxyCIDRsEnvironment, value: "proxy-secret"},
-		{name: "Cookie secure", environment: cookieSecureEnvironment, value: "secret-bool"},
 		{name: "bootstrap secret file", environment: bootstrapSecretFileEnvironment, value: "relative-secret-file"},
 		{name: "PII keyring file", environment: piiKeyringFileEnvironment, value: "relative-pii-secret"},
 	}
@@ -309,9 +256,6 @@ func validEnvironment(t *testing.T) map[string]string {
 		databaseURLEnvironment:               "postgres://runtime:database-secret@db.example.test/game_night?sslmode=require",
 		redisURLEnvironment:                  "rediss://:redis-secret@redis.example.test/0",
 		redisKeyPrefixEnvironment:            "game-night:test:",
-		userOriginsEnvironment:               "http://localhost:3000",
-		adminOriginsEnvironment:              "http://localhost:3001",
-		trustedProxyCIDRsEnvironment:         "127.0.0.1/32,::1/128",
 		piiKeyringFileEnvironment:            filepath.Join(secretDirectory, "pii.json"),
 		totpKeyringFileEnvironment:           filepath.Join(secretDirectory, "totp.json"),
 		resultEnvelopeKeyringFileEnvironment: filepath.Join(secretDirectory, "result-envelope.json"),
@@ -329,8 +273,6 @@ func productionEnvironment(t *testing.T) map[string]string {
 	t.Helper()
 	environment := validEnvironment(t)
 	environment[environmentName] = string(EnvironmentProduction)
-	environment[userOriginsEnvironment] = "https://play.example.test"
-	environment[adminOriginsEnvironment] = "https://admin.example.test"
 	return environment
 }
 

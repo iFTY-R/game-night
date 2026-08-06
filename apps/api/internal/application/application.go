@@ -645,11 +645,11 @@ func transportHandler(
 	if err != nil {
 		return nil, err
 	}
-	userOrigins, err := origin.NewUserValidator(config.Network.UserOrigins)
+	userOrigins, err := origin.NewUserValidator()
 	if err != nil {
 		return nil, err
 	}
-	adminOrigins, err := origin.NewAdminValidator(config.Network.AdminOrigins)
+	adminOrigins, err := origin.NewAdminValidator()
 	if err != nil {
 		return nil, err
 	}

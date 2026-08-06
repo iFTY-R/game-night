@@ -45,18 +45,27 @@ type UserValidator struct{ policy policy }
 // AdminValidator owns a separate private immutable copy of the administrator-domain allowlist.
 type AdminValidator struct{ policy policy }
 
-// NewUserValidator revalidates configured origins before the user service starts accepting requests.
-func NewUserValidator(allowlist sharedconfig.OriginAllowlist) (*UserValidator, error) {
-	validated, err := newPolicy(allowlist)
+// NewUserValidator accepts an optional legacy allowlist. With no list, every well-formed Origin is
+// canonicalized and bound into the request challenge, which keeps deployment independent of domain names.
+func NewUserValidator(allowlist ...sharedconfig.OriginAllowlist) (*UserValidator, error) {
+	var configured sharedconfig.OriginAllowlist
+	if len(allowlist) > 0 {
+		configured = allowlist[0]
+	}
+	validated, err := newPolicy(configured)
 	if err != nil {
 		return nil, err
 	}
 	return &UserValidator{policy: validated}, nil
 }
 
-// NewAdminValidator revalidates configured origins independently from user-domain configuration.
-func NewAdminValidator(allowlist sharedconfig.OriginAllowlist) (*AdminValidator, error) {
-	validated, err := newPolicy(allowlist)
+// NewAdminValidator mirrors the user validator while retaining a separate type for admin challenge claims.
+func NewAdminValidator(allowlist ...sharedconfig.OriginAllowlist) (*AdminValidator, error) {
+	var configured sharedconfig.OriginAllowlist
+	if len(allowlist) > 0 {
+		configured = allowlist[0]
+	}
+	validated, err := newPolicy(configured)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +100,7 @@ type policy struct{ allowed map[string]struct{} }
 
 func newPolicy(allowlist sharedconfig.OriginAllowlist) (policy, error) {
 	if len(allowlist) == 0 {
-		return policy{}, ErrInvalidConfig
+		return policy{}, nil
 	}
 	allowed := make(map[string]struct{}, len(allowlist))
 	for _, configured := range allowlist {
@@ -108,9 +117,6 @@ func newPolicy(allowlist sharedconfig.OriginAllowlist) (policy, error) {
 }
 
 func (policy policy) validate(header http.Header) (string, error) {
-	if len(policy.allowed) == 0 {
-		return "", ErrNotAllowed
-	}
 	values := headerValues(header, HeaderName)
 	if len(values) != 1 {
 		return "", ErrNotAllowed
@@ -118,6 +124,9 @@ func (policy policy) validate(header http.Header) (string, error) {
 	canonical, valid := parseCanonical(values[0])
 	if !valid {
 		return "", ErrNotAllowed
+	}
+	if len(policy.allowed) == 0 {
+		return canonical, nil
 	}
 	if _, allowed := policy.allowed[canonical]; !allowed {
 		return "", ErrNotAllowed

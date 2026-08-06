@@ -12,7 +12,7 @@ func TestParseConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if command != "up" || config.Schema != "public" || config.RuntimeRole != "game_night_runtime" {
+	if command != "up" || config.Schema != "public" || config.DatabaseURL != environment[databaseURLEnvironment] {
 		t.Fatalf("unexpected parsed configuration: command=%s config=%+v", command, config)
 	}
 }
@@ -24,12 +24,12 @@ func TestParseConfigRejectsDownWithoutExplicitFlag(t *testing.T) {
 	}
 }
 
-func TestParseConfigRejectsInvalidRoleWithoutLeakingDSN(t *testing.T) {
+func TestParseConfigRejectsInvalidSchemaWithoutLeakingDSN(t *testing.T) {
 	environment := validEnvironment()
-	environment[runtimeRoleEnvironment] = "invalid-role;drop"
+	environment[databaseSchemaEnvironment] = "invalid-schema;drop"
 	_, _, err := ParseConfig([]string{"up"}, mapLookup(environment), io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "runtime role") {
-		t.Fatalf("expected runtime role validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "schema") {
+		t.Fatalf("expected schema validation error, got %v", err)
 	}
 	if strings.Contains(err.Error(), environment[databaseURLEnvironment]) {
 		t.Fatal("migration validation error leaked database URL")
@@ -41,21 +41,14 @@ func TestParseConfigReportsAllMissingEnvironmentNames(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing environment error")
 	}
-	for _, name := range []string{databaseURLEnvironment, ownerRoleEnvironment, workerRoleEnvironment} {
-		if !strings.Contains(err.Error(), name) {
-			t.Errorf("missing environment error did not include %s: %v", name, err)
-		}
+	if !strings.Contains(err.Error(), databaseURLEnvironment) {
+		t.Errorf("missing environment error did not include %s: %v", databaseURLEnvironment, err)
 	}
 }
 
 func validEnvironment() map[string]string {
 	return map[string]string{
-		databaseURLEnvironment:     "postgres://secret@example.invalid/game_night",
-		ownerRoleEnvironment:       "game_night_owner",
-		auditWriterRoleEnvironment: "game_night_audit_writer",
-		migrationRoleEnvironment:   "game_night_migration",
-		runtimeRoleEnvironment:     "game_night_runtime",
-		workerRoleEnvironment:      "game_night_worker",
+		databaseURLEnvironment: "postgres://secret@example.invalid/game_night",
 	}
 }
 

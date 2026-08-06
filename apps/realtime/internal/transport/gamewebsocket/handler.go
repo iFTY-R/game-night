@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
@@ -68,7 +70,7 @@ type readResult struct {
 
 // NewHandler validates the complete public transport graph before it can be mounted.
 func NewHandler(authorizer Authorizer, register Register, acceptor Acceptor, source clock.Clock, config Config) (*Handler, error) {
-	if authorizer == nil || register == nil || acceptor == nil || source == nil || len(config.AllowedOrigins) == 0 ||
+	if authorizer == nil || register == nil || acceptor == nil || source == nil ||
 		config.HelloTimeout < time.Millisecond || config.WriteTimeout < time.Millisecond || config.PingInterval < time.Millisecond ||
 		config.MaxMessageBytes < 1 || config.QueueCapacity < 1 {
 		return nil, ErrInvalidSinkConfig
@@ -187,8 +189,24 @@ func (handler *Handler) requestOrigin(request *http.Request) (string, bool) {
 	if len(values) != 1 {
 		return "", false
 	}
-	_, allowed := handler.origins[values[0]]
-	return values[0], allowed
+	raw := strings.TrimSpace(values[0])
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.User != nil || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", false
+	}
+	canonical := scheme + "://" + strings.ToLower(parsed.Host)
+	if canonical != raw {
+		return "", false
+	}
+	if len(handler.origins) == 0 {
+		return canonical, true
+	}
+	_, allowed := handler.origins[canonical]
+	return canonical, allowed
 }
 
 func (handler *Handler) reject(connection socketConnection, cause error) {

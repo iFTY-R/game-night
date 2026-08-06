@@ -49,6 +49,7 @@ func TestStaticRoutingUsesSurfaceSpecificRoots(t *testing.T) {
 		wantBody   string
 	}{
 		{name: "user-asset", host: testUserHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
+		{name: "custom-domain-user-asset", host: "play.example.test", method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
 		{name: "admin-asset", host: testAdminHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "ADMIN-ASSET"},
 		{name: "user-fallback", host: testUserHost, method: http.MethodGet, target: "/rooms/123", accept: "text/html", wantStatus: http.StatusOK, wantBody: "USER-INDEX"},
 		{name: "admin-fallback", host: testAdminHost, method: http.MethodGet, target: "/audit/events", accept: "text/html", wantStatus: http.StatusOK, wantBody: "ADMIN-INDEX"},
@@ -77,7 +78,7 @@ func TestStaticRoutingUsesSurfaceSpecificRoots(t *testing.T) {
 	}
 }
 
-func TestUnknownHostReturnsMisdirectedRequestBeforeProxyOrStatic(t *testing.T) {
+func TestInvalidHostReturnsMisdirectedRequestBeforeProxyOrStatic(t *testing.T) {
 	apiHits := 0
 	apiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		apiHits++
@@ -93,7 +94,7 @@ func TestUnknownHostReturnsMisdirectedRequestBeforeProxyOrStatic(t *testing.T) {
 	for _, target := range []string{"/health/live", "/platform.identity.v1.IdentityService/Bootstrap", "/readyz", "/"} {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, target, nil)
-		req.Host = "unknown.game-night.test"
+		req.Host = "invalid host"
 		req.Header.Set("Accept", "text/html")
 		handler.ServeHTTP(rr, req)
 		if rr.Code != http.StatusMisdirectedRequest {
@@ -101,7 +102,7 @@ func TestUnknownHostReturnsMisdirectedRequestBeforeProxyOrStatic(t *testing.T) {
 		}
 	}
 	if apiHits != 0 {
-		t.Fatalf("unknown host reached upstream %d times", apiHits)
+		t.Fatalf("invalid host reached upstream %d times", apiHits)
 	}
 }
 
@@ -406,8 +407,6 @@ func TestRunStartsAndStopsHeartbeatReporter(t *testing.T) {
 		AdminStaticDirectory: writeStaticRoot(t, map[string]string{
 			"index.html": "ADMIN-INDEX",
 		}),
-		UserHosts:                  []string{testUserHost},
-		AdminHosts:                 []string{testAdminHost},
 		TrustedProxyCIDRs:          []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")},
 		ShutdownTimeout:            2 * time.Second,
 		ReadHeaderTimeout:          time.Second,
@@ -573,8 +572,6 @@ func newTestHandlerWithRoots(t *testing.T, apiURL, realtimeURL *url.URL, userFil
 		RealtimeUpstreamURL:  realtimeURL,
 		UserStaticDirectory:  userDir,
 		AdminStaticDirectory: adminDir,
-		UserHosts:            []string{testUserHost},
-		AdminHosts:           []string{testAdminHost},
 		TrustedProxyCIDRs: []netip.Prefix{
 			netip.MustParsePrefix("127.0.0.1/32"),
 		},

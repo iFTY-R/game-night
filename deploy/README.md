@@ -1,103 +1,38 @@
 # Docker 部署
 
-`deploy` 提供两种互相独立的部署方式。两种方式都从 GHCR 拉取同一个应用镜像，并且只运行一个 `game-night` 应用容器。
+`deploy` 只提供一个 Compose 方案：运行一个 `game-night` 容器，连接外部 PostgreSQL 和 Redis。1Panel 操作见 [`1panel.md`](1panel.md)。
 
-| 编排文件 | 环境变量模板 | 默认发布端口 | 依赖服务 |
-| --- | --- | --- | --- |
-| `docker-compose.yml` | `.env.full.example` | `127.0.0.1:8080` | Compose 创建 PostgreSQL、Redis、MinIO 和初始化容器 |
-| `docker-compose.standalone.yml` | `.env.standalone.example` | `127.0.0.1:40891` | 使用外部 PostgreSQL、Redis 和 S3 |
+## 配置
 
-1Panel 上的 standalone 部署步骤见 [`1panel-standalone.md`](1panel-standalone.md)。
-
-## 准备配置
-
-按部署方式复制对应模板，不要混用。
-
-完整部署：
+复制环境模板：
 
 ```powershell
-Copy-Item deploy/.env.full.example deploy/.env
+Copy-Item deploy/.env.example deploy/.env
 ```
 
-Standalone / 1Panel 部署：
+至少填写 `GAME_NIGHT_DATABASE_URL`、`GAME_NIGHT_REDIS_URL` 和长度不小于 32 字节的 `GAME_NIGHT_SECRET`。launcher 会从主密钥在容器临时目录生成用途隔离的 keyring 和内部通信 token，不需要 `secrets/` 目录或 secret 文件。
 
-```powershell
-Copy-Item deploy/.env.standalone.example deploy/.env
-```
-
-`deploy/.env.example` 保留为完整部署的兼容别名。编辑 `deploy/.env`，替换所有 `change-me` 值。默认镜像为 `ghcr.io/ifty-r/game-night:latest`；生产发布建议把 `GAME_NIGHT_IMAGE` 固定为 workflow 输出的版本标签或 digest。私有 GHCR 包需要先执行 `docker login ghcr.io`。管理员 MFA 策略不再通过环境变量控制。
-
-在 `deploy/secrets` 中准备以下文件：
-
-```text
-admin-bootstrap.txt
-admin-challenge.json
-admin-cursor.json
-admin-session.json
-audit.json
-device.json
-pii.json
-rate-limit.json
-result-envelope.json
-totp.json
-user-challenge.json
-```
-
-这些文件不能提交到 Git。应用镜像已在 Dockerfile 中使用固定的非 root 用户 `10001:10001`，Compose 不再重复配置 `user:`。standalone 模式直接挂载文件时，宿主机权限必须允许 UID `10001` 读取；完整模式由 `secrets-init` 设置所有权和 `0400` 权限。
-
-## 完整部署
-
-默认 `docker-compose.yml` 创建一个应用容器以及 PostgreSQL、Redis 和 MinIO。数据库角色、对象存储 bucket 和 keyring staging 由一次性初始化容器完成。
+## 启动
 
 ```powershell
 Set-Location deploy
-
-docker compose config
-docker compose pull
-docker compose run --rm game-night migrate up
-docker compose up -d
-docker compose ps
+docker compose -f docker-compose.yml config
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
+docker compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml ps
 ```
 
-完整部署中的依赖连接使用 Compose 私有网络明文通信，可按实际用途设置 `GAME_NIGHT_ENVIRONMENT=development` 或 `production`。TLS PostgreSQL、TLS Redis 和远程 S3 checkpoint 是可选增强项，不是小规模私网生产的启动前提。
+默认只发布 `127.0.0.1:40891`。反向代理转发该地址时保留原始 Host、客户端地址和 WebSocket Upgrade 头；`admin.` 子域自动进入管理端，其余合法 Host 进入玩家端。
 
-## Standalone 部署
+`GAME_NIGHT_SECRET` 同时用于首次 bootstrap 和运行时密钥派生，初始化完成后保持不变；更换它会使历史加密数据无法解密。
 
-`docker-compose.standalone.yml` 只定义一个 `game-night` 服务。启动前必须配置外部 PostgreSQL、Redis 和对应凭据；checkpoint 默认保存在 Docker 命名卷中。
+## 更新
 
 ```powershell
-Set-Location deploy
-
-docker compose -f docker-compose.standalone.yml config
-docker compose -f docker-compose.standalone.yml pull
-docker compose -f docker-compose.standalone.yml run --rm --no-deps game-night migrate up
-docker compose -f docker-compose.standalone.yml up -d
-docker compose -f docker-compose.standalone.yml ps
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
+docker compose -f docker-compose.yml up -d
 ```
 
-## 对外入口
-
-两种方式都只发布 `${GAME_NIGHT_HTTP_BIND_ADDRESS}:${GAME_NIGHT_HTTP_PUBLISHED_PORT}`。完整部署默认是 `127.0.0.1:8080`，standalone 默认是 `127.0.0.1:40891`。外部 Nginx、1Panel OpenResty 或其他 TLS 终止层只需反代这个地址，并转发原始 Host、客户端地址以及 WebSocket Upgrade 头。
-
-## 更新与清理
-
-更新应用镜像：
-
-```powershell
-docker compose pull game-night
-docker compose up -d game-night
-```
-
-停止完整部署但保留数据：
-
-```powershell
-docker compose down
-```
-
-删除完整部署的数据库、Redis、MinIO 和 secret staging volume：
-
-```powershell
-docker compose down -v
-```
-
-`down -v` 会永久删除 Compose 管理的数据，不能作为生产环境的常规更新命令。
+`docker compose down` 会保留 checkpoint 命名卷；只有确认不再需要数据时才使用 `down -v`。

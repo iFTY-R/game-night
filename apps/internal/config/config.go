@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"net/netip"
 	"net/url"
 	"path/filepath"
@@ -26,10 +25,6 @@ const (
 	redisURLEnvironment                      = "GAME_NIGHT_REDIS_URL"
 	redisTimeoutEnvironment                  = "GAME_NIGHT_REDIS_TIMEOUT"
 	redisKeyPrefixEnvironment                = "GAME_NIGHT_REDIS_KEY_PREFIX"
-	userOriginsEnvironment                   = "GAME_NIGHT_USER_ORIGINS"
-	adminOriginsEnvironment                  = "GAME_NIGHT_ADMIN_ORIGINS"
-	trustedProxyCIDRsEnvironment             = "GAME_NIGHT_TRUSTED_PROXY_CIDRS"
-	cookieSecureEnvironment                  = "GAME_NIGHT_COOKIE_SECURE"
 	checkpointMaxEventsEnvironment           = "GAME_NIGHT_AUDIT_CHECKPOINT_MAX_EVENTS"
 	checkpointMaxIntervalEnvironment         = "GAME_NIGHT_AUDIT_CHECKPOINT_MAX_INTERVAL"
 	bootstrapSecretFileEnvironment           = "GAME_NIGHT_ADMIN_BOOTSTRAP_SECRET_FILE"
@@ -292,31 +287,15 @@ func loadRedis(reader environmentReader) (RedisConfig, error) {
 	return RedisConfig{URL: redisURL, Timeout: timeout, KeyPrefix: keyPrefix}, nil
 }
 
-func loadNetwork(reader environmentReader, environment Environment) (NetworkConfig, error) {
-	userOrigins, err := parseOrigins(reader, userOriginsEnvironment)
-	if err != nil {
-		return NetworkConfig{}, err
-	}
-	adminOrigins, err := parseOrigins(reader, adminOriginsEnvironment)
-	if err != nil {
-		return NetworkConfig{}, err
-	}
-	if originAllowlistsOverlap(userOrigins, adminOrigins) {
-		return NetworkConfig{}, fieldError(adminOriginsEnvironment, "user and admin origins must be isolated")
-	}
-	trustedProxies, err := parseTrustedProxies(reader)
-	if err != nil {
-		return NetworkConfig{}, err
-	}
-	cookieSecure, err := parseBool(reader, cookieSecureEnvironment, environment == EnvironmentProduction)
-	if err != nil {
-		return NetworkConfig{}, err
-	}
+func loadNetwork(_ environmentReader, environment Environment) (NetworkConfig, error) {
+	// Browser origins and proxy headers are bound to the request/edge topology, so deployments no longer
+	// carry per-domain allowlists. Loopback remains the only trusted proxy boundary for the local edge.
 	return NetworkConfig{
-		UserOrigins:    userOrigins,
-		AdminOrigins:   adminOrigins,
-		TrustedProxies: trustedProxies,
-		CookieSecure:   cookieSecure,
+		TrustedProxies: []netip.Prefix{
+			netip.MustParsePrefix("127.0.0.1/32"),
+			netip.MustParsePrefix("::1/128"),
+		},
+		CookieSecure: environment == EnvironmentProduction,
 	}, nil
 }
 
@@ -410,96 +389,6 @@ func loadKeyringFiles(reader environmentReader) (KeyringFiles, error) {
 	}, nil
 }
 
-func parseOrigins(reader environmentReader, name string) (OriginAllowlist, error) {
-	value, err := reader.required(name)
-	if err != nil {
-		return nil, err
-	}
-	parts := strings.Split(value, ",")
-	origins := make(OriginAllowlist, 0, len(parts))
-	seen := make(map[string]struct{}, len(parts))
-	for _, part := range parts {
-		parsed, parseErr := url.Parse(strings.TrimSpace(part))
-		if parseErr != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-			return nil, fieldError(name, "invalid origin allowlist")
-		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return nil, fieldError(name, "invalid origin allowlist")
-		}
-		canonical := parsed.Scheme + "://" + strings.ToLower(parsed.Host)
-		if _, exists := seen[canonical]; exists {
-			return nil, fieldError(name, "duplicate origin")
-		}
-		seen[canonical] = struct{}{}
-		origins = append(origins, Origin(canonical))
-	}
-	if len(origins) == 0 {
-		return nil, fieldError(name, "empty origin allowlist")
-	}
-	return origins, nil
-}
-
-func parseTrustedProxies(reader environmentReader) ([]netip.Prefix, error) {
-	value, err := reader.required(trustedProxyCIDRsEnvironment)
-	if err != nil {
-		return nil, err
-	}
-	parts := strings.Split(value, ",")
-	prefixes := make([]netip.Prefix, 0, len(parts))
-	seen := make(map[netip.Prefix]struct{}, len(parts))
-	covered := map[int]*big.Int{32: new(big.Int), 128: new(big.Int)}
-	for _, part := range parts {
-		prefix, parseErr := netip.ParsePrefix(strings.TrimSpace(part))
-		if parseErr != nil {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "invalid CIDR allowlist")
-		}
-		prefix = prefix.Masked()
-		if prefix.Addr().Is4In6() {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "mapped IPv4 CIDR is forbidden")
-		}
-		// A zero-length prefix would trust direct internet clients and defeat right-to-left proxy peeling.
-		if prefix.Bits() == 0 {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "unbounded CIDR is forbidden")
-		}
-		if _, exists := seen[prefix]; exists {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "duplicate CIDR")
-		}
-		for existing := range seen {
-			if existing.Addr().BitLen() == prefix.Addr().BitLen() &&
-				(existing.Contains(prefix.Addr()) || prefix.Contains(existing.Addr())) {
-				return nil, fieldError(trustedProxyCIDRsEnvironment, "overlapping CIDR")
-			}
-		}
-		seen[prefix] = struct{}{}
-		prefixes = append(prefixes, prefix)
-
-		addressBits := prefix.Addr().BitLen()
-		prefixSize := new(big.Int).Lsh(big.NewInt(1), uint(addressBits-prefix.Bits()))
-		covered[addressBits].Add(covered[addressBits], prefixSize)
-		addressSpaceSize := new(big.Int).Lsh(big.NewInt(1), uint(addressBits))
-		if covered[addressBits].Cmp(addressSpaceSize) >= 0 {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "unbounded CIDR set is forbidden")
-		}
-	}
-	if len(prefixes) == 0 {
-		return nil, fieldError(trustedProxyCIDRsEnvironment, "empty CIDR allowlist")
-	}
-	return prefixes, nil
-}
-
-func originAllowlistsOverlap(first, second OriginAllowlist) bool {
-	seen := make(map[Origin]struct{}, len(first))
-	for _, origin := range first {
-		seen[origin] = struct{}{}
-	}
-	for _, origin := range second {
-		if _, exists := seen[origin]; exists {
-			return true
-		}
-	}
-	return false
-}
-
 func validServiceURL(value string, allowedSchemes map[string]struct{}, requireDatabasePath bool) bool {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || parsed.Fragment != "" {
@@ -509,18 +398,6 @@ func validServiceURL(value string, allowedSchemes map[string]struct{}, requireDa
 		return false
 	}
 	return !requireDatabasePath || strings.Trim(parsed.Path, "/") != ""
-}
-
-func parseBool(reader environmentReader, name string, fallback bool) (bool, error) {
-	value := reader.optional(name)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return false, fieldError(name, "invalid boolean")
-	}
-	return parsed, nil
 }
 
 func parseInt32InRange(reader environmentReader, name string, fallback, minimum, maximum int32) (int32, error) {

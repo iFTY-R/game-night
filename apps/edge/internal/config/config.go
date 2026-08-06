@@ -17,25 +17,18 @@ import (
 )
 
 const (
-	listenAddressEnvironment        = "GAME_NIGHT_EDGE_LISTEN_ADDRESS"
-	apiUpstreamURLEnvironment       = "GAME_NIGHT_EDGE_API_UPSTREAM_URL"
-	realtimeUpstreamURLEnvironment  = "GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL"
-	userStaticDirectoryEnvironment  = "GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY"
-	adminStaticDirectoryEnvironment = "GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY"
-	userHostsEnvironment            = "GAME_NIGHT_EDGE_USER_HOSTS"
-	adminHostsEnvironment           = "GAME_NIGHT_EDGE_ADMIN_HOSTS"
-	trustedProxyCIDRsEnvironment    = "GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS"
-	instanceIDEnvironment           = "GAME_NIGHT_EDGE_INSTANCE_ID"
-	defaultListenAddress            = ":8080"
-	defaultAPIUpstreamURL           = "http://127.0.0.1:8081"
-	defaultRealtimeUpstreamURL      = "http://127.0.0.1:8090"
-	defaultUserStaticDirectory      = "/app/web"
-	defaultAdminStaticDirectory     = "/app/admin"
-	defaultUserHosts                = "localhost:8080,127.0.0.1:8080"
-	defaultAdminHosts               = "admin.localhost:8080"
-	defaultInstanceID               = "edge-local"
-	// Only local loopback is trusted by default; deployments must explicitly name their proxy networks.
-	defaultTrustedProxyCIDRs          = "127.0.0.1/32,::1/128"
+	listenAddressEnvironment          = "GAME_NIGHT_EDGE_LISTEN_ADDRESS"
+	apiUpstreamURLEnvironment         = "GAME_NIGHT_EDGE_API_UPSTREAM_URL"
+	realtimeUpstreamURLEnvironment    = "GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL"
+	userStaticDirectoryEnvironment    = "GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY"
+	adminStaticDirectoryEnvironment   = "GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY"
+	instanceIDEnvironment             = "GAME_NIGHT_EDGE_INSTANCE_ID"
+	defaultListenAddress              = ":8080"
+	defaultAPIUpstreamURL             = "http://127.0.0.1:8081"
+	defaultRealtimeUpstreamURL        = "http://127.0.0.1:8090"
+	defaultUserStaticDirectory        = "/app/web"
+	defaultAdminStaticDirectory       = "/app/admin"
+	defaultInstanceID                 = "edge-local"
 	defaultShutdownTimeout            = 15 * time.Second
 	defaultReadHeaderTimeout          = 5 * time.Second
 	defaultProxyDialTimeout           = 5 * time.Second
@@ -57,8 +50,6 @@ type Config struct {
 	RealtimeUpstreamURL        *url.URL
 	UserStaticDirectory        string
 	AdminStaticDirectory       string
-	UserHosts                  []string
-	AdminHosts                 []string
 	TrustedProxyCIDRs          []netip.Prefix
 	ShutdownTimeout            time.Duration
 	ReadHeaderTimeout          time.Duration
@@ -72,7 +63,8 @@ type Config struct {
 	Heartbeat serviceheartbeat.Config
 }
 
-// Load validates URLs, CIDRs, and the static asset directory before the server starts.
+// Load validates upstreams and static assets before the server starts. Host routing and proxy trust use
+// fixed local defaults so deployments do not carry another allowlist configuration surface.
 func Load(lookup LookupEnv) (Config, error) {
 	if lookup == nil {
 		return Config{}, fmt.Errorf("lookup env: required")
@@ -103,21 +95,6 @@ func Load(lookup LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	userHosts, err := parseHostAllowlist(valueOrDefault(lookup, userHostsEnvironment, defaultUserHosts), userHostsEnvironment)
-	if err != nil {
-		return Config{}, err
-	}
-	adminHosts, err := parseHostAllowlist(valueOrDefault(lookup, adminHostsEnvironment, defaultAdminHosts), adminHostsEnvironment)
-	if err != nil {
-		return Config{}, err
-	}
-	if overlaps(userHosts, adminHosts) {
-		return Config{}, fieldError(adminHostsEnvironment, "overlaps user hosts")
-	}
-	trustedProxyCIDRs, err := parseTrustedProxyCIDRs(valueOrDefault(lookup, trustedProxyCIDRsEnvironment, defaultTrustedProxyCIDRs))
-	if err != nil {
-		return Config{}, err
-	}
 	instanceID := valueOrDefault(lookup, instanceIDEnvironment, defaultInstanceID)
 	if !instanceIDPattern.MatchString(instanceID) {
 		return Config{}, fieldError(instanceIDEnvironment, "invalid instance identifier")
@@ -127,14 +104,15 @@ func Load(lookup LookupEnv) (Config, error) {
 		return Config{}, fieldError(serviceheartbeat.TokenEnvironment, "missing or invalid heartbeat configuration")
 	}
 	return Config{
-		ListenAddress:              listenAddress,
-		APIUpstreamURL:             apiUpstreamURL,
-		RealtimeUpstreamURL:        realtimeUpstreamURL,
-		UserStaticDirectory:        userStaticDirectory,
-		AdminStaticDirectory:       adminStaticDirectory,
-		UserHosts:                  userHosts,
-		AdminHosts:                 adminHosts,
-		TrustedProxyCIDRs:          trustedProxyCIDRs,
+		ListenAddress:        listenAddress,
+		APIUpstreamURL:       apiUpstreamURL,
+		RealtimeUpstreamURL:  realtimeUpstreamURL,
+		UserStaticDirectory:  userStaticDirectory,
+		AdminStaticDirectory: adminStaticDirectory,
+		TrustedProxyCIDRs: []netip.Prefix{
+			netip.MustParsePrefix("127.0.0.1/32"),
+			netip.MustParsePrefix("::1/128"),
+		},
 		ShutdownTimeout:            defaultShutdownTimeout,
 		ReadHeaderTimeout:          defaultReadHeaderTimeout,
 		ProxyDialTimeout:           defaultProxyDialTimeout,
@@ -186,27 +164,6 @@ func parseStaticDirectory(raw, environment string) (string, error) {
 	}
 	// Keep the caller's absolute path stable; the server resolves both sides when checking symlink boundaries.
 	return abs, nil
-}
-
-func parseHostAllowlist(raw, environment string) ([]string, error) {
-	parts := strings.Split(raw, ",")
-	hosts := make([]string, 0, len(parts))
-	seen := make(map[string]struct{}, len(parts))
-	for _, part := range parts {
-		authority, err := CanonicalizeAuthority(part)
-		if err != nil {
-			return nil, fieldError(environment, "invalid host")
-		}
-		if _, ok := seen[authority]; ok {
-			continue
-		}
-		seen[authority] = struct{}{}
-		hosts = append(hosts, authority)
-	}
-	if len(hosts) == 0 {
-		return nil, fieldError(environment, "invalid host")
-	}
-	return hosts, nil
 }
 
 // CanonicalizeAuthority normalizes a Host authority the same way config parsing and request routing do.
@@ -266,49 +223,6 @@ func formatAuthority(host, port string) string {
 		return "[" + host + "]:" + port
 	}
 	return host + ":" + port
-}
-
-func overlaps(left, right []string) bool {
-	seen := make(map[string]struct{}, len(left))
-	for _, value := range left {
-		seen[value] = struct{}{}
-	}
-	for _, value := range right {
-		if _, ok := seen[value]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-func parseTrustedProxyCIDRs(raw string) ([]netip.Prefix, error) {
-	parts := strings.Split(raw, ",")
-	prefixes := make([]netip.Prefix, 0, len(parts))
-	seen := make(map[string]struct{}, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "invalid proxy CIDR")
-		}
-		prefix, err := netip.ParsePrefix(part)
-		if err != nil {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "invalid proxy CIDR")
-		}
-		prefix = prefix.Masked()
-		if !prefix.IsValid() || prefix.Bits() == 0 {
-			return nil, fieldError(trustedProxyCIDRsEnvironment, "invalid proxy CIDR")
-		}
-		key := prefix.String()
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		prefixes = append(prefixes, prefix)
-	}
-	if len(prefixes) == 0 {
-		return nil, fieldError(trustedProxyCIDRsEnvironment, "invalid proxy CIDR")
-	}
-	return prefixes, nil
 }
 
 func validListenAddress(value string) bool {

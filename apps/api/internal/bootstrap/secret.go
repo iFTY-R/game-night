@@ -35,7 +35,18 @@ func NewCoordinator(ctx context.Context, service Service, path string) (*Coordin
 		return nil, err
 	}
 	if mounted {
-		err = service.BootstrapPassword(ctx, secret)
+		// A single launcher secret is regenerated on every container start. Reuse it only while the
+		// singleton is still pending; once setup is complete, the secret is ignored just like an absent mount.
+		state, stateErr := service.GetSetupState(ctx)
+		if stateErr != nil {
+			return nil, stateErr
+		}
+		if state == admin.SetupStateActive {
+			mounted = false
+			err = service.BootstrapReadyWithoutSecret(ctx)
+		} else {
+			err = service.BootstrapPassword(ctx, secret)
+		}
 	} else {
 		err = service.BootstrapReadyWithoutSecret(ctx)
 	}
@@ -46,7 +57,7 @@ func NewCoordinator(ctx context.Context, service Service, path string) (*Coordin
 	return &Coordinator{service: service, mounted: mounted}, nil
 }
 
-// Check fails once setup becomes active while the process was started with the one-time secret still mounted.
+// Check keeps startup blocked only while bootstrap is pending without a usable secret.
 func (coordinator *Coordinator) Check(ctx context.Context) error {
 	if coordinator == nil || coordinator.service == nil || ctx == nil {
 		return ErrInvalidSecretFile
@@ -56,7 +67,7 @@ func (coordinator *Coordinator) Check(ctx context.Context) error {
 		return err
 	}
 	if coordinator.mounted {
-		if state != admin.SetupStateSetupRequired {
+		if state == admin.SetupStateBootstrapPending {
 			return admin.ErrBootstrapSecretMismatch
 		}
 		return nil

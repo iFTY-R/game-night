@@ -11,7 +11,7 @@ func TestParseRequiresExplicitConfirmationUnlessDryRun(t *testing.T) {
 		values := map[string]string{
 			DatabaseURLEnvironment:  "postgres://migration:secret@db.example.test/game_night",
 			SchemaEnvironment:       "public",
-			AuditKeyringEnvironment: "/run/secrets/audit.json",
+			AuditKeyringEnvironment: "/tmp/game-night-audit.json",
 		}
 		value, ok := values[name]
 		return value, ok

@@ -26,16 +26,12 @@ const (
 	commandServeAll    = "serve-all"
 	commandHealthcheck = "healthcheck"
 
-	environmentBinDirectory         = "GAME_NIGHT_BIN_DIRECTORY"
-	environmentShutdownTimeout      = "GAME_NIGHT_SHUTDOWN_TIMEOUT"
-	environmentHealthcheckURL       = "GAME_NIGHT_HEALTHCHECK_URL"
-	environmentHealthcheckTimeout   = "GAME_NIGHT_HEALTHCHECK_TIMEOUT"
-	environmentDatabaseURL          = "GAME_NIGHT_DATABASE_URL"
-	environmentMigrationDatabaseURL = "GAME_NIGHT_MIGRATION_DATABASE_URL"
-
-	environmentAPIDatabaseURL      = "GAME_NIGHT_API_DATABASE_URL"
-	environmentRealtimeDatabaseURL = "GAME_NIGHT_REALTIME_DATABASE_URL"
-	environmentWorkerDatabaseURL   = "GAME_NIGHT_WORKER_DATABASE_URL"
+	environmentBinDirectory       = "GAME_NIGHT_BIN_DIRECTORY"
+	environmentShutdownTimeout    = "GAME_NIGHT_SHUTDOWN_TIMEOUT"
+	environmentHealthcheckURL     = "GAME_NIGHT_HEALTHCHECK_URL"
+	environmentHealthcheckTimeout = "GAME_NIGHT_HEALTHCHECK_TIMEOUT"
+	environmentDatabaseURL        = "GAME_NIGHT_DATABASE_URL"
+	environmentSecret             = "GAME_NIGHT_SECRET"
 
 	environmentAPIKeyringDirectory    = "GAME_NIGHT_API_KEYRING_DIRECTORY"
 	environmentWorkerKeyringDirectory = "GAME_NIGHT_WORKER_KEYRING_DIRECTORY"
@@ -53,6 +49,10 @@ const (
 	environmentAdminSessionKeyringFile   = "GAME_NIGHT_ADMIN_SESSION_KEYRING_FILE"
 	environmentAdminCursorKeyringFile    = "GAME_NIGHT_ADMIN_CURSOR_KEYRING_FILE"
 	environmentAuditKeyringFile          = "GAME_NIGHT_AUDIT_KEYRING_FILE"
+
+	environmentAPIRealtimeInternalToken = "GAME_NIGHT_API_REALTIME_INTERNAL_TOKEN"
+	environmentRealtimeInternalToken    = "GAME_NIGHT_REALTIME_INTERNAL_TOKEN"
+	environmentAdminHeartbeatToken      = "GAME_NIGHT_ADMIN_HEARTBEAT_TOKEN"
 )
 
 var (
@@ -60,13 +60,9 @@ var (
 	defaultShutdownTimeout = 30 * time.Second
 )
 
-// The launcher strips shared secret mounts first, then adds back only the minimal authority each child needs.
+// The launcher strips shared secret material first, then adds back only the minimal authority each child needs.
 var secretEnvironmentNames = []string{
-	environmentDatabaseURL,
-	environmentMigrationDatabaseURL,
-	environmentAPIDatabaseURL,
-	environmentRealtimeDatabaseURL,
-	environmentWorkerDatabaseURL,
+	environmentSecret,
 	environmentAPIKeyringDirectory,
 	environmentWorkerKeyringDirectory,
 	environmentAPIBootstrapSecretFile,
@@ -81,6 +77,9 @@ var secretEnvironmentNames = []string{
 	environmentAdminSessionKeyringFile,
 	environmentAdminCursorKeyringFile,
 	environmentAuditKeyringFile,
+	environmentAPIRealtimeInternalToken,
+	environmentRealtimeInternalToken,
+	environmentAdminHeartbeatToken,
 }
 
 type runtimeConfig struct {
@@ -324,19 +323,7 @@ func buildServeAllSpecs(environ []string, binDirectory string) ([]commandSpec, e
 		if err != nil {
 			return nil, err
 		}
-		childEnv := newChildEnvironment(base)
-		switch name {
-		case commandAPI:
-			applyDatabaseMapping(childEnv, base, environmentAPIDatabaseURL)
-			applyAPISecrets(childEnv, base)
-		case commandRealtime:
-			applyDatabaseMapping(childEnv, base, environmentRealtimeDatabaseURL)
-		case commandWorker:
-			applyDatabaseMapping(childEnv, base, environmentWorkerDatabaseURL)
-			applyWorkerSecrets(childEnv, base)
-		case commandEdge:
-			// Edge intentionally stays database-free in single-image mode.
-		}
+		childEnv := buildChildEnvironment(name, base)
 		specs = append(specs, commandSpec{name: name, path: path, env: childEnv.list()})
 	}
 	return specs, nil
@@ -347,7 +334,8 @@ func newProxyCommandSpec(name string, args []string, environ []string, binDirect
 	if err != nil {
 		return commandSpec{}, err
 	}
-	return commandSpec{name: name, path: path, args: append([]string(nil), args...), env: newEnvironment(environ).list()}, nil
+	base := newEnvironment(environ)
+	return commandSpec{name: name, path: path, args: append([]string(nil), args...), env: buildChildEnvironment(name, base).list()}, nil
 }
 
 func runHealthcheck(lookup sharedconfig.LookupEnv) error {
@@ -393,12 +381,6 @@ func resolveExecutable(binDirectory, name string) (string, error) {
 	return candidates[0], nil
 }
 
-func applyDatabaseMapping(child *environment, source environment, sourceName string) {
-	if value, ok := source.get(sourceName); ok && value != "" {
-		child.set(environmentDatabaseURL, value)
-	}
-}
-
 func applyAPISecrets(child *environment, source environment) {
 	directory, ok := source.get(environmentAPIKeyringDirectory)
 	if ok && directory != "" {
@@ -424,6 +406,34 @@ func applyWorkerSecrets(child *environment, source environment) {
 		child.set(environmentPIIKeyringFile, filepath.Join(directory, "pii.json"))
 		child.set(environmentTOTPKeyringFile, filepath.Join(directory, "totp.json"))
 		child.set(environmentAuditKeyringFile, filepath.Join(directory, "audit.json"))
+	}
+}
+
+// buildChildEnvironment removes launcher-only inputs and grants each child only its required keyring and token files.
+func buildChildEnvironment(name string, base environment) *environment {
+	child := newChildEnvironment(base)
+	switch name {
+	case commandAPI:
+		applyAPISecrets(child, base)
+		applyInternalToken(child, base, environmentAPIRealtimeInternalToken)
+		applyInternalToken(child, base, environmentAdminHeartbeatToken)
+	case commandRealtime:
+		applyInternalToken(child, base, environmentRealtimeInternalToken)
+		applyInternalToken(child, base, environmentAdminHeartbeatToken)
+	case commandWorker:
+		applyWorkerSecrets(child, base)
+		applyInternalToken(child, base, environmentAdminHeartbeatToken)
+	case commandEdge:
+		// Edge only serves HTTP and must not receive database credentials.
+		child.unset(environmentDatabaseURL)
+		applyInternalToken(child, base, environmentAdminHeartbeatToken)
+	}
+	return child
+}
+
+func applyInternalToken(child *environment, source environment, name string) {
+	if token, ok := source.get(name); ok && token != "" {
+		child.set(name, token)
 	}
 }
 

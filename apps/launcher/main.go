@@ -59,14 +59,30 @@ func run(
 	switch command {
 	case commandHealthcheck:
 		return runHealthcheck(lookup)
-	case commandAPI, commandRealtime, commandWorker, commandEdge, commandMigrate:
+	case commandMigrate:
 		spec, buildErr := newProxyCommandSpec(command, forwardedArgs, environ, config.binDirectory)
 		if buildErr != nil {
 			return commandError{message: buildErr.Error(), code: 1}
 		}
 		return runProxyCommand(ctx, spec, config.shutdownTimeout, streams, starter, signals)
+	case commandAPI, commandRealtime, commandWorker, commandEdge:
+		prepared, cleanup, prepareErr := prepareRuntimeSecrets(newEnvironment(environ))
+		if prepareErr != nil {
+			return commandError{message: prepareErr.Error(), code: 1}
+		}
+		defer cleanup()
+		spec, buildErr := newProxyCommandSpec(command, forwardedArgs, prepared.list(), config.binDirectory)
+		if buildErr != nil {
+			return commandError{message: buildErr.Error(), code: 1}
+		}
+		return runProxyCommand(ctx, spec, config.shutdownTimeout, streams, starter, signals)
 	case commandServeAll:
-		specs, buildErr := buildServeAllSpecs(environ, config.binDirectory)
+		prepared, cleanup, prepareErr := prepareRuntimeSecrets(newEnvironment(environ))
+		if prepareErr != nil {
+			return commandError{message: prepareErr.Error(), code: 1}
+		}
+		defer cleanup()
+		specs, buildErr := buildServeAllSpecs(prepared.list(), config.binDirectory)
 		if buildErr != nil {
 			return commandError{message: buildErr.Error(), code: 1}
 		}

@@ -20,18 +20,14 @@ import (
 	sharedconfig "github.com/iFTY-R/game-night/apps/internal/config"
 )
 
-func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
+func TestBuildServeAllSpecsSharesDatabaseAndScopesSecrets(t *testing.T) {
 	apiSecrets := filepath.Join(t.TempDir(), "api-secrets")
 	workerSecrets := filepath.Join(t.TempDir(), "worker-secrets")
 	specs, err := buildServeAllSpecs([]string{
-		environmentAPIDatabaseURL + "=postgres://api",
-		environmentRealtimeDatabaseURL + "=postgres://realtime",
-		environmentWorkerDatabaseURL + "=postgres://worker",
+		environmentDatabaseURL + "=postgres://shared",
 		environmentAPIKeyringDirectory + "=" + apiSecrets,
 		environmentWorkerKeyringDirectory + "=" + workerSecrets,
 		environmentAPIBootstrapSecretFile + "=" + filepath.Join(apiSecrets, "admin-bootstrap.txt"),
-		environmentDatabaseURL + "=postgres://should-not-leak",
-		environmentMigrationDatabaseURL + "=postgres://migration-should-not-leak",
 		environmentPIIKeyringFile + "=should-not-leak",
 	}, defaultBinDirectory)
 	if err != nil {
@@ -39,7 +35,7 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	}
 
 	apiEnv := environmentFromList(t, specs[0].env)
-	if apiEnv[environmentDatabaseURL] != "postgres://api" {
+	if apiEnv[environmentDatabaseURL] != "postgres://shared" {
 		t.Fatalf("api database mapping = %q", apiEnv[environmentDatabaseURL])
 	}
 	if apiEnv[environmentPIIKeyringFile] != filepath.Join(apiSecrets, "pii.json") ||
@@ -51,26 +47,16 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	if apiEnv[environmentAdminBootstrapSecretFile] != filepath.Join(apiSecrets, "admin-bootstrap.txt") {
 		t.Fatalf("api bootstrap mapping = %q", apiEnv[environmentAdminBootstrapSecretFile])
 	}
-	if _, leaked := apiEnv[environmentAPIDatabaseURL]; leaked {
-		t.Fatal("api retained process-specific database environment")
-	}
-	if _, leaked := apiEnv[environmentMigrationDatabaseURL]; leaked {
-		t.Fatal("api retained migration database environment")
-	}
-
 	realtimeEnv := environmentFromList(t, specs[1].env)
-	if realtimeEnv[environmentDatabaseURL] != "postgres://realtime" {
+	if realtimeEnv[environmentDatabaseURL] != "postgres://shared" {
 		t.Fatalf("realtime database mapping = %q", realtimeEnv[environmentDatabaseURL])
 	}
 	if _, leaked := realtimeEnv[environmentPIIKeyringFile]; leaked {
 		t.Fatal("realtime inherited secret keyring material")
 	}
-	if _, leaked := realtimeEnv[environmentMigrationDatabaseURL]; leaked {
-		t.Fatal("realtime retained migration database environment")
-	}
 
 	workerEnv := environmentFromList(t, specs[2].env)
-	if workerEnv[environmentDatabaseURL] != "postgres://worker" {
+	if workerEnv[environmentDatabaseURL] != "postgres://shared" {
 		t.Fatalf("worker database mapping = %q", workerEnv[environmentDatabaseURL])
 	}
 	if workerEnv[environmentPIIKeyringFile] != filepath.Join(workerSecrets, "pii.json") ||
@@ -83,16 +69,54 @@ func TestBuildServeAllSpecsMapsDedicatedEnvironment(t *testing.T) {
 	if _, leaked := workerEnv[environmentAdminCursorKeyringFile]; leaked {
 		t.Fatal("worker received admin cursor keyring material")
 	}
-	if _, leaked := workerEnv[environmentMigrationDatabaseURL]; leaked {
-		t.Fatal("worker retained migration database environment")
-	}
 
 	edgeEnv := environmentFromList(t, specs[3].env)
 	if _, mapped := edgeEnv[environmentDatabaseURL]; mapped {
 		t.Fatal("edge unexpectedly received a database url")
 	}
-	if _, leaked := edgeEnv[environmentMigrationDatabaseURL]; leaked {
-		t.Fatal("edge retained migration database environment")
+}
+
+func TestPrepareRuntimeSecretsDerivesScopedFilesAndTokens(t *testing.T) {
+	secret := strings.Repeat("s", minimumRuntimeSecretLength)
+	prepared, cleanup, err := prepareRuntimeSecrets(newEnvironment([]string{environmentSecret + "=" + secret}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(cleanup)
+	directory, ok := prepared.get(environmentAPIKeyringDirectory)
+	if !ok || directory == "" {
+		t.Fatalf("runtime keyring directory = %q", directory)
+	}
+	for _, filename := range []string{"pii.json", "totp.json", "audit.json", "admin-bootstrap.txt"} {
+		info, err := os.Stat(filepath.Join(directory, filename))
+		if err != nil {
+			t.Fatalf("stat %s: %v", filename, err)
+		}
+		if runtime.GOOS == "windows" {
+			if info.Mode().Perm()&0o222 != 0 {
+				t.Fatalf("%s mode = %o, expected read-only", filename, info.Mode().Perm())
+			}
+		} else if info.Mode().Perm() != 0o400 {
+			t.Fatalf("%s mode = %o, want 400", filename, info.Mode().Perm())
+		}
+	}
+	if token, ok := prepared.get(environmentAdminHeartbeatToken); !ok || len(token) < minimumRuntimeSecretLength {
+		t.Fatalf("derived heartbeat token = %q", token)
+	}
+	child := buildChildEnvironment(commandAPI, prepared)
+	if _, leaked := child.get(environmentSecret); leaked {
+		t.Fatal("child retained deployment master secret")
+	}
+	if _, leaked := child.get(environmentAPIKeyringDirectory); leaked {
+		t.Fatal("child retained launcher keyring directory")
+	}
+}
+
+func TestPrepareRuntimeSecretsRejectsShortSecret(t *testing.T) {
+	secret := "too-short"
+	_, _, err := prepareRuntimeSecrets(newEnvironment([]string{environmentSecret + "=" + secret}))
+	if err == nil || !strings.Contains(err.Error(), environmentSecret) || strings.Contains(err.Error(), secret) {
+		t.Fatalf("short secret error = %v", err)
 	}
 }
 

@@ -126,15 +126,13 @@ func NewHandler(cfg config.Config, logger *slog.Logger) (http.Handler, error) {
 
 func newHandler(cfg config.Config, logger *slog.Logger) (*handler, error) {
 	if logger == nil || cfg.APIUpstreamURL == nil || cfg.RealtimeUpstreamURL == nil || cfg.UserStaticDirectory == "" ||
-		cfg.AdminStaticDirectory == "" || len(cfg.UserHosts) == 0 || len(cfg.AdminHosts) == 0 || len(cfg.TrustedProxyCIDRs) == 0 ||
+		cfg.AdminStaticDirectory == "" || len(cfg.TrustedProxyCIDRs) == 0 ||
 		cfg.InstanceID == "" {
 		return nil, errInvalidServer
 	}
 	return &handler{
 		logger:        logger,
 		cfg:           cfg,
-		userHosts:     hostSet(cfg.UserHosts),
-		adminHosts:    hostSet(cfg.AdminHosts),
 		apiProxy:      newProxy(cfg.APIUpstreamURL, cfg.TrustedProxyCIDRs, logger, "api", true, cfg),
 		realtimeProxy: newProxy(cfg.RealtimeUpstreamURL, cfg.TrustedProxyCIDRs, logger, "realtime", false, cfg),
 		healthClient: &http.Client{
@@ -189,8 +187,6 @@ func newHeartbeatReporter(cfg config.Config, handler *handler) (*serviceheartbea
 type handler struct {
 	logger        *slog.Logger
 	cfg           config.Config
-	userHosts     map[string]struct{}
-	adminHosts    map[string]struct{}
 	apiProxy      *httputil.ReverseProxy
 	realtimeProxy *httputil.ReverseProxy
 	healthClient  *http.Client
@@ -507,21 +503,16 @@ func (h *handler) surfaceForHost(host string) surfaceClass {
 	if err != nil {
 		return unknownSurface
 	}
-	if _, ok := h.userHosts[authority]; ok {
-		return userSurface
+	parsed, err := url.Parse("//" + authority)
+	if err != nil || parsed.Hostname() == "" {
+		return unknownSurface
 	}
-	if _, ok := h.adminHosts[authority]; ok {
+	// A single edge instance serves both surfaces. The admin subdomain is the only routing convention;
+	// every other valid authority is treated as the player surface.
+	if strings.HasPrefix(strings.ToLower(parsed.Hostname()), "admin.") {
 		return adminSurface
 	}
-	return unknownSurface
-}
-
-func hostSet(values []string) map[string]struct{} {
-	set := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		set[value] = struct{}{}
-	}
-	return set
+	return userSurface
 }
 
 func stopHeartbeat(cancel context.CancelFunc, done <-chan struct{}, timeout time.Duration) {

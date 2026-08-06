@@ -56,7 +56,7 @@ func TestCoordinatorEnforcesMountedSecretLifecycle(t *testing.T) {
 		t.Fatalf("setup-required mounted check: %v", err)
 	}
 	service.state = admin.SetupStateActive
-	if err := coordinator.Check(t.Context()); !errors.Is(err, admin.ErrBootstrapSecretMismatch) {
+	if err := coordinator.Check(t.Context()); err != nil {
 		t.Fatalf("active mounted check error = %v", err)
 	}
 }

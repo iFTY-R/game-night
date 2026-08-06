@@ -72,9 +72,6 @@ $runtimeEnvironment = @{
   GAME_NIGHT_EDGE_REALTIME_UPSTREAM_URL = "http://127.0.0.1:8090"
   GAME_NIGHT_EDGE_USER_STATIC_DIRECTORY = (Join-Path $root "apps\web\dist")
   GAME_NIGHT_EDGE_ADMIN_STATIC_DIRECTORY = (Join-Path $root "apps\admin\dist")
-  GAME_NIGHT_EDGE_USER_HOSTS = "localhost:8080,127.0.0.1:8080"
-  GAME_NIGHT_EDGE_ADMIN_HOSTS = "admin.localhost:8080"
-  GAME_NIGHT_EDGE_TRUSTED_PROXY_CIDRS = "127.0.0.1/32,::1/128"
   GAME_NIGHT_WORKER_INSTANCE_ID = "local-worker"
 }
 

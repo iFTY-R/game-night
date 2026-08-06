@@ -112,6 +112,50 @@ func TestPrepareRuntimeSecretsDerivesScopedFilesAndTokens(t *testing.T) {
 	}
 }
 
+func TestPreparedServeAllEnvironmentPropagatesDatabaseAndTokens(t *testing.T) {
+	secret := strings.Repeat("s", minimumRuntimeSecretLength)
+	prepared, cleanup, err := prepareRuntimeSecrets(newEnvironment([]string{
+		environmentDatabaseURL + "=postgres://shared",
+		environmentSecret + "=" + secret,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(cleanup)
+
+	specs, err := buildServeAllSpecs(prepared.list(), defaultBinDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, spec := range specs {
+		child := environmentFromList(t, spec.env)
+		if _, leaked := child[environmentSecret]; leaked {
+			t.Fatalf("%s retained deployment master secret", spec.name)
+		}
+		if child[environmentAdminHeartbeatToken] == "" {
+			t.Fatalf("%s is missing the derived heartbeat token", spec.name)
+		}
+		if spec.name == commandEdge {
+			if _, leaked := child[environmentDatabaseURL]; leaked {
+				t.Fatal("edge unexpectedly received a database url")
+			}
+			continue
+		}
+		if child[environmentDatabaseURL] != "postgres://shared" {
+			t.Fatalf("%s database url = %q", spec.name, child[environmentDatabaseURL])
+		}
+	}
+
+	api := environmentFromList(t, specs[0].env)
+	if api[environmentAPIRealtimeInternalToken] == "" {
+		t.Fatal("api is missing the derived realtime token")
+	}
+	realtime := environmentFromList(t, specs[1].env)
+	if realtime[environmentRealtimeInternalToken] == "" {
+		t.Fatal("realtime is missing the derived internal token")
+	}
+}
+
 func TestPrepareRuntimeSecretsRejectsShortSecret(t *testing.T) {
 	secret := "too-short"
 	_, _, err := prepareRuntimeSecrets(newEnvironment([]string{environmentSecret + "=" + secret}))

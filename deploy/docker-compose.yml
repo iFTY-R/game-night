@@ -13,8 +13,9 @@ services:
   # 单体拓扑：API、实时服务、worker、迁移和边缘网关由同一个镜像拉起，
   # 适合开发环境、小型自托管环境，或先验证部署链路的场景。
   game-night:
-    # 生产环境建议显式固定 GAME_NIGHT_IMAGE，避免重新部署时意外拉取 latest。
-    image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:latest}
+    # 固定默认版本并在每次部署时检查远端镜像，避免 1Panel 复用不兼容的 latest 缓存。
+    image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:v0.0.7}
+    pull_policy: always
     # 固定容器名可以让日志、exec 和运维手册中的命令保持稳定。
     container_name: game-night
     # serve-all 会同时托管所有服务端角色；除非拆分下面的环境变量块，

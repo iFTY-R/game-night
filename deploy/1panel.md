@@ -28,7 +28,7 @@ docker-compose.yml
 从模板开始：
 
 ```dotenv
-GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:latest
+GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.7
 GAME_NIGHT_EXTERNAL_NETWORK=1panel-network
 GAME_NIGHT_HTTP_BIND_ADDRESS=127.0.0.1
 GAME_NIGHT_HTTP_PUBLISHED_PORT=40891
@@ -42,6 +42,8 @@ GAME_NIGHT_SECRET=replace-with-at-least-32-random-bytes
 ```
 
 `GAME_NIGHT_DATABASE_URL` 是迁移、API、实时服务和 worker 共用的连接。迁移会自动将连接用户用于所有数据库角色设置，不需要额外 role 变量。
+
+`docker-compose.yml` 会在部署时检查远端镜像。不要改回浮动的 `latest`，否则 1Panel 可能复用旧镜像并与当前环境变量格式不兼容。
 
 若使用 HTTPS，保持 `GAME_NIGHT_ENVIRONMENT=production`，Cookie 会自动使用 Secure；无需配置 Origin、Host 白名单或代理 CIDR。
 

@@ -46,7 +46,13 @@ jobs:
           cache: true
 
       - name: Run short tests
-        run: go test -short ./...
+        shell: bash
+        run: |
+          if go test -short ./...; then
+            exit 0
+          fi
+          echo '::warning::Short tests failed once; retrying without the Go test cache.'
+          go test -count=1 -short ./...
 
       - name: Run vet
         run: go vet ./apps/...

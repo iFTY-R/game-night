@@ -28,7 +28,7 @@ docker-compose.yml
 从模板开始：
 
 ```dotenv
-GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.9
+GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.10
 GAME_NIGHT_EXTERNAL_NETWORK=1panel-network
 GAME_NIGHT_HTTP_BIND_ADDRESS=127.0.0.1
 GAME_NIGHT_HTTP_PUBLISHED_PORT=40891

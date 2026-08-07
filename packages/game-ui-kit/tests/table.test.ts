@@ -318,8 +318,8 @@ describe("GameTable", () => {
 
     await wrapper.get(".gn-seat__card").trigger("click");
     expect(wrapper.get(".gn-seat__card").attributes("aria-expanded")).toBe("true");
-    expect(wrapper.get(".gn-seat__details").text()).toContain("房主 · 已入座");
-    expect(wrapper.get(".gn-seat__details").text()).toContain("已入座");
+    expect(wrapper.get(".gn-seat__details").text()).not.toContain("房主 · 已入座");
+    expect(wrapper.get(".gn-seat__details").findAll("li").map((item) => item.text())).toEqual(["房主", "已入座", "你的座位"]);
 
     await wrapper.get(".gn-seat__card").trigger("keydown", { key: "Escape" });
     expect(wrapper.find(".gn-seat__details").exists()).toBe(false);

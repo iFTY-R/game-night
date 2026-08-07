@@ -52,7 +52,8 @@ const roleInfoItems = computed(() => normalizeInfoItems([
   props.seat.connected ? "" : "已断线",
   turnStatusText.value,
 ]));
-const detailItems = computed(() => normalizeInfoItems([statusText.value, ...statusItems.value, ...roleInfoItems.value]));
+// Explicit status items already carry the complete status breakdown; adding the composite status here duplicated the same labels in the popover.
+const detailItems = computed(() => normalizeInfoItems([...statusItems.value, ...roleInfoItems.value]));
 const detailId = computed(() => `gn-seat-info-${props.seat.userId.replace(/[^a-zA-Z0-9_-]/g, "-")}-${props.seat.seatIndex}`);
 const detailHint = computed(() => detailItems.value.length > 1 ? "点击查看完整信息" : "点击查看状态");
 

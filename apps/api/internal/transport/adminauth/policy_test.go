@@ -242,7 +242,7 @@ func TestAdminRoomPoliciesSeparateReadControlAndRepairElevation(t *testing.T) {
 		t.Fatalf("set admission policy = %+v", setAdmission)
 	}
 	forceClose := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceForceCloseRoomProcedure)
-	if forceClose.permission != admin.PermissionRoomsControl || !forceClose.requiresRequestID || forceClose.elevation != admin.ElevationScopeRoomsForceClose {
+	if forceClose.permission != admin.PermissionRoomsControl || !forceClose.requiresRequestID || forceClose.elevation != "" {
 		t.Fatalf("force close policy = %+v", forceClose)
 	}
 	terminate := requireProcedurePolicy(t, adminv1connect.AdminRoomServiceForceTerminateGameProcedure)

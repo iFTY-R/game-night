@@ -288,7 +288,7 @@ var procedurePolicies = map[string]procedurePolicy{
 		adminv1connect.AdminRoomServiceRemoveRoomMemberProcedure, admin.PermissionRoomsControl, true, "",
 	),
 	adminv1connect.AdminRoomServiceForceCloseRoomProcedure: adminRoomProcedurePolicy(
-		adminv1connect.AdminRoomServiceForceCloseRoomProcedure, admin.PermissionRoomsControl, true, admin.ElevationScopeRoomsForceClose,
+		adminv1connect.AdminRoomServiceForceCloseRoomProcedure, admin.PermissionRoomsControl, true, "",
 	),
 	adminv1connect.AdminRoomServiceForceTerminateGameProcedure: adminRoomProcedurePolicy(
 		adminv1connect.AdminRoomServiceForceTerminateGameProcedure, admin.PermissionGamesControl, true, admin.ElevationScopeGamesForceTerminate,

@@ -12,7 +12,7 @@ Copy-Item deploy/.env.example deploy/.env
 
 至少填写 `GAME_NIGHT_DATABASE_URL`、`GAME_NIGHT_REDIS_URL` 和长度不小于 32 字节的 `GAME_NIGHT_SECRET`。直接通过 HTTP 访问时使用 `GAME_NIGHT_ENVIRONMENT=development`，启用 HTTPS 后改为 `production`。launcher 会从主密钥在容器临时目录生成用途隔离的 keyring 和内部通信 token，不需要 `secrets/` 目录或 secret 文件。
 
-镜像默认固定为与本配置兼容的 `v0.0.10`，Compose 每次部署都会检查远端镜像，避免复用旧的 `latest` 缓存。
+镜像默认固定为与本配置兼容的 `v0.0.11`，Compose 每次部署都会检查远端镜像，避免复用旧的 `latest` 缓存。
 
 ## 启动
 

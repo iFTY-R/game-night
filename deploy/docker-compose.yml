@@ -14,7 +14,7 @@ services:
   # 适合开发环境、小型自托管环境，或先验证部署链路的场景。
   game-night:
     # 固定默认版本并在每次部署时检查远端镜像，避免 1Panel 复用不兼容的 latest 缓存。
-    image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:v0.0.10}
+    image: ${GAME_NIGHT_IMAGE:-ghcr.io/ifty-r/game-night:v0.0.11}
     pull_policy: always
     # 固定容器名可以让日志、exec 和运维手册中的命令保持稳定。
     container_name: game-night

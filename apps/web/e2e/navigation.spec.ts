@@ -28,7 +28,7 @@ test("invite deep link carries the room code through first-time identity setup",
       body: JSON.stringify({ code: "unauthenticated", message: "identity.missing" }),
     });
   });
-  await page.route("**/platform.identity.v1.IdentityService/BeginBootstrap", async (route) => {
+  await page.route("**/platform.identity.v1.IdentityService/BeginIdentityBootstrap", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -417,9 +417,10 @@ test("creating a public room preserves the selected game", async ({ page }) => {
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /789.*两颗骰子/ }).click();
-  await page.getByRole("button", { name: "公开大厅" }).click();
   await page.getByRole("button", { name: "创建789房间" }).click();
+  const createDialog = page.getByRole("dialog", { name: "789" });
+  await expect(createDialog).toBeVisible();
+  await createDialog.getByRole("button", { name: "公开房间", exact: true }).click();
 
   await expect.poll(() => createBody).toMatchObject({ visibility: "ROOM_VISIBILITY_PUBLIC" });
   await expect.poll(() => selectBody).toMatchObject({
@@ -428,7 +429,6 @@ test("creating a public room preserves the selected game", async ({ page }) => {
     expectedVersion: { roomVersion: "7", membershipVersion: "3" },
   });
   await expect(page).toHaveURL(new RegExp(`/room/${createdRoomId}\\?game=dice-789$`));
-  await expect(page.getByRole("button", { name: /789.*两颗骰子/ })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("room polling renders newly joined members without reloading the host page", async ({ page }) => {
@@ -471,6 +471,9 @@ test("room polling renders newly joined members without reloading the host page"
 
   await page.goto("/");
   await page.getByRole("button", { name: "创建吹牛骰子房间" }).click();
+  const createDialog = page.getByRole("dialog", { name: "吹牛骰子" });
+  await expect(createDialog).toBeVisible();
+  await createDialog.getByRole("button", { name: "仅邀请", exact: true }).click();
 
   await expect(page).toHaveURL(new RegExp(`/room/${createdRoomId}\\?game=liars-dice$`));
   await expect(page.locator(".member-row__copy strong")).toHaveText(["阿青", "小满"], { timeout: 7_000 });

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ArrowRight, Crown, Dices, DoorOpen, Eye, Globe2, LockKeyhole, RefreshCw, ShieldCheck, Users, X } from "lucide-vue-next";
+import { ArrowRight, Crown, Dices, DoorOpen, Eye, Globe2, RefreshCw, ShieldCheck, Users, X } from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { ApiError, type MyRoomCardWire, type PublicRoomCardWire, type RoomSnapshot } from "../api/client";
+import CreateRoomDialog, { type CreateRoomDialogHandle, type RoomVisibility } from "../components/CreateRoomDialog.vue";
 import ProfileTrigger from "../components/ProfileTrigger.vue";
 import UsernameDialog, { type UsernameChangedEvent, type UsernameDialogHandle } from "../components/UsernameDialog.vue";
 import { gameById, gameCatalog, type GameId } from "../game-catalog";
@@ -31,13 +32,16 @@ const pendingRoomEntry = ref<PendingRoomEntry | null>(null);
 const roomUsernameConflict = ref(false);
 const roomEntryPending = ref(false);
 const usernameDialog = ref<UsernameDialogHandle | null>(null);
+const createRoomDialog = ref<CreateRoomDialogHandle | null>(null);
 const conflictAction = ref<HTMLButtonElement | null>(null);
 const ready = computed(() => room.hasIdentity);
 const usernameValidation = computed(() => validateUsernameInput(displayName.value));
 const usernameInvalid = computed(() => displayName.value.length > 0 && !usernameValidation.value.isValid);
 const canSubmitIdentity = computed(() => usernameValidation.value.isValid && !room.busy);
+// The selected game is the target of the currently opened creation dialog, not a persistent card selection.
 const selectedGameId = ref<GameId>("liars-dice");
-const newRoomVisibility = ref<"ROOM_VISIBILITY_PRIVATE" | "ROOM_VISIBILITY_PUBLIC">("ROOM_VISIBILITY_PRIVATE");
+const creatingRoom = ref(false);
+const createRoomError = ref("");
 const selectedGame = computed(() => gameById(selectedGameId.value) ?? gameCatalog[0]);
 
 const saveIdentity = async (): Promise<boolean> => {
@@ -136,10 +140,20 @@ const joinRoom = async (): Promise<void> => {
   await enterRoom(code);
 };
 
-const createRoom = async (): Promise<void> => {
+/** Binds room creation to the game whose local action the user selected. */
+const openCreateRoomDialog = (gameId: GameId): void => {
+  selectedGameId.value = gameId;
+  createRoomError.value = "";
+  createRoomDialog.value?.open();
+};
+
+const createRoom = async (visibility: RoomVisibility): Promise<void> => {
+  if (creatingRoom.value) return;
+  creatingRoom.value = true;
+  createRoomError.value = "";
   try {
     if (!room.hasIdentity && !(await saveIdentity())) return;
-    const created = await room.createRemoteRoom(newRoomVisibility.value);
+    const created = await room.createRemoteRoom(visibility);
     // CreateRoom starts from the platform default; commit the card selected on
     // the discovery screen before any member can observe a different table.
     const selected = created.selectedGameId === selectedGameId.value
@@ -151,7 +165,9 @@ const createRoom = async (): Promise<void> => {
     room.setRemoteRoom(selected);
     await router.push({ name: "room", params: { roomId }, query: { game: selectedGameId.value } });
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : "创建房间失败";
+    createRoomError.value = reason instanceof Error ? reason.message : "创建房间失败";
+  } finally {
+    creatingRoom.value = false;
   }
 };
 
@@ -323,16 +339,26 @@ onMounted(async () => {
       <section class="game-shelf" aria-labelledby="games-title">
         <div class="section-heading"><div><p class="eyebrow">游戏桌</p><h2 id="games-title" class="section-title">今晚玩什么</h2></div><span class="muted">{{ gameCatalog.length }} 款</span></div>
         <div class="game-list">
-          <button v-for="game in gameCatalog" :key="game.gameId" class="game-card" :class="{ 'is-selected': selectedGameId === game.gameId }" type="button" :aria-pressed="selectedGameId === game.gameId" @click="selectedGameId = game.gameId">
+          <article v-for="game in gameCatalog" :key="game.gameId" class="game-card">
             <span class="game-card__accent">{{ game.accent }}</span>
-            <span><strong>{{ game.name }}</strong><small>{{ game.summary }}</small></span>
-            <em>至少 {{ game.minimumPlayers }} 人</em>
-          </button>
+            <span class="game-card__copy">
+              <span class="game-card__name"><strong>{{ game.name }}</strong><em>至少 {{ game.minimumPlayers }} 人</em></span>
+              <small>{{ game.summary }}</small>
+            </span>
+            <button
+              class="button button--quiet game-card__create"
+              type="button"
+              :aria-label="`创建${game.name}房间`"
+              @click="openCreateRoomDialog(game.gameId)"
+            >
+              <Dices :size="16" aria-hidden="true" /> 创建房间
+            </button>
+          </article>
         </div>
       </section>
 
       <section class="join-panel panel" aria-labelledby="join-title">
-        <div><p class="eyebrow">晚上好，{{ room.displayName }}</p><h2 id="join-title" class="section-title">加入或创建房间</h2></div>
+        <div><p class="eyebrow">晚上好，{{ room.displayName }}</p><h2 id="join-title" class="section-title">加入房间</h2></div>
         <form class="entry-form" @submit.prevent="joinRoom">
           <label for="room-code">房间码</label>
           <div class="field-row">
@@ -340,13 +366,6 @@ onMounted(async () => {
             <button class="button" type="submit" :disabled="roomEntryPending"><DoorOpen :size="18" aria-hidden="true" /> 进房</button>
           </div>
         </form>
-        <div class="create-row">
-          <div class="visibility-control" role="group" aria-label="新房间可见范围">
-            <button type="button" :aria-pressed="newRoomVisibility === 'ROOM_VISIBILITY_PRIVATE'" @click="newRoomVisibility = 'ROOM_VISIBILITY_PRIVATE'"><LockKeyhole :size="16" aria-hidden="true" /> 仅邀请</button>
-            <button type="button" :aria-pressed="newRoomVisibility === 'ROOM_VISIBILITY_PUBLIC'" @click="newRoomVisibility = 'ROOM_VISIBILITY_PUBLIC'"><Globe2 :size="16" aria-hidden="true" /> 公开大厅</button>
-          </div>
-          <button class="button create-button" type="button" @click="createRoom"><Dices :size="18" aria-hidden="true" /> 创建{{ selectedGame.name }}房间</button>
-        </div>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
       </section>
 
@@ -371,6 +390,13 @@ onMounted(async () => {
     </template>
 
     <UsernameDialog ref="usernameDialog" @changed="handleUsernameChanged" />
+    <CreateRoomDialog
+      ref="createRoomDialog"
+      :game-name="selectedGame.name"
+      :pending="creatingRoom"
+      :error="createRoomError"
+      @choose="createRoom"
+    />
   </main>
 </template>
 
@@ -412,19 +438,15 @@ onMounted(async () => {
 .room-card__meta { display: grid; justify-items: end; gap: 4px; }
 .room-card__meta em { color: #99d8b1; font-size: 11px; font-style: normal; }
 .room-card__meta small { color: var(--platform-muted); font-size: 11px; }
-.game-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.game-card { position: relative; min-height: 112px; display: grid; grid-template-columns: 40px minmax(0, 1fr); align-content: center; gap: 8px 12px; padding: 14px; color: var(--platform-ink); text-align: left; background: rgb(27 41 45 / 66%); border: 1px solid rgb(168 181 180 / 16%); border-radius: 8px; }
-.game-card.is-selected { background: rgb(48 52 42 / 86%); border-color: var(--platform-accent); box-shadow: inset 0 0 0 1px rgb(230 181 102 / 22%); }
-.game-card__accent { grid-row: span 2; width: 40px; height: 40px; display: grid; place-items: center; color: #171b1a; background: var(--platform-accent); border-radius: 50%; font-family: var(--font-display); font-weight: 900; }
-.game-card > span:nth-child(2) { min-width: 0; display: grid; gap: 5px; }
+.game-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.game-card { min-height: 92px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 13px 14px; color: var(--platform-ink); background: rgb(27 41 45 / 66%); border: 1px solid rgb(168 181 180 / 16%); border-radius: 8px; }
+.game-card__accent { width: 40px; height: 40px; display: grid; place-items: center; color: #171b1a; background: var(--platform-accent); border-radius: 50%; font-family: var(--font-display); font-weight: 900; }
+.game-card__copy { min-width: 0; display: grid; gap: 6px; }
+.game-card__name { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .game-card strong { font-size: 15px; }
 .game-card small { overflow: hidden; color: var(--platform-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.game-card em { grid-column: 2; color: var(--platform-accent); font-size: 10px; font-style: normal; }
-.create-row { display: grid; grid-template-columns: minmax(240px, 1fr) auto; gap: 10px; }
-.visibility-control { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; background: rgb(8 18 19 / 48%); border: 1px solid rgb(168 181 180 / 22%); border-radius: 7px; }
-.visibility-control button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: var(--platform-muted); background: transparent; border: 0; border-radius: 5px; }
-.visibility-control button[aria-pressed="true"] { color: #171b1a; background: var(--platform-accent); }
-.create-button { min-width: 210px; }
+.game-card em { flex: 0 0 auto; color: var(--platform-accent); font-size: 10px; font-style: normal; }
+.game-card__create { min-width: 108px; min-height: 42px; padding: 0 12px; white-space: nowrap; }
 .public-room-list { display: grid; gap: 8px; }
 .public-room-card { min-height: 72px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto minmax(120px, auto); align-items: center; gap: 11px; padding: 11px 12px; background: rgb(27 41 45 / 64%); border: 1px solid rgb(168 181 180 / 16%); border-radius: 8px; }
 .public-room-card__count { display: inline-flex; align-items: center; gap: 5px; color: var(--platform-muted); font-size: 11px; }
@@ -434,9 +456,6 @@ onMounted(async () => {
 @media (max-width: 720px) {
   .my-room-grid,
   .game-list { grid-template-columns: 1fr; }
-  .game-card { min-height: 82px; }
-  .create-row { grid-template-columns: 1fr; }
-  .create-button { width: 100%; }
   .public-room-card { grid-template-columns: 40px minmax(0, 1fr) auto; }
   .public-room-card .button { grid-column: 2 / 4; width: 100%; }
 }
@@ -448,6 +467,9 @@ onMounted(async () => {
   .username-conflict .button { width: 100%; }
   .my-room-card { grid-template-columns: 36px minmax(0, 1fr) auto; }
   .room-card__icon { width: 36px; height: 36px; }
-  .visibility-control { grid-template-columns: 1fr; }
+  .game-card { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 9px; padding: 11px; }
+  .game-card__accent { width: 36px; height: 36px; font-size: 13px; }
+  .game-card__name { display: grid; gap: 2px; }
+  .game-card__create { min-width: 98px; padding: 0 9px; }
 }
 </style>

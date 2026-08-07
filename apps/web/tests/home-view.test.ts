@@ -98,6 +98,22 @@ afterEach(() => {
 });
 
 describe("HomeView profile and room-entry recovery", () => {
+  it("opens room visibility from the selected game's create action", async () => {
+    const { app, root } = await mountHomeView();
+
+    root.querySelector<HTMLButtonElement>('[aria-label="创建789房间"]')?.click();
+    await nextTick();
+    expect(roomStore.createRemoteRoom).not.toHaveBeenCalled();
+    expect(document.body.querySelector(".create-room-dialog")?.hasAttribute("open")).toBe(true);
+    expect(document.body.querySelector(".create-room-dialog")?.textContent).toContain("789");
+
+    buttonByText(document.body, "公开房间")?.click();
+    await vi.waitFor(() => expect(roomStore.createRemoteRoom).toHaveBeenCalledWith("ROOM_VISIBILITY_PUBLIC"));
+    expect(roomStore.selectRemoteGame).toHaveBeenCalledWith("dice-789");
+
+    app.unmount();
+  });
+
   it("limits onboarding username input to four characters", async () => {
     Object.assign(roomStore, { userId: "", displayName: "", hasIdentity: false, identityState: "anonymous" });
     const { app, root } = await mountHomeView();

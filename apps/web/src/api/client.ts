@@ -315,7 +315,7 @@ declare global {
 }
 
 const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
-const userCSRFName = "__Host-gn_csrf";
+const userCSRFName = "gn_csrf";
 const localizedErrorMessages: Record<string, string> = {
   "identity.device.invalid": "设备登录已失效，请重新设置用户名",
   "identity.device.revoked": "这台设备的登录已失效，请重新设置用户名",
@@ -342,6 +342,22 @@ const requestID = (): string => {
     return crypto.randomUUID();
   }
   return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const rawBase64URL = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+
+/** Creates the canonical 128-bit idempotency selector required by mutation APIs. */
+export const createOperationID = (): string => {
+  const candidate = requestID().replaceAll("-", "");
+  if (/^[0-9a-f]{32}$/iu.test(candidate)) {
+    const bytes = Uint8Array.from({ length: 16 }, (_, index) => Number.parseInt(candidate.slice(index * 2, index * 2 + 2), 16));
+    return rawBase64URL(bytes);
+  }
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    return rawBase64URL(crypto.getRandomValues(new Uint8Array(16)));
+  }
+  throw new Error("浏览器未提供安全随机数，无法发起请求。");
 };
 
 const readCookie = (name: string): string | undefined => {
@@ -570,7 +586,7 @@ export const identityClient = {
     return call("platform.identity.v1.IdentityService", "BootstrapIdentity", { challengeProof, operationId, deviceLabel: "Game Night 浏览器" }, true, { "X-Request-Flow-ID": requestFlowId });
   },
   completeOnboarding(username: string): Promise<IdentityResponse> {
-    return call("platform.identity.v1.IdentityService", "CompleteOnboarding", { username, operationId: requestID() }, true);
+    return call("platform.identity.v1.IdentityService", "CompleteOnboarding", { username, operationId: createOperationID() }, true);
   },
   current(): Promise<IdentityResponse> {
     return call("platform.identity.v1.IdentityService", "GetCurrentIdentity", {});
@@ -620,7 +636,7 @@ export const roomClient = {
     }, true);
   },
   async selectRoomGame(room: RoomSnapshot, gameId: string): Promise<RoomResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const version = currentRuleVersion(room);
     return callRoom("SelectRoomGame", {
       roomId: room.roomId,
@@ -640,7 +656,7 @@ export const roomClient = {
     if (!config) {
       throw new Error("invalid game config");
     }
-    const operationId = requestID();
+    const operationId = createOperationID();
     const version = currentRuleVersion(room);
     const normalizedConfig = configDigestInput(gameId, config);
     return callRoom("UpdateGameConfig", {
@@ -672,7 +688,7 @@ export const roomClient = {
     mode: GameRulePresetWriteMode;
     expectedPresetRevision: string | number | bigint | undefined;
   }): Promise<GameRulePresetResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const expectedPresetRevision = input.expectedPresetRevision ?? "0";
     const presetId = input.presetId ?? "";
     const normalizedConfig = configDigestInput(input.gameId, input.config);
@@ -696,7 +712,7 @@ export const roomClient = {
     }, true);
   },
   async deleteGameRulePreset(presetId: string, expectedPresetRevision: string | number | bigint): Promise<DeleteGameRulePresetResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     return call("platform.room.v1.RoomService", "DeleteGameRulePreset", {
       presetId,
       expectedPresetRevision: String(expectedPresetRevision),
@@ -705,7 +721,7 @@ export const roomClient = {
     }, true);
   },
   async beginGameStart(room: RoomSnapshot, gameId: string, configRevision: string | number | bigint = "0"): Promise<RoomResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const version = currentRuleVersion(room);
     return callRoom("BeginGameStart", {
       roomId: room.roomId,
@@ -724,7 +740,7 @@ export const roomClient = {
     }, true);
   },
   async cancelGameStart(room: RoomSnapshot, pendingStart: PendingGameStartWire): Promise<RoomResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const version = currentRuleVersion(room);
     const pendingStartId = pendingStart.pendingStartId;
     const cancelToken = pendingStart.cancelToken;
@@ -753,7 +769,7 @@ export const roomClient = {
     gameId = "liars-dice",
     configRevision?: string | number | bigint,
   ): Promise<RoomResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const pendingStart = room.pendingStart?.gameId === gameId ? room.pendingStart : undefined;
     const draft = pendingStart ? draftForGame(room, gameId) : undefined;
     const startConfigRevision = configRevision ?? (pendingStart && draft?.config ? pendingStart.configRevision ?? "0" : "0");
@@ -795,7 +811,7 @@ export const roomClient = {
     }, true);
   },
   async finishGame(room: RoomSnapshot, actorUserId: string, sessionId: string, expectedStateVersion: number, command: GameEnvelopeInput): Promise<RoomResponse> {
-    const operationId = requestID();
+    const operationId = createOperationID();
     const sourceEventId = requestID();
     return callRoom("FinishGame", {
       roomId: room.roomId,

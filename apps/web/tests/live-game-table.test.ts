@@ -469,8 +469,8 @@ describe("live game route lifecycle", () => {
     expect(shared.api.action).toHaveBeenCalledTimes(2);
     expect(shared.api.action.mock.calls[0]?.[3]).toBe(1);
     expect(shared.api.action.mock.calls[1]?.[3]).toBe(2);
-    expect(shared.api.action.mock.calls[0]?.[4]).toBe("00000000-0000-4000-8000-000000000001");
-    expect(shared.api.action.mock.calls[1]?.[4]).toBe("00000000-0000-4000-8000-000000000002");
+    expect(shared.api.action.mock.calls[0]?.[4]).toBe("AAAAAAAAQACAAAAAAAAAAQ");
+    expect(shared.api.action.mock.calls[1]?.[4]).toBe("AAAAAAAAQACAAAAAAAAAAg");
     expect(shared.api.action.mock.calls[0]?.[5]).toBe(command);
     expect(shared.api.action.mock.calls[1]?.[5]).toBe(command);
     expect(harness.view.value.confirmed).toBe(true);
@@ -528,9 +528,9 @@ describe("live game route lifecycle", () => {
 
     expect(shared.api.action).toHaveBeenCalledTimes(3);
     expect(shared.api.action.mock.calls.map((call) => call[4])).toEqual([
-      "00000000-0000-4000-8000-000000000001",
-      "00000000-0000-4000-8000-000000000002",
-      "00000000-0000-4000-8000-000000000003",
+      "AAAAAAAAQACAAAAAAAAAAQ",
+      "AAAAAAAAQACAAAAAAAAAAg",
+      "AAAAAAAAQACAAAAAAAAAAw",
     ]);
     expect(harness.view.value.phase).toBe("stage-1");
     expect(harness.context.value.connection).toBe("online");

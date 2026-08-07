@@ -14,7 +14,7 @@ import {
 } from "@game-night/game-client";
 
 import { BrowserRealtimeAdapter } from "../api/browser-realtime";
-import { ApiError, gameClient, type GameEnvelopeInput, type GameSessionSummaryWire, type RoomSnapshot } from "../api/client";
+import { ApiError, createOperationID, gameClient, type GameEnvelopeInput, type GameSessionSummaryWire, type RoomSnapshot } from "../api/client";
 import { gameProjectionFromConnect } from "../api/game-projection";
 import { memberDisplayName } from "../member-display";
 import { useRoomStore } from "../stores/room";
@@ -431,7 +431,7 @@ export const useLiveGameTable = <TView, TContext extends LiveTableContext>(optio
             fence.userId,
             options.sessionId,
             nextStateVersion,
-            crypto.randomUUID(),
+            createOperationID(),
             input.message,
             controller.signal,
           );

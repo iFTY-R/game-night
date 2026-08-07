@@ -41,7 +41,7 @@ func TestCredentialCookieDefinitionsEnforceSecurityPolicyAndExpiry(t *testing.T)
 
 	for _, expectation := range cookieExpectations() {
 		t.Run(expectation.definition.name, func(t *testing.T) {
-			cookie, err := newCredentialCookie(expectation.definition, testCredentialValue, now, expiresAt)
+			cookie, err := newCredentialCookie(expectation.definition, testCredentialValue, now, expiresAt, true)
 			if err != nil {
 				t.Fatalf("new credential Cookie: %v", err)
 			}
@@ -56,6 +56,22 @@ func TestCredentialCookieDefinitionsEnforceSecurityPolicyAndExpiry(t *testing.T)
 				t.Fatalf("Expires = %v, want authoritative %v", cookie.Expires, expiresAt)
 			}
 		})
+	}
+}
+
+func TestManagerAllowsHTTPDevelopmentCookies(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 8, 30, 0, 0, time.UTC)
+	manager, err := NewManager(clock.NewFake(now), false)
+	if err != nil {
+		t.Fatalf("new Manager: %v", err)
+	}
+	writer := newHeaderOnlyWriter()
+	if err = manager.writeSingle(writer, userChallengeDefinition, testCredentialValue, now.Add(time.Minute)); err != nil {
+		t.Fatalf("write development Cookie: %v", err)
+	}
+	cookies := (&http.Response{Header: writer.Header()}).Cookies()
+	if len(cookies) != 1 || cookies[0].Secure {
+		t.Fatalf("development Cookie = %+v, want one non-Secure Cookie", cookies)
 	}
 }
 

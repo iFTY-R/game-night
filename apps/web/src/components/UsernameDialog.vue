@@ -153,7 +153,7 @@ defineExpose({ open, close });
             ref="inputRef"
             v-model="username"
             autocomplete="nickname"
-            maxlength="8"
+            maxlength="4"
             :aria-invalid="inputInvalid ? 'true' : 'false'"
             aria-describedby="username-dialog-hint"
           />

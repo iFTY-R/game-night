@@ -11,6 +11,7 @@ import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
 const router = useRouter();
+const brandMarkURL = `${import.meta.env.BASE_URL}brand-mark.svg`;
 const submitting = ref(false);
 
 // Compute panel title based on session kind
@@ -84,7 +85,7 @@ if (!auth.session && !auth.challenge) {
     <div class="auth-shell__workspace">
       <section class="auth-shell__intro">
         <div class="auth-brand">
-          <img class="auth-brand__mark" :src="'/brand-mark.svg'" alt="" aria-hidden="true" />
+          <img class="auth-brand__mark" :src="brandMarkURL" alt="" aria-hidden="true" />
           <div class="auth-brand__copy">
             <span class="admin-eyebrow">Game Night</span>
             <strong>运营管理</strong>

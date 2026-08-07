@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,17 +16,17 @@ import (
 
 const (
 	// UserDeviceCookieName stores the long-lived user device bearer token.
-	UserDeviceCookieName = "__Host-gn_device"
+	UserDeviceCookieName = "gn_device"
 	// UserCSRFCookieName stores the browser-readable user CSRF proof.
-	UserCSRFCookieName = "__Host-gn_csrf"
+	UserCSRFCookieName = "gn_csrf"
 	// UserChallengeCookieName stores the short-lived user login-CSRF challenge token.
-	UserChallengeCookieName = "__Host-gn_user_challenge"
+	UserChallengeCookieName = "gn_user_challenge"
 	// AdminSessionCookieName stores administrator setup, MFA, recovery, or full-session bearer tokens.
-	AdminSessionCookieName = "__Host-gn_admin"
+	AdminSessionCookieName = "gn_admin"
 	// AdminCSRFCookieName stores the browser-readable administrator CSRF proof.
-	AdminCSRFCookieName = "__Host-gn_admin_csrf"
+	AdminCSRFCookieName = "gn_admin_csrf"
 	// AdminChallengeCookieName stores the short-lived administrator login-CSRF challenge token.
-	AdminChallengeCookieName = "__Host-gn_admin_challenge"
+	AdminChallengeCookieName = "gn_admin_challenge"
 
 	// maximumCredentialBytes stays below common per-cookie limits and bounds request-header retention.
 	maximumCredentialBytes = 4096
@@ -65,17 +64,25 @@ type HeaderWriter interface {
 	Add(string, string)
 }
 
-// Manager applies one injected clock to Expires and Max-Age calculations without allowing Secure to be disabled.
+// Manager applies one injected clock and the environment-selected transport policy to every credential Cookie.
 type Manager struct {
-	clock clock.Clock
+	clock  clock.Clock
+	secure bool
 }
 
 // NewManager validates transport wiring before any handler can read or write browser credentials.
-func NewManager(source clock.Clock) (*Manager, error) {
+func NewManager(source clock.Clock, secure ...bool) (*Manager, error) {
 	if source == nil {
 		return nil, ErrInvalidInput
 	}
-	return &Manager{clock: source}, nil
+	useSecureCookies := true
+	if len(secure) > 1 {
+		return nil, ErrInvalidInput
+	}
+	if len(secure) == 1 {
+		useSecureCookies = secure[0]
+	}
+	return &Manager{clock: source, secure: useSecureCookies}, nil
 }
 
 // SetUserDevice installs bearer and CSRF Cookies only for the exact persisted device generation authorized by identity.
@@ -150,11 +157,11 @@ func (manager *Manager) writePair(
 		return ErrInvalidInput
 	}
 	now := manager.clock.Now()
-	first, err := newCredentialCookie(firstDefinition, firstValue, now, expiresAt)
+	first, err := newCredentialCookie(firstDefinition, firstValue, now, expiresAt, manager.secure)
 	if err != nil {
 		return err
 	}
-	second, err := newCredentialCookie(secondDefinition, secondValue, now, expiresAt)
+	second, err := newCredentialCookie(secondDefinition, secondValue, now, expiresAt, manager.secure)
 	if err != nil {
 		return err
 	}
@@ -166,7 +173,7 @@ func (manager *Manager) writeSingle(writer HeaderWriter, definition cookieDefini
 	if manager == nil || manager.clock == nil || writer == nil {
 		return ErrInvalidInput
 	}
-	cookie, err := newCredentialCookie(definition, value, manager.clock.Now(), expiresAt)
+	cookie, err := newCredentialCookie(definition, value, manager.clock.Now(), expiresAt, manager.secure)
 	if err != nil {
 		return err
 	}
@@ -180,13 +187,13 @@ func (manager *Manager) clear(writer HeaderWriter, definitions ...cookieDefiniti
 	}
 	cookies := make([]*http.Cookie, len(definitions))
 	for index, definition := range definitions {
-		cookies[index] = expiredCookie(definition)
+		cookies[index] = expiredCookie(definition, manager.secure)
 	}
 	return appendCookies(writer, cookies...)
 }
 
 // newCredentialCookie converts an authoritative expiry to browser Max-Age without shortening fractional seconds.
-func newCredentialCookie(definition cookieDefinition, value string, now, expiresAt time.Time) (*http.Cookie, error) {
+func newCredentialCookie(definition cookieDefinition, value string, now, expiresAt time.Time, secure bool) (*http.Cookie, error) {
 	now, expiresAt = now.UTC(), expiresAt.UTC()
 	if !validDefinition(definition) || !validCredentialValue(value) || now.IsZero() || !expiresAt.After(now) {
 		return nil, ErrInvalidInput
@@ -204,15 +211,15 @@ func newCredentialCookie(definition cookieDefinition, value string, now, expires
 	}
 	return &http.Cookie{
 		Name: definition.name, Value: value, Path: "/", Expires: expiresAt,
-		MaxAge: int(seconds), Secure: true, HttpOnly: definition.httpOnly, SameSite: definition.sameSite,
+		MaxAge: int(seconds), Secure: secure, HttpOnly: definition.httpOnly, SameSite: definition.sameSite,
 	}, nil
 }
 
 // expiredCookie preserves namespace policy while instructing browsers to delete the credential immediately.
-func expiredCookie(definition cookieDefinition) *http.Cookie {
+func expiredCookie(definition cookieDefinition, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name: definition.name, Value: "", Path: "/", Expires: time.Unix(0, 0).UTC(),
-		MaxAge: -1, Secure: true, HttpOnly: definition.httpOnly, SameSite: definition.sameSite,
+		MaxAge: -1, Secure: secure, HttpOnly: definition.httpOnly, SameSite: definition.sameSite,
 	}
 }
 
@@ -227,7 +234,7 @@ func appendCookies(writer HeaderWriter, cookies ...*http.Cookie) error {
 	}
 	encoded := make([]string, len(cookies))
 	for index, cookie := range cookies {
-		if cookie == nil || cookie.Domain != "" || !cookie.Secure || cookie.Path != "/" || cookie.SameSite == http.SameSiteDefaultMode {
+		if cookie == nil || cookie.Domain != "" || cookie.Path != "/" || cookie.SameSite == http.SameSiteDefaultMode {
 			return ErrInvalidInput
 		}
 		encoded[index] = cookie.String()
@@ -241,9 +248,11 @@ func appendCookies(writer HeaderWriter, cookies ...*http.Cookie) error {
 	return nil
 }
 
-// validDefinition enforces the host-only prefix and the two reviewed SameSite policies.
+// validDefinition keeps Cookie namespaces fixed while permitting both HTTP development and HTTPS production transport.
 func validDefinition(definition cookieDefinition) bool {
-	return strings.HasPrefix(definition.name, "__Host-") &&
+	return (definition.name == UserDeviceCookieName || definition.name == UserCSRFCookieName ||
+		definition.name == UserChallengeCookieName || definition.name == AdminSessionCookieName ||
+		definition.name == AdminCSRFCookieName || definition.name == AdminChallengeCookieName) &&
 		(definition.sameSite == http.SameSiteLaxMode || definition.sameSite == http.SameSiteStrictMode)
 }
 

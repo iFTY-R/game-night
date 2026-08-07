@@ -25,7 +25,7 @@ import (
 
 const (
 	testUserHost  = "localhost:8080"
-	testAdminHost = "admin.localhost:8080"
+	testAdminHost = "admin.localhost:8080" // Valid authority; /admin selects the management surface.
 )
 
 func TestStaticRoutingUsesSurfaceSpecificRoots(t *testing.T) {
@@ -50,11 +50,12 @@ func TestStaticRoutingUsesSurfaceSpecificRoots(t *testing.T) {
 	}{
 		{name: "user-asset", host: testUserHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
 		{name: "custom-domain-user-asset", host: "play.example.test", method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
-		{name: "admin-asset", host: testAdminHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "ADMIN-ASSET"},
+		{name: "admin-subdomain-root-is-user", host: testAdminHost, method: http.MethodGet, target: "/asset.txt", wantStatus: http.StatusOK, wantBody: "USER-ASSET"},
+		{name: "admin-asset", host: testAdminHost, method: http.MethodGet, target: "/admin/asset.txt", wantStatus: http.StatusOK, wantBody: "ADMIN-ASSET"},
 		{name: "user-fallback", host: testUserHost, method: http.MethodGet, target: "/rooms/123", accept: "text/html", wantStatus: http.StatusOK, wantBody: "USER-INDEX"},
-		{name: "admin-fallback", host: testAdminHost, method: http.MethodGet, target: "/audit/events", accept: "text/html", wantStatus: http.StatusOK, wantBody: "ADMIN-INDEX"},
+		{name: "admin-fallback", host: testAdminHost, method: http.MethodGet, target: "/admin/audit/events", accept: "text/html", wantStatus: http.StatusOK, wantBody: "ADMIN-INDEX"},
 		{name: "json-no-fallback", host: testUserHost, method: http.MethodGet, target: "/rooms/123", accept: "application/json", wantStatus: http.StatusNotFound},
-		{name: "head-fallback", host: testAdminHost, method: http.MethodHead, target: "/dashboard", wantStatus: http.StatusOK},
+		{name: "head-fallback", host: testAdminHost, method: http.MethodHead, target: "/admin/dashboard", wantStatus: http.StatusOK},
 		{name: "post-no-fallback", host: testUserHost, method: http.MethodPost, target: "/dashboard", wantStatus: http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -137,24 +138,24 @@ func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
 		{name: "user-readiness-404", host: testUserHost, method: http.MethodGet, target: "/readyz", wantStatus: http.StatusNotFound},
 		{name: "user-realtime", host: testUserHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusOK, wantBody: "realtime", wantUpstream: "realtime"},
 		{name: "user-realtime-other-404", host: testUserHost, method: http.MethodGet, target: "/realtime/other", wantStatus: http.StatusNotFound},
-		{name: "admin-auth-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-runtime-readiness-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/GetRuntimeReadiness", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-preview-revoke-other-sessions-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-user-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminUserService/ListUsers", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-room-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminRoomService/ListRooms", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-audit-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminAuditService/ListAuditEvents", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-operations-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOperationsService/GetOperationsSnapshot", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-overview-rpc", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminOverviewService/GetOverview", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
-		{name: "admin-identity-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/platform.admin.v1.AdminIdentityService/ListAuditEvents", wantStatus: http.StatusNotFound},
-		{name: "admin-user-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/platform.identity.v1.IdentityService/Bootstrap", wantStatus: http.StatusNotFound},
-		{name: "admin-realtime-404", host: testAdminHost, method: http.MethodGet, target: "/realtime/game", wantStatus: http.StatusNotFound},
-		{name: "admin-readyz-404", host: testAdminHost, method: http.MethodGet, target: "/readyz", wantStatus: http.StatusNotFound},
-		{name: "admin-sensitive-readyz-404", host: testAdminHost, method: http.MethodHead, target: "/readyz/sensitive", wantStatus: http.StatusNotFound},
-		{name: "known-platform-miss", host: testAdminHost, method: http.MethodGet, target: "/platform.example", wantStatus: http.StatusNotFound},
+		{name: "admin-auth-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-runtime-readiness-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminAuthService/GetRuntimeReadiness", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-preview-revoke-other-sessions-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminAuthService/PreviewRevokeOtherAdminSessions", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-user-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminUserService/ListUsers", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-room-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminRoomService/ListRooms", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-audit-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminAuditService/ListAuditEvents", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-operations-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminOperationsService/GetOperationsSnapshot", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-overview-rpc", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminOverviewService/GetOverview", wantStatus: http.StatusOK, wantBody: "api", wantUpstream: "api"},
+		{name: "admin-identity-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.admin.v1.AdminIdentityService/ListAuditEvents", wantStatus: http.StatusNotFound},
+		{name: "admin-user-rpc-404", host: testAdminHost, method: http.MethodPost, target: "/admin/platform.identity.v1.IdentityService/Bootstrap", wantStatus: http.StatusNotFound},
+		{name: "admin-realtime-404", host: testAdminHost, method: http.MethodGet, target: "/admin/realtime/game", wantStatus: http.StatusNotFound},
+		{name: "admin-readyz-404", host: testAdminHost, method: http.MethodGet, target: "/admin/readyz", wantStatus: http.StatusNotFound},
+		{name: "admin-sensitive-readyz-404", host: testAdminHost, method: http.MethodHead, target: "/admin/readyz/sensitive", wantStatus: http.StatusNotFound},
+		{name: "known-platform-miss", host: testAdminHost, method: http.MethodGet, target: "/admin/platform.example", wantStatus: http.StatusNotFound},
 		{name: "known-health-miss", host: testUserHost, method: http.MethodGet, target: "/health/not-real", wantStatus: http.StatusNotFound},
 		{name: "user-private-heartbeat-404", host: testUserHost, method: http.MethodPost, target: "/internal/admin/operations/heartbeat", wantStatus: http.StatusNotFound},
-		{name: "admin-private-heartbeat-404", host: testAdminHost, method: http.MethodPost, target: "/internal/admin/operations/heartbeat", wantStatus: http.StatusNotFound},
-		{name: "known-non-get-route", host: testAdminHost, method: http.MethodPatch, target: "/dashboard", wantStatus: http.StatusNotFound},
+		{name: "admin-private-heartbeat-404", host: testAdminHost, method: http.MethodPost, target: "/admin/internal/admin/operations/heartbeat", wantStatus: http.StatusNotFound},
+		{name: "known-non-get-route", host: testAdminHost, method: http.MethodPatch, target: "/admin/dashboard", wantStatus: http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rr := httptest.NewRecorder()
@@ -175,8 +176,12 @@ func TestRouteIsolationByHostMethodAndPath(t *testing.T) {
 			if request.Host != tc.host {
 				t.Fatalf("upstream host=%q, want %q", request.Host, tc.host)
 			}
-			if request.Path != tc.target {
-				t.Fatalf("upstream path=%q, want %q", request.Path, tc.target)
+			wantPath := tc.target
+			if strings.HasPrefix(wantPath, "/admin/") {
+				wantPath = strings.TrimPrefix(wantPath, "/admin")
+			}
+			if request.Path != wantPath {
+				t.Fatalf("upstream path=%q, want %q", request.Path, wantPath)
 			}
 		})
 	}
@@ -200,7 +205,7 @@ func TestSurfaceSelectionIgnoresForwardedHost(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", strings.NewReader("{}"))
+	req = httptest.NewRequest(http.MethodPost, "/admin/platform.admin.v1.AdminAuthService/GetCurrentAdminSession", strings.NewReader("{}"))
 	req.Host = testAdminHost
 	req.RemoteAddr = "203.0.113.10:12345"
 	req.Header.Set("X-Forwarded-Host", testUserHost)

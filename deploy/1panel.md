@@ -10,7 +10,7 @@
                                            -> 外部 PostgreSQL / Redis
 ```
 
-Edge 容器监听 `8080`，宿主机默认只发布 `127.0.0.1:40891`。请求 Host 以 `admin.` 开头时使用管理端静态资源和管理 API，其余合法 Host 使用玩家端。
+Edge 容器监听 `8080`，宿主机默认只发布 `127.0.0.1:40891`。请求路径以 `/admin` 开头时使用管理端静态资源和管理 API，其余路径使用玩家端。
 
 ## 文件
 
@@ -28,11 +28,11 @@ docker-compose.yml
 从模板开始：
 
 ```dotenv
-GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.8
+GAME_NIGHT_IMAGE=ghcr.io/ifty-r/game-night:v0.0.9
 GAME_NIGHT_EXTERNAL_NETWORK=1panel-network
 GAME_NIGHT_HTTP_BIND_ADDRESS=127.0.0.1
 GAME_NIGHT_HTTP_PUBLISHED_PORT=40891
-GAME_NIGHT_ENVIRONMENT=production
+GAME_NIGHT_ENVIRONMENT=development
 GAME_NIGHT_DATABASE_SCHEMA=game_night
 GAME_NIGHT_DATABASE_URL=postgresql://game_night:change-me@postgres.example.internal:5432/game_night?sslmode=disable
 GAME_NIGHT_REDIS_URL=redis://:change-me@redis.example.internal:6379/0
@@ -45,7 +45,7 @@ GAME_NIGHT_SECRET=replace-with-at-least-32-random-bytes
 
 `docker-compose.yml` 会在部署时检查远端镜像。不要改回浮动的 `latest`，否则 1Panel 可能复用旧镜像并与当前环境变量格式不兼容。
 
-若使用 HTTPS，保持 `GAME_NIGHT_ENVIRONMENT=production`，Cookie 会自动使用 Secure；无需配置 Origin、Host 白名单或代理 CIDR。
+直接使用 `http://IP:端口` 时保持 `GAME_NIGHT_ENVIRONMENT=development`；启用 HTTPS 后改为 `production`，Cookie 会自动使用 Secure。无需配置 Origin、Host 白名单或代理 CIDR。
 
 ## 部署命令
 
@@ -63,7 +63,7 @@ docker compose -f docker-compose.yml ps
 
 ## 反向代理
 
-1Panel 反代目标填写 `http://127.0.0.1:40891`，开启 WebSocket，并保留原始 Host、`X-Forwarded-For`、`X-Forwarded-Proto`。管理端域名使用 `admin.example.com` 这类 `admin.` 子域，玩家端使用其他域名。
+1Panel 反代目标填写 `http://127.0.0.1:40891`，开启 WebSocket，并保留原始 Host、`X-Forwarded-For`、`X-Forwarded-Proto`。管理端直接访问 `https://你的域名/admin`，玩家端访问域名根路径。
 
 ## 更新与停止
 

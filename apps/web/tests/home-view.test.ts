@@ -98,6 +98,15 @@ afterEach(() => {
 });
 
 describe("HomeView profile and room-entry recovery", () => {
+  it("limits onboarding username input to four characters", async () => {
+    Object.assign(roomStore, { userId: "", displayName: "", hasIdentity: false, identityState: "anonymous" });
+    const { app, root } = await mountHomeView();
+
+    expect(root.querySelector<HTMLInputElement>("#display-name")?.maxLength).toBe(4);
+
+    app.unmount();
+  });
+
   it("shows the profile trigger and refreshes both room lists after a normal rename", async () => {
     const { app, root } = await mountHomeView();
     roomStore.loadMyRooms.mockClear();

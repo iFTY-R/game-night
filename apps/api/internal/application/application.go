@@ -637,11 +637,11 @@ func transportHandler(
 	metricsHandler http.Handler,
 	heartbeatHandler http.Handler,
 ) (http.Handler, error) {
-	userCookies, err := cookies.NewManager(source)
+	userCookies, err := cookies.NewManager(source, config.Network.CookieSecure)
 	if err != nil {
 		return nil, err
 	}
-	adminCookies, err := cookies.NewManager(source)
+	adminCookies, err := cookies.NewManager(source, config.Network.CookieSecure)
 	if err != nil {
 		return nil, err
 	}

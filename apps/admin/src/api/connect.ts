@@ -11,6 +11,8 @@ type UnaryMethod = {
   policy: UnaryRequestPolicy;
 };
 
+const adminPathPrefix = "/admin";
+
 // UnaryRequestPolicy mirrors the backend's independent CSRF and audit-correlation requirements.
 export type UnaryRequestPolicy = Readonly<{
   csrf: boolean;
@@ -188,7 +190,7 @@ export const procedure = (
   output: DescMessage,
   policy: UnaryRequestPolicy
 ): UnaryMethod => ({
-  path: `/${service}/${method}`,
+  path: `${adminPathPrefix}/${service}/${method}`,
   input,
   output,
   policy

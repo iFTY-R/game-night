@@ -90,7 +90,7 @@ func TestMapDoesNotExposeWrappedInternalMessage(t *testing.T) {
 func TestInterceptorDoesNotForwardUnwrappedErrorCookies(t *testing.T) {
 	intercepted := Interceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
 		response := connect.NewResponse(&commonv1.BusinessErrorDetail{})
-		response.Header().Add("Set-Cookie", "__Host-gn_device=credential; Path=/; Secure; HttpOnly")
+		response.Header().Add("Set-Cookie", "gn_device=credential; Path=/; Secure; HttpOnly")
 		return response, identity.ErrDeviceAuthentication
 	})
 
@@ -107,8 +107,8 @@ func TestInterceptorDoesNotForwardUnwrappedErrorCookies(t *testing.T) {
 func TestWithCookieExpiriesOnlyForwardsDestructiveCookies(t *testing.T) {
 	intercepted := Interceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
 		return nil, WithCookieExpiries(identity.ErrDeviceAuthentication, []string{
-			"__Host-gn_device=credential; Path=/; Secure; HttpOnly",
-			"__Host-gn_device=; Path=/; Max-Age=0; Secure; HttpOnly",
+			"gn_device=credential; Path=/; Secure; HttpOnly",
+			"gn_device=; Path=/; Max-Age=0; Secure; HttpOnly",
 		})
 	})
 
@@ -118,7 +118,7 @@ func TestWithCookieExpiriesOnlyForwardsDestructiveCookies(t *testing.T) {
 		t.Fatalf("mapped error type = %T", err)
 	}
 	values := connectError.Meta().Values("Set-Cookie")
-	if len(values) != 1 || !strings.Contains(values[0], "__Host-gn_device=;") {
+	if len(values) != 1 || !strings.Contains(values[0], "gn_device=;") {
 		t.Fatalf("approved error Cookie expiries = %v", values)
 	}
 }

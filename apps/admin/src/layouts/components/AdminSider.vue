@@ -14,6 +14,7 @@ const props = defineProps<{
 const preferences = usePreferencesStore();
 const auth = useAuthStore();
 const route = useRoute();
+const brandMarkURL = `${import.meta.env.BASE_URL}brand-mark.svg`;
 
 // Mobile navigation always stays expanded even when the desktop preference is collapsed.
 const collapsed = computed(() => !props.mobile && preferences.siderCollapsed);
@@ -23,7 +24,7 @@ const visibleItems = computed(() => navigationItems.filter((item) => auth.permis
 <template>
   <aside class="admin-sider" :class="{ 'admin-sider--collapsed': collapsed, 'admin-sider--mobile': props.mobile }">
     <div class="admin-sider__brand">
-      <img class="admin-sider__logo" :src="'/brand-mark.svg'" alt="" aria-hidden="true" />
+      <img class="admin-sider__logo" :src="brandMarkURL" alt="" aria-hidden="true" />
       <span v-if="!collapsed" class="admin-sider__brand-copy">
         <strong>Game Night</strong>
         <small>管理后台</small>

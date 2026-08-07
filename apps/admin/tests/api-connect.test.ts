@@ -145,7 +145,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ requiresMfa: { session: { kind: "ADMIN_SESSION_KIND_MFA_PENDING" } } }), {
@@ -163,7 +163,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe("/platform.admin.v1.AdminAuthService/LoginPassword");
+    expect(url).toBe("/admin/platform.admin.v1.AdminAuthService/LoginPassword");
     expect(headers.get("X-CSRF-Token")).toBeNull();
     expect(headers.get("X-Request-Flow-ID")).toBe("flow-1");
     expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
@@ -176,7 +176,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ users: [], page: {} }), {
@@ -190,7 +190,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe("/platform.admin.v1.AdminUserService/ListUsers");
+    expect(url).toBe("/admin/platform.admin.v1.AdminUserService/ListUsers");
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toBeNull();
     expect(String(init.body)).toContain("alice");
@@ -200,7 +200,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ rooms: [], page: {} }), {
@@ -214,7 +214,7 @@ describe("admin connect transport", () => {
 
     const [readUrl, readInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const readHeaders = new Headers(readInit.headers);
-    expect(readUrl).toBe("/platform.admin.v1.AdminRoomService/ListRooms");
+    expect(readUrl).toBe("/admin/platform.admin.v1.AdminRoomService/ListRooms");
     expect(readHeaders.get("X-CSRF-Token")).toBe("csrf-token");
     expect(readHeaders.get("X-Request-ID")).toBeNull();
     expect(String(readInit.body)).toContain("ABCD");
@@ -234,7 +234,7 @@ describe("admin connect transport", () => {
 
     const [writeUrl, writeInit] = fetchSpy.mock.calls[1] as [string, RequestInit];
     const writeHeaders = new Headers(writeInit.headers);
-    expect(writeUrl).toBe("/platform.admin.v1.AdminRoomService/ForceCloseRoom");
+    expect(writeUrl).toBe("/admin/platform.admin.v1.AdminRoomService/ForceCloseRoom");
     expect(writeHeaders.get("X-CSRF-Token")).toBe("csrf-token");
     expect(writeHeaders.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
@@ -243,7 +243,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ events: [], page: {}, scannedEvents: 0 }), {
@@ -257,7 +257,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe("/platform.admin.v1.AdminAuditService/ListAuditEvents");
+    expect(url).toBe("/admin/platform.admin.v1.AdminAuditService/ListAuditEvents");
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toBeNull();
     expect(String(init.body)).toContain("req-1");
@@ -311,7 +311,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({}), {
@@ -325,7 +325,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe(`/platform.admin.v1.AdminUserService/${procedureName}`);
+    expect(url).toBe(`/admin/platform.admin.v1.AdminUserService/${procedureName}`);
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
@@ -338,7 +338,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(responseBody), {
@@ -352,7 +352,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe(`/platform.admin.v1.AdminUserService/${procedureName}`);
+    expect(url).toBe(`/admin/platform.admin.v1.AdminUserService/${procedureName}`);
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toBeNull();
   });
@@ -375,7 +375,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe("/platform.admin.v1.AdminAuthService/ChangeAdminPassword");
+    expect(url).toBe("/admin/platform.admin.v1.AdminAuthService/ChangeAdminPassword");
     expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
 
@@ -387,7 +387,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({}), {
@@ -401,7 +401,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe(`/platform.admin.v1.AdminAuthService/${procedureName}`);
+    expect(url).toBe(`/admin/platform.admin.v1.AdminAuthService/${procedureName}`);
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(headers.get("X-Request-ID")).toMatch(/[0-9a-f-]{8,}/i);
   });
@@ -410,7 +410,7 @@ describe("admin connect transport", () => {
     Object.defineProperty(document, "cookie", {
       configurable: true,
       writable: true,
-      value: "__Host-gn_admin_csrf=csrf-token"
+      value: "gn_admin_csrf=csrf-token"
     });
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(
@@ -427,7 +427,7 @@ describe("admin connect transport", () => {
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe("/platform.admin.v1.AdminAuthService/GetRuntimeReadiness");
+    expect(url).toBe("/admin/platform.admin.v1.AdminAuthService/GetRuntimeReadiness");
     expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
     expect(response.ordinary?.components.postgresql).toBe("ready");
     expect(response.sensitive?.ready).toBe(false);

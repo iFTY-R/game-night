@@ -69,6 +69,8 @@ describe("room context recovery", () => {
       "/platform.identity.v1.IdentityService/CompleteOnboarding",
     ]);
     expect(calls[2]?.body).toMatchObject({ challengeProof: "proof-1", deviceLabel: "Game Night 浏览器" });
+    expect(calls[2]?.body.operationId).toMatch(/^[A-Za-z0-9_-]{22}$/u);
+    expect(calls[3]?.body.operationId).toMatch(/^[A-Za-z0-9_-]{22}$/u);
     expect(room.userId).toBe("user-1");
     expect(room.displayName).toBe("小满");
     expect(room.hasIdentity).toBe(true);

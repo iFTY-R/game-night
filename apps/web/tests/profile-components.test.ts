@@ -56,6 +56,7 @@ describe("profile controls", () => {
     expect(document.body.textContent).toContain("房间内已有同名玩家");
     expect(submit?.textContent).toContain("改名并进房");
     expect(input?.value).toBe("小满");
+    expect(input?.maxLength).toBe(4);
     expect(submit?.disabled).toBe(true);
 
     if (input) {

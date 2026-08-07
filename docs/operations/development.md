@@ -73,7 +73,7 @@ if ($LASTEXITCODE -ne 0) { throw 'frozen pnpm install failed' }
 
 - 用户端开发服务器由 `apps/web` 负责，继续使用既有 `pnpm dev` 流程。
 - 管理端开发服务器固定运行在 `http://127.0.0.1:4174`，使用 `pnpm dev:admin` 启动。
-- 本地 API 仍通过 edge 暴露在 `http://127.0.0.1:8080`；管理端使用 `admin.` 子域访问，其他合法 Host 使用玩家端。
+- 本地 API 仍通过 edge 暴露在 `http://127.0.0.1:8080`；管理端访问 `http://127.0.0.1:8080/admin`，其他路径使用玩家端。
 - 管理员 TOTP 默认关闭，只能在后台“安全设置”中按账户启用或停用；进程环境变量不再控制 MFA 策略。
 
 ## Docker Compose 本地部署
@@ -89,7 +89,7 @@ docker compose -f docker-compose.yml run --rm --no-deps game-night migrate up
 docker compose -f docker-compose.yml up -d
 ```
 
-编排同时提供 `/app/web/index.html` 和 `/app/admin/index.html`；Edge 按 `admin.` 子域自动选择站点，完整命令和变量说明见 [`deploy/README.md`](../../deploy/README.md)。
+编排同时提供 `/app/web/index.html` 和 `/app/admin/index.html`；Edge 按 `/admin` 路径选择管理端，完整命令和变量说明见 [`deploy/README.md`](../../deploy/README.md)。
 
 ## 仓库验证
 

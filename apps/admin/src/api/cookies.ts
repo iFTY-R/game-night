@@ -1,4 +1,4 @@
-export const ADMIN_CSRF_COOKIE = "__Host-gn_admin_csrf";
+export const ADMIN_CSRF_COOKIE = "gn_admin_csrf";
 
 export const approvedPreferenceKeys = [
   "gn.admin.theme",

@@ -182,7 +182,7 @@ describe("Connect JSON mutation requests", () => {
       expectedVersion: { roomVersion: "9", membershipVersion: "4" },
       config: { gameId: "liars-dice", schemaVersion: 1, messageType: "session.config", payload: "" },
     });
-    expect(calls[0]?.body.requestDigest).toBe("drAey0lL07qe/lTQrmkvJ251Re6+SjAa6kgs+ZRKhMU=");
+    expect(calls[0]?.body.requestDigest).toBe("aPB7MirMpHZnbWa7eAQ98MqB8Ee4ADR95uJGcKi/4Jo=");
   });
 
   it("uses the atomic room finish boundary and canonical uint64 strings", async () => {
@@ -202,9 +202,9 @@ describe("Connect JSON mutation requests", () => {
       expectedStateVersion: "12",
       command: { gameId: "liars-dice", messageType: "session.finish", payload: "AQID" },
     });
-    expect(calls[0]?.body.operationId).toEqual(expect.any(String));
+    expect(calls[0]?.body.operationId).toMatch(/^[A-Za-z0-9_-]{22}$/u);
     expect(calls[0]?.body.sourceEventId).toEqual(expect.any(String));
-    expect(calls[0]?.body.requestDigest).toBe("XICV/mY8PglL1TVFqbbS7JaV2PTHkcCeLxPtDG/JVEU=");
+    expect(calls[0]?.body.requestDigest).toBe("yy43MT+E0yGFFBb88Eg0ethgkfu03E1cFvDRlRaTKNg=");
   });
 
   it("binds pause governance and host transfer to room and ownership fences", async () => {
@@ -410,20 +410,20 @@ describe("Connect JSON mutation requests", () => {
         payload: "BQQ=",
       },
     });
-    expect(calls[2]?.body.requestDigest).toBe("W+E6COC59InWHbGusQOWRxsQGnJXedJh0xRmxKAOMdc=");
+    expect(calls[2]?.body.requestDigest).toBe("VFa14sBGRFPes/q5XIeXVpQYogus47CmsHcDp0dD9Q0=");
   });
 
   it("serializes action versions and protobuf bytes using Connect JSON rules", async () => {
     const { calls } = captureRequest();
 
-    await gameClient.action(room.roomId, room.hostUserId, room.activeSessionId, 7, "00000000-0000-4000-8000-000000000004", command);
+    await gameClient.action(room.roomId, room.hostUserId, room.activeSessionId, 7, "AAAAAAAAQACAAAAAAAAABA", command);
 
     expect(calls[0]?.url).toBe("/platform.game.v1.GameService/GameAction");
     expect(calls[0]?.body).toMatchObject({
       expectedStateVersion: "7",
       command: { payload: "AQID" },
     });
-    expect(calls[0]?.body.requestDigest).toBe("7qbUc9o04q9LvdThmOOhdfikCYvziClTVZ/uX4+a8wU=");
+    expect(calls[0]?.body.requestDigest).toBe("55T9e8WpQExl5FbCIJsHcCIdwfuUSZXIlpjAYnPRXck=");
   });
 
   it("opens a cursor-bound subscription and decodes one-time credentials", async () => {

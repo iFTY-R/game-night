@@ -49,7 +49,7 @@ export const installAdminSessionInvalidHandler = (router: Router, pinia: Pinia):
 
 export const createAdminRouter = (pinia: Pinia) => {
   const router = createRouter({
-    history: createWebHistory(),
+    history: createWebHistory(import.meta.env.BASE_URL),
     routes
   });
   router.beforeEach(createAdminGuard());

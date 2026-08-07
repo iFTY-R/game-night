@@ -30,6 +30,7 @@ const (
 	healthReadyPath         = "/health/ready"
 	adminReadyPath          = "/readyz"
 	adminSensitiveReadyPath = "/readyz/sensitive"
+	adminPathPrefix         = "/admin"
 	realtimeGamePath        = "/realtime/game"
 	staticIndexName         = "index.html"
 	// Edge reports only fixed upstream reachability codes so browser operators never receive raw transport errors.
@@ -200,6 +201,11 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusMisdirectedRequest)
 		return
 	case userSurface, adminSurface:
+	}
+	if isAdminPath(request.URL.Path) {
+		// The admin boundary is path-based; strip it before existing RPC and static handlers see the request.
+		surface = adminSurface
+		request = stripAdminPath(request)
 	}
 
 	switch {
@@ -507,12 +513,31 @@ func (h *handler) surfaceForHost(host string) surfaceClass {
 	if err != nil || parsed.Hostname() == "" {
 		return unknownSurface
 	}
-	// A single edge instance serves both surfaces. The admin subdomain is the only routing convention;
-	// every other valid authority is treated as the player surface.
-	if strings.HasPrefix(strings.ToLower(parsed.Hostname()), "admin.") {
-		return adminSurface
-	}
+	// A single edge instance serves both surfaces. Every valid authority is the player surface;
+	// the explicit /admin path is the only management boundary.
 	return userSurface
+}
+
+func isAdminPath(requestPath string) bool {
+	return requestPath == adminPathPrefix || strings.HasPrefix(requestPath, adminPathPrefix+"/")
+}
+
+func stripAdminPath(request *http.Request) *http.Request {
+	cloned := request.Clone(request.Context())
+	strippedPath := strings.TrimPrefix(request.URL.Path, adminPathPrefix)
+	if strippedPath == "" {
+		strippedPath = "/"
+	}
+	cloned.URL.Path = strippedPath
+	if request.URL.RawPath != "" {
+		strippedRawPath := strings.TrimPrefix(request.URL.RawPath, adminPathPrefix)
+		if strippedRawPath == "" {
+			strippedRawPath = "/"
+		}
+		cloned.URL.RawPath = strippedRawPath
+	}
+	cloned.RequestURI = cloned.URL.RequestURI()
+	return cloned
 }
 
 func stopHeartbeat(cancel context.CancelFunc, done <-chan struct{}, timeout time.Duration) {

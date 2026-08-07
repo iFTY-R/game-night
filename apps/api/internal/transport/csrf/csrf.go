@@ -15,9 +15,9 @@ const (
 	// HeaderName is the sole request header accepted for double-submit proof.
 	HeaderName = "X-CSRF-Token"
 	// UserCookieName is readable only by the user-side browser application.
-	UserCookieName = "__Host-gn_csrf"
+	UserCookieName = "gn_csrf"
 	// AdminCookieName is isolated from user credentials and uses stricter Cookie attributes at issuance.
-	AdminCookieName = "__Host-gn_admin_csrf"
+	AdminCookieName = "gn_admin_csrf"
 	// TokenBytes matches device and administrator session CSRF entropy.
 	TokenBytes = 32
 	// AdminSessionTokenVersion matches the independently verified administrator session token protocol.

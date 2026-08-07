@@ -44,7 +44,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env run --rm --no
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d game-night
 ```
 
-`deploy/docker-compose.yml` 只创建一个 `game-night` 容器，PostgreSQL 和 Redis 由外部部署提供，统一主密钥由 `GAME_NIGHT_SECRET` 注入，checkpoint 默认写入本地命名卷。编排只发布环回地址；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。Edge 按 `admin.` 子域自动区分 user/admin surface。任一关键应用子进程退出都会结束并重启整个 `game-night` 容器。
+`deploy/docker-compose.yml` 只创建一个 `game-night` 容器，PostgreSQL 和 Redis 由外部部署提供，统一主密钥由 `GAME_NIGHT_SECRET` 注入，checkpoint 默认写入本地命名卷。编排只发布环回地址；外部 Nginx 或 TLS 终止只需反代该一个上游，并保留 WebSocket Upgrade 与原始 Host。Edge 按 `/admin` 路径区分 user/admin surface。任一关键应用子进程退出都会结束并重启整个 `game-night` 容器。
 
 ## 滚动发布
 

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
+  createOperationID,
   identityClient,
   roomClient,
   type GameEnvelopeInput,
@@ -224,7 +225,7 @@ export const useRoomStore = defineStore("room", {
           if (!proof) {
             throw new Error("设备身份挑战无效");
           }
-          const bootstrapped = await identityClient.bootstrap(proof, requestID(), requestFlowId);
+          const bootstrapped = await identityClient.bootstrap(proof, createOperationID(), requestFlowId);
           this.applyIdentity(bootstrapped.user, "");
           if (String(this.identityState) === "onboarding") {
             const onboarded = await identityClient.completeOnboarding(normalized);

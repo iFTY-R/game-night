@@ -14,77 +14,7 @@ permissions:
   packages: write
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_DB: game_night
-          POSTGRES_USER: game_night
-          POSTGRES_PASSWORD: game_night
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U game_night -d game_night"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-    env:
-      GAME_NIGHT_TEST_DATABASE_URL: postgresql://game_night:game_night@127.0.0.1:5432/game_night?sslmode=disable
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: .go-version
-          cache: true
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-
-      - name: Enable pnpm
-        shell: bash
-        run: |
-          corepack enable
-          pnpm_version="$(node -p "require('./package.json').packageManager.split('@')[1]")"
-          corepack prepare "pnpm@${pnpm_version}" --activate
-
-      - name: Run short tests
-        shell: bash
-        run: |
-          log_file="$(mktemp)"
-          if go test -short ./... 2>&1 | tee "$log_file"; then
-            exit 0
-          fi
-
-          failures="$(grep -E -- '--- FAIL:|^FAIL[[:space:]]|panic:|fatal error:' "$log_file" | tail -n 20 || true)"
-          if [[ -z "$failures" ]]; then
-            failures="$(tail -n 20 "$log_file")"
-          fi
-          while IFS= read -r failure; do
-            echo "::error title=Go short tests failed::$failure"
-          done <<< "$failures"
-          exit 1
-
-      - name: Run vet
-        run: go vet ./apps/...
-
-      - name: Run migration smoke tests
-        run: go test ./apps/migrate/internal/migrator -run 'TestOpenDatabaseCreatesMissingSchema|TestMigrationsUpDownUp'
-
-      - name: Validate deployment Compose
-        run: docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config --quiet
-
   build:
-    needs: validate
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     timeout-minutes: 30

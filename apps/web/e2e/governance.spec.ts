@@ -30,6 +30,13 @@ const roomSnapshot = (host = hostUserId): RoomSnapshot => ({
 const seedIdentity = async (page: Page): Promise<void> => {
   // Host room views load personal presets in the background; keep that unrelated request
   // deterministic so governance assertions only observe the command under test.
+  await page.route("**/platform.identity.v1.IdentityService/GetCurrentIdentity", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ user: { userId: hostUserId, status: "USER_STATUS_ACTIVE", username: "房主" } }),
+    });
+  });
   await page.route("**/platform.room.v1.RoomService/ListGameRulePresets", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ presets: [] }) });
   });
@@ -97,7 +104,7 @@ test("host confirms member removal and idle-room closure on mobile", async ({ pa
     expectedVersion: { roomVersion: "3", membershipVersion: "2" },
   });
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("status")).toContainText("房间已解散");
+  await expect(page.getByRole("status").filter({ hasText: "房间已解散" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("game-night.room-context.v1") ?? "{}") as { roomId?: unknown })).toMatchObject({ roomId: null });
 });
 
@@ -156,6 +163,7 @@ test("non-host members never receive governance controls", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: /移出/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "解散房间" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "开局许可与危险操作" })).toHaveCount(0);
 });
 
 test("member leaves an idle room after the host closes it", async ({ page }) => {

@@ -236,6 +236,18 @@ describe("RoomView", () => {
     expect(root.querySelectorAll(".gn-table__seat")).toHaveLength(4);
     expect(root.textContent).toContain("候场玩家");
     expect(root.querySelector(".member-roster")).not.toBeNull();
+    expect(root.querySelector("#roster-title")?.textContent).toBe("成员列表");
+
+    app.unmount();
+  });
+
+  it("hides the host management section from non-host members", async () => {
+    vi.useFakeTimers();
+    roomStore.remoteRoom.hostUserId = "another-host";
+    const { app, root } = await mountRoomView();
+
+    expect(root.querySelector(".host-controls")).toBeNull();
+    expect(root.textContent).not.toContain("房主管理");
 
     app.unmount();
   });

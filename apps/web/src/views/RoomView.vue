@@ -1123,7 +1123,7 @@ const leave = async (): Promise<void> => {
 
     <section class="member-roster panel" aria-labelledby="roster-title">
       <div class="member-roster__head">
-        <div><p class="eyebrow">成员与座位</p><h2 id="roster-title" class="section-title">候场、观战与治理</h2></div>
+        <div><p class="eyebrow">成员与座位</p><h2 id="roster-title" class="section-title">成员列表</h2></div>
         <p class="member-roster__meta">{{ participantMembers.length }} 人围桌，{{ waitingMembers.length }} 人候场，{{ spectatorMembers.length }} 人观战</p>
       </div>
       <div class="member-roster__list">
@@ -1172,7 +1172,7 @@ const leave = async (): Promise<void> => {
       </div>
     </section>
 
-    <section class="host-controls panel" aria-labelledby="host-title">
+    <section v-if="currentHost" class="host-controls panel" aria-labelledby="host-title">
       <div><p class="eyebrow">房主管理</p><h2 id="host-title" class="section-title">开局许可与危险操作</h2></div>
       <div class="host-controls__body">
         <button class="permission-toggle" type="button" :aria-pressed="entryOpen" :disabled="isPlaying || (isRemote && !currentHost)" @click="toggleAdmission">
@@ -1525,8 +1525,15 @@ const leave = async (): Promise<void> => {
   .rule-controls { grid-template-columns: 1fr; }
   .countdown-card { grid-template-columns: 32px minmax(0, 1fr); }
   .countdown-card .danger-control { grid-column: 1 / -1; width: 100%; justify-content: center; }
-  .member-row { grid-template-columns: 48px minmax(0, 1fr); align-items: start; }
-  .member-row__actions { grid-column: 1 / -1; justify-content: start; }
+  .member-row {
+    min-height: 62px;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px;
+  }
+  .member-row__avatar { width: 42px; height: 42px; }
+  .member-row__actions { flex-wrap: nowrap; gap: 6px; }
+  .member-row__actions .mini-action { width: 42px; height: 42px; }
 }
 
 @media (orientation: landscape) and (min-width: 768px) and (max-height: 520px) {
